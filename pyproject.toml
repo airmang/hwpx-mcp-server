@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "0.1.0"
+version = "0.1.1"
 description = "Model Context Protocol server for local HWPX document automation."
 readme = "README.md"
 authors = [{ name = "HWPX MCP Team" }]
@@ -33,41 +33,3 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 addopts = "-q"
-
-
-[build-system]
-requires = ["setuptools>=64", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "hwpx-mcp-server"
-version = "0.1.0"
-description = "Model Context Protocol server for local HWPX document automation."
-readme = "README.md"
-authors = [{ name = "HWPX MCP Team" }]
-license = { file = "LICENSE" }
-requires-python = ">=3.9"
-dependencies = [
-    "python-hwpx>=1.4",
-    "pydantic>=2.7",
-    "anyio>=4.0",
-    "mcp>=1.14.1",
-    "modelcontextprotocol>=0.1.0",
-]
-
-[project.optional-dependencies]
-test = ["pytest>=8.0"]
-
-[project.scripts]
-"hwpx-mcp-server" = "hwpx_mcp_server.server:main"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-addopts = "-q"
-
