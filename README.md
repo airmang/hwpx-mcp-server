@@ -31,6 +31,7 @@ MCP 클라이언트 설정에 추가할 때는 다음 예시를 활용하세요.
       "env": {
         "HWPX_MCP_PAGING_PARA_LIMIT": "2000",
         "HWPX_MCP_AUTOBACKUP": "1",
+        "HWPX_MCP_ENABLE_OPC_WRITE": "1",
         "LOG_LEVEL": "INFO"
       }
     }
