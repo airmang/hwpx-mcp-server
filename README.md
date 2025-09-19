@@ -87,13 +87,18 @@ MCP 클라이언트 설정에 추가할 때는 다음 예시를 활용하세요.
 
 ## 테스트
 
-핵심 문서 조작을 검증하는 pytest 스위트가 포함되어 있습니다. 의존성을 설치한 뒤 아래 명령으로
-테스트를 실행하세요.
+핵심 문서 조작뿐 아니라 MCP 도구 정의 전체를 실제 호출 흐름으로 검증하는 종단 간 pytest 스위트가 포함되어 있습니다.
+의존성을 설치한 뒤 아래 명령으로 테스트를 실행하세요.
 
 ```bash
 python -m pip install -e .[test]
-python -m pytest
+HWPX_MCP_ENABLE_OPC_WRITE=1 python -m pytest
 ```
+
+`tests/test_mcp_end_to_end.py`는 `build_tool_definitions()`를 통해 노출된 모든 MCP 도구를 직접 호출하여
+텍스트/표/메모 편집, OPC 패키지 쓰기, 백업 생성 등의 동작을 재현합니다. CI 환경에서도 동일한 명령으로 실행하면
+자동 백업(`HWPX_MCP_AUTOBACKUP`)과 OPC 쓰기(`HWPX_MCP_ENABLE_OPC_WRITE`)가 활성화된 실제 서버 설정과 동일한 조건에서
+검증을 수행할 수 있습니다.
 
 ## 개발 참고
 
