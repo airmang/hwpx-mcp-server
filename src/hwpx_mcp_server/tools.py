@@ -39,7 +39,7 @@ class PackagePartOutput(_BaseModel):
 
 
 class PackageTextInput(PathInput):
-    partName: str = Field(alias="partName")
+    part_name: str = Field(alias="partName")
     encoding: Optional[str] = None
 
 
@@ -335,7 +335,7 @@ class LintOutput(_BaseModel):
 
 
 class PackageXmlInput(PathInput):
-    partName: str
+    part_name: str = Field(alias="partName")
 
 
 class PackageXmlOutput(_BaseModel):
