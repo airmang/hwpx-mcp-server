@@ -91,3 +91,23 @@ def test_package_set_xml_tool_accepts_alias_arguments(ops_with_sample):
     )
 
     assert result == {"updated": False}
+
+
+def test_add_table_returns_valid_index(ops_with_sample):
+    ops, path = ops_with_sample
+    result = ops.add_table(str(path), rows=2, cols=2)
+
+    assert result["cellCount"] == 4
+    index = result["tableIndex"]
+
+    # ensure the table can be edited using the reported index
+    update = ops.set_table_cell_text(
+        str(path),
+        table_index=index,
+        row=0,
+        col=0,
+        text="이름",
+        dry_run=False,
+    )
+
+    assert update == {"ok": True}
