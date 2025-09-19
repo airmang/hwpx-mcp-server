@@ -8,7 +8,7 @@
 ## 주요 기능
 
 - 공식 `mcp` 파이썬 SDK로 구현한 표준 입력/출력 기반 MCP 서버.
-- `HWPX_MCP_WORKDIR` 환경 변수를 통한 강력한 작업 디렉터리 보호(미설정 시 현재 디렉터리 사용).
+- 추가 설정 없이 현재 작업 디렉터리를 기준으로 경로를 처리.
 - 텍스트 추출, 페이지네이션, 스타일 기반 검색/치환 기능 제공.
 - 문단·표·메모·개체·OPC 파트를 다루는 고급 편집 도구.
 - 변경 전 자동 백업 옵션(`HWPX_MCP_AUTOBACKUP`).
@@ -29,7 +29,6 @@ MCP 클라이언트 설정에 추가할 때는 다음 예시를 활용하세요.
       "command": "uvx",
       "args": ["hwpx-mcp-server"],
       "env": {
-        "HWPX_MCP_WORKDIR": "C:/Docs",
         "HWPX_MCP_PAGING_PARA_LIMIT": "2000",
         "HWPX_MCP_AUTOBACKUP": "1",
         "LOG_LEVEL": "INFO"
@@ -39,13 +38,12 @@ MCP 클라이언트 설정에 추가할 때는 다음 예시를 활용하세요.
 }
 ```
 
-`HWPX_MCP_WORKDIR`를 지정하지 않으면 서버가 실행된 현재 디렉터리를 기본 작업 공간으로 사용합니다.
+서버는 실행된 현재 디렉터리를 기준으로 경로를 해석하며, 별도의 작업 디렉터리 설정 없이 바로 사용할 수 있습니다.
 
 ## 환경 변수
 
 | 변수 | 설명 | 기본값 |
 | --- | --- | --- |
-| `HWPX_MCP_WORKDIR` | 모든 파일 작업을 제한할 절대 경로. 지정하지 않으면 현재 작업 디렉터리를 사용합니다. | 현재 작업 디렉터리 |
 | `HWPX_MCP_PAGING_PARA_LIMIT` | 페이지네이션 도구가 반환할 최대 문단 수 | `2000` |
 | `HWPX_MCP_AUTOBACKUP` | `1`이면 저장 전 `<file>.bak` 백업 생성 | `0` |
 | `HWPX_MCP_ENABLE_OPC_WRITE` | `package_set_text` / `package_set_xml` 사용을 허용할지 여부 | `0` |
@@ -72,7 +70,7 @@ MCP 클라이언트 설정에 추가할 때는 다음 예시를 활용하세요.
 
 ## 테스트
 
-작업 디렉터리 보호와 핵심 문서 조작을 검증하는 pytest 스위트가 포함되어 있습니다. 의존성을 설치한 뒤 아래 명령으로
+핵심 문서 조작을 검증하는 pytest 스위트가 포함되어 있습니다. 의존성을 설치한 뒤 아래 명령으로
 테스트를 실행하세요.
 
 ```bash
@@ -83,7 +81,7 @@ python -m pytest
 ## 개발 참고
 
 - 서버는 전적으로 파이썬으로 작성되었으며 `python-hwpx`, `mcp`, `anyio`, `pydantic`, `modelcontextprotocol`에 의존합니다.
-- 모든 도구 핸들러는 `WorkdirGuard`를 사용해 경로를 검증하고, `HwpxDocument` API로 문서를 조작합니다.
+- 모든 도구 핸들러는 `HwpxOps`의 경로 헬퍼를 사용해 입력 경로를 해석하고, `HwpxDocument` API로 문서를 조작합니다.
 - 파괴적 작업에는 `dryRun` 플래그를 기본 제공하며, 자동 백업 옵션이 활성화되어 있으면 `.bak` 파일을 생성합니다.
 
 ## 라이선스

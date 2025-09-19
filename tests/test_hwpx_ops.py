@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.fs import WorkdirGuard
 from hwpx_mcp_server.hwpx_ops import HwpxOps
 
 
@@ -13,8 +12,7 @@ def ops_with_sample(tmp_path) -> tuple[HwpxOps, Path]:
     workdir.mkdir()
     target = workdir / "sample.hwpx"
     target.write_bytes(sample.read_bytes())
-    guard = WorkdirGuard(workdir)
-    ops = HwpxOps(guard, auto_backup=True)
+    ops = HwpxOps(base_directory=workdir, auto_backup=True)
     return ops, target
 
 
