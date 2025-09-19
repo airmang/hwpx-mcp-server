@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from hwpx_mcp_server.hwpx_ops import HwpxOps
+from hwpx_mcp_server.tools import build_tool_definitions
 
 
 @pytest.fixture()
@@ -59,3 +60,34 @@ def test_save_as_creates_new_file(ops_with_sample, tmp_path):
     out = path.with_name("copy.hwpx")
     result = ops.save_as(str(path), str(out))
     assert Path(result["outPath"]).exists()
+
+
+def test_package_set_xml_tool_accepts_alias_arguments(ops_with_sample):
+    ops, path = ops_with_sample
+    ops.enable_opc_write = True
+    tools = {tool.name: tool for tool in build_tool_definitions()}
+    package_set_tool = tools["package_set_xml"]
+    schema = package_set_tool.input_model.model_json_schema(by_alias=True)
+    assert "xmlString" in schema["properties"]
+
+    part_name = "Contents/section0.xml"
+    package_get_tool = tools["package_get_xml"]
+    xml_payload = package_get_tool.call(
+        ops,
+        {
+            "path": str(path),
+            "partName": part_name,
+        },
+    )
+
+    result = package_set_tool.call(
+        ops,
+        {
+            "path": str(path),
+            "partName": part_name,
+            "xmlString": xml_payload["xmlString"],
+            "dryRun": True,
+        },
+    )
+
+    assert result == {"updated": False}

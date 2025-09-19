@@ -343,7 +343,7 @@ class PackageXmlOutput(_BaseModel):
 
 
 class PackageSetXmlInput(PackageXmlInput):
-    xmlString: str
+    xml_string: str = Field(alias="xmlString")
     dry_run: bool = Field(True, alias="dryRun")
 
 
