@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import re
+import shutil
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -15,8 +16,6 @@ from hwpx.document import HwpxDocument, HwpxOxmlMemo, HwpxOxmlParagraph, HwpxOxm
 from hwpx.package import HwpxPackage
 from hwpx.tools.text_extractor import AnnotationOptions, TextExtractor
 from hwpx.tools.validator import ValidationReport, validate_document
-
-from .fs import WorkdirGuard
 
 HH_NS = "{http://www.hancom.co.kr/hwpml/2011/head}"
 
@@ -32,13 +31,13 @@ class HwpxOps:
 
     def __init__(
         self,
-        guard: WorkdirGuard,
         *,
+        base_directory: Path | None = None,
         paging_paragraph_limit: int = 2000,
         auto_backup: bool = False,
         enable_opc_write: bool = False,
     ) -> None:
-        self.guard = guard
+        self.base_directory = (base_directory or Path.cwd()).expanduser().resolve()
         self.paging_limit = max(1, paging_paragraph_limit)
         self.auto_backup = auto_backup
         self.enable_opc_write = enable_opc_write
@@ -47,11 +46,36 @@ class HwpxOps:
     # Basic helpers
     # ------------------------------------------------------------------
     def _resolve_path(self, path: str, *, must_exist: bool = True) -> Path:
-        return self.guard.resolve_path(path, must_exist=must_exist)
+        candidate = Path(path).expanduser()
+        if not candidate.is_absolute():
+            candidate = (self.base_directory / candidate).resolve(strict=False)
+        else:
+            candidate = candidate.resolve(strict=False)
+        if must_exist and not candidate.exists():
+            raise FileNotFoundError(f"Path '{candidate}' does not exist")
+        return candidate
+
+    def _resolve_output_path(self, path: str) -> Path:
+        resolved = self._resolve_path(path, must_exist=False)
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        return resolved
+
+    def _ensure_backup(self, path: Path) -> Optional[Path]:
+        if not path.exists():
+            return None
+        backup = path.with_suffix(path.suffix + ".bak")
+        shutil.copy2(path, backup)
+        return backup
+
+    def _relative_path(self, path: Path) -> str:
+        try:
+            return str(path.relative_to(self.base_directory))
+        except ValueError:
+            return str(path)
 
     def _maybe_backup(self, path: Path) -> None:
         if self.auto_backup:
-            backup = self.guard.ensure_backup(path)
+            backup = self._ensure_backup(path)
             if backup is not None:
                 logger.info("created backup", extra={"path": str(path), "backup": str(backup)})
 
@@ -168,7 +192,7 @@ class HwpxOps:
         header_count = len(document.headers)
         stat = resolved.stat()
         meta = {
-            "path": self.guard.relative(resolved),
+            "path": self._relative_path(resolved),
             "absolutePath": str(resolved),
             "size": stat.st_size,
             "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
@@ -698,13 +722,13 @@ class HwpxOps:
 
     def save_as(self, path: str, out: str) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
-        out_path = self.guard.resolve_output_path(out)
+        out_path = self._resolve_output_path(out)
         document.save(out_path)
         return {"outPath": str(out_path)}
 
     def make_blank(self, out: str) -> Dict[str, Any]:
         document = HwpxDocument.new()
-        out_path = self.guard.resolve_output_path(out)
+        out_path = self._resolve_output_path(out)
         document.save(out_path)
         return {"outPath": str(out_path)}
 

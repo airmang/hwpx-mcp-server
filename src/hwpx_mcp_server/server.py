@@ -13,7 +13,6 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
 
-from .fs import WorkdirGuard
 from .hwpx_ops import HwpxOps, HwpxOperationError
 from .logging_conf import configure_logging
 from .tools import ToolDefinition, build_tool_definitions
@@ -66,20 +65,11 @@ async def _serve(ops: HwpxOps, tools: List[ToolDefinition]) -> None:
 def main() -> int:
     configure_logging(os.getenv("LOG_LEVEL"))
 
-    workdir_env = os.getenv("HWPX_MCP_WORKDIR")
-    guard_root = Path(workdir_env) if workdir_env else Path.cwd()
-    if not workdir_env:
-        LOGGER.info(
-            "HWPX_MCP_WORKDIR not set; defaulting to current directory",
-            extra={"root": str(guard_root)},
-        )
-
-    guard = WorkdirGuard(guard_root)
-    try:
-        guard.ensure_ready()
-    except Exception as exc:
-        LOGGER.error("Failed to initialise workdir: %s", exc)
-        return 1
+    base_directory = Path.cwd()
+    LOGGER.info(
+        "Using current working directory for file operations",
+        extra={"root": str(base_directory)},
+    )
 
     paging_limit = os.getenv("HWPX_MCP_PAGING_PARA_LIMIT")
     try:
@@ -89,7 +79,7 @@ def main() -> int:
         paging_value = 2000
 
     ops = HwpxOps(
-        guard,
+        base_directory=base_directory,
         paging_paragraph_limit=paging_value,
         auto_backup=_bool_env("HWPX_MCP_AUTOBACKUP"),
         enable_opc_write=_bool_env("HWPX_MCP_ENABLE_OPC_WRITE"),
