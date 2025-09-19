@@ -61,10 +61,26 @@ MCP 클라이언트 설정에 추가할 때는 다음 예시를 활용하세요.
 - **add_shape**, **add_control**, **add_memo**, **attach_memo_field**, **add_memo_with_anchor**, **remove_memo** – 개체와 메모 관리.
 - **ensure_run_style**, **list_styles_and_bullets**, **apply_style_to_paragraphs** – 스타일 생성 및 적용.
 - **save**, **save_as**, **make_blank** – 저장 및 새 문서 생성.
-- **package_parts**, **package_get_text**, **package_set_text**, **package_get_xml**, **package_set_xml** – OPC 파트 접근(쓰기 도구는 `HWPX_MCP_ENABLE_OPC_WRITE` 필요).
 - **object_find_by_tag**, **object_find_by_attr** – XML 요소 검색.
 - **validate_structure**, **lint_text_conventions** – 문서 구조 검증 및 텍스트 린트.
 - **list_master_pages_histories_versions** – 마스터 페이지/히스토리/버전 요약.
+
+### 고급: OPC 패키지 조작
+
+이 도구들은 `HwpxPackage`를 통해 OPC 파트를 직접 읽고 쓰며, 내부 구조에 손을 대는 강력한 기능입니다. 쓰기 작업은 기본적으로 차단되어 있어 `HWPX_MCP_ENABLE_OPC_WRITE` 환경 변수를 명시적으로 `1`로 설정하지 않으면 실행할 수 없습니다. 또한 `HwpxOps.package_set_text` 및 `HwpxOps.package_set_xml`은 기본적으로 `dryRun`이 `true`인 상태로 동작하여 패키지에 대한 변경 사항을 계산만 하고 파일에는 저장하지 않습니다. `dryRun`을 `false`로 전환하고 쓰기 권한을 열면 즉시 OPC 파일이 덮어써지므로, 잘못 사용하면 문서가 손상될 수 있다는 점에 유의하세요.
+
+- **package_parts** – 패키지에 포함된 OPC 파트 경로 목록을 확인합니다.
+- **package_get_text** – 지정한 파트를 텍스트로 읽어옵니다(필요 시 인코딩 지정).
+- **package_set_text** – 텍스트 파트를 교체합니다(`dryRun` 해제 및 쓰기 권한 필요).
+- **package_get_xml** – 지정한 파트를 XML 문자열로 반환합니다.
+- **package_set_xml** – XML 파트를 교체합니다(`dryRun` 해제 및 쓰기 권한 필요).
+
+예시 시나리오(읽기 전용): 스타일 정의가 파트 어디에 배치되었는지 확인하고 싶다면 다음과 같이 호출합니다.
+
+1. `package_parts` 도구에 `{"path": "sample.hwpx"}`를 전달해 `Contents/Styles.xml`과 같은 대상 파트 이름을 찾습니다.
+2. 이어서 `package_get_xml` 도구에 `{"path": "sample.hwpx", "partName": "Contents/Styles.xml"}`을 전달해 해당 파트의 원본 XML을 읽기 전용으로 검토합니다.
+
+이 조합은 문서 구조를 직접 손대지 않고도 고급 진단 작업을 수행해야 할 때 유용합니다.
 
 각 도구는 `ListTools` 응답에 JSON 스키마로 노출되며, 클라이언트에서 호출 전에 입력을 검증할 수 있습니다.
 
