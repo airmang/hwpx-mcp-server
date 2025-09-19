@@ -510,7 +510,12 @@ class HwpxOps:
             border_fill_id_ref=border_fill,
         )
         tables = self._iter_tables(document)
-        index = tables.index(table)
+        element_id = id(table.element)
+        index = len(tables) - 1
+        for idx, candidate in enumerate(tables):
+            if id(candidate.element) == element_id:
+                index = idx
+                break
         self._save_document(document, resolved)
         return {"tableIndex": index, "cellCount": rows * cols}
 
