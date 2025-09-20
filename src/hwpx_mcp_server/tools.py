@@ -264,6 +264,22 @@ class StylesAndBulletsOutput(_BaseModel):
     bullets: List[Dict[str, Any]]
 
 
+class TextSpanModel(_BaseModel):
+    paragraph_index: int = Field(alias="paragraphIndex")
+    start: int
+    end: int
+
+
+class ApplyStyleToTextInput(PathInput):
+    spans: Sequence[TextSpanModel]
+    char_pr_id_ref: str = Field(alias="charPrIDRef")
+    dry_run: bool = Field(True, alias="dryRun")
+
+
+class ApplyStyleToTextOutput(_BaseModel):
+    styledSpans: int
+
+
 class ApplyStyleInput(PathInput):
     paragraph_indexes: Sequence[int] = Field(alias="paragraphIndexes")
     char_pr_id_ref: str = Field(alias="charPrIDRef")
@@ -547,6 +563,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=PathInput,
             output_model=StylesAndBulletsOutput,
             func=_simple("list_styles_and_bullets"),
+        ),
+        ToolDefinition(
+            name="apply_style_to_text_ranges",
+            description="Apply a charPr style to specific text spans.",
+            input_model=ApplyStyleToTextInput,
+            output_model=ApplyStyleToTextOutput,
+            func=_simple("apply_style_to_text_ranges"),
         ),
         ToolDefinition(
             name="apply_style_to_paragraphs",
