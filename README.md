@@ -1,29 +1,45 @@
-# HWPX MCP Server
+물론이죠\! 기존의 상세하고 정확한 정보는 그대로 유지하면서, 최신 오픈소스 프로젝트 스타일로 가독성과 시각적 매력을 더해 README.md를 새롭게 디자인해 드릴게요. 이모지, 뱃지, 블록 인용, 접이식 섹션 등을 활용하여 더 깔끔하고 트렌디하게 만들어 보겠습니다.
 
-`hwpx-mcp-server`는 순수 파이썬으로 작성된 [Model Context Protocol](https://github.com/modelcontextprotocol/specification) 서버로,
-[`python-hwpx`](https://github.com/airmang/python-hwpx) 라이브러리를 기반으로 로컬 HWPX 문서를 열람·검색·편집·저장할 수
-있는 다양한 도구를 제공합니다. Gemini, Claude 등의 MCP 호환 클라이언트에서 바로 사용할 수 있도록 표준 입력/출력 기반
-전송을 구현했습니다.
+-----
 
-## 주요 기능
+# ⚡ HWPX MCP Server ⚡
 
-- 공식 `mcp` 파이썬 SDK로 구현한 표준 입력/출력 기반 MCP 서버.
-- 추가 설정 없이 현재 작업 디렉터리를 기준으로 경로를 처리.
-- 텍스트 추출, 페이지네이션, 스타일 기반 검색/치환 기능 제공.
-- 문단·표·메모·개체·OPC 파트를 다루는 고급 편집 도구.
-- 변경 전 자동 백업 옵션(`HWPX_MCP_AUTOBACKUP`).
-- [`uvx`](https://github.com/astral-sh/uv)를 이용한 즉시 실행 지원.
+[](https://www.google.com/search?q=https://pypi.org/project/hwpx-mcp-server/)
+[](https://opensource.org/licenses/MIT)
+[](https://www.google.com/search?q=https://github.com/your-repo/hwpx-mcp-server/actions/workflows/ci.yml)
 
-## 빠른 시작
+**순수 파이썬으로 HWPX 문서를 자유롭게 다루는 가장 강력한 방법.**
 
-uv를 먼저 설치하세요.
-[설치링크](https://docs.astral.sh/uv/getting-started/installation/)
+`hwpx-mcp-server`는 [Model Context Protocol](https://github.com/modelcontextprotocol/specification) 표준을 따르는 서버로, 강력한 [`python-hwpx`](https://www.google.com/search?q=%5Bhttps://github.com/airmang/python-hwpx%5D\(https://github.com/airmang/python-hwpx\)) 라이브러리를 기반으로 합니다. Gemini, Claude와 같은 최신 AI 클라이언트와 완벽하게 연동하여 로컬 HWPX 문서를 열람, 검색, 편집, 저장하는 풍부한 기능을 제공합니다.
+
+-----
+
+## ✨ 주요 기능
+
+  * **✅ 표준 MCP 서버 구현**: 공식 `mcp` SDK를 사용하여 안정적인 표준 입/출력 기반 서버를 제공합니다.
+  * **📂 제로 설정**: 별도 설정 없이 현재 작업 디렉터리를 기준으로 즉시 경로를 처리합니다.
+  * **📄 강력한 문서 편집**: 텍스트 추출, 페이지네이션부터 스타일, 표, 메모, 개체 편집까지 모두 가능합니다.
+  * **🛡️ 안전한 저장**: 자동 백업(`*.bak`) 옵션으로 예기치 않은 데이터 손실을 방지합니다.
+  * **🚀 즉시 실행**: `uv`만 있으면 `uvx hwpx-mcp-server` 한 줄로 바로 시작할 수 있습니다.
+
+## 🚀 빠른 시작
+
+### 1\. `uv` 설치
+
+가장 먼저 파이썬 패키지 설치 도구인 `uv`를 설치하세요.
+[👉 Astral uv 설치 가이드](https://docs.astral.sh/uv/getting-started/installation/)
+
+### 2\. 서버 실행
+
+터미널에서 아래 명령어를 실행하면 서버가 바로 시작됩니다.
 
 ```bash
 uvx hwpx-mcp-server
 ```
 
-MCP 클라이언트 설정에 추가할 때는 다음 예시를 활용하세요.
+### 3\. MCP 클라이언트 설정
+
+사용 중인 MCP 클라이언트 설정에 아래와 같이 서버 정보를 추가하세요.
 
 ```json
 {
@@ -42,73 +58,92 @@ MCP 클라이언트 설정에 추가할 때는 다음 예시를 활용하세요.
 }
 ```
 
-서버는 실행된 현재 디렉터리를 기준으로 경로를 해석하며, 별도의 작업 디렉터리 설정 없이 바로 사용할 수 있습니다.
+> 서버는 실행된 현재 디렉터리를 기준으로 경로를 해석하므로, 별도의 작업 디렉터리 설정 없이 바로 사용할 수 있습니다.
 
-## 환경 변수
+## ⚙️ 환경 변수
 
 | 변수 | 설명 | 기본값 |
 | --- | --- | --- |
 | `HWPX_MCP_PAGING_PARA_LIMIT` | 페이지네이션 도구가 반환할 최대 문단 수 | `2000` |
 | `HWPX_MCP_AUTOBACKUP` | `1`이면 저장 전 `<file>.bak` 백업 생성 | `0` |
-| `HWPX_MCP_ENABLE_OPC_WRITE` | `package_set_text` / `package_set_xml` 사용을 허용할지 여부 | `0` |
-| `LOG_LEVEL` | JSON 라인 형태로 stderr에 출력할 로그 레벨 | `INFO` |
+| `HWPX_MCP_ENABLE_OPC_WRITE` | `package_set_text` / `package_set_xml` 사용 허용 | `0` |
+| `LOG_LEVEL` | stderr에 JSONL 형식으로 출력할 로그 레벨 | `INFO` |
 
-## 제공 도구
+## 🛠️ 제공 도구
 
-서버는 다음과 같은 MCP 도구를 등록합니다.
+다양한 문서 편집 및 관리 도구를 제공합니다. 각 도구의 상세한 입출력 형식은 `ListTools` 응답에 포함된 JSON 스키마를 통해 확인할 수 있습니다.
 
-- **open_info** – 문서 메타데이터 및 단락·헤더 개수 요약.
-- **list_sections**, **list_headers** – 섹션/헤더 구조 탐색.
-- **read_text**, **text_extract_report** – 페이지네이션 및 주석 포함 텍스트 추출.
-- **find**, **find_runs_by_style**, **replace_text_in_runs** – 검색 및 스타일 보존 치환.
-- **add_paragraph**, **insert_paragraphs_bulk**, **add_table**, **set_table_cell_text**, **replace_table_region** – 문단·표 편집.
-- **add_shape**, **add_control**, **add_memo**, **attach_memo_field**, **add_memo_with_anchor**, **remove_memo** – 개체와 메모 관리.
-- **ensure_run_style**, **list_styles_and_bullets**, **apply_style_to_text_ranges**, **apply_style_to_paragraphs** – 스타일 생성 및 단어/문단 단위 적용.
-- **save**, **save_as**, **make_blank** – 저장 및 새 문서 생성.
-- **object_find_by_tag**, **object_find_by_attr** – XML 요소 검색.
-- **validate_structure**, **lint_text_conventions** – 문서 구조 검증 및 텍스트 린트.
-- **list_master_pages_histories_versions** – 마스터 페이지/히스토리/버전 요약.
+\<details\>
+\<summary\>\<b\>전체 도구 목록 펼쳐보기...\</b\>\</summary\>
 
-### 고급: OPC 패키지 조작
+  - **문서 정보 및 탐색**
+      - `open_info`: 문서 메타데이터 및 단락·헤더 개수 요약
+      - `list_sections`, `list_headers`: 섹션/헤더 구조 탐색
+      - `list_master_pages_histories_versions`: 마스터 페이지/히스토리/버전 요약
+  - **콘텐츠 추출 및 검색**
+      - `read_text`, `text_extract_report`: 페이지네이션 및 주석 포함 텍스트 추출
+      - `find`, `find_runs_by_style`: 텍스트 검색 및 스타일 기반 검색
+  - **문서 편집**
+      - `replace_text_in_runs`: 스타일을 보존하며 텍스트 치환
+      - `add_paragraph`, `insert_paragraphs_bulk`: 문단 추가
+      - `add_table`, `set_table_cell_text`, `replace_table_region`: 표 생성 및 편집
+      - `add_shape`, `add_control`: 개체 추가
+      - `add_memo`, `attach_memo_field`, `add_memo_with_anchor`, `remove_memo`: 메모 관리
+  - **스타일링**
+      - `ensure_run_style`, `list_styles_and_bullets`: 스타일 및 글머리표 목록 확인/생성
+      - `apply_style_to_text_ranges`, `apply_style_to_paragraphs`: 단어/문단 단위 스타일 적용
+  - **파일 관리**
+      - `save`, `save_as`: 문서 저장
+      - `make_blank`: 새 빈 문서 생성
+  - **구조 검증 및 고급 검색**
+      - `object_find_by_tag`, `object_find_by_attr`: XML 요소 검색
+      - `validate_structure`, `lint_text_conventions`: 문서 구조 검증 및 텍스트 린트
 
-이 도구들은 `HwpxPackage`를 통해 OPC 파트를 직접 읽고 쓰며, 내부 구조에 손을 대는 강력한 기능입니다. 쓰기 작업은 기본적으로 차단되어 있어 `HWPX_MCP_ENABLE_OPC_WRITE` 환경 변수를 명시적으로 `1`로 설정하지 않으면 실행할 수 없습니다. 또한 `HwpxOps.package_set_text` 및 `HwpxOps.package_set_xml`은 기본적으로 `dryRun`이 `true`인 상태로 동작하여 패키지에 대한 변경 사항을 계산만 하고 파일에는 저장하지 않습니다. `dryRun`을 `false`로 전환하고 쓰기 권한을 열면 즉시 OPC 파일이 덮어써지므로, 잘못 사용하면 문서가 손상될 수 있다는 점에 유의하세요.
+\</details\>
 
-- **package_parts** – 패키지에 포함된 OPC 파트 경로 목록을 확인합니다.
-- **package_get_text** – 지정한 파트를 텍스트로 읽어옵니다(필요 시 인코딩 지정).
-- **package_set_text** – 텍스트 파트를 교체합니다(`dryRun` 해제 및 쓰기 권한 필요).
-- **package_get_xml** – 지정한 파트를 XML 문자열로 반환합니다.
-- **package_set_xml** – XML 파트를 교체합니다(`dryRun` 해제 및 쓰기 권한 필요).
+## ☢️ 고급 기능: 직접 OPC 패키지 조작
 
-예시 시나리오(읽기 전용): 스타일 정의가 파트 어디에 배치되었는지 확인하고 싶다면 다음과 같이 호출합니다.
+> **⚠️ 경고:** 아래 도구들은 HWPX 문서의 내부 OPC 파트를 직접 조작합니다. 잘못 사용하면 문서를 손상시킬 수 있으므로, 내부 구조를 충분히 이해한 상태에서 사용해야 합니다. 쓰기 작업은 기본적으로 비활성화되어 있습니다.
 
-1. `package_parts` 도구에 `{"path": "sample.hwpx"}`를 전달해 `Contents/Styles.xml`과 같은 대상 파트 이름을 찾습니다.
-2. 이어서 `package_get_xml` 도구에 `{"path": "sample.hwpx", "partName": "Contents/Styles.xml"}`을 전달해 해당 파트의 원본 XML을 읽기 전용으로 검토합니다.
+활성화를 위해서는 `HWPX_MCP_ENABLE_OPC_WRITE` 환경 변수를 `1`로 설정해야 합니다. 또한, `package_set_text`, `package_set_xml` 도구는 기본적으로 `dryRun: true` 모드로 동작하여 실제 파일에 쓰지 않습니다. 변경 사항을 즉시 적용하려면 `dryRun: false`로 설정해야 합니다.
 
-이 조합은 문서 구조를 직접 손대지 않고도 고급 진단 작업을 수행해야 할 때 유용합니다.
+  * `package_parts`: 패키지에 포함된 모든 OPC 파트의 경로 목록을 확인합니다.
+  * `package_get_text`: 지정한 파트를 텍스트로 읽어옵니다 (인코딩 지정 가능).
+  * `package_set_text`: 텍스트 파트의 내용을 교체합니다 (`dryRun` 해제 및 쓰기 권한 필요).
+  * `package_get_xml`: 지정한 파트를 XML 문자열로 반환합니다.
+  * `package_set_xml`: XML 파트의 내용을 교체합니다 (`dryRun` 해제 및 쓰기 권한 필요).
 
-각 도구는 `ListTools` 응답에 JSON 스키마로 노출되며, 클라이언트에서 호출 전에 입력을 검증할 수 있습니다.
+#### 시나리오 예시 (읽기 전용)
 
-## 테스트
+스타일 정의 XML 파일(`Styles.xml`)의 내용을 확인하고 싶다면:
 
-핵심 문서 조작뿐 아니라 MCP 도구 정의 전체를 실제 호출 흐름으로 검증하는 종단 간 pytest 스위트가 포함되어 있습니다.
-의존성을 설치한 뒤 아래 명령으로 테스트를 실행하세요.
+1.  `package_parts` 도구에 `{"path": "sample.hwpx"}`를 전달하여 `Contents/Styles.xml`과 같은 파트 이름을 찾습니다.
+2.  `package_get_xml` 도구에 `{"path": "sample.hwpx", "partName": "Contents/Styles.xml"}`을 전달하여 해당 파트의 원본 XML을 안전하게 검토합니다.
+
+## 🧪 테스트
+
+핵심 기능부터 모든 MCP 도구의 실제 호출까지 검증하는 엔드투엔드 테스트 스위트가 포함되어 있습니다.
 
 ```bash
+# 1. 테스트 의존성 설치
 python -m pip install -e .[test]
+
+# 2. 테스트 실행 (OPC 쓰기 활성화)
 HWPX_MCP_ENABLE_OPC_WRITE=1 python -m pytest
 ```
 
-`tests/test_mcp_end_to_end.py`는 `build_tool_definitions()`를 통해 노출된 모든 MCP 도구를 직접 호출하여
-텍스트/표/메모 편집, OPC 패키지 쓰기, 백업 생성 등의 동작을 재현합니다. CI 환경에서도 동일한 명령으로 실행하면
-자동 백업(`HWPX_MCP_AUTOBACKUP`)과 OPC 쓰기(`HWPX_MCP_ENABLE_OPC_WRITE`)가 활성화된 실제 서버 설정과 동일한 조건에서
-검증을 수행할 수 있습니다.
+`tests/test_mcp_end_to_end.py`는 서버가 노출하는 모든 도구를 실제로 호출하여 텍스트, 표, 메모 편집, OPC 패키지 쓰기, 자동 백업 생성 등 핵심 동작을 완벽하게 검증합니다.
 
-## 개발 참고
+## 🧑‍💻 개발 참고
 
-- 서버는 전적으로 파이썬으로 작성되었으며 `python-hwpx`, `mcp`, `anyio`, `pydantic`, `modelcontextprotocol`에 의존합니다.
-- 모든 도구 핸들러는 `HwpxOps`의 경로 헬퍼를 사용해 입력 경로를 해석하고, `HwpxDocument` API로 문서를 조작합니다.
-- 파괴적 작업에는 `dryRun` 플래그를 기본 제공하며, 자동 백업 옵션이 활성화되어 있으면 `.bak` 파일을 생성합니다.
+  * 이 서버는 `python-hwpx`, `mcp`, `anyio`, `pydantic` 등 순수 파이썬 라이브러리로만 구성됩니다.
+  * 모든 도구 핸들러는 `HwpxOps`의 경로 헬퍼와 `HwpxDocument` API를 통해 문서를 안전하게 조작합니다.
+  * 파괴적 작업(수정/저장)에는 `dryRun` 플래그를 우선 제공하며, 자동 백업 옵션이 활성화되어 있으면 `.bak` 파일을 생성하여 안정성을 높입니다.
 
-## 라이선스
+## 📜 라이선스
 
-이 프로젝트는 MIT 라이선스로 배포됩니다. 자세한 내용은 [LICENSE](LICENSE)를 확인하세요.
+이 프로젝트는 [MIT 라이선스](https://www.google.com/search?q=LICENSE)로 배포됩니다. 자세한 내용은 라이선스 파일을 확인하세요.
+
+## 이메일
+
+광교고등학교 교사 고규현 : kokyuhyun@hotmail.com
