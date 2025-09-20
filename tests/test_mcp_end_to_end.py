@@ -255,6 +255,55 @@ def test_paragraph_insertion_and_style_application(
             assert run.char_pr_id_ref == style_id
 
 
+def test_apply_style_to_text_ranges(
+    ops: HwpxOps,
+    tool_map: Dict[str, ToolDefinition],
+    sample_workspace: tuple[Path, Path],
+) -> None:
+    _, doc_path = sample_workspace
+    rel_path = doc_path.name
+
+    add_result = _call(
+        tool_map,
+        "add_paragraph",
+        ops,
+        path=rel_path,
+        text="alpha beta gamma",
+    )
+    paragraph_index = add_result["paragraphIndex"]
+
+    ensure_result = _call(
+        tool_map,
+        "ensure_run_style",
+        ops,
+        path=rel_path,
+        bold=True,
+    )
+    style_id = ensure_result["charPrIDRef"]
+    assert style_id is not None
+
+    apply_result = _call(
+        tool_map,
+        "apply_style_to_text_ranges",
+        ops,
+        path=rel_path,
+        spans=[
+            {"paragraphIndex": paragraph_index, "start": 6, "end": 10},
+            {"paragraphIndex": paragraph_index, "start": 11, "end": 16},
+        ],
+        charPrIDRef=style_id,
+        dryRun=False,
+    )
+    assert apply_result["styledSpans"] == 2
+
+    document = HwpxDocument.open(doc_path)
+    paragraph = document.paragraphs[paragraph_index]
+    texts = [run.text for run in paragraph.runs if run.text]
+    assert texts == ["alpha ", "beta", " ", "gamma"]
+    styled_segments = [run.text for run in paragraph.runs if run.char_pr_id_ref == style_id]
+    assert styled_segments == ["beta", "gamma"]
+
+
 def test_table_workflow(
     ops: HwpxOps,
     tool_map: Dict[str, ToolDefinition],

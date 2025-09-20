@@ -63,7 +63,7 @@ MCP 클라이언트 설정에 추가할 때는 다음 예시를 활용하세요.
 - **find**, **find_runs_by_style**, **replace_text_in_runs** – 검색 및 스타일 보존 치환.
 - **add_paragraph**, **insert_paragraphs_bulk**, **add_table**, **set_table_cell_text**, **replace_table_region** – 문단·표 편집.
 - **add_shape**, **add_control**, **add_memo**, **attach_memo_field**, **add_memo_with_anchor**, **remove_memo** – 개체와 메모 관리.
-- **ensure_run_style**, **list_styles_and_bullets**, **apply_style_to_paragraphs** – 스타일 생성 및 적용.
+- **ensure_run_style**, **list_styles_and_bullets**, **apply_style_to_text_ranges**, **apply_style_to_paragraphs** – 스타일 생성 및 단어/문단 단위 적용.
 - **save**, **save_as**, **make_blank** – 저장 및 새 문서 생성.
 - **object_find_by_tag**, **object_find_by_attr** – XML 요소 검색.
 - **validate_structure**, **lint_text_conventions** – 문서 구조 검증 및 텍스트 린트.
