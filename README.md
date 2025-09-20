@@ -16,6 +16,9 @@
 
 ## 빠른 시작
 
+uv를 먼저 설치하세요.
+[설치링크](https://docs.astral.sh/uv/getting-started/installation/)
+
 ```bash
 uvx hwpx-mcp-server
 ```
