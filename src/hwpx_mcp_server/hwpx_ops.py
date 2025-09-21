@@ -550,6 +550,9 @@ class HwpxOps:
         self,
         path: str,
         table_index: int,
+        *,
+        include_text: bool = False,
+        max_text_length: Optional[int] = None,
     ) -> Dict[str, Any]:
         document, _ = self._open_document(path)
         tables = self._iter_tables(document)
@@ -558,17 +561,30 @@ class HwpxOps:
         except IndexError as exc:
             raise HwpxOperationError("tableIndex out of range") from exc
 
+        if max_text_length is not None and max_text_length < 0:
+            raise HwpxOperationError("maxTextLength must be non-negative")
+
         grid_positions = table.get_cell_map()
         serialized: List[List[Dict[str, Any]]] = []
+        fetch_text = include_text or max_text_length is not None
+        ellipsis = "\N{HORIZONTAL ELLIPSIS}"
         for row in grid_positions:
             row_payload: List[Dict[str, Any]] = []
             for position in row:
                 anchor_row, anchor_col = position.anchor
                 row_span, col_span = position.span
                 cell_text: Optional[str] = None
-                cell = position.cell
-                if cell is not None:
-                    cell_text = cell.text
+                if fetch_text:
+                    cell = position.cell
+                    if cell is not None:
+                        raw_text = cell.text
+                        if raw_text is not None:
+                            cell_text = raw_text
+                            if (
+                                max_text_length is not None
+                                and len(cell_text) > max_text_length
+                            ):
+                                cell_text = cell_text[:max_text_length] + ellipsis
                 row_payload.append(
                     {
                         "row": position.row,

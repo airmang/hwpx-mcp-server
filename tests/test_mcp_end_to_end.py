@@ -343,6 +343,7 @@ def test_table_workflow(
     assert {(cell["row"], cell["column"]) for row in grid for cell in row} == {
         (r, c) for r in range(2) for c in range(3)
     }
+    assert all(cell["text"] is None for row in grid for cell in row)
     assert grid[0][0]["rowSpan"] == 2
     assert grid[0][0]["colSpan"] == 2
     assert grid[1][1]["anchor"] == {"row": 0, "column": 0}
@@ -376,6 +377,21 @@ def test_table_workflow(
     )
     assert replace_result["updatedCells"] == 4
 
+    long_text = "Summary column heading for Q1"
+    long_update = _call(
+        tool_map,
+        "set_table_cell_text",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        row=0,
+        col=2,
+        text=long_text,
+        logical=True,
+        dryRun=False,
+    )
+    assert long_update == {"ok": True}
+
     post_split_grid = _call(
         tool_map,
         "get_table_cell_map",
@@ -388,6 +404,29 @@ def test_table_workflow(
         for row in post_split_grid["grid"]
         for cell in row
     )
+    assert all(cell["text"] is None for row in post_split_grid["grid"] for cell in row)
+
+    text_enabled_grid = _call(
+        tool_map,
+        "get_table_cell_map",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        includeText=True,
+    )
+    assert text_enabled_grid["grid"][0][0]["text"] == "A"
+    assert text_enabled_grid["grid"][0][2]["text"] == long_text
+
+    truncated_grid = _call(
+        tool_map,
+        "get_table_cell_map",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        maxTextLength=10,
+    )
+    assert truncated_grid["grid"][0][0]["text"] == "A"
+    assert truncated_grid["grid"][0][2]["text"] == long_text[:10] + "…"
 
     document = HwpxDocument.open(doc_path)
     tables = []

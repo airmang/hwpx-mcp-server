@@ -121,7 +121,7 @@ uvx hwpx-mcp-server
 
 ### 📐 표 편집 고급 옵션
 
-`get_table_cell_map` 도구를 사용하면 표의 전체 격자를 그대로 직렬화하여 각 위치가 어느 앵커 셀(`anchor`)에 속하는지, 병합 범위(`rowSpan`, `colSpan`)는 얼마인지 한눈에 확인할 수 있습니다. 응답은 항상 행×열 전체를 채우며, 각 위치에 대해 `row`/`column` 좌표와 병합된 앵커 셀의 텍스트를 알려 줍니다.
+`get_table_cell_map` 도구를 사용하면 표의 전체 격자를 그대로 직렬화하여 각 위치가 어느 앵커 셀(`anchor`)에 속하는지, 병합 범위(`rowSpan`, `colSpan`)는 얼마인지 한눈에 확인할 수 있습니다. 응답은 항상 행×열 전체를 채우며, 각 위치에 대해 `row`/`column` 좌표와 병합된 앵커 셀 메타데이터를 알려 줍니다. 대규모 표에서도 빠르게 응답하기 위해 기본 응답에는 셀 텍스트를 포함하지 않으며(`text: null`), 실제 문자열이 필요한 경우에만 `includeText` 또는 `maxTextLength` 옵션으로 명시적으로 요청하세요.
 
 ```jsonc
 {
@@ -132,14 +132,33 @@ uvx hwpx-mcp-server
     "columnCount": 3,
     "grid": [
       [
-        {"row": 0, "column": 0, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
-        {"row": 0, "column": 1, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
-        {"row": 0, "column": 2, "anchor": {"row": 0, "column": 2}, "rowSpan": 3, "colSpan": 1, "text": "요약"}
+        {"row": 0, "column": 0, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": null},
+        {"row": 0, "column": 1, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": null},
+        {"row": 0, "column": 2, "anchor": {"row": 0, "column": 2}, "rowSpan": 3, "colSpan": 1, "text": null}
       ],
       [
-        {"row": 1, "column": 0, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
-        {"row": 1, "column": 1, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
-        {"row": 1, "column": 2, "anchor": {"row": 0, "column": 2}, "rowSpan": 3, "colSpan": 1, "text": "요약"}
+        {"row": 1, "column": 0, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": null},
+        {"row": 1, "column": 1, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": null},
+        {"row": 1, "column": 2, "anchor": {"row": 0, "column": 2}, "rowSpan": 3, "colSpan": 1, "text": null}
+      ],
+      "... 생략 ..."
+    ]
+  }
+}
+```
+
+`includeText: true`로 응답에 문자열을 포함시키거나, `maxTextLength`로 지정한 길이까지만 미리보기 텍스트를 받고 싶을 때는 다음처럼 호출하세요. 두 옵션은 함께 사용할 수 있으며, `maxTextLength`가 설정되면 초과 문자는 잘리고 `…`(ellipsis)가 덧붙습니다.
+
+```jsonc
+{
+  "name": "get_table_cell_map",
+  "arguments": {"path": "sample.hwpx", "tableIndex": 0, "includeText": true, "maxTextLength": 8},
+  "result": {
+    "grid": [
+      [
+        {"row": 0, "column": 0, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
+        {"row": 0, "column": 1, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
+        {"row": 0, "column": 2, "anchor": {"row": 0, "column": 2}, "rowSpan": 3, "colSpan": 1, "text": "요약 본…"}
       ],
       "... 생략 ..."
     ]

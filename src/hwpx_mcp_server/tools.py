@@ -184,6 +184,8 @@ class TableCellPosition(_BaseModel):
 
 class GetTableCellMapInput(PathInput):
     table_index: int = Field(alias="tableIndex")
+    include_text: bool = Field(False, alias="includeText")
+    max_text_length: Optional[int] = Field(None, alias="maxTextLength")
 
 
 class TableCellMapOutput(_BaseModel):

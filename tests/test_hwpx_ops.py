@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from hwpx.document import HwpxDocument
-from hwpx_mcp_server.hwpx_ops import HwpxOps
+from hwpx_mcp_server.hwpx_ops import HwpxOps, HwpxOperationError
 import hwpx_mcp_server.hwpx_ops as ops_module
 from hwpx_mcp_server.tools import build_tool_definitions
 
@@ -348,23 +348,79 @@ def test_get_table_cell_map_serializes_grid_with_merges(ops_with_sample):
         "anchor": {"row": 0, "column": 0},
         "rowSpan": 2,
         "colSpan": 2,
-        "text": "R0C0",
+        "text": None,
     }
 
     overlapped = grid[1][1]
     assert overlapped["anchor"] == {"row": 0, "column": 0}
     assert overlapped["rowSpan"] == 2
     assert overlapped["colSpan"] == 2
-    assert overlapped["text"] == "R0C0"
+    assert overlapped["text"] is None
 
     vertical_anchor = grid[0][2]
     assert vertical_anchor["anchor"] == {"row": 0, "column": 2}
     assert vertical_anchor["rowSpan"] == 3
     assert vertical_anchor["colSpan"] == 1
-    assert vertical_anchor["text"] == "R0C2"
+    assert vertical_anchor["text"] is None
 
     bottom_left = grid[2][0]
     assert bottom_left["anchor"] == {"row": 2, "column": 0}
     assert bottom_left["rowSpan"] == 1
     assert bottom_left["colSpan"] == 1
-    assert bottom_left["text"] == "R2C0"
+    assert bottom_left["text"] is None
+
+
+def test_get_table_cell_map_can_include_and_truncate_text(ops_with_sample):
+    ops, path = ops_with_sample
+    table_info = ops.add_table(str(path), rows=1, cols=2)
+    index = table_info["tableIndex"]
+
+    document = HwpxDocument.open(path)
+    tables: list = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    target_table = tables[index]
+    target_table.cell(0, 0).text = "ABCDEFGHIJ"
+    target_table.cell(0, 1).text = "Short"
+    document.save(path)
+
+    included = ops.get_table_cell_map(str(path), table_index=index, include_text=True)
+    first_row = included["grid"][0]
+    assert first_row[0]["text"] == "ABCDEFGHIJ"
+    assert first_row[1]["text"] == "Short"
+
+    truncated = ops.get_table_cell_map(str(path), table_index=index, max_text_length=5)
+    truncated_row = truncated["grid"][0]
+    assert truncated_row[0]["text"] == "ABCDE…"
+    assert truncated_row[1]["text"] == "Short"
+
+    combined = ops.get_table_cell_map(
+        str(path),
+        table_index=index,
+        include_text=True,
+        max_text_length=3,
+    )
+    assert combined["grid"][0][0]["text"] == "ABC…"
+
+
+def test_get_table_cell_map_rejects_negative_max_length(ops_with_sample):
+    ops, path = ops_with_sample
+    table_info = ops.add_table(str(path), rows=1, cols=1)
+    index = table_info["tableIndex"]
+
+    with pytest.raises(HwpxOperationError, match="maxTextLength"):
+        ops.get_table_cell_map(str(path), table_index=index, max_text_length=-1)
+
+
+def test_get_table_cell_map_schema_exposes_text_controls():
+    tools = {tool.name: tool for tool in build_tool_definitions()}
+    table_tool = tools["get_table_cell_map"]
+    schema = table_tool.input_model.model_json_schema(by_alias=True)
+
+    include_prop = schema["properties"]["includeText"]
+    assert include_prop["type"] == "boolean"
+    assert include_prop["default"] is False
+
+    max_prop = schema["properties"]["maxTextLength"]
+    assert max_prop["default"] is None
+    assert any(option.get("type") == "integer" for option in max_prop.get("anyOf", []))
