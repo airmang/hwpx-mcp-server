@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "0.1.7"
+version = "0.2.0"
 description = "Model Context Protocol server for local HWPX document automation."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
