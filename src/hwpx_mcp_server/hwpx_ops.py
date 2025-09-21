@@ -31,6 +31,9 @@ HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_PAGING_PARAGRAPH_LIMIT = 200
+
+
 class HwpxOperationError(RuntimeError):
     """문서 단위 작업이 실패했을 때 사용하는 예외."""
 
@@ -42,7 +45,7 @@ class HwpxOps:
         self,
         *,
         base_directory: Path | None = None,
-        paging_paragraph_limit: int = 2000,
+        paging_paragraph_limit: int = DEFAULT_PAGING_PARAGRAPH_LIMIT,
         auto_backup: bool = False,
         enable_opc_write: bool = False,
     ) -> None:
@@ -287,8 +290,10 @@ class HwpxOps:
         with_footnotes: bool = False,
     ) -> Dict[str, Any]:
         resolved = self._resolve_path(path)
-        effective_limit = limit if limit is not None else self.paging_limit
-        effective_limit = max(1, min(effective_limit, self.paging_limit))
+        if limit is None:
+            effective_limit = self.paging_limit
+        else:
+            effective_limit = max(1, limit)
         annotations = None
         if with_highlights or with_footnotes:
             annotations = AnnotationOptions(

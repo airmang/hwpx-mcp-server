@@ -13,7 +13,11 @@ import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
 
-from .hwpx_ops import HwpxOps, HwpxOperationError
+from .hwpx_ops import (
+    DEFAULT_PAGING_PARAGRAPH_LIMIT,
+    HwpxOps,
+    HwpxOperationError,
+)
 from .logging_conf import configure_logging
 from .tools import ToolDefinition, build_tool_definitions
 
@@ -73,10 +77,13 @@ def main() -> int:
 
     paging_limit = os.getenv("HWPX_MCP_PAGING_PARA_LIMIT")
     try:
-        paging_value = int(paging_limit) if paging_limit else 2000
+        paging_value = int(paging_limit) if paging_limit else DEFAULT_PAGING_PARAGRAPH_LIMIT
     except ValueError:
-        LOGGER.warning("Invalid HWPX_MCP_PAGING_PARA_LIMIT, falling back to 2000")
-        paging_value = 2000
+        LOGGER.warning(
+            "Invalid HWPX_MCP_PAGING_PARA_LIMIT, falling back to %s",
+            DEFAULT_PAGING_PARAGRAPH_LIMIT,
+        )
+        paging_value = DEFAULT_PAGING_PARAGRAPH_LIMIT
 
     ops = HwpxOps(
         base_directory=base_directory,

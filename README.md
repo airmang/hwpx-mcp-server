@@ -37,7 +37,7 @@
       "command": "uvx",
       "args": ["hwpx-mcp-server"],
       "env": {
-        "HWPX_MCP_PAGING_PARA_LIMIT": "2000",
+        "HWPX_MCP_PAGING_PARA_LIMIT": "200",
         "HWPX_MCP_AUTOBACKUP": "1",
         "HWPX_MCP_ENABLE_OPC_WRITE": "1",
         "LOG_LEVEL": "INFO"
@@ -63,10 +63,12 @@ uvx hwpx-mcp-server
 
 | 변수 | 설명 | 기본값 |
 | --- | --- | --- |
-| `HWPX_MCP_PAGING_PARA_LIMIT` | 페이지네이션 도구가 반환할 최대 문단 수 | `2000` |
+| `HWPX_MCP_PAGING_PARA_LIMIT` | 페이지네이션 도구가 반환할 최대 문단 수 | `200` |
 | `HWPX_MCP_AUTOBACKUP` | `1`이면 저장 전 `<file>.bak` 백업 생성 | `0` |
 | `HWPX_MCP_ENABLE_OPC_WRITE` | `package_set_text` / `package_set_xml` 사용 허용 | `0` |
 | `LOG_LEVEL` | stderr에 JSONL 형식으로 출력할 로그 레벨 | `INFO` |
+
+> ℹ️ `read_text` 도구는 기본적으로 최대 200개의 문단을 반환합니다. 더 큰 덤프가 필요하면 도구 호출 시 `limit` 인수를 직접 지정하거나 `HWPX_MCP_PAGING_PARA_LIMIT` 환경 변수를 확장하세요. 이는 Microsoft Office Word에서 필요한 범위만 순차적으로 읽는 워크플로와 동일합니다.
 
 ## 🛠️ 제공 도구
 

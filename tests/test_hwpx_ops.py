@@ -34,6 +34,53 @@ def test_read_text_pagination(ops_with_sample):
     assert result["nextOffset"] >= 1
 
 
+def test_read_text_uses_default_limit(monkeypatch, tmp_path):
+    class FakeParagraph:
+        def __init__(self, index: int, content: str) -> None:
+            self.index = index
+            self._content = content
+
+        def text(
+            self,
+            *,
+            annotations=None,
+            preserve_breaks: bool = False,
+        ) -> str:
+            return self._content
+
+    paragraphs = [FakeParagraph(index, f"Paragraph {index}") for index in range(500)]
+
+    class FakeExtractor:
+        def __init__(self, path):
+            self.path = path
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def iter_document_paragraphs(self):
+            yield from paragraphs
+
+    monkeypatch.setattr(ops_module, "TextExtractor", FakeExtractor)
+
+    ops = HwpxOps(base_directory=tmp_path)
+    dummy = tmp_path / "dummy.hwpx"
+    dummy.write_bytes(b"")
+
+    result = ops.read_text(dummy.name)
+    lines = result["textChunk"].splitlines()
+    assert len(lines) <= ops_module.DEFAULT_PAGING_PARAGRAPH_LIMIT
+    assert result["nextOffset"] == ops_module.DEFAULT_PAGING_PARAGRAPH_LIMIT
+
+    expanded_limit = ops_module.DEFAULT_PAGING_PARAGRAPH_LIMIT + 50
+    expanded = ops.read_text(dummy.name, limit=expanded_limit)
+    expanded_lines = expanded["textChunk"].splitlines()
+    assert len(expanded_lines) == expanded_limit
+    assert expanded["nextOffset"] == expanded_limit
+
+
 def test_find_returns_matches(ops_with_sample):
     ops, path = ops_with_sample
     matches = ops.find(str(path), "HWPX")
