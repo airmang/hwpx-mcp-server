@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: hwpx-mcp-server
-Version: 0.2.0
+Version: 0.2.1
 Summary: Model Context Protocol server for local HWPX document automation.
 Author: Kohkyuhyun
 License: MIT License
@@ -37,7 +37,7 @@ Provides-Extra: test
 Requires-Dist: pytest>=8.0; extra == "test"
 Dynamic: license-file
 
-# ⚡ HWPX MCP Server ⚡
+# HWPX MCP Server 한글 자동화 mcp #
 
 [](https://www.google.com/search?q=https://pypi.org/project/hwpx-mcp-server/)
 [](https://opensource.org/licenses/MIT)
@@ -78,7 +78,6 @@ Dynamic: license-file
       "env": {
         "HWPX_MCP_PAGING_PARA_LIMIT": "200",
         "HWPX_MCP_AUTOBACKUP": "1",
-        "HWPX_MCP_ENABLE_OPC_WRITE": "1",
         "LOG_LEVEL": "INFO"
       }
     }
@@ -104,7 +103,6 @@ uvx hwpx-mcp-server
 | --- | --- | --- |
 | `HWPX_MCP_PAGING_PARA_LIMIT` | 페이지네이션 도구가 반환할 최대 문단 수 | `200` |
 | `HWPX_MCP_AUTOBACKUP` | `1`이면 저장 전 `<file>.bak` 백업 생성 | `0` |
-| `HWPX_MCP_ENABLE_OPC_WRITE` | `package_set_text` / `package_set_xml` 사용 허용 | `0` |
 | `LOG_LEVEL` | stderr에 JSONL 형식으로 출력할 로그 레벨 | `INFO` |
 
 > ℹ️ `read_text` 도구는 기본적으로 최대 200개의 문단을 반환합니다. 더 큰 덤프가 필요하면 도구 호출 시 `limit` 인수를 직접 지정하거나 `HWPX_MCP_PAGING_PARA_LIMIT` 환경 변수를 확장하세요. 이는 Microsoft Office Word에서 필요한 범위만 순차적으로 읽는 워크플로와 동일합니다.
@@ -216,19 +214,15 @@ uvx hwpx-mcp-server
 
 응답의 `rowSpan`/`colSpan` 값은 분할되기 전 병합 범위를 알려주므로, 프런트엔드 클라이언트가 UI 상태를 즉시 갱신할 수 있습니다.
 
-## ☢️ 고급 기능: 직접 OPC 패키지 조작
+## ☢️ 고급 기능: OPC 패키지 내부 살펴보기
 
-> **⚠️ 경고:** 아래 도구들은 HWPX 문서의 내부 OPC 파트를 직접 조작합니다. 잘못 사용하면 문서를 손상시킬 수 있으므로, 내부 구조를 충분히 이해한 상태에서 사용해야 합니다. 쓰기 작업은 기본적으로 비활성화되어 있습니다.
-
-활성화를 위해서는 `HWPX_MCP_ENABLE_OPC_WRITE` 환경 변수를 `1`로 설정해야 합니다. 또한, `package_set_text`, `package_set_xml` 도구는 기본적으로 `dryRun: true` 모드로 동작하여 실제 파일에 쓰지 않습니다. 변경 사항을 즉시 적용하려면 `dryRun: false`로 설정해야 합니다.
+> **⚠️ 경고:** 아래 도구들은 HWPX 문서의 내부 OPC 파트를 그대로 노출합니다. 구조를 잘못 해석하면 문서를 오해할 수 있으니, 스키마와 관계를 충분히 이해한 상태에서 활용하세요. 현재 MCP 서버는 의도치 않은 손상을 막기 위해 **읽기 전용 도구만** 제공합니다.
 
   * `package_parts`: 패키지에 포함된 모든 OPC 파트의 경로 목록을 확인합니다.
   * `package_get_text`: 지정한 파트를 텍스트로 읽어옵니다 (인코딩 지정 가능).
-  * `package_set_text`: 텍스트 파트의 내용을 교체합니다 (`dryRun` 해제 및 쓰기 권한 필요).
   * `package_get_xml`: 지정한 파트를 XML 문자열로 반환합니다.
-  * `package_set_xml`: XML 파트의 내용을 교체합니다 (`dryRun` 해제 및 쓰기 권한 필요).
 
-#### 시나리오 예시 (읽기 전용)
+#### 시나리오 예시
 
 스타일 정의 XML 파일(`Styles.xml`)의 내용을 확인하고 싶다면:
 
@@ -243,11 +237,11 @@ uvx hwpx-mcp-server
 # 1. 테스트 의존성 설치
 python -m pip install -e .[test]
 
-# 2. 테스트 실행 (OPC 쓰기 활성화)
-HWPX_MCP_ENABLE_OPC_WRITE=1 python -m pytest
+# 2. 테스트 실행
+python -m pytest
 ```
 
-`tests/test_mcp_end_to_end.py`는 서버가 노출하는 모든 도구를 실제로 호출하여 텍스트, 표, 메모 편집, OPC 패키지 쓰기, 자동 백업 생성 등 핵심 동작을 완벽하게 검증합니다.
+`tests/test_mcp_end_to_end.py`는 서버가 노출하는 대부분의 도구를 실제로 호출하여 텍스트, 표, 메모 편집, OPC 패키지 읽기, 자동 백업 생성 등 핵심 동작을 완벽하게 검증합니다.
 
 ## 🧑‍💻 개발 참고
 
