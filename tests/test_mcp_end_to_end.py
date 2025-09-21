@@ -357,9 +357,16 @@ def test_table_workflow(
         col=1,
         text="헤더",
         logical=True,
-        dryRun=False,
     )
     assert set_result == {"ok": True}
+
+    merged_state = HwpxDocument.open(doc_path)
+    merged_tables: list = []
+    for paragraph in merged_state.paragraphs:
+        merged_tables.extend(paragraph.tables)
+    merged_anchor = merged_tables[table_index].cell(0, 0)
+    assert merged_anchor.span == (2, 2)
+    assert merged_anchor.text == "헤더"
 
     replace_result = _call(
         tool_map,
@@ -372,7 +379,6 @@ def test_table_workflow(
         values=[["A", "B"], ["C", "D"]],
         logical=True,
         splitMerged=True,
-        dryRun=False,
     )
     assert replace_result["updatedCells"] == 4
 
@@ -734,7 +740,6 @@ def test_failure_paths_raise_runtime_errors(
             startRow=0,
             startCol=0,
             values=[["X"]],
-            dryRun=False,
         )
 
 

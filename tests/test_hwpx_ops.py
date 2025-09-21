@@ -198,10 +198,15 @@ def test_add_table_returns_valid_index(ops_with_sample):
         row=0,
         col=0,
         text="이름",
-        dry_run=False,
     )
 
     assert update == {"ok": True}
+
+    refreshed = HwpxDocument.open(path)
+    refreshed_tables: list = []
+    for paragraph in refreshed.paragraphs:
+        refreshed_tables.extend(paragraph.tables)
+    assert refreshed_tables[index].cell(0, 0).text == "이름"
 
 
 def test_set_table_cell_supports_logical_and_split_flags(ops_with_sample):
@@ -223,7 +228,6 @@ def test_set_table_cell_supports_logical_and_split_flags(ops_with_sample):
         col=1,
         text="Merged anchor",
         logical=True,
-        dry_run=False,
     )
 
     assert logical_result == {"ok": True}
@@ -244,7 +248,6 @@ def test_set_table_cell_supports_logical_and_split_flags(ops_with_sample):
         text="Bottom-right",
         logical=True,
         split_merged=True,
-        dry_run=False,
     )
 
     assert split_result == {"ok": True}
@@ -282,7 +285,6 @@ def test_replace_region_and_split_tool_handle_merged_cells(ops_with_sample):
         values=[["A", "B"], ["C", "D"]],
         logical=True,
         split_merged=True,
-        dry_run=False,
     )
 
     assert region_result["updatedCells"] == 4
