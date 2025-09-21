@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "0.1.1"
+version = "0.1.7"
 description = "Model Context Protocol server for local HWPX document automation."
 readme = "README.md"
-authors = [{ name = "HWPX MCP Team" }]
+authors = [{ name = "Kohkyuhyun" }]
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
