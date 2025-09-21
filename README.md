@@ -54,6 +54,8 @@
 uvx hwpx-mcp-server
 ```
 
+> `uvx` 명령은 첫 실행 시 필요한 종속성을 자동으로 설치하며, 반드시 `python-hwpx 1.9` 이상의 버전이 준비되어야 합니다.
+
 
 > 서버는 실행된 현재 디렉터리를 기준으로 경로를 해석하므로, 별도의 작업 디렉터리 설정 없이 바로 사용할 수 있습니다.
 
@@ -133,7 +135,7 @@ HWPX_MCP_ENABLE_OPC_WRITE=1 python -m pytest
 
 ## 🧑‍💻 개발 참고
 
-  * 이 서버는 `python-hwpx`, `mcp`, `anyio`, `pydantic` 등 순수 파이썬 라이브러리로만 구성됩니다.
+  * 이 서버는 `python-hwpx>=1.9`, `mcp`, `anyio`, `pydantic` 등 순수 파이썬 라이브러리로만 구성됩니다.
   * 모든 도구 핸들러는 `HwpxOps`의 경로 헬퍼와 `HwpxDocument` API를 통해 문서를 안전하게 조작합니다.
   * 파괴적 작업(수정/저장)에는 `dryRun` 플래그를 우선 제공하며, 자동 백업 옵션이 활성화되어 있으면 `.bak` 파일을 생성하여 안정성을 높입니다.
 
