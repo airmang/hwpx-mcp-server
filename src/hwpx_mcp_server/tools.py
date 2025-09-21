@@ -199,7 +199,7 @@ class SetTableCellInput(PathInput):
     text: str
     logical: Optional[bool] = Field(None, alias="logical")
     split_merged: Optional[bool] = Field(None, alias="splitMerged")
-    dry_run: bool = Field(True, alias="dryRun")
+    dry_run: bool = Field(False, alias="dryRun")
 
 
 class SetTableCellOutput(_BaseModel):
@@ -213,7 +213,7 @@ class ReplaceTableRegionInput(PathInput):
     values: Sequence[Sequence[str]]
     logical: Optional[bool] = Field(None, alias="logical")
     split_merged: Optional[bool] = Field(None, alias="splitMerged")
-    dry_run: bool = Field(True, alias="dryRun")
+    dry_run: bool = Field(False, alias="dryRun")
 
 
 class ReplaceTableRegionOutput(_BaseModel):

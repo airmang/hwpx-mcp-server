@@ -592,7 +592,7 @@ class HwpxOps:
         col: int,
         text: str,
         *,
-        dry_run: bool = True,
+        dry_run: bool = False,
         logical: Optional[bool] = None,
         split_merged: Optional[bool] = None,
     ) -> Dict[str, Any]:
@@ -627,7 +627,7 @@ class HwpxOps:
         start_col: int,
         values: Sequence[Sequence[str]],
         *,
-        dry_run: bool = True,
+        dry_run: bool = False,
         logical: Optional[bool] = None,
         split_merged: Optional[bool] = None,
     ) -> Dict[str, Any]:
