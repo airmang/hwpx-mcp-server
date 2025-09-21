@@ -330,6 +330,23 @@ def test_table_workflow(
     tables[table_index].merge_cells(0, 0, 1, 1)
     document.save(doc_path)
 
+    grid_state = _call(
+        tool_map,
+        "get_table_cell_map",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+    )
+    grid = grid_state["grid"]
+    assert grid_state["rowCount"] == 2
+    assert grid_state["columnCount"] == 3
+    assert {(cell["row"], cell["column"]) for row in grid for cell in row} == {
+        (r, c) for r in range(2) for c in range(3)
+    }
+    assert grid[0][0]["rowSpan"] == 2
+    assert grid[0][0]["colSpan"] == 2
+    assert grid[1][1]["anchor"] == {"row": 0, "column": 0}
+
     set_result = _call(
         tool_map,
         "set_table_cell_text",
@@ -358,6 +375,19 @@ def test_table_workflow(
         dryRun=False,
     )
     assert replace_result["updatedCells"] == 4
+
+    post_split_grid = _call(
+        tool_map,
+        "get_table_cell_map",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+    )
+    assert all(
+        cell["rowSpan"] == 1 and cell["colSpan"] == 1
+        for row in post_split_grid["grid"]
+        for cell in row
+    )
 
     document = HwpxDocument.open(doc_path)
     tables = []

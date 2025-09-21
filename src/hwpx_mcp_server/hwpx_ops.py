@@ -528,6 +528,44 @@ class HwpxOps:
         self._save_document(document, resolved)
         return {"tableIndex": index, "cellCount": rows * cols}
 
+    def get_table_cell_map(
+        self,
+        path: str,
+        table_index: int,
+    ) -> Dict[str, Any]:
+        document, _ = self._open_document(path)
+        tables = self._iter_tables(document)
+        try:
+            table = tables[table_index]
+        except IndexError as exc:
+            raise HwpxOperationError("tableIndex out of range") from exc
+
+        grid_positions = table.get_cell_map()
+        serialized: List[List[Dict[str, Any]]] = []
+        for row in grid_positions:
+            row_payload: List[Dict[str, Any]] = []
+            for position in row:
+                anchor_row, anchor_col = position.anchor
+                row_span, col_span = position.span
+                cell_text: Optional[str] = None
+                cell = position.cell
+                if cell is not None:
+                    cell_text = cell.text
+                row_payload.append(
+                    {
+                        "row": position.row,
+                        "column": position.column,
+                        "anchor": {"row": anchor_row, "column": anchor_col},
+                        "rowSpan": row_span,
+                        "colSpan": col_span,
+                        "text": cell_text,
+                    }
+                )
+            serialized.append(row_payload)
+        row_count = len(serialized)
+        column_count = len(serialized[0]) if serialized else 0
+        return {"grid": serialized, "rowCount": row_count, "columnCount": column_count}
+
     def set_table_cell_text(
         self,
         path: str,
