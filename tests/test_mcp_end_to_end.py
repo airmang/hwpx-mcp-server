@@ -83,7 +83,7 @@ def sample_workspace(tmp_path: Path) -> tuple[Path, Path]:
 @pytest.fixture()
 def ops(sample_workspace: tuple[Path, Path]) -> HwpxOps:
     workspace, _ = sample_workspace
-    return HwpxOps(base_directory=workspace, auto_backup=True, enable_opc_write=True)
+    return HwpxOps(base_directory=workspace, auto_backup=True)
 
 
 @pytest.fixture()
@@ -506,122 +506,6 @@ def test_shape_control_and_memo_tools(
     assert anchor_id in remaining_ids
 
 
-def test_package_tools_with_and_without_writes(
-    ops: HwpxOps,
-    tool_map: Dict[str, ToolDefinition],
-    sample_workspace: tuple[Path, Path],
-) -> None:
-    _, doc_path = sample_workspace
-    rel_path = doc_path.name
-
-    parts = _call(tool_map, "package_parts", ops, path=rel_path)["parts"]
-    assert "Contents/section0.xml" in parts
-    target_part = "Contents/section0.xml"
-
-    text_payload = _call(
-        tool_map,
-        "package_get_text",
-        ops,
-        path=rel_path,
-        partName=target_part,
-    )["text"]
-
-    dry_text = _call(
-        tool_map,
-        "package_set_text",
-        ops,
-        path=rel_path,
-        partName=target_part,
-        text=text_payload,
-        dryRun=True,
-    )
-    assert dry_text == {"updated": False}
-
-    xml_payload = _call(
-        tool_map,
-        "package_get_xml",
-        ops,
-        path=rel_path,
-        partName=target_part,
-    )["xmlString"]
-
-    dry_xml = _call(
-        tool_map,
-        "package_set_xml",
-        ops,
-        path=rel_path,
-        partName=target_part,
-        xmlString=xml_payload,
-        dryRun=True,
-    )
-    assert dry_xml == {"updated": False}
-
-    modified_text = text_payload.replace("Hello HWPX!", "Hello HWPX! (patched)")
-    live_text = _call(
-        tool_map,
-        "package_set_text",
-        ops,
-        path=rel_path,
-        partName=target_part,
-        text=modified_text,
-        dryRun=False,
-    )
-    assert live_text == {"updated": True}
-
-    after_text = _call(
-        tool_map,
-        "package_get_text",
-        ops,
-        path=rel_path,
-        partName=target_part,
-    )["text"]
-    assert "Hello HWPX! (patched)" in after_text
-
-    xml_after_text = _call(
-        tool_map,
-        "package_get_xml",
-        ops,
-        path=rel_path,
-        partName=target_part,
-    )["xmlString"]
-
-    modified_xml = xml_after_text.replace(
-        "Table below demonstrates cell editing.",
-        "Table below demonstrates cell editing (XML).",
-    )
-    live_xml = _call(
-        tool_map,
-        "package_set_xml",
-        ops,
-        path=rel_path,
-        partName=target_part,
-        xmlString=modified_xml,
-        dryRun=False,
-    )
-    assert live_xml == {"updated": True}
-
-    final_text = _call(
-        tool_map,
-        "package_get_text",
-        ops,
-        path=rel_path,
-        partName=target_part,
-    )["text"]
-    assert "Table below demonstrates cell editing (XML)." in final_text
-
-    backup = doc_path.with_suffix(doc_path.suffix + ".bak")
-    assert backup.exists()
-    backup_text = _call(
-        tool_map,
-        "package_get_text",
-        ops,
-        path=backup.name,
-        partName=target_part,
-    )["text"]
-    assert "Hello HWPX! (patched)" in backup_text
-    assert "Table below demonstrates cell editing (XML)." not in backup_text
-
-
 def test_save_operations_and_blank_document(
     ops: HwpxOps,
     tool_map: Dict[str, ToolDefinition],
@@ -724,7 +608,7 @@ def test_failure_paths_raise_runtime_errors(
     sample_workspace: tuple[Path, Path],
 ) -> None:
     workspace, doc_path = sample_workspace
-    ops = HwpxOps(base_directory=workspace, auto_backup=True, enable_opc_write=True)
+    ops = HwpxOps(base_directory=workspace, auto_backup=True)
     rel_path = doc_path.name
 
     with pytest.raises(FileNotFoundError):

@@ -47,12 +47,10 @@ class HwpxOps:
         base_directory: Path | None = None,
         paging_paragraph_limit: int = DEFAULT_PAGING_PARAGRAPH_LIMIT,
         auto_backup: bool = False,
-        enable_opc_write: bool = False,
     ) -> None:
         self.base_directory = (base_directory or Path.cwd()).expanduser().resolve()
         self.paging_limit = max(1, paging_paragraph_limit)
         self.auto_backup = auto_backup
-        self.enable_opc_write = enable_opc_write
 
     # ------------------------------------------------------------------
     # Basic helpers
@@ -257,25 +255,6 @@ class HwpxOps:
         text = package.get_text(part_name, encoding=encoding or "utf-8")
         return {"text": text}
 
-    def package_set_text(
-        self,
-        path: str,
-        part_name: str,
-        text: str,
-        *,
-        encoding: str | None = None,
-        dry_run: bool = True,
-    ) -> Dict[str, Any]:
-        if not self.enable_opc_write:
-            raise PermissionError("OPC write access is disabled by default")
-        resolved = self._resolve_path(path)
-        package = HwpxPackage.open(resolved)
-        package.set_part(part_name, text.encode(encoding or "utf-8"))
-        if dry_run:
-            return {"updated": False}
-        self._maybe_backup(resolved)
-        package.save(resolved)
-        return {"updated": True}
 
     # ------------------------------------------------------------------
     # Text extraction
@@ -1200,24 +1179,3 @@ class HwpxOps:
         xml_string = ET.tostring(element, encoding="unicode")
         return {"xmlString": xml_string}
 
-    def package_set_xml(
-        self,
-        path: str,
-        part_name: str,
-        xml_string: str,
-        *,
-        dry_run: bool = True,
-    ) -> Dict[str, Any]:
-        if not self.enable_opc_write:
-            raise PermissionError("OPC write access is disabled by default")
-        resolved = self._resolve_path(path)
-        from xml.etree import ElementTree as ET
-
-        element = ET.fromstring(xml_string)
-        package = HwpxPackage.open(resolved)
-        package.set_xml(part_name, element)
-        if dry_run:
-            return {"updated": False}
-        self._maybe_backup(resolved)
-        package.save(resolved)
-        return {"updated": True}
