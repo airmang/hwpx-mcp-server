@@ -47,15 +47,6 @@ class PackageTextOutput(_BaseModel):
     text: str
 
 
-class PackageSetTextInput(PackageTextInput):
-    text: str
-    dry_run: bool = Field(True, alias="dryRun")
-
-
-class UpdatedOutput(_BaseModel):
-    updated: bool
-
-
 class ReadTextInput(PathInput):
     offset: int = 0
     limit: Optional[int] = None
@@ -400,11 +391,6 @@ class PackageXmlOutput(_BaseModel):
     xmlString: str
 
 
-class PackageSetXmlInput(PackageXmlInput):
-    xml_string: str = Field(alias="xmlString")
-    dry_run: bool = Field(True, alias="dryRun")
-
-
 @dataclass
 class ToolDefinition:
     name: str
@@ -472,13 +458,6 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=PackageTextInput,
             output_model=PackageTextOutput,
             func=_simple("package_get_text"),
-        ),
-        ToolDefinition(
-            name="package_set_text",
-            description="Write text into an OPC part (requires OPC write flag).",
-            input_model=PackageSetTextInput,
-            output_model=UpdatedOutput,
-            func=_simple("package_set_text"),
         ),
         ToolDefinition(
             name="read_text",
@@ -699,12 +678,5 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=PackageXmlInput,
             output_model=PackageXmlOutput,
             func=_simple("package_get_xml"),
-        ),
-        ToolDefinition(
-            name="package_set_xml",
-            description="Write XML into an OPC part (requires OPC write flag).",
-            input_model=PackageSetXmlInput,
-            output_model=UpdatedOutput,
-            func=_simple("package_set_xml"),
         ),
     ]

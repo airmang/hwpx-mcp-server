@@ -89,7 +89,6 @@ def main() -> int:
         base_directory=base_directory,
         paging_paragraph_limit=paging_value,
         auto_backup=_bool_env("HWPX_MCP_AUTOBACKUP"),
-        enable_opc_write=_bool_env("HWPX_MCP_ENABLE_OPC_WRITE"),
     )
 
     tools = build_tool_definitions()
