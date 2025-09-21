@@ -337,11 +337,24 @@ class HwpxOps:
         *,
         is_regex: bool = False,
         max_results: int = 100,
+        context_radius: int = 80,
     ) -> Dict[str, Any]:
         if not query:
             raise ValueError("query must be a non-empty string")
         resolved = self._resolve_path(path)
         matches: List[Dict[str, Any]] = []
+        radius = max(0, context_radius)
+
+        def build_context(text: str, start: int, end: int) -> str:
+            context_start = max(0, start - radius)
+            context_end = min(len(text), end + radius)
+            snippet = text[context_start:context_end]
+            if context_start > 0:
+                snippet = "..." + snippet
+            if context_end < len(text):
+                snippet = snippet + "..."
+            return snippet
+
         pattern = re.compile(query) if is_regex else None
         with TextExtractor(resolved) as extractor:
             for paragraph in extractor.iter_document_paragraphs():
@@ -353,7 +366,7 @@ class HwpxOps:
                                 "paragraphIndex": paragraph.index,
                                 "start": match.start(),
                                 "end": match.end(),
-                                "context": text,
+                                "context": build_context(text, match.start(), match.end()),
                             }
                         )
                         if len(matches) >= max_results:
@@ -369,7 +382,7 @@ class HwpxOps:
                                 "paragraphIndex": paragraph.index,
                                 "start": found,
                                 "end": found + len(query),
-                                "context": text,
+                                "context": build_context(text, found, found + len(query)),
                             }
                         )
                         if len(matches) >= max_results:

@@ -80,6 +80,7 @@ class FindInput(PathInput):
     query: str
     is_regex: bool = Field(False, alias="isRegex")
     max_results: int = Field(100, alias="maxResults")
+    context_radius: int = Field(80, alias="contextRadius")
 
 
 class MatchResult(_BaseModel):

@@ -100,6 +100,23 @@ uvx hwpx-mcp-server
 
 \</details\>
 
+### 🔍 검색 문맥 길이 조절
+
+`find` 도구는 각 일치 항목 주변의 전후 80자를 기본으로 잘라 `context` 스니펫을 반환하며, 잘린 경우 문자열 앞뒤에 `...`이 붙습니다. 더 넓은 범위가 필요하면 `contextRadius` 인수를 사용해 유지할 문자 수를 조정할 수 있습니다.
+
+```jsonc
+{
+  "name": "find",
+  "arguments": {
+    "path": "sample.hwpx",
+    "query": "HWPX",
+    "contextRadius": 200
+  }
+}
+```
+
+`contextRadius` 값은 일치 구간 앞뒤 각각에 포함할 문자 수를 의미합니다.
+
 ### 📐 표 편집 고급 옵션
 
 `get_table_cell_map` 도구를 사용하면 표의 전체 격자를 그대로 직렬화하여 각 위치가 어느 앵커 셀(`anchor`)에 속하는지, 병합 범위(`rowSpan`, `colSpan`)는 얼마인지 한눈에 확인할 수 있습니다. 응답은 항상 행×열 전체를 채우며, 각 위치에 대해 `row`/`column` 좌표와 병합된 앵커 셀의 텍스트를 알려 줍니다.

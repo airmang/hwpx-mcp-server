@@ -4,6 +4,7 @@ import pytest
 
 from hwpx.document import HwpxDocument
 from hwpx_mcp_server.hwpx_ops import HwpxOps
+import hwpx_mcp_server.hwpx_ops as ops_module
 from hwpx_mcp_server.tools import build_tool_definitions
 
 
@@ -38,6 +39,48 @@ def test_find_returns_matches(ops_with_sample):
     matches = ops.find(str(path), "HWPX")
     assert matches["matches"]
     assert any("HWPX" in match["context"] for match in matches["matches"])
+
+
+def test_find_truncates_context_and_respects_radius(monkeypatch, tmp_path):
+    text = "A" * 200 + "needle" + "B" * 200
+
+    class FakeParagraph:
+        def __init__(self, index: int, content: str) -> None:
+            self.index = index
+            self._content = content
+
+        def text(self) -> str:
+            return self._content
+
+    class FakeExtractor:
+        def __init__(self, path):
+            self.path = path
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def iter_document_paragraphs(self):
+            yield FakeParagraph(0, text)
+
+    monkeypatch.setattr(ops_module, "TextExtractor", FakeExtractor)
+
+    ops = HwpxOps(base_directory=tmp_path)
+    dummy = tmp_path / "dummy.hwpx"
+    dummy.write_bytes(b"")
+
+    default = ops.find(dummy.name, "needle")
+    context = default["matches"][0]["context"]
+    assert context.startswith("...")
+    assert context.endswith("...")
+    assert len(context) < len(text)
+    assert "needle" in context
+
+    expanded = ops.find(dummy.name, "needle", context_radius=500)
+    expanded_context = expanded["matches"][0]["context"]
+    assert expanded_context == text
 
 
 def test_replace_text_in_runs_dry_run_does_not_modify(ops_with_sample):
