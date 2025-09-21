@@ -222,3 +222,59 @@ def test_replace_region_and_split_tool_handle_merged_cells(ops_with_sample):
         split_tables.extend(paragraph.tables)
     column_cell = split_tables[index].cell(0, 2)
     assert column_cell.span == (1, 1)
+
+
+def test_get_table_cell_map_serializes_grid_with_merges(ops_with_sample):
+    ops, path = ops_with_sample
+    table_info = ops.add_table(str(path), rows=3, cols=3)
+    index = table_info["tableIndex"]
+
+    document = HwpxDocument.open(path)
+    tables: list = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    target_table = tables[index]
+    for row in range(3):
+        for col in range(3):
+            target_table.cell(row, col).text = f"R{row}C{col}"
+    target_table.merge_cells(0, 0, 1, 1)
+    target_table.merge_cells(0, 2, 2, 2)
+    document.save(path)
+
+    grid_info = ops.get_table_cell_map(str(path), table_index=index)
+    grid = grid_info["grid"]
+
+    assert grid_info["rowCount"] == 3
+    assert grid_info["columnCount"] == 3
+    assert all(len(row) == 3 for row in grid)
+
+    coords = {(cell["row"], cell["column"]) for row in grid for cell in row}
+    assert coords == {(r, c) for r in range(3) for c in range(3)}
+
+    top_left = grid[0][0]
+    assert top_left == {
+        "row": 0,
+        "column": 0,
+        "anchor": {"row": 0, "column": 0},
+        "rowSpan": 2,
+        "colSpan": 2,
+        "text": "R0C0",
+    }
+
+    overlapped = grid[1][1]
+    assert overlapped["anchor"] == {"row": 0, "column": 0}
+    assert overlapped["rowSpan"] == 2
+    assert overlapped["colSpan"] == 2
+    assert overlapped["text"] == "R0C0"
+
+    vertical_anchor = grid[0][2]
+    assert vertical_anchor["anchor"] == {"row": 0, "column": 2}
+    assert vertical_anchor["rowSpan"] == 3
+    assert vertical_anchor["colSpan"] == 1
+    assert vertical_anchor["text"] == "R0C2"
+
+    bottom_left = grid[2][0]
+    assert bottom_left["anchor"] == {"row": 2, "column": 0}
+    assert bottom_left["rowSpan"] == 1
+    assert bottom_left["colSpan"] == 1
+    assert bottom_left["text"] == "R2C0"

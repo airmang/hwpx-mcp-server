@@ -167,6 +167,30 @@ class AddTableOutput(_BaseModel):
     cellCount: int
 
 
+class TableCellAnchor(_BaseModel):
+    row: int
+    column: int
+
+
+class TableCellPosition(_BaseModel):
+    row: int
+    column: int
+    anchor: TableCellAnchor
+    rowSpan: int
+    colSpan: int
+    text: Optional[str] = None
+
+
+class GetTableCellMapInput(PathInput):
+    table_index: int = Field(alias="tableIndex")
+
+
+class TableCellMapOutput(_BaseModel):
+    rowCount: int
+    columnCount: int
+    grid: List[List[TableCellPosition]]
+
+
 class SetTableCellInput(PathInput):
     table_index: int = Field(alias="tableIndex")
     row: int
@@ -510,6 +534,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=AddTableInput,
             output_model=AddTableOutput,
             func=_simple("add_table"),
+        ),
+        ToolDefinition(
+            name="get_table_cell_map",
+            description="Return the logical grid coverage for a table, including merged spans.",
+            input_model=GetTableCellMapInput,
+            output_model=TableCellMapOutput,
+            func=_simple("get_table_cell_map"),
         ),
         ToolDefinition(
             name="set_table_cell_text",

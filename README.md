@@ -85,7 +85,7 @@ uvx hwpx-mcp-server
   - **문서 편집**
       - `replace_text_in_runs`: 스타일을 보존하며 텍스트 치환
       - `add_paragraph`, `insert_paragraphs_bulk`: 문단 추가
-      - `add_table`, `set_table_cell_text`, `replace_table_region`, `split_table_cell`: 표 생성·편집 및 병합 해제
+      - `add_table`, `get_table_cell_map`, `set_table_cell_text`, `replace_table_region`, `split_table_cell`: 표 생성·편집 및 병합 해제
       - `add_shape`, `add_control`: 개체 추가
       - `add_memo`, `attach_memo_field`, `add_memo_with_anchor`, `remove_memo`: 메모 관리
   - **스타일링**
@@ -102,7 +102,33 @@ uvx hwpx-mcp-server
 
 ### 📐 표 편집 고급 옵션
 
-`set_table_cell_text`와 `replace_table_region`은 선택적인 `logical`/`splitMerged` 플래그를 지원합니다. `logical: true`로 지정하면 병합된 셀을 포함한 논리 좌표계를 그대로 사용할 수 있고, `splitMerged: true`를 함께 전달하면 쓰기 전에 자동으로 해당 병합 영역을 분할합니다. 병합을 직접 해제해야 할 때는 `split_table_cell` 도구가 원래 범위를 알려주면서 셀을 분할합니다.
+`get_table_cell_map` 도구를 사용하면 표의 전체 격자를 그대로 직렬화하여 각 위치가 어느 앵커 셀(`anchor`)에 속하는지, 병합 범위(`rowSpan`, `colSpan`)는 얼마인지 한눈에 확인할 수 있습니다. 응답은 항상 행×열 전체를 채우며, 각 위치에 대해 `row`/`column` 좌표와 병합된 앵커 셀의 텍스트를 알려 줍니다.
+
+```jsonc
+{
+  "name": "get_table_cell_map",
+  "arguments": {"path": "sample.hwpx", "tableIndex": 0},
+  "result": {
+    "rowCount": 3,
+    "columnCount": 3,
+    "grid": [
+      [
+        {"row": 0, "column": 0, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
+        {"row": 0, "column": 1, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
+        {"row": 0, "column": 2, "anchor": {"row": 0, "column": 2}, "rowSpan": 3, "colSpan": 1, "text": "요약"}
+      ],
+      [
+        {"row": 1, "column": 0, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
+        {"row": 1, "column": 1, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
+        {"row": 1, "column": 2, "anchor": {"row": 0, "column": 2}, "rowSpan": 3, "colSpan": 1, "text": "요약"}
+      ],
+      "... 생략 ..."
+    ]
+  }
+}
+```
+
+`set_table_cell_text`와 `replace_table_region`은 선택적인 `logical`/`splitMerged` 플래그를 지원합니다. `logical: true`로 지정하면 방금 확인한 논리 좌표계를 그대로 사용할 수 있고, `splitMerged: true`를 함께 전달하면 쓰기 전에 자동으로 해당 병합 영역을 분할합니다. 병합을 직접 해제해야 할 때는 `split_table_cell` 도구가 원래 범위를 알려주면서 셀을 분할합니다.
 
 ```jsonc
 {
