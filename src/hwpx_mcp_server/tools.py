@@ -172,6 +172,8 @@ class SetTableCellInput(PathInput):
     row: int
     col: int
     text: str
+    logical: Optional[bool] = Field(None, alias="logical")
+    split_merged: Optional[bool] = Field(None, alias="splitMerged")
     dry_run: bool = Field(True, alias="dryRun")
 
 
@@ -184,11 +186,26 @@ class ReplaceTableRegionInput(PathInput):
     start_row: int = Field(alias="startRow")
     start_col: int = Field(alias="startCol")
     values: Sequence[Sequence[str]]
+    logical: Optional[bool] = Field(None, alias="logical")
+    split_merged: Optional[bool] = Field(None, alias="splitMerged")
     dry_run: bool = Field(True, alias="dryRun")
 
 
 class ReplaceTableRegionOutput(_BaseModel):
     updatedCells: int
+
+
+class SplitTableCellInput(PathInput):
+    table_index: int = Field(alias="tableIndex")
+    row: int
+    col: int
+
+
+class SplitTableCellOutput(_BaseModel):
+    startRow: int
+    startCol: int
+    rowSpan: int
+    colSpan: int
 
 
 class AddShapeInput(PathInput):
@@ -507,6 +524,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ReplaceTableRegionInput,
             output_model=ReplaceTableRegionOutput,
             func=_simple("replace_table_region"),
+        ),
+        ToolDefinition(
+            name="split_table_cell",
+            description="Split a merged table cell back into individual cells and report the original span.",
+            input_model=SplitTableCellInput,
+            output_model=SplitTableCellOutput,
+            func=_simple("split_table_cell"),
         ),
         ToolDefinition(
             name="add_shape",
