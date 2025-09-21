@@ -85,7 +85,7 @@ uvx hwpx-mcp-server
   - **문서 편집**
       - `replace_text_in_runs`: 스타일을 보존하며 텍스트 치환
       - `add_paragraph`, `insert_paragraphs_bulk`: 문단 추가
-      - `add_table`, `set_table_cell_text`, `replace_table_region`: 표 생성 및 편집
+      - `add_table`, `set_table_cell_text`, `replace_table_region`, `split_table_cell`: 표 생성·편집 및 병합 해제
       - `add_shape`, `add_control`: 개체 추가
       - `add_memo`, `attach_memo_field`, `add_memo_with_anchor`, `remove_memo`: 메모 관리
   - **스타일링**
@@ -99,6 +99,38 @@ uvx hwpx-mcp-server
       - `validate_structure`, `lint_text_conventions`: 문서 구조 검증 및 텍스트 린트
 
 \</details\>
+
+### 📐 표 편집 고급 옵션
+
+`set_table_cell_text`와 `replace_table_region`은 선택적인 `logical`/`splitMerged` 플래그를 지원합니다. `logical: true`로 지정하면 병합된 셀을 포함한 논리 좌표계를 그대로 사용할 수 있고, `splitMerged: true`를 함께 전달하면 쓰기 전에 자동으로 해당 병합 영역을 분할합니다. 병합을 직접 해제해야 할 때는 `split_table_cell` 도구가 원래 범위를 알려주면서 셀을 분할합니다.
+
+```jsonc
+{
+  "name": "set_table_cell_text",
+  "arguments": {
+    "path": "sample.hwpx",
+    "tableIndex": 0,
+    "row": 1,
+    "col": 1,
+    "text": "논리 좌표 편집",
+    "logical": true,
+    "splitMerged": true,
+    "dryRun": false
+  }
+}
+```
+
+위 예시는 2×2로 병합된 셀에 논리 좌표 `(1, 1)`을 지정하여 자동 분할 후 텍스트를 기록합니다. 분할 여부와 원래 범위를 확인하려면 `split_table_cell`을 호출하세요.
+
+```jsonc
+{
+  "name": "split_table_cell",
+  "arguments": {"path": "sample.hwpx", "tableIndex": 0, "row": 0, "col": 0},
+  "result": {"startRow": 0, "startCol": 0, "rowSpan": 2, "colSpan": 2}
+}
+```
+
+응답의 `rowSpan`/`colSpan` 값은 분할되기 전 병합 범위를 알려주므로, 프런트엔드 클라이언트가 UI 상태를 즉시 갱신할 수 있습니다.
 
 ## ☢️ 고급 기능: 직접 OPC 패키지 조작
 

@@ -318,10 +318,17 @@ def test_table_workflow(
         ops,
         path=rel_path,
         rows=2,
-        cols=2,
+        cols=3,
     )
     table_index = table_result["tableIndex"]
-    assert table_result["cellCount"] == 4
+    assert table_result["cellCount"] == 6
+
+    document = HwpxDocument.open(doc_path)
+    tables: list = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    tables[table_index].merge_cells(0, 0, 1, 1)
+    document.save(doc_path)
 
     set_result = _call(
         tool_map,
@@ -329,9 +336,10 @@ def test_table_workflow(
         ops,
         path=rel_path,
         tableIndex=table_index,
-        row=0,
-        col=0,
+        row=1,
+        col=1,
         text="헤더",
+        logical=True,
         dryRun=False,
     )
     assert set_result == {"ok": True}
@@ -345,6 +353,8 @@ def test_table_workflow(
         startRow=0,
         startCol=0,
         values=[["A", "B"], ["C", "D"]],
+        logical=True,
+        splitMerged=True,
         dryRun=False,
     )
     assert replace_result["updatedCells"] == 4
@@ -353,11 +363,31 @@ def test_table_workflow(
     tables = []
     for paragraph in document.paragraphs:
         tables.extend(paragraph.tables)
+    tables[table_index].merge_cells(0, 2, 1, 2)
+    document.save(doc_path)
+
+    split_meta = _call(
+        tool_map,
+        "split_table_cell",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        row=0,
+        col=2,
+    )
+
+    assert split_meta == {"startRow": 0, "startCol": 2, "rowSpan": 2, "colSpan": 1}
+
+    document = HwpxDocument.open(doc_path)
+    tables = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
     target_table = tables[table_index]
-    assert [[target_table.cell(r, c).text for c in range(target_table.column_count)] for r in range(target_table.row_count)] == [
-        ["A", "B"],
-        ["C", "D"],
-    ]
+    assert target_table.cell(0, 0).span == (1, 1)
+    assert target_table.cell(0, 0).text == "A"
+    assert target_table.cell(0, 1).text == "B"
+    assert target_table.cell(1, 0).text == "C"
+    assert target_table.cell(1, 1).text == "D"
 
 
 def test_shape_control_and_memo_tools(

@@ -537,6 +537,8 @@ class HwpxOps:
         text: str,
         *,
         dry_run: bool = True,
+        logical: Optional[bool] = None,
+        split_merged: Optional[bool] = None,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         tables = self._iter_tables(document)
@@ -544,7 +546,19 @@ class HwpxOps:
             table = tables[table_index]
         except IndexError as exc:
             raise HwpxOperationError("tableIndex out of range") from exc
-        table.set_cell_text(row, col, text)
+        kwargs: Dict[str, bool] = {}
+        if logical is not None:
+            kwargs["logical"] = logical
+        if split_merged is not None:
+            kwargs["split_merged"] = split_merged
+        guidance = (
+            "failed to update table cell; check indexes, enable logical addressing, "
+            "or split merged cells first"
+        )
+        try:
+            table.set_cell_text(row, col, text, **kwargs)
+        except (IndexError, ValueError) as exc:
+            raise HwpxOperationError(f"{guidance}: {exc}") from exc
         if not dry_run:
             self._save_document(document, resolved)
         return {"ok": True}
@@ -558,6 +572,8 @@ class HwpxOps:
         values: Sequence[Sequence[str]],
         *,
         dry_run: bool = True,
+        logical: Optional[bool] = None,
+        split_merged: Optional[bool] = None,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         tables = self._iter_tables(document)
@@ -565,14 +581,69 @@ class HwpxOps:
             table = tables[table_index]
         except IndexError as exc:
             raise HwpxOperationError("tableIndex out of range") from exc
+        kwargs: Dict[str, bool] = {}
+        if logical is not None:
+            kwargs["logical"] = logical
+        if split_merged is not None:
+            kwargs["split_merged"] = split_merged
+        guidance = (
+            "failed to update table cell; check indexes, enable logical addressing, "
+            "or split merged cells first"
+        )
         updated = 0
         for row_offset, row_values in enumerate(values):
             for col_offset, cell_text in enumerate(row_values):
-                table.set_cell_text(start_row + row_offset, start_col + col_offset, cell_text)
+                logical_row = start_row + row_offset
+                logical_col = start_col + col_offset
+                try:
+                    table.set_cell_text(logical_row, logical_col, cell_text, **kwargs)
+                except (IndexError, ValueError) as exc:
+                    message = (
+                        f"{guidance} while writing cell ({logical_row}, {logical_col})"
+                    )
+                    raise HwpxOperationError(f"{message}: {exc}") from exc
                 updated += 1
         if not dry_run:
             self._save_document(document, resolved)
         return {"updatedCells": updated}
+
+    def split_table_cell(
+        self,
+        path: str,
+        table_index: int,
+        row: int,
+        col: int,
+    ) -> Dict[str, Any]:
+        document, resolved = self._open_document(path)
+        tables = self._iter_tables(document)
+        try:
+            table = tables[table_index]
+        except IndexError as exc:
+            raise HwpxOperationError("tableIndex out of range") from exc
+        try:
+            target = table.cell(row, col)
+        except (IndexError, ValueError) as exc:
+            raise HwpxOperationError(
+                "table cell coordinates out of range; enable logical addressing to verify merged grids"
+            ) from exc
+        anchor_row, anchor_col = target.address
+        span_row, span_col = target.span
+        changed = span_row > 1 or span_col > 1
+        guidance = (
+            "failed to split merged cell; check indexes or split manually if logical addressing shows overlaps"
+        )
+        try:
+            table.split_merged_cell(row, col)
+        except (IndexError, ValueError) as exc:
+            raise HwpxOperationError(f"{guidance}: {exc}") from exc
+        if changed:
+            self._save_document(document, resolved)
+        return {
+            "startRow": anchor_row,
+            "startCol": anchor_col,
+            "rowSpan": span_row,
+            "colSpan": span_col,
+        }
 
     def add_shape(
         self,
