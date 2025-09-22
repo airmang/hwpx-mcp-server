@@ -92,6 +92,59 @@ def test_read_text_uses_default_limit(monkeypatch, tmp_path):
     assert expanded["nextOffset"] == expanded_limit
 
 
+def test_read_text_consumes_only_requested_slice(monkeypatch, tmp_path):
+    class TrackingParagraph:
+        def __init__(self, index: int) -> None:
+            self.index = index
+            self._content = f"Paragraph {index}"
+            self.text_calls = 0
+
+        def text(
+            self,
+            *,
+            annotations=None,
+            preserve_breaks: bool = False,
+        ) -> str:
+            self.text_calls += 1
+            return self._content
+
+    paragraphs = [TrackingParagraph(index) for index in range(10)]
+    yielded_indexes: list[int] = []
+
+    class FakeExtractor:
+        def __init__(self, path):
+            self.path = path
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def iter_document_paragraphs(self):
+            for paragraph in paragraphs:
+                yielded_indexes.append(paragraph.index)
+                yield paragraph
+
+    monkeypatch.setattr(ops_module, "TextExtractor", FakeExtractor)
+
+    ops = HwpxOps(base_directory=tmp_path)
+    dummy = tmp_path / "dummy.hwpx"
+    dummy.write_bytes(b"")
+
+    offset = 2
+    limit = 2
+    result = ops.read_text(dummy.name, offset=offset, limit=limit)
+
+    assert result["textChunk"] == "Paragraph 2\nParagraph 3"
+    assert result["nextOffset"] == offset + limit
+    assert yielded_indexes == [0, 1, 2, 3, 4]
+
+    for index, paragraph in enumerate(paragraphs):
+        expected_calls = 1 if offset <= index < offset + limit else 0
+        assert paragraph.text_calls == expected_calls
+
+
 def test_find_returns_matches(ops_with_sample):
     ops, path = ops_with_sample
     matches = ops.find(str(path), "HWPX")

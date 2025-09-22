@@ -282,16 +282,30 @@ class HwpxOps:
             )
         paragraphs: List[str] = []
         next_offset: Optional[int] = None
+        start = max(0, offset)
         with TextExtractor(resolved) as extractor:
-            all_paragraphs = list(extractor.iter_document_paragraphs())
-            start = max(0, offset)
-            slice_end = min(len(all_paragraphs), start + effective_limit)
-            for para in all_paragraphs[start:slice_end]:
-                paragraphs.append(
-                    para.text(annotations=annotations, preserve_breaks=True)
-                )
-            if slice_end < len(all_paragraphs):
-                next_offset = slice_end
+            paragraph_iter = extractor.iter_document_paragraphs()
+            sentinel = object()
+
+            skip_exhausted = False
+            for _ in range(start):
+                if next(paragraph_iter, sentinel) is sentinel:
+                    skip_exhausted = True
+                    break
+
+            if not skip_exhausted:
+                while len(paragraphs) < effective_limit:
+                    paragraph = next(paragraph_iter, sentinel)
+                    if paragraph is sentinel:
+                        break
+                    paragraphs.append(
+                        paragraph.text(annotations=annotations, preserve_breaks=True)
+                    )
+
+                if len(paragraphs) == effective_limit:
+                    if next(paragraph_iter, sentinel) is not sentinel:
+                        next_offset = start + len(paragraphs)
+
         return {"textChunk": "\n".join(paragraphs), "nextOffset": next_offset}
 
     def get_paragraphs(
