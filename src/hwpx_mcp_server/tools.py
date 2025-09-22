@@ -59,6 +59,21 @@ class ReadTextOutput(_BaseModel):
     nextOffset: Optional[int]
 
 
+class ReadParagraphsInput(PathInput):
+    paragraph_indexes: Sequence[int] = Field(alias="paragraphIndexes")
+    with_highlights: bool = Field(False, alias="withHighlights")
+    with_footnotes: bool = Field(False, alias="withFootnotes")
+
+
+class ParagraphText(_BaseModel):
+    paragraphIndex: int
+    text: str
+
+
+class ReadParagraphsOutput(_BaseModel):
+    paragraphs: List[ParagraphText]
+
+
 class TextExtractReportInput(PathInput):
     mode: str = "plain"
 
@@ -465,6 +480,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ReadTextInput,
             output_model=ReadTextOutput,
             func=_simple("read_text"),
+        ),
+        ToolDefinition(
+            name="read_paragraphs",
+            description="Read specific paragraphs by index.",
+            input_model=ReadParagraphsInput,
+            output_model=ReadParagraphsOutput,
+            func=_simple("get_paragraphs"),
         ),
         ToolDefinition(
             name="text_extract_report",

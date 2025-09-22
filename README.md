@@ -80,7 +80,7 @@ uvx hwpx-mcp-server
       - `list_sections`, `list_headers`: 섹션/헤더 구조 탐색
       - `list_master_pages_histories_versions`: 마스터 페이지/히스토리/버전 요약
   - **콘텐츠 추출 및 검색**
-      - `read_text`, `text_extract_report`: 페이지네이션 및 주석 포함 텍스트 추출
+      - `read_text`, `read_paragraphs`, `text_extract_report`: 페이지네이션, 선택 문단, 주석 포함 텍스트 추출
       - `find`, `find_runs_by_style`: 텍스트 검색 및 스타일 기반 검색
   - **문서 편집**
       - `replace_text_in_runs`: 스타일을 보존하며 텍스트 치환
@@ -99,6 +99,24 @@ uvx hwpx-mcp-server
       - `validate_structure`, `lint_text_conventions`: 문서 구조 검증 및 텍스트 린트
 
 \</details\>
+
+### 🎯 필요한 문단만 빠르게 읽기
+
+대용량 문서를 순차적으로 확인할 때는 `read_text` 페이지네이션이 편리하지만, 특정 문단만 바로 확인하고 싶을 때는 `read_paragraphs` 도구가 더 적합합니다. `paragraphIndexes` 배열에 원하는 문단 번호만 전달하면, 요청한 문단만 순서대로 반환합니다. 각 항목에는 원본 문단 인덱스(`paragraphIndex`)와 추출된 텍스트가 함께 포함되므로, 이전 호출에서 기억한 문단을 정확히 다시 불러올 수 있습니다.
+
+```jsonc
+{
+  "name": "read_paragraphs",
+  "arguments": {
+    "path": "sample.hwpx",
+    "paragraphIndexes": [1, 4, 9],
+    "withHighlights": false,
+    "withFootnotes": false
+  }
+}
+```
+
+선택된 문단만 처리하므로 큰 문서를 반복해서 탐색할 때 불필요한 텍스트 복사를 줄이고, 하이라이트/각주 옵션도 `read_text`와 동일하게 활용할 수 있습니다. 존재하지 않는 인덱스를 요청하면 오류가 발생하므로, 이전에 받은 문단 개수 정보를 활용해 안전하게 요청하세요.
 
 ### 🔍 검색 문맥 길이 조절
 
