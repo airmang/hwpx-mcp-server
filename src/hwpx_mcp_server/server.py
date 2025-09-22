@@ -42,10 +42,39 @@ def _resolve_version() -> str:
 async def _serve(ops: HwpxOps, tools: List[ToolDefinition]) -> None:
     server = Server(DEFAULT_SERVER_NAME, version=_resolve_version())
     tool_map: Dict[str, ToolDefinition] = {tool.name: tool for tool in tools}
+    cached_tools: List[types.Tool] | None = None
+    page_size = 31
 
-    @server.list_tools()
-    async def _list_tools() -> List[types.Tool]:  # type: ignore[name-defined]
-        return [tool.to_tool() for tool in tools]
+    async def _list_tools(req: types.ListToolsRequest | None) -> types.ServerResult:
+        nonlocal cached_tools
+
+        if cached_tools is None or len(cached_tools) != len(tools):
+            cached_tools = [tool.to_tool() for tool in tools]
+            server._tool_cache.clear()
+            for tool in cached_tools:
+                server._tool_cache[tool.name] = tool
+
+        cursor_value = "0"
+        if req is not None and req.params and req.params.cursor is not None:
+            cursor_value = req.params.cursor
+
+        try:
+            start = int(cursor_value)
+        except (TypeError, ValueError):
+            start = 0
+
+        if start < 0:
+            start = 0
+
+        page_tools = cached_tools[start : start + page_size]
+        next_cursor: str | None = None
+        if start + page_size < len(cached_tools):
+            next_cursor = str(start + page_size)
+
+        result = types.ListToolsResult(tools=page_tools, nextCursor=next_cursor)
+        return types.ServerResult(result)
+
+    server.request_handlers[types.ListToolsRequest] = _list_tools
 
     @server.call_tool()
     async def _call_tool(name: str, arguments: Dict[str, object] | None) -> Dict[str, object]:
