@@ -6,7 +6,7 @@
 
 **순수 파이썬으로 HWPX 문서를 자유롭게 다루는 가장 강력한 방법.**
 
-`hwpx-mcp-server`는 [Model Context Protocol](https://github.com/modelcontextprotocol/specification) 표준을 따르는 서버로, 강력한 [`python-hwpx`](https://www.google.com/search?q=%5Bhttps://github.com/airmang/python-hwpx%5D\(https://github.com/airmang/python-hwpx\)) 라이브러리를 기반으로 합니다. Gemini, Claude와 같은 최신 AI 클라이언트와 완벽하게 연동하여 로컬 HWPX 문서를 열람, 검색, 편집, 저장하는 풍부한 기능을 제공합니다.
+`hwpx-mcp-server`는 [Model Context Protocol](https://github.com/modelcontextprotocol/specification) 표준을 따르는 서버로, 강력한 [`python-hwpx`](https://www.google.com/search?q=%5Bhttps://github.com/airmang/python-hwpx%5D\(https://github.com/airmang/python-hwpx\)) 라이브러리를 기반으로 합니다. Gemini, Claude와 같은 최신 AI 클라이언트와 완벽하게 연동하여 한글 워드 프로세서 로컬 HWPX 문서를 열람, 검색, 편집, 저장하는 풍부한 기능을 제공합니다.
 
 -----
 
