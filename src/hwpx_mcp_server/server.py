@@ -43,7 +43,6 @@ async def _serve(ops: HwpxOps, tools: List[ToolDefinition]) -> None:
     server = Server(DEFAULT_SERVER_NAME, version=_resolve_version())
     tool_map: Dict[str, ToolDefinition] = {tool.name: tool for tool in tools}
     cached_tools: List[types.Tool] | None = None
-    page_size = 31
 
     async def _list_tools(req: types.ListToolsRequest | None) -> types.ServerResult:
         nonlocal cached_tools
@@ -66,10 +65,22 @@ async def _serve(ops: HwpxOps, tools: List[ToolDefinition]) -> None:
         if start < 0:
             start = 0
 
-        page_tools = cached_tools[start : start + page_size]
+        page_size = len(cached_tools)
+        if req is not None and req.params:
+            limit = getattr(req.params, "limit", None)
+            try:
+                parsed_limit = int(limit) if limit is not None else None
+            except (TypeError, ValueError):
+                parsed_limit = None
+
+            if parsed_limit is not None and parsed_limit > 0:
+                page_size = min(parsed_limit, len(cached_tools))
+
+        end = min(start + page_size, len(cached_tools))
+        page_tools = cached_tools[start:end]
         next_cursor: str | None = None
-        if start + page_size < len(cached_tools):
-            next_cursor = str(start + page_size)
+        if end < len(cached_tools):
+            next_cursor = str(end)
 
         result = types.ListToolsResult(tools=page_tools, nextCursor=next_cursor)
         return types.ServerResult(result)
