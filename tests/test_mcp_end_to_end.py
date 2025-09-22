@@ -613,6 +613,105 @@ def test_diagnostic_tools_and_validation(
     assert lint_violations["warnings"]
 
 
+def test_tool_json_schemas_use_draft7(
+    tool_map: Dict[str, ToolDefinition],
+) -> None:
+    def _walk(value):
+        if isinstance(value, dict):
+            yield value
+            for item in value.values():
+                yield from _walk(item)
+        elif isinstance(value, list):
+            for item in value:
+                yield from _walk(item)
+
+    target_names = [
+        "package_get_text",
+        "find_runs_by_style",
+        "replace_text_in_runs",
+        "add_paragraph",
+        "read_paragraphs",
+        "add_memo_with_anchor",
+    ]
+    generated = {name: tool_map[name].to_tool() for name in target_names}
+
+    for tool in generated.values():
+        for schema in (tool.inputSchema, tool.outputSchema):
+            assert schema["type"] == "object"
+            assert "properties" in schema
+            for mapping in _walk(schema):
+                assert "$defs" not in mapping
+                assert "$schema" not in mapping
+                ref = mapping.get("$ref")
+                if isinstance(ref, str):
+                    assert not ref.startswith("#/$defs/")
+
+    package_get_text = generated["package_get_text"].inputSchema
+    encoding_schema = package_get_text["properties"]["encoding"]
+    assert encoding_schema.get("nullable") is True
+    assert "anyOf" not in encoding_schema
+    assert set(package_get_text["required"]) == {"path", "partName"}
+
+    find_runs_input = generated["find_runs_by_style"].inputSchema
+    assert "definitions" in find_runs_input
+    filters_schema = find_runs_input["properties"]["filters"]
+    assert filters_schema.get("nullable") is True
+    assert filters_schema["$ref"] == "#/definitions/StyleFilter"
+    assert "anyOf" not in filters_schema
+    assert "path" in find_runs_input.get("required", [])
+    find_runs_output = generated["find_runs_by_style"].outputSchema
+    assert "definitions" in find_runs_output
+    assert (
+        find_runs_output["properties"]["runs"]["items"]["$ref"]
+        == "#/definitions/RunInfo"
+    )
+
+    replace_runs_input = generated["replace_text_in_runs"].inputSchema
+    assert "definitions" in replace_runs_input
+    style_filter_schema = replace_runs_input["properties"]["styleFilter"]
+    assert style_filter_schema.get("nullable") is True
+    assert style_filter_schema["$ref"] == "#/definitions/StyleFilter"
+    assert "anyOf" not in style_filter_schema
+    required_fields = set(replace_runs_input.get("required", []))
+    assert {"path", "search", "replacement"}.issubset(required_fields)
+
+    add_paragraph_input = generated["add_paragraph"].inputSchema
+    assert "definitions" in add_paragraph_input
+    run_style_schema = add_paragraph_input["properties"]["runStyle"]
+    assert run_style_schema.get("nullable") is True
+    assert run_style_schema["$ref"] == "#/definitions/RunStyleModel"
+    assert "anyOf" not in run_style_schema
+    assert "path" in add_paragraph_input.get("required", [])
+
+    read_paragraphs_input = generated["read_paragraphs"].inputSchema
+    assert {"path", "paragraphIndexes"}.issubset(
+        set(read_paragraphs_input.get("required", []))
+    )
+    paragraph_indexes = read_paragraphs_input["properties"]["paragraphIndexes"]
+    assert paragraph_indexes["type"] == "array"
+    assert paragraph_indexes["items"]["type"] == "integer"
+    read_paragraphs_output = generated["read_paragraphs"].outputSchema
+    assert "definitions" in read_paragraphs_output
+    assert (
+        read_paragraphs_output["properties"]["paragraphs"]["items"]["$ref"]
+        == "#/definitions/ParagraphText"
+    )
+
+    add_memo_with_anchor_input = generated["add_memo_with_anchor"].inputSchema
+    memo_anchor_props = add_memo_with_anchor_input["properties"]
+    assert memo_anchor_props["memoShapeIdRef"].get("nullable") is True
+    assert "anyOf" not in memo_anchor_props["memoShapeIdRef"]
+    assert {"path", "text"}.issubset(
+        set(add_memo_with_anchor_input.get("required", []))
+    )
+    add_memo_with_anchor_output = generated["add_memo_with_anchor"].outputSchema
+    memo_output_props = add_memo_with_anchor_output["properties"]
+    assert memo_output_props["memoId"].get("nullable") is True
+    assert "anyOf" not in memo_output_props["memoId"]
+    required_output = set(add_memo_with_anchor_output.get("required", []))
+    assert {"paragraphIndex", "fieldId"}.issubset(required_output)
+
+
 def test_failure_paths_raise_runtime_errors(
     tool_map: Dict[str, ToolDefinition],
     sample_workspace: tuple[Path, Path],
