@@ -7,7 +7,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import mcp.types as types
 from pydantic import BaseModel, Field, ConfigDict
-from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
 
 from .hwpx_ops import HwpxOps
 
@@ -16,80 +15,8 @@ class _BaseModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
-class _Draft7JsonSchemaGenerator(GenerateJsonSchema):
-    schema_dialect = "http://json-schema.org/draft-07/schema#"
-    ref_template = "#/definitions/{model}"
-
-
-def _is_null_schema(schema: JsonSchemaValue) -> bool:
-    if not isinstance(schema, dict):
-        return False
-    if schema.get("type") != "null":
-        return False
-    allowed_keys = {"type", "title", "description", "default", "examples"}
-    return set(schema).issubset(allowed_keys)
-
-
-def _collapse_nullable(schema: Dict[str, Any]) -> Dict[str, Any]:
-    any_of = schema.get("anyOf")
-    if isinstance(any_of, list):
-        null_entries = [item for item in any_of if _is_null_schema(item)]
-        non_null_entries = [item for item in any_of if not _is_null_schema(item)]
-        if len(non_null_entries) == 1 and null_entries:
-            base: Dict[str, Any] = {k: v for k, v in schema.items() if k != "anyOf"}
-            non_null = non_null_entries[0]
-            if isinstance(non_null, dict):
-                for key, value in non_null.items():
-                    if key in {"title", "description"} and key in base:
-                        continue
-                    base[key] = value
-            base["nullable"] = True
-            return base
-
-    type_value = schema.get("type")
-    if isinstance(type_value, list):
-        non_null_types = [t for t in type_value if t != "null"]
-        if len(non_null_types) == 1 and len(non_null_types) != len(type_value):
-            schema["type"] = non_null_types[0]
-            schema["nullable"] = True
-
-    return schema
-
-
-def _normalize_draft7_schema(value: JsonSchemaValue) -> JsonSchemaValue:
-    if isinstance(value, dict):
-        normalized: Dict[str, Any] = {}
-        for key, item in value.items():
-            if key == "$schema":
-                continue
-            if key == "$defs" and isinstance(item, dict):
-                normalized["definitions"] = {
-                    name: _normalize_draft7_schema(sub_schema)
-                    for name, sub_schema in item.items()
-                }
-                continue
-            if key == "$ref" and isinstance(item, str) and item.startswith("#/$defs/"):
-                normalized["$ref"] = "#/definitions/" + item[len("#/$defs/"):]
-                continue
-            normalized[key] = _normalize_draft7_schema(item)
-
-        if "anyOf" in normalized:
-            normalized = _collapse_nullable(normalized)
-
-        return normalized
-
-    if isinstance(value, list):
-        return [_normalize_draft7_schema(item) for item in value]
-
-    return value
-
-
 def _model_json_schema(model: type[_BaseModel], *, by_alias: bool) -> Dict[str, Any]:
-    raw = model.model_json_schema(
-        by_alias=by_alias,
-        schema_generator=_Draft7JsonSchemaGenerator,
-    )
-    schema = _normalize_draft7_schema(raw)
+    schema = model.model_json_schema(by_alias=by_alias)
     if not isinstance(schema, dict):
         raise TypeError("Expected model_json_schema to return a mapping")
     if schema.get("type") != "object":

@@ -613,7 +613,7 @@ def test_diagnostic_tools_and_validation(
     assert lint_violations["warnings"]
 
 
-def test_tool_json_schemas_use_draft7(
+def test_tool_json_schemas_use_json_schema_2020_12(
     tool_map: Dict[str, ToolDefinition],
 ) -> None:
     def _walk(value):
@@ -640,47 +640,54 @@ def test_tool_json_schemas_use_draft7(
             assert schema["type"] == "object"
             assert "properties" in schema
             for mapping in _walk(schema):
-                assert "$defs" not in mapping
-                assert "$schema" not in mapping
-                ref = mapping.get("$ref")
-                if isinstance(ref, str):
-                    assert not ref.startswith("#/$defs/")
+                assert "nullable" not in mapping
 
     package_get_text = generated["package_get_text"].inputSchema
     encoding_schema = package_get_text["properties"]["encoding"]
-    assert encoding_schema.get("nullable") is True
-    assert "anyOf" not in encoding_schema
+    assert "anyOf" in encoding_schema
+    assert any(branch.get("type") == "string" for branch in encoding_schema["anyOf"])
+    assert any(branch.get("type") == "null" for branch in encoding_schema["anyOf"])
+    assert encoding_schema.get("default") is None
     assert set(package_get_text["required"]) == {"path", "partName"}
 
     find_runs_input = generated["find_runs_by_style"].inputSchema
-    assert "definitions" in find_runs_input
+    assert "$defs" in find_runs_input
     filters_schema = find_runs_input["properties"]["filters"]
-    assert filters_schema.get("nullable") is True
-    assert filters_schema["$ref"] == "#/definitions/StyleFilter"
-    assert "anyOf" not in filters_schema
+    assert "anyOf" in filters_schema
+    assert any(branch.get("$ref") == "#/$defs/StyleFilter" for branch in filters_schema["anyOf"])
+    assert any(branch.get("type") == "null" for branch in filters_schema["anyOf"])
+    assert filters_schema.get("default") is None
     assert "path" in find_runs_input.get("required", [])
     find_runs_output = generated["find_runs_by_style"].outputSchema
-    assert "definitions" in find_runs_output
+    assert "$defs" in find_runs_output
     assert (
         find_runs_output["properties"]["runs"]["items"]["$ref"]
-        == "#/definitions/RunInfo"
+        == "#/$defs/RunInfo"
     )
 
     replace_runs_input = generated["replace_text_in_runs"].inputSchema
-    assert "definitions" in replace_runs_input
+    assert "$defs" in replace_runs_input
     style_filter_schema = replace_runs_input["properties"]["styleFilter"]
-    assert style_filter_schema.get("nullable") is True
-    assert style_filter_schema["$ref"] == "#/definitions/StyleFilter"
-    assert "anyOf" not in style_filter_schema
+    assert "anyOf" in style_filter_schema
+    assert any(
+        branch.get("$ref") == "#/$defs/StyleFilter"
+        for branch in style_filter_schema["anyOf"]
+    )
+    assert any(branch.get("type") == "null" for branch in style_filter_schema["anyOf"])
+    assert style_filter_schema.get("default") is None
     required_fields = set(replace_runs_input.get("required", []))
     assert {"path", "search", "replacement"}.issubset(required_fields)
 
     add_paragraph_input = generated["add_paragraph"].inputSchema
-    assert "definitions" in add_paragraph_input
+    assert "$defs" in add_paragraph_input
     run_style_schema = add_paragraph_input["properties"]["runStyle"]
-    assert run_style_schema.get("nullable") is True
-    assert run_style_schema["$ref"] == "#/definitions/RunStyleModel"
-    assert "anyOf" not in run_style_schema
+    assert "anyOf" in run_style_schema
+    assert any(
+        branch.get("$ref") == "#/$defs/RunStyleModel"
+        for branch in run_style_schema["anyOf"]
+    )
+    assert any(branch.get("type") == "null" for branch in run_style_schema["anyOf"])
+    assert run_style_schema.get("default") is None
     assert "path" in add_paragraph_input.get("required", [])
 
     read_paragraphs_input = generated["read_paragraphs"].inputSchema
@@ -691,23 +698,37 @@ def test_tool_json_schemas_use_draft7(
     assert paragraph_indexes["type"] == "array"
     assert paragraph_indexes["items"]["type"] == "integer"
     read_paragraphs_output = generated["read_paragraphs"].outputSchema
-    assert "definitions" in read_paragraphs_output
+    assert "$defs" in read_paragraphs_output
     assert (
         read_paragraphs_output["properties"]["paragraphs"]["items"]["$ref"]
-        == "#/definitions/ParagraphText"
+        == "#/$defs/ParagraphText"
     )
 
     add_memo_with_anchor_input = generated["add_memo_with_anchor"].inputSchema
     memo_anchor_props = add_memo_with_anchor_input["properties"]
-    assert memo_anchor_props["memoShapeIdRef"].get("nullable") is True
-    assert "anyOf" not in memo_anchor_props["memoShapeIdRef"]
+    assert "anyOf" in memo_anchor_props["memoShapeIdRef"]
+    assert any(
+        branch.get("type") == "string"
+        for branch in memo_anchor_props["memoShapeIdRef"]["anyOf"]
+    )
+    assert any(
+        branch.get("type") == "null"
+        for branch in memo_anchor_props["memoShapeIdRef"]["anyOf"]
+    )
     assert {"path", "text"}.issubset(
         set(add_memo_with_anchor_input.get("required", []))
     )
     add_memo_with_anchor_output = generated["add_memo_with_anchor"].outputSchema
     memo_output_props = add_memo_with_anchor_output["properties"]
-    assert memo_output_props["memoId"].get("nullable") is True
-    assert "anyOf" not in memo_output_props["memoId"]
+    assert "anyOf" in memo_output_props["memoId"]
+    assert any(
+        branch.get("type") == "string"
+        for branch in memo_output_props["memoId"]["anyOf"]
+    )
+    assert any(
+        branch.get("type") == "null"
+        for branch in memo_output_props["memoId"]["anyOf"]
+    )
     required_output = set(add_memo_with_anchor_output.get("required", []))
     assert {"paragraphIndex", "fieldId"}.issubset(required_output)
 
