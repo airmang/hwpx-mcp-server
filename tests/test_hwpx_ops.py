@@ -238,7 +238,25 @@ def test_add_table_returns_valid_index(ops_with_sample):
     refreshed_tables: list = []
     for paragraph in refreshed.paragraphs:
         refreshed_tables.extend(paragraph.tables)
-    assert refreshed_tables[index].cell(0, 0).text == "이름"
+    target_table = refreshed_tables[index]
+    assert target_table.cell(0, 0).text == "이름"
+
+    basic_border_id = str(refreshed._root.ensure_basic_border_fill())
+    assert target_table.element.get("borderFillIDRef") == basic_border_id
+
+
+def test_add_table_border_style_none_uses_empty_border(ops_with_sample):
+    ops, path = ops_with_sample
+    result = ops.add_table(str(path), rows=2, cols=2, border_style="none")
+
+    index = result["tableIndex"]
+
+    refreshed = HwpxDocument.open(path)
+    refreshed_tables: list = []
+    for paragraph in refreshed.paragraphs:
+        refreshed_tables.extend(paragraph.tables)
+
+    assert refreshed_tables[index].element.get("borderFillIDRef") == "0"
 
 
 def test_set_table_cell_supports_logical_and_split_flags(ops_with_sample):
