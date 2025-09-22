@@ -183,6 +183,17 @@ class HwpxOps:
             raise HwpxOperationError("char property does not expose an identifier")
         return char_id
 
+    def _resolve_table_border_fill(self, border_style: Optional[str]) -> Optional[str]:
+        if border_style is None:
+            return None
+
+        normalized = border_style.strip().lower()
+        if not normalized or normalized == "solid":
+            return None
+        if normalized == "none":
+            return "0"
+        raise ValueError(f"Unsupported border style: {border_style}")
+
     def _create_underline_element(self, color: str) -> Any:
         from xml.etree import ElementTree as ET
 
@@ -571,9 +582,7 @@ class HwpxOps:
         border_style: str | None = None,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
-        border_fill = "0"
-        if border_style == "none":
-            border_fill = "0"
+        border_fill = self._resolve_table_border_fill(border_style)
         table = document.add_table(
             rows,
             cols,

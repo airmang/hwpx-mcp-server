@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Literal
 
 import mcp.types as types
 from pydantic import BaseModel, Field, ConfigDict
@@ -393,7 +393,7 @@ class AddTableInput(PathInput):
     rows: int
     cols: int
     section_index: Optional[int] = Field(None, alias="sectionIndex")
-    border_style: Optional[str] = Field(None, alias="borderStyle")
+    border_style: Optional[Literal["solid", "none"]] = Field(None, alias="borderStyle")
 
 
 class AddTableOutput(_BaseModel):
