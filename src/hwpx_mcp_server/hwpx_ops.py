@@ -294,6 +294,57 @@ class HwpxOps:
                 next_offset = slice_end
         return {"textChunk": "\n".join(paragraphs), "nextOffset": next_offset}
 
+    def get_paragraphs(
+        self,
+        path: str,
+        paragraph_indexes: Sequence[int],
+        *,
+        with_highlights: bool = False,
+        with_footnotes: bool = False,
+    ) -> Dict[str, Any]:
+        if not paragraph_indexes:
+            return {"paragraphs": []}
+        normalized_indexes: List[int] = []
+        unique_indexes: set[int] = set()
+        for index in paragraph_indexes:
+            if index < 0:
+                raise ValueError("paragraphIndexes must contain non-negative integers")
+            normalized_indexes.append(int(index))
+            unique_indexes.add(int(index))
+
+        annotations = None
+        if with_highlights or with_footnotes:
+            annotations = AnnotationOptions(
+                highlight="markers" if with_highlights else "ignore",
+                footnote="inline" if with_footnotes else "ignore",
+                endnote="inline" if with_footnotes else "ignore",
+            )
+
+        resolved = self._resolve_path(path)
+        collected: Dict[int, str] = {}
+        with TextExtractor(resolved) as extractor:
+            for paragraph in extractor.iter_document_paragraphs():
+                para_index = paragraph.index
+                if para_index in unique_indexes and para_index not in collected:
+                    collected[para_index] = paragraph.text(
+                        annotations=annotations, preserve_breaks=True
+                    )
+                    if len(collected) == len(unique_indexes):
+                        break
+
+        missing = [index for index in normalized_indexes if index not in collected]
+        if missing:
+            raise ValueError(
+                "paragraphIndexes out of range: " + ", ".join(str(idx) for idx in sorted(set(missing)))
+            )
+
+        return {
+            "paragraphs": [
+                {"paragraphIndex": index, "text": collected[index]}
+                for index in normalized_indexes
+            ]
+        }
+
     def text_extract_report(self, path: str, mode: str = "plain") -> Dict[str, Any]:
         resolved = self._resolve_path(path)
         annotations = None

@@ -34,6 +34,17 @@ def test_read_text_pagination(ops_with_sample):
     assert result["nextOffset"] >= 1
 
 
+def test_get_paragraphs_returns_requested_indices(ops_with_sample):
+    ops, path = ops_with_sample
+    result = ops.get_paragraphs(str(path), paragraph_indexes=[1, 4, 9])
+    paragraphs = result["paragraphs"]
+    assert [item["paragraphIndex"] for item in paragraphs] == [1, 4, 9]
+    assert "Hello HWPX!" in paragraphs[0]["text"]
+    assert "Table below demonstrates cell editing." in paragraphs[1]["text"]
+    assert paragraphs[2]["text"].strip() == "B2"
+    assert len(paragraphs) == 3
+
+
 def test_read_text_uses_default_limit(monkeypatch, tmp_path):
     class FakeParagraph:
         def __init__(self, index: int, content: str) -> None:

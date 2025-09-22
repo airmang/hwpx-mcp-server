@@ -136,6 +136,16 @@ def test_text_reading_and_search_tools(
     page = _call(tool_map, "read_text", ops, path=rel_path, limit=4)
     assert "Hello HWPX!" in page["textChunk"]
 
+    selection = _call(
+        tool_map,
+        "read_paragraphs",
+        ops,
+        path=rel_path,
+        paragraphIndexes=[1, 4, 9],
+    )["paragraphs"]
+    assert [entry["paragraphIndex"] for entry in selection] == [1, 4, 9]
+    assert selection[0]["text"].startswith("Hello HWPX!")
+
     report = _call(tool_map, "text_extract_report", ops, path=rel_path)
     assert "Remember to replace HWPX references." in report["content"]
 
