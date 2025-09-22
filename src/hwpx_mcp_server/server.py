@@ -65,18 +65,24 @@ async def _serve(ops: HwpxOps, tools: List[ToolDefinition]) -> None:
         if start < 0:
             start = 0
 
-        page_size = len(cached_tools)
-        if req is not None and req.params:
-            limit = getattr(req.params, "limit", None)
-            try:
-                parsed_limit = int(limit) if limit is not None else None
-            except (TypeError, ValueError):
-                parsed_limit = None
+        total_tools = len(cached_tools)
 
-            if parsed_limit is not None and parsed_limit > 0:
-                page_size = min(parsed_limit, len(cached_tools))
+        if start == 0:
+            page_size = total_tools
+        else:
+            remaining = max(total_tools - start, 0)
+            page_size = remaining
+            if remaining and req is not None and req.params:
+                limit = getattr(req.params, "limit", None)
+                try:
+                    parsed_limit = int(limit) if limit is not None else None
+                except (TypeError, ValueError):
+                    parsed_limit = None
 
-        end = min(start + page_size, len(cached_tools))
+                if parsed_limit is not None and parsed_limit > 0:
+                    page_size = min(parsed_limit, remaining)
+
+        end = min(start + page_size, total_tools)
         page_tools = cached_tools[start:end]
         next_cursor: str | None = None
         if end < len(cached_tools):
