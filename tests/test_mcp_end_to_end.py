@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
 import zipfile
 from pathlib import Path
 from typing import Dict
 import warnings
 
+import mcp.types as types
 import pytest
 
 from hwpx.document import HwpxDocument
@@ -89,6 +92,66 @@ def ops(sample_workspace: tuple[Path, Path]) -> HwpxOps:
 @pytest.fixture()
 def tool_map() -> Dict[str, ToolDefinition]:
     return {tool.name: tool for tool in build_tool_definitions()}
+
+
+@pytest.fixture(scope="module")
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) -> None:
+    import hwpx_mcp_server.server as server_module
+
+    tools = build_tool_definitions()
+    assert len(tools) == 37
+
+    created_servers: list = []
+
+    class DummyServer:
+        def __init__(self, *args, **kwargs):
+            self.request_handlers = {}
+            self._tool_cache = {}
+            created_servers.append(self)
+
+        def create_initialization_options(self, options):
+            self.init_options = options
+            return options
+
+        def call_tool(self):
+            def decorator(func):
+                return func
+
+            return decorator
+
+        async def run(self, read_stream, write_stream, init_options):
+            self.run_args = (read_stream, write_stream, init_options)
+
+    @asynccontextmanager
+    async def fake_stdio_server():
+        yield (None, None)
+
+    monkeypatch.setattr(server_module, "Server", DummyServer)
+    monkeypatch.setattr(server_module, "stdio_server", fake_stdio_server)
+
+    ops = HwpxOps(base_directory=tmp_path, auto_backup=False)
+
+    await server_module._serve(ops, tools)
+
+    assert created_servers, "expected DummyServer to be instantiated"
+    server_instance = created_servers[0]
+    handler = server_instance.request_handlers[types.ListToolsRequest]
+
+    request = types.ListToolsRequest()
+    object.__setattr__(request, "params", SimpleNamespace(cursor=None, limit=5))
+
+    response = await handler(request)
+    assert isinstance(response, types.ServerResult)
+
+    result = response.root
+    assert isinstance(result, types.ListToolsResult)
+    assert len(result.tools) == 37
+    assert result.nextCursor is None
 
 
 def _call(tool_map: Dict[str, ToolDefinition], name: str, ops: HwpxOps, **arguments):
