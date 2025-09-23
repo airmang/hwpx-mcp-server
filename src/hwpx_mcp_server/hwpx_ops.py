@@ -11,6 +11,7 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 from hwpx import ObjectFinder
@@ -24,6 +25,21 @@ from hwpx.document import (
 from hwpx.package import HwpxPackage
 from hwpx.tools.text_extractor import AnnotationOptions, TextExtractor
 from hwpx.tools.validator import ValidationReport, validate_document
+from .core.plan import (
+    ApplyData,
+    ApplyEditInput,
+    ContextOutput,
+    GetContextInput,
+    PipelineError,
+    PlanEditInput,
+    PlanManager,
+    PreviewEditInput,
+    ReplaceTextArgs,
+    SearchHitModel,
+    SearchInput,
+    SearchOutput,
+)
+from .metadata import tools_meta
 
 HH_NS = "{http://www.hancom.co.kr/hwpml/2011/head}"
 HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
@@ -51,6 +67,11 @@ class HwpxOps:
         self.base_directory = (base_directory or Path.cwd()).expanduser().resolve()
         self.paging_limit = max(1, paging_paragraph_limit)
         self.auto_backup = auto_backup
+        self._plan_manager = PlanManager()
+
+    @property
+    def plan_manager(self) -> PlanManager:
+        return self._plan_manager
 
     # ------------------------------------------------------------------
     # Basic helpers
@@ -1500,6 +1521,138 @@ class HwpxOps:
                             }
                         )
         return {"warnings": warnings}
+
+    # ------------------------------------------------------------------
+    # Hardened planning helpers
+    # ------------------------------------------------------------------
+    def plan_edit(
+        self,
+        *,
+        path: str,
+        operations: Sequence[Dict[str, Any]],
+        trace_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = PlanEditInput.model_validate(
+            {"path": path, "operations": operations, "traceId": trace_id}
+        )
+        trace = payload.trace_id or f"plan-{uuid4().hex}"
+        try:
+            record = self._plan_manager.create_plan_record(
+                payload.path, payload.operations, trace_id=trace
+            )
+        except PipelineError as error:
+            return self._plan_manager.error_response(payload.path, trace, error)
+        return self._plan_manager.plan_response(record)
+
+    def preview_edit(
+        self,
+        *,
+        plan_id: str,
+        trace_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = PreviewEditInput.model_validate(
+            {"planId": plan_id, "traceId": trace_id}
+        )
+        trace = payload.trace_id or payload.plan_id
+        try:
+            preview = self._plan_manager.preview_plan_record(payload.plan_id)
+        except PipelineError as error:
+            plan = self._plan_manager.get_plan_record(payload.plan_id)
+            doc_id = plan.doc_id if plan is not None else payload.plan_id
+            return self._plan_manager.error_response(
+                doc_id, trace, error, plan_id=payload.plan_id
+            )
+        return self._plan_manager.preview_response(preview)
+
+    def apply_edit(
+        self,
+        *,
+        plan_id: str,
+        confirm: bool,
+        idempotency_key: Optional[str] = None,
+        trace_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = ApplyEditInput.model_validate(
+            {
+                "planId": plan_id,
+                "confirm": confirm,
+                "idempotencyKey": idempotency_key,
+                "traceId": trace_id,
+            }
+        )
+        trace = payload.trace_id or payload.plan_id
+        try:
+            result = self._plan_manager.apply_plan_record(
+                payload.plan_id,
+                confirm=payload.confirm,
+                idempotency_key=payload.idempotency_key,
+            )
+        except PipelineError as error:
+            plan = self._plan_manager.get_plan_record(payload.plan_id)
+            doc_id = plan.doc_id if plan is not None else payload.plan_id
+            template = tools_meta.ERROR_PREVIEW_REQUIRED if error.error_code == "PREVIEW_REQUIRED" else None
+            return self._plan_manager.error_response(
+                doc_id,
+                trace,
+                error,
+                plan_id=payload.plan_id,
+                next_action=template,
+            )
+        plan_record = self._plan_manager.get_plan_record(payload.plan_id)
+        if plan_record is None:  # pragma: no cover - defensive
+            raise HwpxOperationError("plan record missing after apply")
+        return self._plan_manager.apply_response(plan_record, result, trace)
+
+    def search(
+        self,
+        *,
+        path: str,
+        pattern: str,
+        scope: Optional[str] = None,
+        is_regex: bool = False,
+        limit: int = 20,
+    ) -> Dict[str, Any]:
+        payload = SearchInput.model_validate(
+            {
+                "path": path,
+                "pattern": pattern,
+                "scope": scope,
+                "is_regex": is_regex,
+                "limit": limit,
+            }
+        )
+        try:
+            hits = self._plan_manager.search_document(payload.path, payload)
+        except PipelineError as error:
+            raise HwpxOperationError(error.message) from error
+        models = [
+            SearchHitModel(
+                nodeId=hit.node_id,
+                paragraphIndex=hit.paragraph_index,
+                match=hit.match,
+                context=hit.context,
+            )
+            for hit in hits
+        ]
+        return SearchOutput(matches=models).model_dump(by_alias=True)
+
+    def get_context(
+        self,
+        *,
+        path: str,
+        target: Dict[str, Any],
+        window: int = 1,
+    ) -> Dict[str, Any]:
+        payload = GetContextInput.model_validate(
+            {"path": path, "target": target, "window": window}
+        )
+        try:
+            view = self._plan_manager.context_window(
+                payload.path, payload.target, window=payload.window
+            )
+        except PipelineError as error:
+            raise HwpxOperationError(error.message) from error
+        return view.model_dump(by_alias=True)
 
     # ------------------------------------------------------------------
     # Raw package helpers

@@ -2,12 +2,25 @@
 
 from __future__ import annotations
 
+import os
+
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Literal
 
 import mcp.types as types
 from pydantic import BaseModel, Field, ConfigDict
 
+from .core.plan import (
+    ApplyEditInput,
+    ContextOutput,
+    GetContextInput,
+    PlanEditInput,
+    PreviewEditInput,
+    SearchInput,
+    SearchOutput,
+    ServerResponse,
+)
+from .schema.builder import build_tool_schema
 from .hwpx_ops import HwpxOps
 
 
@@ -15,231 +28,9 @@ class _BaseModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
-class _SchemaSanitizer:
-    _DROP_KEYS = {"title", "description", "examples", "default"}
-
-    def __init__(self, schema: Dict[str, Any]):
-        self._raw_schema = schema
-        self._ref_cache: Dict[str, Any] = {}
-        self._resolving: set[str] = set()
-
-    def sanitize(self) -> Dict[str, Any]:
-        sanitized, _ = self._sanitize_schema(self._raw_schema)
-        if not isinstance(sanitized, dict):
-            raise TypeError("Expected sanitized schema to be a mapping")
-        sanitized["type"] = "object"
-        properties = sanitized.get("properties")
-        if not isinstance(properties, dict):
-            properties = {}
-            sanitized["properties"] = properties
-        if properties:
-            sanitized.setdefault("additionalProperties", False)
-        else:
-            sanitized.pop("additionalProperties", None)
-        return sanitized
-
-    def _sanitize_schema(self, node: Any) -> tuple[Any, bool]:
-        if isinstance(node, dict):
-            working = dict(node)
-            optional = False
-
-            for key in list(working.keys()):
-                if key in self._DROP_KEYS or key == "$defs":
-                    working.pop(key, None)
-
-            if "allOf" in working:
-                merged: Dict[str, Any] = {}
-                parts = working.pop("allOf")
-                if isinstance(parts, list):
-                    for part in parts:
-                        sanitized_part, _ = self._sanitize_schema(part)
-                        if isinstance(sanitized_part, dict):
-                            merged = self._merge_schema_dicts(merged, sanitized_part)
-                working = self._merge_schema_dicts(merged, working)
-
-            for union_key in ("anyOf", "oneOf"):
-                if union_key in working:
-                    options = working.pop(union_key)
-                    sanitized_options: List[Any] = []
-                    found_null = False
-                    if isinstance(options, list):
-                        for option in options:
-                            sanitized_option, _ = self._sanitize_schema(option)
-                            if self._is_null_schema(sanitized_option):
-                                found_null = True
-                            else:
-                                sanitized_options.append(sanitized_option)
-                    if found_null and len(sanitized_options) == 1:
-                        base_schema = sanitized_options[0]
-                        if isinstance(base_schema, dict):
-                            working = self._merge_schema_dicts(base_schema, working)
-                        else:
-                            working = base_schema
-                        optional = True
-                    else:
-                        working = self._merge_union_into_node(working, sanitized_options)
-                    break
-
-            if "$ref" in working:
-                ref = working.pop("$ref")
-                resolved = self._resolve_ref(ref)
-                working = self._merge_schema_dicts(resolved, working)
-
-            optional_props: set[str] = set()
-            properties_value = working.get("properties")
-            if isinstance(properties_value, dict):
-                sanitized_properties: Dict[str, Any] = {}
-                optional_names: set[str] = set()
-                for prop_name, prop_schema in properties_value.items():
-                    sanitized_prop, prop_optional = self._sanitize_schema(prop_schema)
-                    sanitized_properties[prop_name] = sanitized_prop
-                    if prop_optional:
-                        optional_names.add(prop_name)
-                working["properties"] = sanitized_properties
-                optional_props = optional_names
-
-            if "required" in working:
-                required_value = working["required"]
-                if isinstance(required_value, list):
-                    filtered: List[str] = []
-                    seen: set[str] = set()
-                    for item in required_value:
-                        if not isinstance(item, str):
-                            continue
-                        if item in optional_props or item in seen:
-                            continue
-                        seen.add(item)
-                        filtered.append(item)
-                    if filtered:
-                        working["required"] = filtered
-                    else:
-                        working.pop("required", None)
-                else:
-                    working.pop("required", None)
-
-            for key, value in list(working.items()):
-                if key in {"properties", "required"}:
-                    continue
-                sanitized_value, _ = self._sanitize_schema(value)
-                working[key] = sanitized_value
-
-            if working.get("type") == "object":
-                props = working.get("properties")
-                if not isinstance(props, dict):
-                    props = {}
-                    working["properties"] = props
-                if props:
-                    working.setdefault("additionalProperties", False)
-                elif working.get("additionalProperties") is False:
-                    working.pop("additionalProperties")
-
-            return working, optional
-
-        if isinstance(node, list):
-            sanitized_items: List[Any] = []
-            for item in node:
-                sanitized_item, _ = self._sanitize_schema(item)
-                sanitized_items.append(sanitized_item)
-            return sanitized_items, False
-
-        return node, False
-
-    def _resolve_ref(self, ref: Any) -> Dict[str, Any]:
-        if not isinstance(ref, str):
-            raise TypeError("Schema reference must be a string")
-        cached = self._ref_cache.get(ref)
-        if cached is not None:
-            return self._clone(cached)
-        if ref in self._resolving:
-            raise ValueError(f"Circular schema reference detected for {ref}")
-        target = self._resolve_pointer(self._raw_schema, ref)
-        self._resolving.add(ref)
-        sanitized_target, _ = self._sanitize_schema(target)
-        self._resolving.remove(ref)
-        if not isinstance(sanitized_target, dict):
-            raise TypeError("Referenced schema must resolve to a mapping")
-        self._ref_cache[ref] = sanitized_target
-        return self._clone(sanitized_target)
-
-    def _resolve_pointer(self, schema: Any, pointer: str) -> Any:
-        if pointer == "#":
-            return schema
-        if not pointer.startswith("#/"):
-            raise ValueError(f"Unsupported schema reference: {pointer}")
-        parts = pointer[2:].split("/")
-        current = schema
-        for raw_part in parts:
-            part = raw_part.replace("~1", "/").replace("~0", "~")
-            if isinstance(current, dict):
-                if part not in current:
-                    raise KeyError(f"Cannot resolve pointer {pointer}")
-                current = current[part]
-            elif isinstance(current, list):
-                index = int(part)
-                current = current[index]
-            else:
-                raise KeyError(f"Cannot resolve pointer {pointer}")
-        return current
-
-    def _merge_schema_dicts(self, base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
-        result = self._clone(base)
-        for key, value in overlay.items():
-            if key == "properties" and isinstance(value, dict):
-                existing = result.get("properties")
-                if isinstance(existing, dict):
-                    merged = existing.copy()
-                    merged.update(value)
-                    result["properties"] = merged
-                else:
-                    result["properties"] = self._clone(value)
-            else:
-                result[key] = self._clone(value)
-        return result
-
-    def _merge_union_into_node(self, node: Dict[str, Any], options: List[Any]) -> Dict[str, Any]:
-        if not options:
-            return dict(node)
-        simple_types: List[Any] = []
-        complex_options: List[Any] = []
-        for option in options:
-            if isinstance(option, dict) and set(option.keys()) == {"type"}:
-                simple_types.append(option["type"])
-            else:
-                complex_options.append(option)
-        if complex_options:
-            raise ValueError("Unsupported schema union with complex options")
-        flattened: List[Any] = []
-        for type_value in simple_types:
-            if isinstance(type_value, list):
-                for item in type_value:
-                    if item not in flattened:
-                        flattened.append(item)
-            else:
-                if type_value not in flattened:
-                    flattened.append(type_value)
-        merged = dict(node)
-        if flattened:
-            merged["type"] = flattened[0] if len(flattened) == 1 else flattened
-        return merged
-
-    def _clone(self, value: Any) -> Any:
-        if isinstance(value, dict):
-            return {k: self._clone(v) for k, v in value.items()}
-        if isinstance(value, list):
-            return [self._clone(item) for item in value]
-        return value
-
-    @staticmethod
-    def _is_null_schema(schema: Any) -> bool:
-        return isinstance(schema, dict) and schema.get("type") == "null" and len(schema) == 1
-
-
-def _model_json_schema(model: type[_BaseModel], *, by_alias: bool) -> Dict[str, Any]:
-    schema = model.model_json_schema(by_alias=by_alias)
-    if not isinstance(schema, dict):
-        raise TypeError("Expected model_json_schema to return a mapping")
-    sanitizer = _SchemaSanitizer(schema)
-    return sanitizer.sanitize()
+def _hardening_enabled() -> bool:
+    value = os.getenv("HWPX_MCP_HARDENING", "0")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 class PathInput(_BaseModel):
@@ -661,8 +452,8 @@ class ToolDefinition:
         return types.Tool(
             name=self.name,
             description=self.description,
-            inputSchema=_model_json_schema(self.input_model, by_alias=True),
-            outputSchema=_model_json_schema(self.output_model, by_alias=True),
+            inputSchema=build_tool_schema(self.input_model),
+            outputSchema=build_tool_schema(self.output_model),
         )
 
     def call(self, ops: HwpxOps, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -681,7 +472,7 @@ def _simple(method_name: str) -> Callable[[HwpxOps, _BaseModel], Dict[str, Any]]
 
 
 def build_tool_definitions() -> List[ToolDefinition]:
-    return [
+    tools = [
         ToolDefinition(
             name="open_info",
             description="Return metadata about an HWPX document.",
@@ -952,3 +743,42 @@ def build_tool_definitions() -> List[ToolDefinition]:
             func=_simple("package_get_xml"),
         ),
     ]
+    if _hardening_enabled():
+        tools.extend([
+            ToolDefinition(
+                name="hwpx.plan_edit",
+                description="Plan hardened edits for preview/apply.",
+                input_model=PlanEditInput,
+                output_model=ServerResponse,
+                func=_simple("plan_edit"),
+            ),
+            ToolDefinition(
+                name="hwpx.preview_edit",
+                description="Preview a hardened edit plan.",
+                input_model=PreviewEditInput,
+                output_model=ServerResponse,
+                func=_simple("preview_edit"),
+            ),
+            ToolDefinition(
+                name="hwpx.apply_edit",
+                description="Apply a hardened edit plan (preview required).",
+                input_model=ApplyEditInput,
+                output_model=ServerResponse,
+                func=_simple("apply_edit"),
+            ),
+            ToolDefinition(
+                name="hwpx.search",
+                description="Search document content using hardened handles.",
+                input_model=SearchInput,
+                output_model=SearchOutput,
+                func=_simple("search"),
+            ),
+            ToolDefinition(
+                name="hwpx.get_context",
+                description="Return paragraph context around a hardened target.",
+                input_model=GetContextInput,
+                output_model=ContextOutput,
+                func=_simple("get_context"),
+            ),
+        ])
+    return tools
