@@ -1,9 +1,10 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from hwpx.document import HwpxDocument
-from hwpx_mcp_server.hwpx_ops import HwpxOps
+from hwpx_mcp_server.hwpx_ops import HH_NS, HwpxOps
 import hwpx_mcp_server.hwpx_ops as ops_module
 from hwpx_mcp_server.tools import build_tool_definitions
 
@@ -259,6 +260,68 @@ def test_add_table_border_style_none_uses_empty_border(ops_with_sample):
     assert refreshed_tables[index].element.get("borderFillIDRef") == "0"
 
 
+def test_add_table_custom_border_fill_reuses_definition(ops_with_sample):
+    ops, path = ops_with_sample
+    first = ops.add_table(
+        str(path),
+        rows=2,
+        cols=2,
+        border_color="#336699",
+        border_width="0.45 mm",
+        fill_color="#abc123",
+    )
+
+    document = HwpxDocument.open(path)
+    tables: list = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    first_table = tables[first["tableIndex"]]
+    border_id = first_table.element.get("borderFillIDRef")
+
+    assert border_id not in (None, "", "0")
+    assert first_table.cell(0, 0).element.get("borderFillIDRef") == border_id
+
+    header = document.headers[0]
+    ref_list = header.element.find(f"{HH_NS}refList")
+    assert ref_list is not None
+    border_fills = ref_list.find(f"{HH_NS}borderFills")
+    assert border_fills is not None
+    target = None
+    for candidate in border_fills.findall(f"{HH_NS}borderFill"):
+        if candidate.get("id") == border_id:
+            target = candidate
+            break
+    assert target is not None
+
+    left_border = target.find(f"{HH_NS}leftBorder")
+    assert left_border is not None
+    assert (left_border.get("color") or "").upper() == "#336699"
+    assert left_border.get("type") == "SOLID"
+    assert (left_border.get("width") or "").replace(" ", "").lower() == "0.45mm"
+
+    fill_brush = target.find(f"{HH_NS}fillBrush")
+    assert fill_brush is not None
+    solid_brush = fill_brush.find(f"{HH_NS}solidBrush")
+    assert solid_brush is not None
+    assert (solid_brush.get("color") or "").upper() == "#ABC123"
+
+    second = ops.add_table(
+        str(path),
+        rows=1,
+        cols=1,
+        border_color="#336699",
+        border_width="0.45 mm",
+        fill_color="#abc123",
+    )
+
+    refreshed = HwpxDocument.open(path)
+    refreshed_tables: list = []
+    for paragraph in refreshed.paragraphs:
+        refreshed_tables.extend(paragraph.tables)
+
+    assert refreshed_tables[second["tableIndex"]].element.get("borderFillIDRef") == border_id
+
+
 def test_set_table_cell_supports_logical_and_split_flags(ops_with_sample):
     ops, path = ops_with_sample
     table_info = ops.add_table(str(path), rows=3, cols=3)
@@ -420,3 +483,60 @@ def test_get_table_cell_map_serializes_grid_with_merges(ops_with_sample):
     assert bottom_left["rowSpan"] == 1
     assert bottom_left["colSpan"] == 1
     assert bottom_left["text"] == "R2C0"
+
+
+def test_set_table_border_fill_updates_anchor_cells(ops_with_sample):
+    ops, path = ops_with_sample
+    table_info = ops.add_table(str(path), rows=3, cols=3)
+    index = table_info["tableIndex"]
+
+    result = ops.set_table_border_fill(
+        str(path),
+        table_index=index,
+        border_style="none",
+        fill_color="#112233",
+    )
+
+    assert result["borderFillIDRef"] != "0"
+    assert result["anchorCells"] == 9
+
+    document = HwpxDocument.open(path)
+    tables: list = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    target_table = tables[index]
+
+    assert target_table.element.get("borderFillIDRef") == result["borderFillIDRef"]
+
+    anchor_elements: dict[tuple[int, int], Any] = {}
+    for position in target_table.iter_grid():
+        if position.is_anchor:
+            anchor_elements[position.anchor] = position.cell.element
+            assert (
+                position.cell.element.get("borderFillIDRef")
+                == result["borderFillIDRef"]
+            )
+
+    assert len(anchor_elements) == result["anchorCells"]
+
+    header = document.headers[0]
+    ref_list = header.element.find(f"{HH_NS}refList")
+    assert ref_list is not None
+    border_fills = ref_list.find(f"{HH_NS}borderFills")
+    assert border_fills is not None
+    target = None
+    for candidate in border_fills.findall(f"{HH_NS}borderFill"):
+        if candidate.get("id") == result["borderFillIDRef"]:
+            target = candidate
+            break
+    assert target is not None
+
+    left_border = target.find(f"{HH_NS}leftBorder")
+    assert left_border is not None
+    assert left_border.get("type") == "NONE"
+
+    fill_brush = target.find(f"{HH_NS}fillBrush")
+    assert fill_brush is not None
+    solid_brush = fill_brush.find(f"{HH_NS}solidBrush")
+    assert solid_brush is not None
+    assert (solid_brush.get("color") or "").upper() == "#112233"

@@ -129,7 +129,7 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
     import hwpx_mcp_server.server as server_module
 
     tools = build_tool_definitions()
-    assert len(tools) == 37
+    assert len(tools) == 38
 
     created_servers: list = []
 
@@ -175,7 +175,7 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
 
     result = response.root
     assert isinstance(result, types.ListToolsResult)
-    assert len(result.tools) == 37
+    assert len(result.tools) == 38
     assert result.nextCursor is None
 
 
@@ -522,6 +522,38 @@ def test_table_workflow(
     assert target_table.cell(0, 1).text == "B"
     assert target_table.cell(1, 0).text == "C"
     assert target_table.cell(1, 1).text == "D"
+
+    border_fill_result = _call(
+        tool_map,
+        "set_table_border_fill",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        borderColor="#123456",
+        borderWidth="0.6 mm",
+        fillColor="#654321",
+    )
+    assert border_fill_result["anchorCells"] >= 1
+
+    refreshed = HwpxDocument.open(doc_path)
+    refreshed_tables = []
+    for paragraph in refreshed.paragraphs:
+        refreshed_tables.extend(paragraph.tables)
+    styled_table = refreshed_tables[table_index]
+    assert styled_table.element.get("borderFillIDRef") == border_fill_result["borderFillIDRef"]
+
+    anchor_ids = {
+        id(position.cell.element)
+        for position in styled_table.iter_grid()
+        if position.is_anchor
+    }
+    assert len(anchor_ids) == border_fill_result["anchorCells"]
+    for position in styled_table.iter_grid():
+        if position.is_anchor:
+            assert (
+                position.cell.element.get("borderFillIDRef")
+                == border_fill_result["borderFillIDRef"]
+            )
 
 
 def test_shape_control_and_memo_tools(

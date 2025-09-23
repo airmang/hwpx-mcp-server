@@ -394,11 +394,27 @@ class AddTableInput(PathInput):
     cols: int
     section_index: Optional[int] = Field(None, alias="sectionIndex")
     border_style: Optional[Literal["solid", "none"]] = Field(None, alias="borderStyle")
+    border_color: Optional[str] = Field(None, alias="borderColor")
+    border_width: Optional[str | float | int] = Field(None, alias="borderWidth")
+    fill_color: Optional[str] = Field(None, alias="fillColor")
 
 
 class AddTableOutput(_BaseModel):
     tableIndex: int
     cellCount: int
+
+
+class SetTableBorderFillInput(PathInput):
+    table_index: int = Field(alias="tableIndex")
+    border_style: Optional[Literal["solid", "none"]] = Field(None, alias="borderStyle")
+    border_color: Optional[str] = Field(None, alias="borderColor")
+    border_width: Optional[str | float | int] = Field(None, alias="borderWidth")
+    fill_color: Optional[str] = Field(None, alias="fillColor")
+
+
+class SetTableBorderFillOutput(_BaseModel):
+    borderFillIDRef: str
+    anchorCells: int
 
 
 class TableCellAnchor(_BaseModel):
@@ -763,6 +779,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=AddTableInput,
             output_model=AddTableOutput,
             func=_simple("add_table"),
+        ),
+        ToolDefinition(
+            name="set_table_border_fill",
+            description="Update a table's border fill and anchor cells.",
+            input_model=SetTableBorderFillInput,
+            output_model=SetTableBorderFillOutput,
+            func=_simple("set_table_border_fill"),
         ),
         ToolDefinition(
             name="get_table_cell_map",
