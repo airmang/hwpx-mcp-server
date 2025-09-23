@@ -65,8 +65,26 @@ uvx hwpx-mcp-server
 | `HWPX_MCP_PAGING_PARA_LIMIT` | 페이지네이션 도구가 반환할 최대 문단 수 | `200` |
 | `HWPX_MCP_AUTOBACKUP` | `1`이면 저장 전 `<file>.bak` 백업 생성 | `0` |
 | `LOG_LEVEL` | stderr에 JSONL 형식으로 출력할 로그 레벨 | `INFO` |
+| `HWPX_MCP_HARDENING` | `1`로 설정 시 하드닝 편집 파이프라인과 검색/컨텍스트 도구 활성화 | `0` |
 
 > ℹ️ `read_text` 도구는 기본적으로 최대 200개의 문단을 반환합니다. 더 큰 덤프가 필요하면 도구 호출 시 `limit` 인수를 직접 지정하거나 `HWPX_MCP_PAGING_PARA_LIMIT` 환경 변수를 확장하세요. 이는 Microsoft Office Word에서 필요한 범위만 순차적으로 읽는 워크플로와 동일합니다.
+
+> 🔐 `HWPX_MCP_HARDENING=1`로 실행하면 새 편집 파이프라인(`plan → preview → apply`)과 검색/컨텍스트 도구가 함께 노출됩니다. 값이 `0` 또는 미설정이면 기존 도구 표면만 유지됩니다.
+
+### 🔐 하드닝 편집 파이프라인 (옵션)
+
+하드닝 플래그를 켜면 모든 편집 요청이 **계획(Plan) → 검토(Preview) → 적용(Apply)**의 3단계를 거치도록 설계된 신규 도구가 함께 노출됩니다.
+
+1. **`hwpx.plan_edit`**: 변경 대상과 의도한 작업을 설명하면 서버가 안정적인 `planId`와 예상 작업 요약을 제공합니다.
+2. **`hwpx.preview_edit`**: 발급된 `planId`로 미리보기를 요청하면 실제 diff, 모호성 경고, 안전 점수 등을 포함한 리뷰 데이터를 반환합니다. 이 단계가 기록되지 않으면 적용 단계로 넘어갈 수 없습니다.
+3. **`hwpx.apply_edit`**: `preview`를 거친 동일한 `planId`에 `confirm: true`를 명시해야 실제 문서 변경이 이루어집니다. `idempotencyKey`를 지정하면 동일 요청이 반복되더라도 안전하게 무시됩니다.
+
+각 단계는 표준 `ServerResponse` 래퍼를 사용하며, 오류 발생 시 `PREVIEW_REQUIRED`, `AMBIGUOUS_TARGET`, `UNSAFE_WILDCARD`, `IDEMPOTENT_REPLAY` 등의 코드와 함께 후속 행동 예시(`next_actions`)를 반환합니다. 모든 스키마는 draft-07 호환 Sanitizer를 통해 `$ref`, `anyOf` 없이 평탄화되어 노출됩니다.
+
+또한 하드닝 모드에서는 지원 도구가 확장됩니다.
+
+- **`hwpx.search`**: 정규식 또는 키워드 기반으로 문서 전반을 검색하여 노출 가능한 문맥만 포함한 일치 결과를 제공합니다.
+- **`hwpx.get_context`**: 특정 문단 주변의 제한된 창(window)만 추출하여 프라이버시를 유지한 채 리뷰에 활용할 수 있습니다.
 
 ## 🛠️ 제공 도구
 
@@ -82,12 +100,15 @@ uvx hwpx-mcp-server
   - **콘텐츠 추출 및 검색**
       - `read_text`, `read_paragraphs`, `text_extract_report`: 페이지네이션, 선택 문단, 주석 포함 텍스트 추출
       - `find`, `find_runs_by_style`: 텍스트 검색 및 스타일 기반 검색
+      - `hwpx.search` *(플래그 활성 시)*: 정규식/키워드 검색과 안정적인 노드 식별자 반환
+      - `hwpx.get_context` *(플래그 활성 시)*: 문단 전후 문맥만 제한적으로 조회
   - **문서 편집**
       - `replace_text_in_runs`: 스타일을 보존하며 텍스트 치환
       - `add_paragraph`, `insert_paragraphs_bulk`: 문단 추가
       - `add_table`, `get_table_cell_map`, `set_table_cell_text`, `replace_table_region`, `split_table_cell`: 표 생성·편집 및 병합 해제
       - `add_shape`, `add_control`: 개체 추가
       - `add_memo`, `attach_memo_field`, `add_memo_with_anchor`, `remove_memo`: 메모 관리
+      - `hwpx.plan_edit`, `hwpx.preview_edit`, `hwpx.apply_edit` *(플래그 활성 시)*: 검증된 3단계 편집 파이프라인
   - **스타일링**
       - `ensure_run_style`, `list_styles_and_bullets`: 스타일 및 글머리표 목록 확인/생성
       - `apply_style_to_text_ranges`, `apply_style_to_paragraphs`: 단어/문단 단위 스타일 적용
@@ -227,6 +248,13 @@ python -m pytest
   * 이 서버는 `python-hwpx>=1.9`, `mcp`, `anyio`, `pydantic` 등 순수 파이썬 라이브러리로만 구성됩니다.
   * 모든 도구 핸들러는 `HwpxOps`의 경로 헬퍼와 `HwpxDocument` API를 통해 문서를 안전하게 조작합니다.
   * 파괴적 작업(수정/저장)에는 `dryRun` 플래그를 우선 제공하며, 자동 백업 옵션이 활성화되어 있으면 `.bak` 파일을 생성하여 안정성을 높입니다.
+  * JSON 스키마는 내부 `schema.builder` 경로를 통해 draft-07 호환 Sanitizer를 거친 후 노출되므로 `$ref`/`anyOf`가 제거된 평탄한 구조를 기대할 수 있습니다.
+
+### 🔒 서버 하드닝 & JSON 스키마 (draft-07) — 선택 사용
+
+- `HWPX_MCP_HARDENING=1`을 설정하면 plan/preview/apply 파이프라인, `hwpx.search`, `hwpx.get_context`가 활성화됩니다.
+- 플래그를 끄면 (`0` 또는 미설정) 기존 도구만 유지하면서도 강화된 스키마 Sanitizer는 계속 적용됩니다.
+- `pytest -q`를 실행하면 스키마 회귀, 파이프라인 게이트, 멱등성 검증 테스트가 함께 수행되어 배포 전 안전성을 확인할 수 있습니다.
 
 ## 📜 라이선스
 
