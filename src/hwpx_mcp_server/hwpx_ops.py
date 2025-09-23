@@ -183,17 +183,6 @@ class HwpxOps:
             raise HwpxOperationError("char property does not expose an identifier")
         return char_id
 
-    def _resolve_table_border_fill(self, border_style: Optional[str]) -> Optional[str]:
-        if border_style is None:
-            return None
-
-        normalized = border_style.strip().lower()
-        if not normalized or normalized == "solid":
-            return None
-        if normalized == "none":
-            return "0"
-        raise ValueError(f"Unsupported border style: {border_style}")
-
     def _create_underline_element(self, color: str) -> Any:
         from xml.etree import ElementTree as ET
 
@@ -201,6 +190,231 @@ class HwpxOps:
             f"{HH_NS}underline",
             {"type": "SOLID", "shape": "SOLID", "color": color},
         )
+
+    def _ensure_table_border_fill(
+        self,
+        document: HwpxDocument,
+        *,
+        border_style: Optional[str] = None,
+        border_color: Optional[str] = None,
+        border_width: Optional[str | float | int] = None,
+        fill_color: Optional[str] = None,
+    ) -> str:
+        normalized_style = (border_style or "").strip().lower() or None
+        if normalized_style not in {None, "solid", "none"}:
+            raise ValueError(f"Unsupported border style: {border_style}")
+
+        normalized_border_color = self._normalize_color(border_color)
+        normalized_fill_color = self._normalize_color(fill_color)
+
+        if normalized_style == "none" and not any(
+            [normalized_border_color, normalized_fill_color, border_width]
+        ):
+            return "0"
+
+        if (
+            normalized_style in {None, "solid"}
+            and normalized_border_color is None
+            and normalized_fill_color is None
+            and border_width is None
+        ):
+            return document.oxml.ensure_basic_border_fill()
+
+        if not document.headers:
+            raise HwpxOperationError(
+                "document does not contain any headers to host border fills"
+            )
+
+        header = document.headers[0]
+
+        border_type = "NONE" if normalized_style == "none" else "SOLID"
+
+        def normalize_length(value: Optional[str | float | int], default: str) -> str:
+            if value is None:
+                return default
+            if isinstance(value, (int, float)):
+                return f"{value:g} mm"
+            text = str(value).strip()
+            if not text:
+                return default
+            match = re.fullmatch(r"([0-9]+(?:\\.[0-9]+)?)\\s*([A-Za-z]+)?", text)
+            if match:
+                number, unit = match.groups()
+                unit = (unit or "mm").lower()
+                return f"{number} {unit}"
+            return text
+
+        if border_type == "NONE":
+            width_default = "0 mm"
+            diag_default = "0 mm"
+        else:
+            width_default = "0.12 mm"
+            diag_default = "0.1 mm"
+
+        width_value = normalize_length(border_width, width_default)
+        if border_width is not None:
+            diagonal_width_value = normalize_length(border_width, width_default)
+        else:
+            diagonal_width_value = normalize_length(None, diag_default)
+
+        def normalize_length_token(value: Optional[str]) -> str:
+            if not value:
+                return ""
+            return re.sub(r"\s+", "", str(value)).lower()
+
+        width_token = normalize_length_token(width_value)
+        diagonal_width_token = normalize_length_token(diagonal_width_value)
+
+        if border_type == "SOLID":
+            edge_color = normalized_border_color or "#000000"
+            diagonal_color = edge_color
+        else:
+            edge_color = normalized_border_color
+            diagonal_color = normalized_border_color
+
+        ref_list = header.element.find(f"{HH_NS}refList")
+        if ref_list is None:
+            ref_list = ET.SubElement(header.element, f"{HH_NS}refList")
+            header.mark_dirty()
+
+        border_fills_element = ref_list.find(f"{HH_NS}borderFills")
+        if border_fills_element is None:
+            border_fills_element = ET.SubElement(
+                ref_list, f"{HH_NS}borderFills", {"itemCnt": "0"}
+            )
+            header.mark_dirty()
+
+        def matches(existing: ET.Element) -> bool:
+            if (existing.get("threeD") or "0") != "0":
+                return False
+            if (existing.get("shadow") or "0") != "0":
+                return False
+            if (existing.get("centerLine") or "NONE").upper() != "NONE":
+                return False
+            if (existing.get("breakCellSeparateLine") or "0") != "0":
+                return False
+
+            for slash_name in ("slash", "backSlash"):
+                slash = existing.find(f"{HH_NS}{slash_name}")
+                if slash is None:
+                    return False
+                if (slash.get("type") or "NONE").upper() != "NONE":
+                    return False
+                if slash.get("Crooked", "0") != "0":
+                    return False
+                if slash.get("isCounter", "0") != "0":
+                    return False
+
+            for child_name in ("leftBorder", "rightBorder", "topBorder", "bottomBorder"):
+                border_child = existing.find(f"{HH_NS}{child_name}")
+                if border_child is None:
+                    return False
+                if (border_child.get("type") or "").upper() != border_type:
+                    return False
+                if normalize_length_token(border_child.get("width")) != width_token:
+                    return False
+                if edge_color is not None:
+                    if (border_child.get("color") or "").upper() != edge_color:
+                        return False
+                else:
+                    if border_child.get("color") not in (None, ""):
+                        return False
+
+            diagonal_child = existing.find(f"{HH_NS}diagonal")
+            if diagonal_child is None:
+                return False
+            expected_diagonal_type = "SOLID" if border_type == "SOLID" else "NONE"
+            if (diagonal_child.get("type") or "").upper() != expected_diagonal_type:
+                return False
+            if normalize_length_token(diagonal_child.get("width")) != diagonal_width_token:
+                return False
+            if diagonal_color is not None:
+                if (diagonal_child.get("color") or "").upper() != diagonal_color:
+                    return False
+            else:
+                if diagonal_child.get("color") not in (None, ""):
+                    return False
+
+            fill_brush = existing.find(f"{HH_NS}fillBrush")
+            if normalized_fill_color is None:
+                if fill_brush is not None:
+                    return False
+            else:
+                if fill_brush is None:
+                    return False
+                solid_brush = fill_brush.find(f"{HH_NS}solidBrush")
+                if solid_brush is None:
+                    return False
+                if (solid_brush.get("type") or "SOLID").upper() != "SOLID":
+                    return False
+                if (solid_brush.get("color") or "").upper() != normalized_fill_color:
+                    return False
+
+            return True
+
+        for candidate in border_fills_element.findall(f"{HH_NS}borderFill"):
+            identifier = candidate.get("id")
+            if not identifier:
+                continue
+            if matches(candidate):
+                return identifier
+
+        if not hasattr(header, "_allocate_border_fill_id"):
+            raise HwpxOperationError("header does not expose ID allocation helpers")
+
+        new_id = header._allocate_border_fill_id(border_fills_element)  # type: ignore[attr-defined]
+        border_fill_element = ET.Element(
+            f"{HH_NS}borderFill",
+            {
+                "id": new_id,
+                "threeD": "0",
+                "shadow": "0",
+                "centerLine": "NONE",
+                "breakCellSeparateLine": "0",
+            },
+        )
+
+        for slash_name in ("slash", "backSlash"):
+            ET.SubElement(
+                border_fill_element,
+                f"{HH_NS}{slash_name}",
+                {"type": "NONE", "Crooked": "0", "isCounter": "0"},
+            )
+
+        def append_border(name: str, *, width: str, color: Optional[str], kind: str) -> None:
+            attrs = {"type": kind}
+            if width:
+                attrs["width"] = width
+            if color is not None:
+                attrs["color"] = color
+            ET.SubElement(border_fill_element, f"{HH_NS}{name}", attrs)
+
+        for side in ("leftBorder", "rightBorder", "topBorder", "bottomBorder"):
+            append_border(side, width=width_value, color=edge_color, kind=border_type)
+
+        append_border(
+            "diagonal",
+            width=diagonal_width_value,
+            color=diagonal_color,
+            kind="SOLID" if border_type == "SOLID" else "NONE",
+        )
+
+        if normalized_fill_color is not None:
+            fill_brush = ET.SubElement(border_fill_element, f"{HH_NS}fillBrush")
+            ET.SubElement(
+                fill_brush,
+                f"{HH_NS}solidBrush",
+                {"type": "SOLID", "color": normalized_fill_color, "alpha": "255"},
+            )
+
+        border_fills_element.append(border_fill_element)
+        if hasattr(header, "_update_border_fills_item_count"):
+            header._update_border_fills_item_count(border_fills_element)  # type: ignore[attr-defined]
+        else:
+            count = len(border_fills_element.findall(f"{HH_NS}borderFill"))
+            border_fills_element.set("itemCnt", str(count))
+        header.mark_dirty()
+        return new_id
 
     # ------------------------------------------------------------------
     # Document information
@@ -580,9 +794,18 @@ class HwpxOps:
         *,
         section_index: Optional[int] = None,
         border_style: str | None = None,
+        border_color: Optional[str] = None,
+        border_width: Optional[str | float | int] = None,
+        fill_color: Optional[str] = None,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
-        border_fill = self._resolve_table_border_fill(border_style)
+        border_fill = self._ensure_table_border_fill(
+            document,
+            border_style=border_style,
+            border_color=border_color,
+            border_width=border_width,
+            fill_color=fill_color,
+        )
         table = document.add_table(
             rows,
             cols,
@@ -598,6 +821,43 @@ class HwpxOps:
                 break
         self._save_document(document, resolved)
         return {"tableIndex": index, "cellCount": rows * cols}
+
+    def set_table_border_fill(
+        self,
+        path: str,
+        table_index: int,
+        *,
+        border_style: str | None = None,
+        border_color: Optional[str] = None,
+        border_width: Optional[str | float | int] = None,
+        fill_color: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        document, resolved = self._open_document(path)
+        tables = self._iter_tables(document)
+        try:
+            table = tables[table_index]
+        except IndexError as exc:
+            raise HwpxOperationError("tableIndex out of range") from exc
+
+        border_fill = self._ensure_table_border_fill(
+            document,
+            border_style=border_style,
+            border_color=border_color,
+            border_width=border_width,
+            fill_color=fill_color,
+        )
+
+        table.element.set("borderFillIDRef", border_fill)
+        anchor_elements: set[int] = set()
+        for position in table.iter_grid():
+            if getattr(position, "is_anchor", False):
+                cell_element = position.cell.element
+                cell_element.set("borderFillIDRef", border_fill)
+                anchor_elements.add(id(cell_element))
+
+        table.mark_dirty()
+        self._save_document(document, resolved)
+        return {"borderFillIDRef": border_fill, "anchorCells": len(anchor_elements)}
 
     def get_table_cell_map(
         self,
