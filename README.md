@@ -1,4 +1,4 @@
-# HWPX MCP Server 한글 자동화 mcp #
+# 한글 MCP (HWPX) 서버 - 한글 자동화 HWPX 문서 자동 생성·편집·검증mcp #
 
 [](https://www.google.com/search?q=https://pypi.org/project/hwpx-mcp-server/)
 [](https://opensource.org/licenses/MIT)
