@@ -12,5 +12,15 @@ src/hwpx_mcp_server.egg-info/dependency_links.txt
 src/hwpx_mcp_server.egg-info/entry_points.txt
 src/hwpx_mcp_server.egg-info/requires.txt
 src/hwpx_mcp_server.egg-info/top_level.txt
+src/hwpx_mcp_server/core/context.py
+src/hwpx_mcp_server/core/diff.py
+src/hwpx_mcp_server/core/handles.py
+src/hwpx_mcp_server/core/plan.py
+src/hwpx_mcp_server/core/txn.py
+src/hwpx_mcp_server/metadata/tools_meta.py
+src/hwpx_mcp_server/schema/builder.py
+src/hwpx_mcp_server/schema/sanitizer.py
 tests/test_hwpx_ops.py
 tests/test_mcp_end_to_end.py
+tests/test_pipeline.py
+tests/test_tool_schemas.py
