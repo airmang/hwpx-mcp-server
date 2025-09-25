@@ -173,7 +173,7 @@ class InsertParagraphsInput(PathInput):
     section_index: Optional[int] = Field(None, alias="sectionIndex")
     paragraphs: Sequence[str]
     run_style: Optional[RunStyleModel] = Field(None, alias="runStyle")
-    dry_run: bool = Field(True, alias="dryRun")
+    dry_run: bool = Field(False, alias="dryRun")
 
 
 class InsertParagraphsOutput(_BaseModel):
