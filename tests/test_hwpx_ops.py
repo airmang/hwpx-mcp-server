@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 
 from hwpx.document import HwpxDocument
-from hwpx_mcp_server.hwpx_ops import HH_NS, HwpxOps
+from hwpx_mcp_server.hwpx_ops import HH_NS, HP_NS, HwpxOps
 import hwpx_mcp_server.hwpx_ops as ops_module
 from hwpx_mcp_server.tools import build_tool_definitions
 
@@ -518,7 +518,6 @@ def test_set_table_border_fill_updates_anchor_cells(ops_with_sample):
             )
 
     assert len(anchor_elements) == result["anchorCells"]
-
     header = document.headers[0]
     ref_list = header.element.find(f"{HH_NS}refList")
     assert ref_list is not None
@@ -540,3 +539,69 @@ def test_set_table_border_fill_updates_anchor_cells(ops_with_sample):
     solid_brush = fill_brush.find(f"{HH_NS}solidBrush")
     assert solid_brush is not None
     assert (solid_brush.get("color") or "").upper() == "#112233"
+
+
+def test_set_table_cell_text_auto_fit_adjusts_widths(ops_with_sample):
+    ops, path = ops_with_sample
+    table_info = ops.add_table(str(path), rows=1, cols=2)
+    index = table_info["tableIndex"]
+
+    ops.set_table_cell_text(
+        str(path),
+        table_index=index,
+        row=0,
+        col=0,
+        text="짧음",
+        auto_fit=True,
+    )
+    ops.set_table_cell_text(
+        str(path),
+        table_index=index,
+        row=0,
+        col=1,
+        text="이 셀은 훨씬 더 긴 설명을 포함합니다",
+        auto_fit=True,
+    )
+
+    refreshed = HwpxDocument.open(path)
+    tables: list = []
+    for paragraph in refreshed.paragraphs:
+        tables.extend(paragraph.tables)
+    table = tables[index]
+
+    left_width = int(table.cell(0, 0).element.find(f"{HP_NS}cellSz").get("width"))
+    right_width = int(table.cell(0, 1).element.find(f"{HP_NS}cellSz").get("width"))
+
+    assert right_width > left_width
+
+    size_element = table.element.find(f"{HP_NS}sz")
+    assert size_element is not None
+    assert int(size_element.get("width")) == left_width + right_width
+
+
+def test_replace_table_region_auto_fit_scales_each_column(ops_with_sample):
+    ops, path = ops_with_sample
+    table_info = ops.add_table(str(path), rows=1, cols=3)
+    index = table_info["tableIndex"]
+
+    ops.replace_table_region(
+        str(path),
+        table_index=index,
+        start_row=0,
+        start_col=0,
+        values=[["짧", "중간길이", "이 열은 아주 길고 자세한 설명을 담고 있습니다"]],
+        auto_fit=True,
+    )
+
+    refreshed = HwpxDocument.open(path)
+    tables: list = []
+    for paragraph in refreshed.paragraphs:
+        tables.extend(paragraph.tables)
+    table = tables[index]
+
+    widths = [
+        int(table.cell(0, col).element.find(f"{HP_NS}cellSz").get("width"))
+        for col in range(table.column_count)
+    ]
+
+    assert widths[2] > widths[1] > widths[0]

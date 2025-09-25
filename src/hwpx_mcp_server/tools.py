@@ -188,6 +188,7 @@ class AddTableInput(PathInput):
     border_color: Optional[str] = Field(None, alias="borderColor")
     border_width: Optional[str | float | int] = Field(None, alias="borderWidth")
     fill_color: Optional[str] = Field(None, alias="fillColor")
+    auto_fit: bool = Field(False, alias="autoFit")
 
 
 class AddTableOutput(_BaseModel):
@@ -240,6 +241,7 @@ class SetTableCellInput(PathInput):
     logical: Optional[bool] = Field(None, alias="logical")
     split_merged: Optional[bool] = Field(None, alias="splitMerged")
     dry_run: bool = Field(False, alias="dryRun")
+    auto_fit: bool = Field(False, alias="autoFit")
 
 
 class SetTableCellOutput(_BaseModel):
@@ -254,6 +256,7 @@ class ReplaceTableRegionInput(PathInput):
     logical: Optional[bool] = Field(None, alias="logical")
     split_merged: Optional[bool] = Field(None, alias="splitMerged")
     dry_run: bool = Field(False, alias="dryRun")
+    auto_fit: bool = Field(False, alias="autoFit")
 
 
 class ReplaceTableRegionOutput(_BaseModel):

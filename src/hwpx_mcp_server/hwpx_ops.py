@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import logging
+import math
 import re
 import shutil
 from dataclasses import asdict
@@ -45,6 +46,18 @@ HH_NS = "{http://www.hancom.co.kr/hwpml/2011/head}"
 HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 logger = logging.getLogger(__name__)
+
+try:  # pragma: no cover - fallback only used if python-hwpx internals change
+    from hwpx.oxml import document as _hwpx_document_module
+
+    _DEFAULT_CELL_WIDTH = getattr(_hwpx_document_module, "_DEFAULT_CELL_WIDTH", 7200)
+except Exception:  # pragma: no cover - safeguard against unexpected import errors
+    _DEFAULT_CELL_WIDTH = 7200
+
+_AUTO_FIT_CHAR_UNIT = max(360, _DEFAULT_CELL_WIDTH // 10)
+_AUTO_FIT_PADDING_CHARS = 2
+_AUTO_FIT_MIN_COLUMN_WIDTH = max(_AUTO_FIT_CHAR_UNIT * (_AUTO_FIT_PADDING_CHARS + 1), _DEFAULT_CELL_WIDTH // 2)
+_AUTO_FIT_MAX_COLUMN_WIDTH = _DEFAULT_CELL_WIDTH * 12
 
 
 DEFAULT_PAGING_PARAGRAPH_LIMIT = 200
@@ -132,6 +145,65 @@ class HwpxOps:
         for paragraph in document.paragraphs:
             tables.extend(paragraph.tables)
         return tables
+
+    def _auto_fit_table_columns(self, table: HwpxOxmlTable) -> List[int]:
+        column_count = table.column_count
+        if column_count <= 0:
+            return []
+
+        char_requirements: List[float] = [0.0] * column_count
+        for position in table.iter_grid():
+            if not position.is_anchor:
+                continue
+            text = position.cell.text or ""
+            lines = text.splitlines()
+            if not lines:
+                lines = [text]
+            longest = max(len(line) for line in lines)
+            span = max(1, position.col_span)
+            per_column = longest / span if span else float(longest)
+            for offset in range(span):
+                column_index = position.column + offset
+                if 0 <= column_index < column_count:
+                    char_requirements[column_index] = max(
+                        char_requirements[column_index],
+                        per_column,
+                    )
+
+        column_widths: List[int] = []
+        for requirement in char_requirements:
+            width = int(math.ceil((requirement + _AUTO_FIT_PADDING_CHARS) * _AUTO_FIT_CHAR_UNIT))
+            width = max(width, _AUTO_FIT_MIN_COLUMN_WIDTH)
+            width = min(width, _AUTO_FIT_MAX_COLUMN_WIDTH)
+            column_widths.append(width)
+
+        total_width = sum(column_widths)
+        if total_width <= 0:
+            column_widths = [max(_AUTO_FIT_MIN_COLUMN_WIDTH, _AUTO_FIT_CHAR_UNIT)] * column_count
+            total_width = sum(column_widths)
+
+        size_element = table.element.find(f"{HP_NS}sz")
+        if size_element is not None:
+            size_element.set("width", str(total_width))
+
+        for position in table.iter_grid():
+            if not position.is_anchor:
+                continue
+            span = max(1, position.col_span)
+            start = position.column
+            width_value = 0
+            for offset in range(span):
+                column_index = start + offset
+                if 0 <= column_index < column_count:
+                    width_value += column_widths[column_index]
+            if width_value <= 0:
+                continue
+            cell_size = position.cell.element.find(f"{HP_NS}cellSz")
+            if cell_size is not None:
+                cell_size.set("width", str(width_value))
+
+        table.mark_dirty()
+        return column_widths
 
     def _normalize_color(self, color: str | None) -> Optional[str]:
         if color is None:
@@ -818,6 +890,7 @@ class HwpxOps:
         border_color: Optional[str] = None,
         border_width: Optional[str | float | int] = None,
         fill_color: Optional[str] = None,
+        auto_fit: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         border_fill = self._ensure_table_border_fill(
@@ -833,6 +906,8 @@ class HwpxOps:
             section_index=section_index,
             border_fill_id_ref=border_fill,
         )
+        if auto_fit:
+            self._auto_fit_table_columns(table)
         tables = self._iter_tables(document)
         element_id = id(table.element)
         index = len(tables) - 1
@@ -929,6 +1004,7 @@ class HwpxOps:
         dry_run: bool = False,
         logical: Optional[bool] = None,
         split_merged: Optional[bool] = None,
+        auto_fit: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         tables = self._iter_tables(document)
@@ -949,6 +1025,8 @@ class HwpxOps:
             table.set_cell_text(row, col, text, **kwargs)
         except (IndexError, ValueError) as exc:
             raise HwpxOperationError(f"{guidance}: {exc}") from exc
+        if auto_fit and not dry_run:
+            self._auto_fit_table_columns(table)
         if not dry_run:
             self._save_document(document, resolved)
         return {"ok": True}
@@ -964,6 +1042,7 @@ class HwpxOps:
         dry_run: bool = False,
         logical: Optional[bool] = None,
         split_merged: Optional[bool] = None,
+        auto_fit: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         tables = self._iter_tables(document)
@@ -993,6 +1072,8 @@ class HwpxOps:
                     )
                     raise HwpxOperationError(f"{message}: {exc}") from exc
                 updated += 1
+        if auto_fit and not dry_run and updated > 0:
+            self._auto_fit_table_columns(table)
         if not dry_run:
             self._save_document(document, resolved)
         return {"updatedCells": updated}
