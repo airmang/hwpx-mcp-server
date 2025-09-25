@@ -188,7 +188,7 @@ uvx hwpx-mcp-server
 }
 ```
 
-`set_table_cell_text`와 `replace_table_region`은 선택적인 `logical`/`splitMerged` 플래그를 지원합니다. `logical: true`로 지정하면 방금 확인한 논리 좌표계를 그대로 사용할 수 있고, `splitMerged: true`를 함께 전달하면 쓰기 전에 자동으로 해당 병합 영역을 분할합니다. 병합을 직접 해제해야 할 때는 `split_table_cell` 도구가 원래 범위를 알려주면서 셀을 분할합니다.
+`set_table_cell_text`와 `replace_table_region`은 선택적인 `logical`/`splitMerged` 플래그를 지원합니다. `logical: true`로 지정하면 방금 확인한 논리 좌표계를 그대로 사용할 수 있고, `splitMerged: true`를 함께 전달하면 쓰기 전에 자동으로 해당 병합 영역을 분할합니다. 긴 텍스트를 채울 때는 `autoFit: true`를 추가로 지정하면 각 열 너비가 셀 내용 길이에 맞춰 다시 계산되어 표 전체 폭(`hp:sz`)과 셀 크기(`hp:cellSz`)가 함께 업데이트됩니다. 병합을 직접 해제해야 할 때는 `split_table_cell` 도구가 원래 범위를 알려주면서 셀을 분할합니다.
 
 ```jsonc
 {
@@ -201,6 +201,7 @@ uvx hwpx-mcp-server
     "text": "논리 좌표 편집",
     "logical": true,
     "splitMerged": true,
+    "autoFit": true,
     "dryRun": false
   }
 }
