@@ -861,10 +861,14 @@ class HwpxOps:
         *,
         section_index: Optional[int] = None,
         run_style: Optional[Dict[str, Any]] = None,
-        dry_run: bool = True,
+        dry_run: bool = False,
     ) -> Dict[str, Any]:
         if not paragraphs:
             return {"added": 0}
+
+        if dry_run:
+            return {"added": len(paragraphs)}
+
         document, resolved = self._open_document(path)
         char_id = self._ensure_char_style(document, run_style)
         count = 0
@@ -875,8 +879,7 @@ class HwpxOps:
                 char_pr_id_ref=char_id,
             )
             count += 1
-        if not dry_run:
-            self._save_document(document, resolved)
+        self._save_document(document, resolved)
         return {"added": count}
 
     def add_table(
