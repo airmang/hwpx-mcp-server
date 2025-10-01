@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 import shutil
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Protocol, Tuple
+from typing import Dict, Mapping, Optional, Protocol, Tuple
 from urllib import error, parse, request
 
 from hwpx.document import HwpxDocument
@@ -101,33 +102,84 @@ class LocalDocumentStorage:
         document.save(target)
 
 
+class RemoteDocumentClient(Protocol):
+    """Protocol describing the minimal HTTP client interface required."""
+
+    def download(self, path: str) -> bytes:
+        """Return the binary payload for *path* from the remote service."""
+
+    def upload(self, path: str, data: bytes) -> None:
+        """Persist *data* to *path* on the remote service."""
+
+
+@dataclass(slots=True)
+class _RestDocumentClient:
+    """Default HTTP client used by :class:`HttpDocumentStorage`."""
+
+    base_url: str
+    timeout: float | None
+    headers: Mapping[str, str]
+
+    def __post_init__(self) -> None:
+        if not self.base_url:
+            raise ValueError("HTTP storage requires a base URL")
+        self._opener = request.build_opener()
+
+    def download(self, path: str) -> bytes:
+        url = self._build_url(path)
+        req = request.Request(url, method="GET")
+        for key, value in self.headers.items():
+            req.add_header(key, value)
+        try:
+            with self._opener.open(req, timeout=self.timeout) as response:
+                return response.read()
+        except error.HTTPError as exc:
+            if exc.code == 404:
+                raise FileNotFoundError(path) from exc
+            raise RuntimeError(f"HTTP download failed: {exc}") from exc
+        except error.URLError as exc:
+            raise RuntimeError(f"HTTP download failed: {exc}") from exc
+
+    def upload(self, path: str, data: bytes) -> None:
+        url = self._build_url(path)
+        req = request.Request(url, data=data, method="PUT")
+        for key, value in self.headers.items():
+            req.add_header(key, value)
+        req.add_header("Content-Type", "application/octet-stream")
+        try:
+            with self._opener.open(req, timeout=self.timeout):
+                return None
+        except error.HTTPError as exc:
+            raise RuntimeError(f"HTTP upload failed: {exc}") from exc
+        except error.URLError as exc:
+            raise RuntimeError(f"HTTP upload failed: {exc}") from exc
+
+    def _build_url(self, path: str) -> str:
+        query = parse.urlencode({"path": path})
+        return f"{self.base_url.rstrip('/')}/documents?{query}"
+
+
 class HttpDocumentStorage:
-    """HTTP based :class:`DocumentStorage` implementation.
-
-    The backend expects endpoints that accept binary payloads using a simple REST
-    contract:
-
-    - ``GET {base_url}/documents`` with ``path`` query parameter to download a
-      document.
-    - ``PUT {base_url}/documents`` with ``path`` query parameter and raw binary
-      body to persist a document.
-
-    Backups are not handled automatically for the HTTP backend.
-    """
+    """HTTP based :class:`DocumentStorage` implementation with local caching."""
 
     def __init__(
         self,
-        base_url: str,
+        base_url: str | None = None,
         *,
         timeout: float | None = None,
+        headers: Mapping[str, str] | None = None,
+        client: RemoteDocumentClient | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
-        if not base_url:
-            raise ValueError("HTTP storage requires a base URL")
+        if client is None and not base_url:
+            raise ValueError("HTTP storage requires either a base URL or a client")
+
         self.base_directory = Path("/")
-        self._base_url = base_url.rstrip("/")
-        self._timeout = timeout
         self._logger = logger or logging.getLogger(__name__)
+        self._headers = dict(headers or {})
+        self._client = client or _RestDocumentClient(base_url=base_url or "", timeout=timeout, headers=self._headers)
+        self._cache_dir = Path(tempfile.mkdtemp(prefix="hwpx_http_cache_"))
+        self._cache: Dict[str, Path] = {}
 
     def resolve_path(self, path: str, *, must_exist: bool = True) -> Path:
         # HTTP storage treats the provided path as an opaque identifier.
@@ -148,51 +200,40 @@ class HttpDocumentStorage:
         return None
 
     def open_document(self, path: str) -> Tuple[HwpxDocument, Path]:
-        url = self._build_url(path)
         try:
-            with request.urlopen(url, timeout=self._timeout) as response:
-                data = response.read()
-        except error.HTTPError as exc:
-            if exc.code == 404:
-                raise FileNotFoundError(path) from exc
-            raise RuntimeError(f"HTTP storage open failed: {exc}") from exc
-        except error.URLError as exc:
+            payload = self._client.download(path)
+        except FileNotFoundError:
+            raise
+        except Exception as exc:  # pragma: no cover - handled in tests for fake clients
             raise RuntimeError(f"HTTP storage open failed: {exc}") from exc
 
-        local_path = self._materialize_local_copy(path, data)
+        local_path = self._cache_path(path)
+        local_path.write_bytes(payload)
+        self._cache[path] = local_path
+
         document = HwpxDocument.open(local_path)
         return document, Path(path)
 
     def save_document(self, document: HwpxDocument, target: Path) -> None:
-        with tempfile.NamedTemporaryFile(suffix=target.suffix or ".hwpx", delete=False) as tmp:
-            temp_path = Path(tmp.name)
-        try:
-            document.save(temp_path)
-            data = temp_path.read_bytes()
-        finally:
-            try:
-                temp_path.unlink()
-            except FileNotFoundError:
-                pass
+        remote_key = str(target)
+        cache_path = self._cache.get(remote_key)
+        if cache_path is None:
+            cache_path = self._cache_path(remote_key)
+            self._cache[remote_key] = cache_path
 
-        url = self._build_url(str(target))
-        req = request.Request(url, data=data, method="PUT")
-        req.add_header("Content-Type", "application/octet-stream")
         try:
-            with request.urlopen(req, timeout=self._timeout):
-                pass
-        except error.HTTPError as exc:
-            raise RuntimeError(f"HTTP storage save failed: {exc}") from exc
-        except error.URLError as exc:
+            document.save(cache_path)
+            payload = cache_path.read_bytes()
+        except Exception as exc:  # pragma: no cover - unexpected save error
             raise RuntimeError(f"HTTP storage save failed: {exc}") from exc
 
-    def _build_url(self, path: str) -> str:
-        query = parse.urlencode({"path": path})
-        return f"{self._base_url}/documents?{query}"
+        try:
+            self._client.upload(remote_key, payload)
+        except Exception as exc:  # pragma: no cover - handled in tests for fake clients
+            raise RuntimeError(f"HTTP storage save failed: {exc}") from exc
 
-    def _materialize_local_copy(self, path: str, data: bytes) -> Path:
+    def _cache_path(self, path: str) -> Path:
         suffix = Path(path).suffix or ".hwpx"
-        directory = Path(tempfile.mkdtemp(prefix="hwpx_http_"))
-        local_path = directory / (Path(path).name or f"document{suffix}")
-        local_path.write_bytes(data)
-        return local_path
+        safe_name = parse.quote_plus(path)
+        filename = safe_name if safe_name.endswith(suffix) else f"{safe_name}{suffix}"
+        return self._cache_dir / filename

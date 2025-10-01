@@ -7,7 +7,7 @@ import logging
 import os
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Dict, List, Mapping, Sequence
 
 import anyio
 import mcp.types as types
@@ -32,6 +32,34 @@ def _bool_env(name: str, default: bool = False) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _float_env(name: str) -> float | None:
+    raw = os.getenv(name)
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        LOGGER.warning("Invalid value for %s: expected float", name)
+        return None
+
+
+def _parse_header_assignments(assignments: Sequence[str]) -> Dict[str, str]:
+    headers: Dict[str, str] = {}
+    for assignment in assignments:
+        item = assignment.strip()
+        if not item:
+            continue
+        if "=" in item:
+            key, value = item.split("=", 1)
+        elif ":" in item:
+            key, value = item.split(":", 1)
+        else:
+            LOGGER.warning("Ignoring malformed HTTP header assignment '%s'", item)
+            continue
+        headers[key.strip()] = value.strip()
+    return headers
 
 
 def _resolve_version() -> str:
@@ -130,6 +158,19 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         type=float,
         help="Timeout in seconds for HTTP storage operations",
     )
+    parser.add_argument(
+        "--http-auth-token",
+        help="Bearer token to send with HTTP storage requests (overrides HWPX_MCP_HTTP_AUTH_TOKEN)",
+    )
+    parser.add_argument(
+        "--http-header",
+        action="append",
+        default=[],
+        help=(
+            "Additional HTTP header to send with storage requests. Format key=value or key:value. "
+            "May be specified multiple times."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -140,6 +181,7 @@ def _select_storage(
     auto_backup: bool,
     http_base_url: str | None,
     http_timeout: float | None,
+    http_headers: Mapping[str, str] | None,
 ) -> DocumentStorage:
     if mode == "http":
         base_url = http_base_url or os.getenv("HWPX_MCP_HTTP_BASE_URL")
@@ -147,8 +189,27 @@ def _select_storage(
             raise ValueError("HTTP storage selected but no base URL provided")
         if auto_backup:
             LOGGER.info("Auto-backup is not supported for HTTP storage; ignoring flag")
-        LOGGER.info("Using HTTP storage backend", extra={"baseUrl": base_url})
-        return HttpDocumentStorage(base_url, timeout=http_timeout, logger=LOGGER)
+        headers = dict(http_headers or {})
+        timeout_value = http_timeout
+        if timeout_value is None:
+            timeout_value = _float_env("HWPX_MCP_HTTP_TIMEOUT")
+        has_auth = any(key.lower() == "authorization" for key in headers)
+        LOGGER.info(
+            "Using HTTP storage backend",
+            extra={
+                "baseUrl": base_url,
+                "headers": sorted(
+                    key for key in headers if key.lower() != "authorization"
+                ),
+                "authorization": "provided" if has_auth else "absent",
+            },
+        )
+        return HttpDocumentStorage(
+            base_url,
+            timeout=timeout_value,
+            headers=headers,
+            logger=LOGGER,
+        )
 
     LOGGER.info(
         "Using current working directory for file operations",
@@ -184,12 +245,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         paging_value = DEFAULT_PAGING_PARAGRAPH_LIMIT
 
+    header_tokens: List[str] = []
+    env_header_raw = os.getenv("HWPX_MCP_HTTP_HEADERS")
+    if env_header_raw:
+        env_header_normalized = env_header_raw.replace(";", "\n")
+        header_tokens.extend(env_header_normalized.splitlines())
+    header_tokens.extend(args.http_header)
+    http_headers = _parse_header_assignments(header_tokens)
+
+    auth_token = args.http_auth_token or os.getenv("HWPX_MCP_HTTP_AUTH_TOKEN")
+    if auth_token:
+        http_headers.setdefault("Authorization", f"Bearer {auth_token.strip()}")
+
     storage = _select_storage(
         mode=storage_mode,
         base_directory=base_directory,
         auto_backup=auto_backup,
         http_base_url=args.http_base_url,
         http_timeout=args.http_timeout,
+        http_headers=http_headers,
     )
 
     ops = HwpxOps(
