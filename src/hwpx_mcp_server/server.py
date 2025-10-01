@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 import anyio
 import mcp.types as types
@@ -19,6 +20,7 @@ from .hwpx_ops import (
     HwpxOperationError,
 )
 from .logging_conf import configure_logging
+from .storage import DocumentStorage, HttpDocumentStorage, LocalDocumentStorage
 from .tools import ToolDefinition, build_tool_definitions
 
 LOGGER = logging.getLogger(__name__)
@@ -112,14 +114,65 @@ async def _serve(ops: HwpxOps, tools: List[ToolDefinition]) -> None:
         await server.run(read_stream, write_stream, init_options)
 
 
-def main() -> int:
-    configure_logging(os.getenv("LOG_LEVEL"))
+def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog=DEFAULT_SERVER_NAME)
+    parser.add_argument(
+        "--storage",
+        choices=("local", "http"),
+        help="Storage backend to use (overrides HWPX_MCP_STORAGE)",
+    )
+    parser.add_argument(
+        "--http-base-url",
+        help="Base URL for the HTTP storage backend (overrides HWPX_MCP_HTTP_BASE_URL)",
+    )
+    parser.add_argument(
+        "--http-timeout",
+        type=float,
+        help="Timeout in seconds for HTTP storage operations",
+    )
+    return parser.parse_args(argv)
 
-    base_directory = Path.cwd()
+
+def _select_storage(
+    *,
+    mode: str,
+    base_directory: Path,
+    auto_backup: bool,
+    http_base_url: str | None,
+    http_timeout: float | None,
+) -> DocumentStorage:
+    if mode == "http":
+        base_url = http_base_url or os.getenv("HWPX_MCP_HTTP_BASE_URL")
+        if not base_url:
+            raise ValueError("HTTP storage selected but no base URL provided")
+        if auto_backup:
+            LOGGER.info("Auto-backup is not supported for HTTP storage; ignoring flag")
+        LOGGER.info("Using HTTP storage backend", extra={"baseUrl": base_url})
+        return HttpDocumentStorage(base_url, timeout=http_timeout, logger=LOGGER)
+
     LOGGER.info(
         "Using current working directory for file operations",
         extra={"root": str(base_directory)},
     )
+    return LocalDocumentStorage(
+        base_directory=base_directory,
+        auto_backup=auto_backup,
+        logger=LOGGER,
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    configure_logging(os.getenv("LOG_LEVEL"))
+
+    args = _parse_args(argv)
+
+    storage_mode = (args.storage or os.getenv("HWPX_MCP_STORAGE") or "local").strip().lower()
+    if storage_mode not in {"local", "http"}:
+        LOGGER.warning("Unknown storage mode '%s', falling back to local", storage_mode)
+        storage_mode = "local"
+
+    base_directory = Path.cwd()
+    auto_backup = _bool_env("HWPX_MCP_AUTOBACKUP")
 
     paging_limit = os.getenv("HWPX_MCP_PAGING_PARA_LIMIT")
     try:
@@ -131,10 +184,17 @@ def main() -> int:
         )
         paging_value = DEFAULT_PAGING_PARAGRAPH_LIMIT
 
-    ops = HwpxOps(
+    storage = _select_storage(
+        mode=storage_mode,
         base_directory=base_directory,
+        auto_backup=auto_backup,
+        http_base_url=args.http_base_url,
+        http_timeout=args.http_timeout,
+    )
+
+    ops = HwpxOps(
         paging_paragraph_limit=paging_value,
-        auto_backup=_bool_env("HWPX_MCP_AUTOBACKUP"),
+        storage=storage,
     )
 
     tools = build_tool_definitions()

@@ -7,7 +7,6 @@ import dataclasses
 import logging
 import math
 import re
-import shutil
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +40,7 @@ from .core.plan import (
     SearchOutput,
 )
 from .metadata import tools_meta
+from .storage import DocumentStorage, LocalDocumentStorage
 
 HH_NS = "{http://www.hancom.co.kr/hwpml/2011/head}"
 HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
@@ -76,10 +76,24 @@ class HwpxOps:
         base_directory: Path | None = None,
         paging_paragraph_limit: int = DEFAULT_PAGING_PARAGRAPH_LIMIT,
         auto_backup: bool = False,
+        storage: DocumentStorage | None = None,
     ) -> None:
-        self.base_directory = (base_directory or Path.cwd()).expanduser().resolve()
+        if storage is not None and (base_directory is not None or auto_backup):
+            logger.debug(
+                "Ignoring base_directory/auto_backup parameters because explicit storage was provided",
+                extra={"base_directory": str(base_directory) if base_directory else None},
+            )
+
+        if storage is None:
+            storage = LocalDocumentStorage(
+                base_directory=base_directory,
+                auto_backup=auto_backup,
+                logger=logger,
+            )
+
+        self.storage = storage
+        self.base_directory = storage.base_directory
         self.paging_limit = max(1, paging_paragraph_limit)
-        self.auto_backup = auto_backup
         self._plan_manager = PlanManager()
 
     @property
@@ -90,52 +104,34 @@ class HwpxOps:
     # Basic helpers
     # ------------------------------------------------------------------
     def _resolve_path(self, path: str, *, must_exist: bool = True) -> Path:
-        candidate = Path(path).expanduser()
-        if not candidate.is_absolute():
-            candidate = (self.base_directory / candidate).resolve(strict=False)
-        else:
-            candidate = candidate.resolve(strict=False)
-        if must_exist and not candidate.exists():
-            raise FileNotFoundError(f"Path '{candidate}' does not exist")
-        return candidate
+        return self.storage.resolve_path(path, must_exist=must_exist)
 
     def _resolve_output_path(self, path: str) -> Path:
-        resolved = self._resolve_path(path, must_exist=False)
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-        return resolved
+        return self.storage.resolve_output_path(path)
 
     def _ensure_backup(self, path: Path) -> Optional[Path]:
-        if not path.exists():
-            return None
-        backup = path.with_suffix(path.suffix + ".bak")
-        shutil.copy2(path, backup)
-        return backup
+        return self.storage.ensure_backup(path)
 
     def _relative_path(self, path: Path) -> str:
-        try:
-            return str(path.relative_to(self.base_directory))
-        except ValueError:
-            return str(path)
+        return self.storage.relative_path(path)
 
     def _maybe_backup(self, path: Path) -> None:
-        if self.auto_backup:
-            backup = self._ensure_backup(path)
-            if backup is not None:
-                logger.info("created backup", extra={"path": str(path), "backup": str(backup)})
+        self.storage.maybe_backup(path)
 
     def _open_document(self, path: str) -> Tuple[HwpxDocument, Path]:
-        resolved = self._resolve_path(path)
         try:
-            document = HwpxDocument.open(resolved)
+            document, resolved = self.storage.open_document(path)
         except FileNotFoundError:
             raise
-        except Exception as exc:  # pragma: no cover - delegated to python-hwpx
-            raise HwpxOperationError(f"failed to open '{resolved}': {exc}") from exc
+        except Exception as exc:  # pragma: no cover - delegated to backend
+            raise HwpxOperationError(f"failed to open '{path}': {exc}") from exc
         return document, resolved
 
     def _save_document(self, document: HwpxDocument, target: Path) -> None:
-        self._maybe_backup(target)
-        document.save(target)
+        try:
+            self.storage.save_document(document, target)
+        except Exception as exc:  # pragma: no cover - delegated to backend
+            raise HwpxOperationError(f"failed to save '{target}': {exc}") from exc
 
     def _iter_paragraphs(self, document: HwpxDocument) -> List[HwpxOxmlParagraph]:
         return list(document.paragraphs)
