@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Literal
+from typing import Any, Dict, List, Optional, Sequence, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, conint, constr, model_validator
@@ -12,11 +12,55 @@ from ..metadata import tools_meta
 from .context import SearchHit, search_paragraphs, window_for_paragraph
 from .diff import ParagraphDiff, ParagraphMatch
 from .handles import stable_node_id
+from .locator import (
+    DocumentLocator,
+    document_locator_schema,
+    locator_identifier,
+    locator_path,
+    normalize_locator_payload,
+)
 from .txn import IdempotentReplayError, TransactionManager
 
 
 class PlanModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+
+class PlanLocatorModel(PlanModel):
+    document: DocumentLocator = Field(alias="document")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inflate_document(cls, data: object) -> object:
+        if isinstance(data, dict):
+            return normalize_locator_payload(dict(data), field_name="document")
+        return data
+
+    @property
+    def doc_id(self) -> str:
+        return locator_identifier(self.document)
+
+    def path_or_none(self) -> Optional[str]:
+        return locator_path(self.document)
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = self.model_dump(exclude={"document"})
+        path = self.path_or_none()
+        if path is None:
+            if require_path:
+                raise ValueError("document locator must include path or uri")
+            payload["path"] = self.doc_id
+        else:
+            payload["path"] = path
+        return payload
+
+    @classmethod
+    def model_json_schema(cls, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        schema = super().model_json_schema(*args, **kwargs)
+        properties = schema.get("properties")
+        if isinstance(properties, dict) and "document" in properties:
+            properties["document"] = document_locator_schema()
+        return schema
 
 
 class Target(PlanModel):
@@ -42,8 +86,7 @@ class ReplaceTextArgs(PlanModel):
     atomic: bool = True
 
 
-class PlanEditInput(PlanModel):
-    path: constr(min_length=1)
+class PlanEditInput(PlanLocatorModel):
     operations: List[ReplaceTextArgs]
     trace_id: Optional[constr(min_length=1)] = Field(None, alias="traceId")
 
@@ -137,8 +180,7 @@ class ServerResponse(PlanModel):
     trace_id: constr(min_length=1) = Field(alias="traceId")
 
 
-class SearchInput(PlanModel):
-    path: constr(min_length=1)
+class SearchInput(PlanLocatorModel):
     pattern: constr(min_length=1)
     scope: Optional[constr(min_length=1)] = None
     is_regex: bool = Field(False, alias="isRegex")
@@ -156,8 +198,7 @@ class SearchOutput(PlanModel):
     matches: List[SearchHitModel]
 
 
-class GetContextInput(PlanModel):
-    path: constr(min_length=1)
+class GetContextInput(PlanLocatorModel):
     target: Target
     window: conint(ge=1, le=3) = 1
 

@@ -75,6 +75,55 @@ uvx hwpx-mcp-server
 
 > 🔐 `HWPX_MCP_HARDENING=1`로 실행하면 새 편집 파이프라인(`plan → preview → apply`)과 검색/컨텍스트 도구가 함께 노출됩니다. 값이 `0` 또는 미설정이면 기존 도구 표면만 유지됩니다.
 
+### 📁 문서 로케이터(Document Locator)
+
+모든 도구의 입력은 이제 문서를 가리키는 **discriminated union** 로케이터를 사용합니다. 기본값은 기존과 동일하게 상위 수준의 `path` 필드이며, 별도 선언 없이도 계속 사용할 수 있습니다. 필요에 따라 명시적으로 `type`을 지정해 HTTP 백엔드나 사전 등록된 핸들을 사용할 수 있습니다.
+
+- **로컬 파일 (기존 스키마와 동일)**
+
+  ```jsonc
+  {
+    "name": "open_info",
+    "arguments": {
+      "path": "sample.hwpx"
+    }
+  }
+  ```
+
+- **HTTP 백엔드와 연계** — 서버를 HTTP 스토리지 모드로 실행한 경우, 원격 경로를 `uri` 필드로 지정하고 필요 시 `backend` 힌트를 제공할 수 있습니다.
+
+  ```jsonc
+  {
+    "name": "open_info",
+    "arguments": {
+      "type": "uri",
+      "uri": "reports/weekly.hwpx",
+      "backend": "http"
+    }
+  }
+  ```
+
+- **사전 등록된 핸들 사용** — 하드닝 파이프라인에서 이미 로드된 문서에 대해 후속 검색/컨텍스트/편집을 수행할 때는 `handleId`를 전달하면 됩니다.
+
+  ```jsonc
+  {
+    "name": "hwpx.plan_edit",
+    "arguments": {
+      "type": "handle",
+      "handleId": "doc-1234",
+      "operations": [
+        {
+          "target": {"nodeId": "n_deadbeef"},
+          "match": "needle",
+          "replacement": "haystack"
+        }
+      ]
+    }
+  }
+  ```
+
+각 변형은 필요에 따라 `backend` 필드를 추가로 가질 수 있으며, 명시적으로 `document` 객체를 중첩하여 전달하는 것도 허용됩니다. 스키마는 Sanitizer를 거쳐 `$ref` 없이 평탄화된 형태로 제공됩니다.
+
 ### 🔐 하드닝 편집 파이프라인 (옵션)
 
 하드닝 플래그를 켜면 모든 편집 요청이 **계획(Plan) → 검토(Preview) → 적용(Apply)**의 3단계를 거치도록 설계된 신규 도구가 함께 노출됩니다. 하드닝 플래그는 저렴한 LLM 모델의 요청에도 성공적인 작업을 수행하기 위해서 도입한 테스트중인 기능입니다. 

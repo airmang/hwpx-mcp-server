@@ -17,6 +17,8 @@
 | Preview | `hwpx.preview_edit` | `planId`를 검증하면서 diff, 모호성 후보, 안전 점수를 제공합니다. 이 기록이 없으면 Apply 단계로 이동할 수 없습니다. |
 | Apply | `hwpx.apply_edit` | `confirm: true`와 함께 요청해야 하며, 미리보기한 동일한 `planId`만 허용됩니다. `idempotencyKey`를 지정하면 재시도 시 안전하게 무시됩니다. |
 
+> 📌 모든 하드닝 도구는 공통 `document` 로케이터 스키마를 사용합니다. 기존 `path` 값을 그대로 전달해도 되지만, 이미 로드된 문서를 후속 요청에서 재사용하려면 `{"type": "handle", "handleId": "..."}` 형태로 안정적인 식별자를 전달하는 것이 좋습니다. HTTP 백엔드를 사용할 때는 `{"type": "uri", "uri": "...", "backend": "http"}`와 같이 명시적으로 지정할 수 있습니다.
+
 ### 오류 코드 요약
 | 코드 | 의미 | 대응 |
 | --- | --- | --- |

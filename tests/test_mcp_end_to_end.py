@@ -766,7 +766,10 @@ def test_tool_json_schemas_use_json_schema_2020_12(
     package_get_text = generated["package_get_text"].inputSchema
     encoding_schema = package_get_text["properties"]["encoding"]
     assert encoding_schema == {"type": "string"}
-    assert set(package_get_text["required"]) == {"path", "partName"}
+    assert set(package_get_text["required"]) == {"document", "partName"}
+    document_schema = package_get_text["properties"]["document"]
+    assert document_schema["type"] == "object"
+    assert "type" in document_schema["properties"]
 
     find_runs_input = generated["find_runs_by_style"].inputSchema
     filters_schema = find_runs_input["properties"]["filters"]
@@ -780,7 +783,7 @@ def test_tool_json_schemas_use_json_schema_2020_12(
     assert filters_schema["properties"]["underline"]["type"] == "boolean"
     assert filters_schema["properties"]["charPrIDRef"]["type"] == "string"
     assert "filters" not in find_runs_input.get("required", [])
-    assert "path" in find_runs_input.get("required", [])
+    assert "document" in find_runs_input.get("required", [])
 
     find_runs_output = generated["find_runs_by_style"].outputSchema
     runs_schema = find_runs_output["properties"]["runs"]
@@ -796,17 +799,17 @@ def test_tool_json_schemas_use_json_schema_2020_12(
     assert style_filter_schema["properties"]["underline"]["type"] == "boolean"
     assert "styleFilter" not in replace_runs_input.get("required", [])
     required_fields = set(replace_runs_input.get("required", []))
-    assert {"path", "search", "replacement"}.issubset(required_fields)
+    assert {"document", "search", "replacement"}.issubset(required_fields)
 
     add_paragraph_input = generated["add_paragraph"].inputSchema
     run_style_schema = add_paragraph_input["properties"]["runStyle"]
     assert run_style_schema["type"] == "object"
     assert run_style_schema["properties"]["bold"]["type"] == "boolean"
     assert "runStyle" not in add_paragraph_input.get("required", [])
-    assert "path" in add_paragraph_input.get("required", [])
+    assert "document" in add_paragraph_input.get("required", [])
 
     read_paragraphs_input = generated["read_paragraphs"].inputSchema
-    assert {"path", "paragraphIndexes"}.issubset(
+    assert {"document", "paragraphIndexes"}.issubset(
         set(read_paragraphs_input.get("required", []))
     )
     paragraph_indexes = read_paragraphs_input["properties"]["paragraphIndexes"]
@@ -823,7 +826,7 @@ def test_tool_json_schemas_use_json_schema_2020_12(
     add_memo_with_anchor_input = generated["add_memo_with_anchor"].inputSchema
     memo_anchor_props = add_memo_with_anchor_input["properties"]
     assert memo_anchor_props["memoShapeIdRef"] == {"type": "string"}
-    assert {"path", "text"}.issubset(
+    assert {"document", "text"}.issubset(
         set(add_memo_with_anchor_input.get("required", []))
     )
     assert "memoShapeIdRef" not in add_memo_with_anchor_input.get("required", [])

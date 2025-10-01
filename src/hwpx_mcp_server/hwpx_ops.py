@@ -1618,10 +1618,10 @@ class HwpxOps:
         trace = payload.trace_id or f"plan-{uuid4().hex}"
         try:
             record = self._plan_manager.create_plan_record(
-                payload.path, payload.operations, trace_id=trace
+                payload.doc_id, payload.operations, trace_id=trace
             )
         except PipelineError as error:
-            return self._plan_manager.error_response(payload.path, trace, error)
+            return self._plan_manager.error_response(payload.doc_id, trace, error)
         return self._plan_manager.plan_response(record)
 
     def preview_edit(
@@ -1702,7 +1702,7 @@ class HwpxOps:
             }
         )
         try:
-            hits = self._plan_manager.search_document(payload.path, payload)
+            hits = self._plan_manager.search_document(payload.doc_id, payload)
         except PipelineError as error:
             raise HwpxOperationError(error.message) from error
         models = [
@@ -1728,7 +1728,7 @@ class HwpxOps:
         )
         try:
             view = self._plan_manager.context_window(
-                payload.path, payload.target, window=payload.window
+                payload.doc_id, payload.target, window=payload.window
             )
         except PipelineError as error:
             raise HwpxOperationError(error.message) from error
