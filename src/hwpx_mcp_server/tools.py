@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Literal
 
 import mcp.types as types
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 from .core.plan import (
     ApplyEditInput,
@@ -19,6 +19,12 @@ from .core.plan import (
     SearchInput,
     SearchOutput,
     ServerResponse,
+)
+from .core.locator import (
+    DocumentLocator,
+    document_locator_schema,
+    normalize_locator_payload,
+    locator_path,
 )
 from .schema.builder import build_tool_schema
 from .hwpx_ops import HwpxOps
@@ -33,8 +39,33 @@ def _hardening_enabled() -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-class PathInput(_BaseModel):
-    path: str
+class DocumentLocatorInput(_BaseModel):
+    document: DocumentLocator = Field(alias="document")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inflate_document(cls, data: object) -> object:
+        if isinstance(data, dict):
+            return normalize_locator_payload(dict(data), field_name="document")
+        return data
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = self.model_dump(exclude={"document"})
+        path = locator_path(self.document)
+        if path is None:
+            if require_path:
+                raise ValueError("document locator must include a path or uri")
+        else:
+            payload["path"] = path
+        return payload
+
+    @classmethod
+    def model_json_schema(cls, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        schema = super().model_json_schema(*args, **kwargs)
+        properties = schema.get("properties")
+        if isinstance(properties, dict) and "document" in properties:
+            properties["document"] = document_locator_schema()
+        return schema
 
 
 class OpenInfoOutput(_BaseModel):
@@ -56,7 +87,7 @@ class PackagePartOutput(_BaseModel):
     parts: List[str]
 
 
-class PackageTextInput(PathInput):
+class PackageTextInput(DocumentLocatorInput):
     part_name: str = Field(alias="partName")
     encoding: Optional[str] = None
 
@@ -65,7 +96,7 @@ class PackageTextOutput(_BaseModel):
     text: str
 
 
-class ReadTextInput(PathInput):
+class ReadTextInput(DocumentLocatorInput):
     offset: int = 0
     limit: Optional[int] = None
     with_highlights: bool = Field(False, alias="withHighlights")
@@ -77,7 +108,7 @@ class ReadTextOutput(_BaseModel):
     nextOffset: Optional[int]
 
 
-class ReadParagraphsInput(PathInput):
+class ReadParagraphsInput(DocumentLocatorInput):
     paragraph_indexes: Sequence[int] = Field(alias="paragraphIndexes")
     with_highlights: bool = Field(False, alias="withHighlights")
     with_footnotes: bool = Field(False, alias="withFootnotes")
@@ -92,7 +123,7 @@ class ReadParagraphsOutput(_BaseModel):
     paragraphs: List[ParagraphText]
 
 
-class TextExtractReportInput(PathInput):
+class TextExtractReportInput(DocumentLocatorInput):
     mode: str = "plain"
 
 
@@ -100,7 +131,7 @@ class TextExtractReportOutput(_BaseModel):
     content: str
 
 
-class FindInput(PathInput):
+class FindInput(DocumentLocatorInput):
     query: str
     is_regex: bool = Field(False, alias="isRegex")
     max_results: int = Field(100, alias="maxResults")
@@ -124,7 +155,7 @@ class StyleFilter(_BaseModel):
     charPrIDRef: Optional[str] = None
 
 
-class FindRunsInput(PathInput):
+class FindRunsInput(DocumentLocatorInput):
     filters: Optional[StyleFilter] = None
     max_results: int = Field(200, alias="maxResults")
 
@@ -140,7 +171,7 @@ class FindRunsOutput(_BaseModel):
     runs: List[RunInfo]
 
 
-class ReplaceRunsInput(PathInput):
+class ReplaceRunsInput(DocumentLocatorInput):
     search: str
     replacement: str
     style_filter: Optional[StyleFilter] = Field(None, alias="styleFilter")
@@ -159,7 +190,7 @@ class RunStyleModel(_BaseModel):
     colorHex: Optional[str] = None
 
 
-class AddParagraphInput(PathInput):
+class AddParagraphInput(DocumentLocatorInput):
     text: str = ""
     section_index: Optional[int] = Field(None, alias="sectionIndex")
     run_style: Optional[RunStyleModel] = Field(None, alias="runStyle")
@@ -169,7 +200,7 @@ class AddParagraphOutput(_BaseModel):
     paragraphIndex: int
 
 
-class InsertParagraphsInput(PathInput):
+class InsertParagraphsInput(DocumentLocatorInput):
     section_index: Optional[int] = Field(None, alias="sectionIndex")
     paragraphs: Sequence[str]
     run_style: Optional[RunStyleModel] = Field(None, alias="runStyle")
@@ -180,7 +211,7 @@ class InsertParagraphsOutput(_BaseModel):
     added: int
 
 
-class AddTableInput(PathInput):
+class AddTableInput(DocumentLocatorInput):
     rows: int
     cols: int
     section_index: Optional[int] = Field(None, alias="sectionIndex")
@@ -196,7 +227,7 @@ class AddTableOutput(_BaseModel):
     cellCount: int
 
 
-class SetTableBorderFillInput(PathInput):
+class SetTableBorderFillInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
     border_style: Optional[Literal["solid", "none"]] = Field(None, alias="borderStyle")
     border_color: Optional[str] = Field(None, alias="borderColor")
@@ -223,7 +254,7 @@ class TableCellPosition(_BaseModel):
     text: Optional[str] = None
 
 
-class GetTableCellMapInput(PathInput):
+class GetTableCellMapInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
 
 
@@ -233,7 +264,7 @@ class TableCellMapOutput(_BaseModel):
     grid: List[List[TableCellPosition]]
 
 
-class SetTableCellInput(PathInput):
+class SetTableCellInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
     row: int
     col: int
@@ -248,7 +279,7 @@ class SetTableCellOutput(_BaseModel):
     ok: bool
 
 
-class ReplaceTableRegionInput(PathInput):
+class ReplaceTableRegionInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
     start_row: int = Field(alias="startRow")
     start_col: int = Field(alias="startCol")
@@ -263,7 +294,7 @@ class ReplaceTableRegionOutput(_BaseModel):
     updatedCells: int
 
 
-class SplitTableCellInput(PathInput):
+class SplitTableCellInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
     row: int
     col: int
@@ -276,7 +307,7 @@ class SplitTableCellOutput(_BaseModel):
     colSpan: int
 
 
-class AddShapeInput(PathInput):
+class AddShapeInput(DocumentLocatorInput):
     shape_type: str = Field("RECTANGLE", alias="shapeType")
     section_index: Optional[int] = Field(None, alias="sectionIndex")
     dry_run: bool = Field(True, alias="dryRun")
@@ -286,13 +317,13 @@ class ObjectIdOutput(_BaseModel):
     objectId: Optional[str]
 
 
-class AddControlInput(PathInput):
+class AddControlInput(DocumentLocatorInput):
     control_type: str = Field("TEXTBOX", alias="controlType")
     section_index: Optional[int] = Field(None, alias="sectionIndex")
     dry_run: bool = Field(True, alias="dryRun")
 
 
-class AddMemoInput(PathInput):
+class AddMemoInput(DocumentLocatorInput):
     text: str
     section_index: Optional[int] = Field(None, alias="sectionIndex")
     author: Optional[str] = None
@@ -303,7 +334,7 @@ class AddMemoOutput(_BaseModel):
     memoId: Optional[str]
 
 
-class AttachMemoFieldInput(PathInput):
+class AttachMemoFieldInput(DocumentLocatorInput):
     paragraph_index: int = Field(alias="paragraphIndex")
     memo_id: str = Field(alias="memoId")
 
@@ -312,7 +343,7 @@ class AttachMemoFieldOutput(_BaseModel):
     fieldId: str
 
 
-class AddMemoWithAnchorInput(PathInput):
+class AddMemoWithAnchorInput(DocumentLocatorInput):
     text: str
     section_index: Optional[int] = Field(None, alias="sectionIndex")
     memo_shape_id_ref: Optional[str] = Field(None, alias="memoShapeIdRef")
@@ -324,7 +355,7 @@ class AddMemoWithAnchorOutput(_BaseModel):
     fieldId: str
 
 
-class RemoveMemoInput(PathInput):
+class RemoveMemoInput(DocumentLocatorInput):
     memo_id: str = Field(alias="memoId")
     dry_run: bool = Field(True, alias="dryRun")
 
@@ -333,7 +364,7 @@ class RemoveMemoOutput(_BaseModel):
     removed: bool
 
 
-class EnsureRunStyleInput(PathInput):
+class EnsureRunStyleInput(DocumentLocatorInput):
     bold: Optional[bool] = False
     italic: Optional[bool] = False
     underline: Optional[bool] = False
@@ -355,7 +386,7 @@ class TextSpanModel(_BaseModel):
     end: int
 
 
-class ApplyStyleToTextInput(PathInput):
+class ApplyStyleToTextInput(DocumentLocatorInput):
     spans: Sequence[TextSpanModel]
     char_pr_id_ref: str = Field(alias="charPrIDRef")
     dry_run: bool = Field(True, alias="dryRun")
@@ -365,7 +396,7 @@ class ApplyStyleToTextOutput(_BaseModel):
     styledSpans: int
 
 
-class ApplyStyleInput(PathInput):
+class ApplyStyleInput(DocumentLocatorInput):
     paragraph_indexes: Sequence[int] = Field(alias="paragraphIndexes")
     char_pr_id_ref: str = Field(alias="charPrIDRef")
     dry_run: bool = Field(True, alias="dryRun")
@@ -379,7 +410,7 @@ class SaveOutput(_BaseModel):
     ok: bool
 
 
-class SaveAsInput(PathInput):
+class SaveAsInput(DocumentLocatorInput):
     out: str
 
 
@@ -397,12 +428,12 @@ class MasterHistoryVersionOutput(_BaseModel):
     versions: Optional[Dict[str, Any]]
 
 
-class ObjectFindByTagInput(PathInput):
+class ObjectFindByTagInput(DocumentLocatorInput):
     tag_name: str = Field(alias="tagName")
     max_results: int = Field(200, alias="maxResults")
 
 
-class ObjectFindByAttrInput(PathInput):
+class ObjectFindByAttrInput(DocumentLocatorInput):
     element_type: str = Field(alias="elementType")
     attr: str
     value: str
@@ -413,7 +444,7 @@ class ObjectsOutput(_BaseModel):
     objects: List[Dict[str, Any]]
 
 
-class ValidateStructureInput(PathInput):
+class ValidateStructureInput(DocumentLocatorInput):
     level: str = "basic"
 
 
@@ -427,7 +458,7 @@ class LintRules(_BaseModel):
     forbid_patterns: Optional[Sequence[str]] = Field(None, alias="forbidPatterns")
 
 
-class LintInput(PathInput):
+class LintInput(DocumentLocatorInput):
     rules: LintRules = Field(default_factory=LintRules)
 
 
@@ -435,7 +466,7 @@ class LintOutput(_BaseModel):
     warnings: List[Dict[str, Any]]
 
 
-class PackageXmlInput(PathInput):
+class PackageXmlInput(DocumentLocatorInput):
     part_name: str = Field(alias="partName")
 
 
@@ -465,10 +496,21 @@ class ToolDefinition:
         return self.output_model.model_validate(raw).model_dump(by_alias=True)
 
 
-def _simple(method_name: str) -> Callable[[HwpxOps, _BaseModel], Dict[str, Any]]:
+def _simple(
+    method_name: str,
+    *,
+    require_path: bool = True,
+) -> Callable[[HwpxOps, _BaseModel], Dict[str, Any]]:
     def caller(ops: HwpxOps, data: _BaseModel) -> Dict[str, Any]:
         method = getattr(ops, method_name)
-        payload = data.model_dump()
+        to_payload = getattr(data, "to_hwpx_payload", None)
+        if callable(to_payload):
+            try:
+                payload = to_payload(require_path=require_path)
+            except TypeError:  # pragma: no cover - defensive guard
+                payload = to_payload()
+        else:
+            payload = data.model_dump()
         return method(**payload)
 
     return caller
@@ -479,28 +521,28 @@ def build_tool_definitions() -> List[ToolDefinition]:
         ToolDefinition(
             name="open_info",
             description="Return metadata about an HWPX document.",
-            input_model=PathInput,
+            input_model=DocumentLocatorInput,
             output_model=OpenInfoOutput,
             func=_simple("open_info"),
         ),
         ToolDefinition(
             name="list_sections",
             description="List sections within a document.",
-            input_model=PathInput,
+            input_model=DocumentLocatorInput,
             output_model=SectionsOutput,
             func=_simple("list_sections"),
         ),
         ToolDefinition(
             name="list_headers",
             description="List header references used by the document.",
-            input_model=PathInput,
+            input_model=DocumentLocatorInput,
             output_model=HeadersOutput,
             func=_simple("list_headers"),
         ),
         ToolDefinition(
             name="package_parts",
             description="List OPC package part names.",
-            input_model=PathInput,
+            input_model=DocumentLocatorInput,
             output_model=PackagePartOutput,
             func=_simple("package_parts"),
         ),
@@ -661,7 +703,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
         ToolDefinition(
             name="list_styles_and_bullets",
             description="List style and bullet definitions.",
-            input_model=PathInput,
+            input_model=DocumentLocatorInput,
             output_model=StylesAndBulletsOutput,
             func=_simple("list_styles_and_bullets"),
         ),
@@ -682,7 +724,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
         ToolDefinition(
             name="save",
             description="Persist in-memory changes to disk.",
-            input_model=PathInput,
+            input_model=DocumentLocatorInput,
             output_model=SaveOutput,
             func=_simple("save"),
         ),
@@ -703,7 +745,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
         ToolDefinition(
             name="list_master_pages_histories_versions",
             description="List master pages, histories and version info.",
-            input_model=PathInput,
+            input_model=DocumentLocatorInput,
             output_model=MasterHistoryVersionOutput,
             func=_simple("list_master_pages_histories_versions"),
         ),
@@ -734,7 +776,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=LintInput,
             output_model=LintOutput,
             func=lambda ops, data: ops.lint_text_conventions(
-                data.path,
+                data.to_hwpx_payload()["path"],
                 **(data.rules.model_dump()),
             ),
         ),
@@ -753,7 +795,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
                 description="Plan hardened edits for preview/apply.",
                 input_model=PlanEditInput,
                 output_model=ServerResponse,
-                func=_simple("plan_edit"),
+                func=_simple("plan_edit", require_path=False),
             ),
             ToolDefinition(
                 name="hwpx.preview_edit",
@@ -774,14 +816,14 @@ def build_tool_definitions() -> List[ToolDefinition]:
                 description="Search document content using hardened handles.",
                 input_model=SearchInput,
                 output_model=SearchOutput,
-                func=_simple("search"),
+                func=_simple("search", require_path=False),
             ),
             ToolDefinition(
                 name="hwpx.get_context",
                 description="Return paragraph context around a hardened target.",
                 input_model=GetContextInput,
                 output_model=ContextOutput,
-                func=_simple("get_context"),
+                func=_simple("get_context", require_path=False),
             ),
         ])
     return tools
