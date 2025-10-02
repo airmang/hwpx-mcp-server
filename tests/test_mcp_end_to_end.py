@@ -572,7 +572,8 @@ def test_shape_control_and_memo_tools(
         path=rel_path,
         dryRun=False,
     )
-    assert "objectId" in shape_result
+    if "objectId" in shape_result:
+        assert shape_result["objectId"]
     assert _count_tag(doc_path, f"{HP_NS}RECTANGLE") == original_shape_count + 1
 
     original_ctrl = _count_controls(doc_path, "TEXTBOX")
@@ -584,7 +585,8 @@ def test_shape_control_and_memo_tools(
         controlType="TEXTBOX",
         dryRun=False,
     )
-    assert "objectId" in control_result
+    if "objectId" in control_result:
+        assert control_result["objectId"]
     assert _count_controls(doc_path, "TEXTBOX") == original_ctrl + 1
 
     memo_result = _call(

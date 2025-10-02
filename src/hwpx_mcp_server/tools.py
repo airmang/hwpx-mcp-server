@@ -493,7 +493,9 @@ class ToolDefinition:
     def call(self, ops: HwpxOps, arguments: Dict[str, Any]) -> Dict[str, Any]:
         data = self.input_model.model_validate(arguments)
         raw = self.func(ops, data)
-        return self.output_model.model_validate(raw).model_dump(by_alias=True)
+        return self.output_model.model_validate(raw).model_dump(
+            by_alias=True, exclude_none=True
+        )
 
 
 def _simple(
