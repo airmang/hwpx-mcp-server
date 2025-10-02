@@ -270,7 +270,10 @@ class SchemaSanitizer:
         else:
             filtered = []
         result["required"] = sorted(dict.fromkeys(filtered))
-        result["additionalProperties"] = False
+        if "additionalProperties" in schema:
+            result["additionalProperties"] = self._clone(schema["additionalProperties"])
+        else:
+            result["additionalProperties"] = False
         return result
 
     def _clone(self, value: Any) -> Any:

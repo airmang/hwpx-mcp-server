@@ -1,6 +1,8 @@
+import jsonschema
 import pytest
 
-from hwpx_mcp_server.tools import build_tool_definitions
+from hwpx_mcp_server.schema.builder import build_tool_schema
+from hwpx_mcp_server.tools import OpenInfoOutput, build_tool_definitions
 
 BANNED_KEYS = {"$defs", "definitions", "$ref", "anyOf", "oneOf", "allOf", "if", "then", "else", "const"}
 
@@ -8,7 +10,9 @@ BANNED_KEYS = {"$defs", "definitions", "$ref", "anyOf", "oneOf", "allOf", "if", 
 def _assert_object_shape(schema: dict) -> None:
     assert schema.get("type") == "object"
     assert "properties" in schema and isinstance(schema["properties"], dict)
-    assert schema.get("additionalProperties") is False
+    assert "additionalProperties" in schema
+    additional = schema["additionalProperties"]
+    assert isinstance(additional, (bool, dict))
     assert "required" in schema and isinstance(schema["required"], list)
     prop_keys = list(schema["properties"].keys())
     assert prop_keys == sorted(prop_keys)
@@ -41,3 +45,23 @@ def test_tool_schemas_are_sanitized(monkeypatch, flag):
         _walk(tool.outputSchema)
         assert tool.inputSchema.get("type") == "object"
         assert tool.outputSchema.get("type") == "object"
+
+
+def test_open_info_meta_allows_additional_properties():
+    schema = build_tool_schema(OpenInfoOutput)
+    meta_schema = schema["properties"]["meta"]
+    assert meta_schema["additionalProperties"]
+
+    sample = {
+        "meta": {
+            "path": "document.hwpx",
+            "absolutePath": "/tmp/document.hwpx",
+            "size": 42,
+            "modified": "2024-01-01T00:00:00",
+        },
+        "sectionCount": 3,
+        "paragraphCount": 10,
+        "headerCount": 1,
+    }
+
+    jsonschema.validate(sample, schema)
