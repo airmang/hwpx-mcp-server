@@ -5,6 +5,7 @@ src/hwpx_mcp_server/__init__.py
 src/hwpx_mcp_server/hwpx_ops.py
 src/hwpx_mcp_server/logging_conf.py
 src/hwpx_mcp_server/server.py
+src/hwpx_mcp_server/storage.py
 src/hwpx_mcp_server/tools.py
 src/hwpx_mcp_server.egg-info/PKG-INFO
 src/hwpx_mcp_server.egg-info/SOURCES.txt
@@ -15,12 +16,15 @@ src/hwpx_mcp_server.egg-info/top_level.txt
 src/hwpx_mcp_server/core/context.py
 src/hwpx_mcp_server/core/diff.py
 src/hwpx_mcp_server/core/handles.py
+src/hwpx_mcp_server/core/locator.py
 src/hwpx_mcp_server/core/plan.py
 src/hwpx_mcp_server/core/txn.py
 src/hwpx_mcp_server/metadata/tools_meta.py
 src/hwpx_mcp_server/schema/builder.py
 src/hwpx_mcp_server/schema/sanitizer.py
+tests/test_http_storage.py
 tests/test_hwpx_ops.py
+tests/test_locator_models.py
 tests/test_mcp_end_to_end.py
 tests/test_pipeline.py
 tests/test_tool_schemas.py
