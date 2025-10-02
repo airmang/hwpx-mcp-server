@@ -156,7 +156,8 @@ uvx hwpx-mcp-server
       - `hwpx.search` *(플래그 활성 시)*: 정규식/키워드 검색과 안정적인 노드 식별자 반환
       - `hwpx.get_context` *(플래그 활성 시)*: 문단 전후 문맥만 제한적으로 조회
   - **문서 편집**
-      - `replace_text_in_runs`: 스타일을 보존하며 텍스트 치환
+      - `replace_text_in_runs`: 스타일을 보존하며 텍스트 치환 (기본적으로 문서를 저장하므로,
+        미리보기만 원하면 `dryRun: true`를 지정하세요.)
       - `add_paragraph`, `insert_paragraphs_bulk`: 문단 추가
       - `add_table`, `get_table_cell_map`, `set_table_cell_text`, `replace_table_region`, `split_table_cell`: 표 생성·편집 및 병합 해제
       - `add_shape`, `add_control`: 개체 추가

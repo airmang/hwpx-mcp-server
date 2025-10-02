@@ -801,7 +801,7 @@ class HwpxOps:
         *,
         style_filter: Optional[Dict[str, Any]] = None,
         limit_per_run: Optional[int] = None,
-        dry_run: bool = True,
+        dry_run: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         filter_args: Dict[str, Any] = {}

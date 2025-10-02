@@ -176,7 +176,7 @@ class ReplaceRunsInput(DocumentLocatorInput):
     replacement: str
     style_filter: Optional[StyleFilter] = Field(None, alias="styleFilter")
     limit_per_run: Optional[int] = Field(None, alias="limitPerRun")
-    dry_run: bool = Field(True, alias="dryRun")
+    dry_run: bool = Field(False, alias="dryRun")
 
 
 class ReplaceRunsOutput(_BaseModel):
