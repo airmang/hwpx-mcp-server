@@ -93,6 +93,24 @@ def test_read_text_uses_default_limit(monkeypatch, tmp_path):
     assert expanded["nextOffset"] == expanded_limit
 
 
+def test_read_text_tool_omits_next_offset_when_complete(ops_with_sample):
+    ops, path = ops_with_sample
+    read_text_tool = next(
+        tool for tool in build_tool_definitions() if tool.name == "read_text"
+    )
+
+    result = read_text_tool.call(
+        ops,
+        {
+            "path": str(path),
+            "limit": 10_000,
+        },
+    )
+
+    assert result["textChunk"]
+    assert "nextOffset" not in result
+
+
 def test_read_text_consumes_only_requested_slice(monkeypatch, tmp_path):
     class TrackingParagraph:
         def __init__(self, index: int) -> None:
