@@ -202,6 +202,29 @@ def test_replace_text_in_runs_dry_run_does_not_modify(ops_with_sample):
     assert "DOCX" not in text
 
 
+def test_planning_flow_registers_document(ops_with_sample):
+    ops, path = ops_with_sample
+    operations = [
+        {
+            "target": {"sectionIndex": 0, "paraIndex": 1},
+            "match": "Hello HWPX!",
+            "replacement": "Hello HWPX!",
+            "dryRun": True,
+        }
+    ]
+
+    plan_result = ops.plan_edit(path=str(path), operations=operations)
+    assert plan_result.get("ok") is True
+
+    search_result = ops.search(path=str(path), pattern="HWPX")
+    assert search_result["matches"], "Expected at least one search match"
+
+    context_result = ops.get_context(
+        path=str(path), target={"sectionIndex": 0, "paraIndex": 1}
+    )
+    assert context_result["focus"].startswith("Hello HWPX!")
+
+
 def test_replace_text_in_runs_updates_file_and_backup(ops_with_sample):
     ops, path = ops_with_sample
     ops.replace_text_in_runs(str(path), "HWPX", "DOCX", dry_run=False)
