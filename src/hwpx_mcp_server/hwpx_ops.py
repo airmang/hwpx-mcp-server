@@ -127,6 +127,14 @@ class HwpxOps:
             raise HwpxOperationError(f"failed to open '{path}': {exc}") from exc
         return document, resolved
 
+    def _ensure_planner_document(self, doc_id: str, path: str) -> None:
+        resolved = self._resolve_path(path)
+        paragraphs: List[str] = []
+        with TextExtractor(resolved) as extractor:
+            for paragraph in extractor.iter_document_paragraphs():
+                paragraphs.append(paragraph.text(preserve_breaks=True))
+        self._plan_manager.register_document(doc_id, "\n".join(paragraphs))
+
     def _save_document(self, document: HwpxDocument, target: Path) -> None:
         try:
             self.storage.save_document(document, target)
@@ -1615,6 +1623,9 @@ class HwpxOps:
         payload = PlanEditInput.model_validate(
             {"path": path, "operations": operations, "traceId": trace_id}
         )
+        doc_path = payload.path_or_none()
+        if doc_path is not None:
+            self._ensure_planner_document(payload.doc_id, doc_path)
         trace = payload.trace_id or f"plan-{uuid4().hex}"
         try:
             record = self._plan_manager.create_plan_record(
@@ -1701,6 +1712,9 @@ class HwpxOps:
                 "limit": limit,
             }
         )
+        doc_path = payload.path_or_none()
+        if doc_path is not None:
+            self._ensure_planner_document(payload.doc_id, doc_path)
         try:
             hits = self._plan_manager.search_document(payload.doc_id, payload)
         except PipelineError as error:
@@ -1726,6 +1740,9 @@ class HwpxOps:
         payload = GetContextInput.model_validate(
             {"path": path, "target": target, "window": window}
         )
+        doc_path = payload.path_or_none()
+        if doc_path is not None:
+            self._ensure_planner_document(payload.doc_id, doc_path)
         try:
             view = self._plan_manager.context_window(
                 payload.doc_id, payload.target, window=payload.window
