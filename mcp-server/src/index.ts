@@ -827,6 +827,122 @@ For template/form work:
     },
   },
   {
+    name: 'find_cell_by_label',
+    description: `🔍 Find table cells by label text and get the adjacent cell position.
+
+Perfect for Korean documents with "레이블: 값" patterns.
+Searches all tables for cells containing the label text.
+
+Example: findCellByLabel("이름:") returns the cell to the right of "이름:" label.
+
+Use case:
+- Finding form fields by their labels
+- Locating cells without knowing exact indices`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        doc_id: { type: 'string', description: 'Document ID' },
+        label_text: { type: 'string', description: 'Label text to search for (partial match, case-insensitive)' },
+        direction: { type: 'string', enum: ['right', 'down'], description: 'Direction from label to target cell (default: right)' },
+      },
+      required: ['doc_id', 'label_text'],
+    },
+  },
+  {
+    name: 'fill_by_path',
+    description: `⭐ RECOMMENDED for template work! Fill multiple cells using path-based addressing.
+
+jkf87-style path format: "label > direction > direction"
+- "이름: > right" → find "이름:" and fill the cell to its right
+- "합계 > down > down" → find "합계" and fill 2 cells below
+- Directions: right, left, up, down
+
+Example:
+fill_by_path({
+  mappings: {
+    "이름: > right": "홍길동",
+    "연락처: > right": "010-1234-5678",
+    "합계 > down": "1,000,000"
+  }
+})
+
+Much easier than specifying table_index, row, col manually!`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        doc_id: { type: 'string', description: 'Document ID' },
+        mappings: {
+          type: 'object',
+          description: 'Path-to-value mappings. Path format: "label > direction > ..." where direction is right/left/up/down',
+          additionalProperties: { type: 'string' }
+        },
+      },
+      required: ['doc_id', 'mappings'],
+    },
+  },
+  {
+    name: 'get_cell_context',
+    description: `Get surrounding cells' content around a specific cell.
+
+Returns center cell and neighboring cells in each direction.
+Useful for understanding table structure without loading entire table.
+
+Example result:
+{
+  "center": "현재 셀",
+  "up_1": "위 1칸",
+  "down_1": "아래 1칸",
+  "left_1": "왼쪽 1칸",
+  "right_1": "오른쪽 1칸"
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        doc_id: { type: 'string', description: 'Document ID' },
+        table_index: { type: 'number', description: 'Global table index (from get_table_map)' },
+        row: { type: 'number', description: 'Row index (0-based)' },
+        col: { type: 'number', description: 'Column index (0-based)' },
+        depth: { type: 'number', description: 'How many cells in each direction (default: 1)' },
+      },
+      required: ['doc_id', 'table_index', 'row', 'col'],
+    },
+  },
+  {
+    name: 'batch_fill_table',
+    description: `Fill multiple table cells at once from a 2D array.
+
+Perfect for:
+- Filling data tables from CSV/JSON
+- Batch updating table content
+- Template form filling
+
+Example:
+batch_fill_table({
+  data: [
+    ["이름", "나이", "주소"],
+    ["홍길동", "30", "서울"],
+    ["김철수", "25", "부산"]
+  ],
+  start_row: 0,
+  start_col: 0
+})`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        doc_id: { type: 'string', description: 'Document ID' },
+        table_index: { type: 'number', description: 'Global table index (from get_table_map)' },
+        data: {
+          type: 'array',
+          items: { type: 'array', items: { type: 'string' } },
+          description: '2D array of cell values'
+        },
+        start_row: { type: 'number', description: 'Starting row index (default: 0)' },
+        start_col: { type: 'number', description: 'Starting column index (default: 0)' },
+      },
+      required: ['doc_id', 'table_index', 'data'],
+    },
+  },
+  {
     name: 'set_cell_properties',
     description: 'Set table cell properties (HWPX only)',
     inputSchema: {
@@ -1112,22 +1228,24 @@ For template/form work:
   // === Undo/Redo ===
   {
     name: 'undo',
-    description: 'Undo the last change',
+    description: 'Undo the last change(s). Supports multiple undo with count parameter.',
     inputSchema: {
       type: 'object',
       properties: {
         doc_id: { type: 'string', description: 'Document ID' },
+        count: { type: 'number', description: 'Number of times to undo (default: 1)' },
       },
       required: ['doc_id'],
     },
   },
   {
     name: 'redo',
-    description: 'Redo the last undone change',
+    description: 'Redo the last undone change(s). Supports multiple redo with count parameter.',
     inputSchema: {
       type: 'object',
       properties: {
         doc_id: { type: 'string', description: 'Document ID' },
+        count: { type: 'number', description: 'Number of times to redo (default: 1)' },
       },
       required: ['doc_id'],
     },
@@ -2978,6 +3096,74 @@ Call get_tool_guide with: template, table, image, search, read, create`
         });
       }
 
+      case 'find_cell_by_label': {
+        const doc = getDoc(args?.doc_id as string);
+        if (!doc) return error('Document not found');
+
+        const results = doc.findCellByLabel(
+          args?.label_text as string,
+          args?.direction as 'right' | 'down' | undefined
+        );
+        return success({ matches: results, count: results.length });
+      }
+
+      case 'fill_by_path': {
+        const docId = args?.doc_id as string;
+        const doc = getDoc(docId);
+        if (!doc) return error('Document not found');
+        if (doc.format === 'hwp') return error('HWP files are read-only');
+
+        // Use document lock to prevent race conditions
+        return await withDocumentLock(docId, async () => {
+          const result = doc.fillByPath(args?.mappings as Record<string, string>);
+          return success(result);
+        });
+      }
+
+      case 'get_cell_context': {
+        const doc = getDoc(args?.doc_id as string);
+        if (!doc) return error('Document not found');
+
+        const globalIdx = args?.table_index as number;
+        const location = doc.convertGlobalToLocalTableIndex(globalIdx);
+        if (!location) {
+          return error(`Table with global index ${globalIdx} not found`);
+        }
+        const context = doc.getCellContext(
+          globalIdx,
+          args?.row as number,
+          args?.col as number,
+          args?.depth as number | undefined
+        );
+        if (!context) {
+          return error('Failed to get cell context');
+        }
+        return success(context);
+      }
+
+      case 'batch_fill_table': {
+        const docId = args?.doc_id as string;
+        const doc = getDoc(docId);
+        if (!doc) return error('Document not found');
+        if (doc.format === 'hwp') return error('HWP files are read-only');
+
+        // Use document lock to prevent race conditions
+        return await withDocumentLock(docId, async () => {
+          const globalIdx = args?.table_index as number;
+          const location = doc.convertGlobalToLocalTableIndex(globalIdx);
+          if (!location) {
+            return error(`Table with global index ${globalIdx} not found`);
+          }
+          const result = doc.batchFillTable(
+            globalIdx,
+            args?.data as string[][],
+            args?.start_row as number | undefined,
+            args?.start_col as number | undefined
+          );
+          return success(result);
+        });
+      }
+
       case 'set_cell_properties': {
         const doc = getDoc(args?.doc_id as string);
         if (!doc) return error('Document not found');
@@ -3306,8 +3492,22 @@ Call get_tool_guide with: template, table, image, search, read, create`
         const doc = getDoc(args?.doc_id as string);
         if (!doc) return error('Document not found');
 
-        if (doc.undo()) {
-          return success({ message: 'Undo successful', canUndo: doc.canUndo(), canRedo: doc.canRedo() });
+        const count = (args?.count as number) || 1;
+        let undoneCount = 0;
+        for (let i = 0; i < count; i++) {
+          if (doc.undo()) {
+            undoneCount++;
+          } else {
+            break;
+          }
+        }
+        if (undoneCount > 0) {
+          return success({
+            message: `Undo successful (${undoneCount}/${count})`,
+            undone_count: undoneCount,
+            canUndo: doc.canUndo(),
+            canRedo: doc.canRedo()
+          });
         }
         return error('Nothing to undo');
       }
@@ -3316,8 +3516,22 @@ Call get_tool_guide with: template, table, image, search, read, create`
         const doc = getDoc(args?.doc_id as string);
         if (!doc) return error('Document not found');
 
-        if (doc.redo()) {
-          return success({ message: 'Redo successful', canUndo: doc.canUndo(), canRedo: doc.canRedo() });
+        const count = (args?.count as number) || 1;
+        let redoneCount = 0;
+        for (let i = 0; i < count; i++) {
+          if (doc.redo()) {
+            redoneCount++;
+          } else {
+            break;
+          }
+        }
+        if (redoneCount > 0) {
+          return success({
+            message: `Redo successful (${redoneCount}/${count})`,
+            redone_count: redoneCount,
+            canUndo: doc.canUndo(),
+            canRedo: doc.canRedo()
+          });
         }
         return error('Nothing to redo');
       }
