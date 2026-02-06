@@ -1123,6 +1123,473 @@ class HwpxOps:
             "colSpan": span_col,
         }
 
+    def add_table_rows(
+        self,
+        path: str,
+        table_index: int,
+        *,
+        count: int = 1,
+        position: Optional[int] = None,
+        copy_style_from: Optional[int] = None,
+        values: Optional[Sequence[Sequence[str]]] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """Add one or more rows to an existing table.
+
+        This method creates complete rows with all columns, copying cell styles
+        from a template row. It handles tables with merged cells by collecting
+        style information from each column's representative cell.
+
+        Args:
+            path: Path to the HWPX document.
+            table_index: Zero-based index of the target table.
+            count: Number of rows to add (default: 1).
+            position: Row index after which to insert new rows.
+                      None means append at the end.
+                      0 means insert before the first row.
+            copy_style_from: Row index to copy cell styles from.
+                             None means use last row as template.
+            values: Optional 2D list of cell values to populate.
+                    If provided, its length should match `count`.
+            dry_run: If True, validate without saving changes.
+
+        Returns:
+            Dictionary with operation result including added row count.
+
+        Raises:
+            HwpxOperationError: If table or row index is invalid.
+        """
+        # Input validation
+        if count < 1:
+            raise HwpxOperationError("count must be at least 1")
+        if values is not None and len(values) != count:
+            raise HwpxOperationError(
+                f"values length ({len(values)}) must match count ({count})"
+            )
+
+        document, resolved = self._open_document(path)
+        tables = self._iter_tables(document)
+
+        # Validate table index
+        if table_index < 0 or table_index >= len(tables):
+            raise HwpxOperationError(
+                f"tableIndex {table_index} out of range (0-{len(tables) - 1})"
+            )
+        table = tables[table_index]
+
+        current_row_count = table.row_count
+        column_count = table.column_count
+
+        if current_row_count == 0:
+            raise HwpxOperationError("cannot add rows to an empty table")
+        if column_count == 0:
+            raise HwpxOperationError("table has no columns")
+
+        # Validate values column count if provided
+        if values is not None:
+            for row_idx, row_values in enumerate(values):
+                if len(row_values) != column_count:
+                    raise HwpxOperationError(
+                        f"values row {row_idx} has {len(row_values)} columns, "
+                        f"expected {column_count}"
+                    )
+
+        # Determine insertion position (0-based row index after which to insert)
+        if position is None:
+            insert_after = current_row_count - 1  # append at end
+        elif position == 0:
+            insert_after = -1  # insert before first row
+        else:
+            if position < 0 or position > current_row_count:
+                raise HwpxOperationError(
+                    f"position {position} out of range (0-{current_row_count})"
+                )
+            insert_after = position - 1
+
+        # Find columns that are covered by spanning cells at the insertion point
+        # These columns should be excluded from new rows (the spanning cell owns them)
+        spanning_columns = self._find_spanning_columns(table, insert_after)
+
+        # Collect cell templates for each column (excluding spanning columns)
+        # We need to find a representative cell for each column to copy styles from
+        column_templates = self._collect_column_cell_templates(table, column_count, copy_style_from)
+
+        # Get table's borderFillIDRef as fallback
+        table_border_fill = table.element.get("borderFillIDRef", "0")
+
+        # Build new rows (excluding columns covered by spanning cells)
+        new_rows: List[ET.Element] = []
+        for row_offset in range(count):
+            new_row_index = (
+                insert_after + 1 + row_offset
+                if insert_after >= 0
+                else row_offset
+            )
+            
+            new_row = ET.Element(f"{HP_NS}tr")
+            
+            for col_idx in range(column_count):
+                # Skip columns that are covered by spanning cells
+                if col_idx in spanning_columns:
+                    continue
+                
+                # Use col_idx to reference values (spanning columns' values are ignored)
+                cell_value = ""
+                if values is not None and col_idx < len(values[row_offset]):
+                    cell_value = values[row_offset][col_idx]
+                
+                template = column_templates.get(col_idx)
+                new_cell = self._create_table_cell(
+                    row_index=new_row_index,
+                    col_index=col_idx,
+                    text=cell_value,
+                    template_cell=template,
+                    fallback_border_fill=table_border_fill,
+                )
+                new_row.append(new_cell)
+            
+            new_rows.append(new_row)
+
+        # Insert new rows at the correct position
+        row_elements = list(table.element.findall(f"{HP_NS}tr"))
+        
+        if insert_after < 0:
+            # Insert at the beginning
+            first_tr_idx = self._find_first_tr_index(table.element)
+            for idx, new_row in enumerate(new_rows):
+                table.element.insert(first_tr_idx + idx, new_row)
+        else:
+            # Find the position of the row after which to insert
+            tr_positions = [
+                i for i, child in enumerate(table.element)
+                if child.tag == f"{HP_NS}tr"
+            ]
+            if insert_after < len(tr_positions):
+                insert_position = tr_positions[insert_after] + 1
+            else:
+                insert_position = len(table.element)
+
+            for idx, new_row in enumerate(new_rows):
+                table.element.insert(insert_position + idx, new_row)
+
+        # Expand rowSpan of cells that cover the insertion point
+        expanded_cells = self._expand_spanning_cells(table, insert_after, count)
+
+        # Update rowCnt attribute
+        new_total_rows = current_row_count + count
+        table.element.set("rowCnt", str(new_total_rows))
+
+        # Update row addresses for all rows after insertion point
+        self._renumber_table_rows(table)
+
+        # Mark table as dirty
+        table.mark_dirty()
+
+        if not dry_run:
+            self._save_document(document, resolved)
+
+        return {
+            "addedRows": count,
+            "totalRows": new_total_rows,
+            "insertedAfter": insert_after if insert_after >= 0 else None,
+            "expandedSpanCells": expanded_cells,
+        }
+
+    def _find_spanning_columns(
+        self,
+        table: "HwpxOxmlTable",
+        insert_after: int,
+    ) -> Dict[int, ET.Element]:
+        """Find columns covered by rowSpan cells at the insertion point.
+        
+        When a cell has rowSpan > 1 and the insertion point falls within
+        its range (start <= insert_after <= end), the columns it covers
+        should not have new cells created - the spanning cell owns them.
+        
+        Args:
+            table: The table to search.
+            insert_after: Row index after which new rows will be inserted.
+                          -1 means inserting before the first row.
+        
+        Returns:
+            Dict mapping column index to the spanning cell element.
+        """
+        spanning_cols: Dict[int, ET.Element] = {}
+        
+        # insert_after=-1 means inserting at the very beginning,
+        # no existing cell can span over that position
+        if insert_after < 0:
+            return spanning_cols
+        
+        for tr in table.element.findall(f"{HP_NS}tr"):
+            for tc in tr.findall(f"{HP_NS}tc"):
+                cell_addr = tc.find(f"{HP_NS}cellAddr")
+                cell_span = tc.find(f"{HP_NS}cellSpan")
+                
+                if cell_addr is None or cell_span is None:
+                    continue
+                
+                anchor_row = int(cell_addr.get("rowAddr", "0"))
+                anchor_col = int(cell_addr.get("colAddr", "0"))
+                row_span = int(cell_span.get("rowSpan", "1"))
+                col_span = int(cell_span.get("colSpan", "1"))
+                
+                # Skip non-spanning cells
+                if row_span <= 1:
+                    continue
+                
+                end_row = anchor_row + row_span - 1  # inclusive
+                
+                # Check if this cell spans over the insertion point
+                # Condition: start <= insert_after <= end
+                if anchor_row <= insert_after <= end_row:
+                    # Record all columns this cell covers
+                    for col_offset in range(col_span):
+                        col_idx = anchor_col + col_offset
+                        spanning_cols[col_idx] = tc
+        
+        return spanning_cols
+
+    def _expand_spanning_cells(
+        self,
+        table: "HwpxOxmlTable",
+        insert_after: int,
+        count: int,
+    ) -> int:
+        """Expand rowSpan of cells that cover the insertion point.
+        
+        When rows are inserted within the range of a spanning cell,
+        that cell's rowSpan must be increased to include the new rows.
+        
+        Args:
+            table: The table being modified.
+            insert_after: Row index after which rows were inserted.
+            count: Number of rows that were inserted.
+        
+        Returns:
+            Number of cells whose rowSpan was expanded.
+        """
+        expanded = 0
+        
+        if insert_after < 0:
+            return expanded
+        
+        for tr in table.element.findall(f"{HP_NS}tr"):
+            for tc in tr.findall(f"{HP_NS}tc"):
+                cell_addr = tc.find(f"{HP_NS}cellAddr")
+                cell_span = tc.find(f"{HP_NS}cellSpan")
+                
+                if cell_addr is None or cell_span is None:
+                    continue
+                
+                anchor_row = int(cell_addr.get("rowAddr", "0"))
+                row_span = int(cell_span.get("rowSpan", "1"))
+                
+                if row_span <= 1:
+                    continue
+                
+                end_row = anchor_row + row_span - 1
+                
+                # Expand if insertion point is within this cell's range
+                if anchor_row <= insert_after <= end_row:
+                    new_span = row_span + count
+                    cell_span.set("rowSpan", str(new_span))
+                    tc.set("dirty", "1")
+                    expanded += 1
+        
+        return expanded
+
+    def _collect_column_cell_templates(
+        self,
+        table: "HwpxOxmlTable",
+        column_count: int,
+        preferred_row: Optional[int] = None,
+    ) -> Dict[int, ET.Element]:
+        """Collect a template cell element for each column.
+        
+        This finds a representative cell for each column to use as a style template.
+        It handles merged cells by finding the actual cell that covers each column.
+        """
+        templates: Dict[int, ET.Element] = {}
+        
+        # Build a map of (row, col) -> cell element using the grid
+        try:
+            grid = table.get_cell_map()
+        except Exception:
+            # Fallback: iterate through rows manually
+            grid = None
+        
+        if grid is not None:
+            # Use the grid to find cells for each column
+            for col_idx in range(column_count):
+                # Try preferred row first, then search all rows
+                rows_to_check = []
+                if preferred_row is not None and 0 <= preferred_row < len(grid):
+                    rows_to_check.append(preferred_row)
+                # Add all rows (from last to first as fallback)
+                rows_to_check.extend(range(len(grid) - 1, -1, -1))
+                
+                for row_idx in rows_to_check:
+                    if row_idx >= len(grid) or col_idx >= len(grid[row_idx]):
+                        continue
+                    position = grid[row_idx][col_idx]
+                    if position.cell is not None and position.is_anchor:
+                        # Found an anchor cell for this column
+                        templates[col_idx] = position.cell.element
+                        break
+                    elif position.cell is not None and col_idx not in templates:
+                        # Use any cell as fallback
+                        templates[col_idx] = position.cell.element
+        
+        # Fallback: search through row elements directly
+        if len(templates) < column_count:
+            for tr in table.element.findall(f"{HP_NS}tr"):
+                for tc in tr.findall(f"{HP_NS}tc"):
+                    cell_addr = tc.find(f"{HP_NS}cellAddr")
+                    if cell_addr is not None:
+                        col = int(cell_addr.get("colAddr", "-1"))
+                        if 0 <= col < column_count and col not in templates:
+                            templates[col] = tc
+                if len(templates) >= column_count:
+                    break
+        
+        return templates
+
+    def _create_table_cell(
+        self,
+        row_index: int,
+        col_index: int,
+        text: str,
+        template_cell: Optional[ET.Element],
+        fallback_border_fill: str,
+    ) -> ET.Element:
+        """Create a new table cell element, optionally copying style from template."""
+        
+        # Start with template attributes or defaults
+        if template_cell is not None:
+            # Copy attributes from template, excluding position-specific ones
+            cell_attrs = {}
+            for key, value in template_cell.attrib.items():
+                cell_attrs[key] = value
+            cell_attrs["dirty"] = "1"
+        else:
+            cell_attrs = {
+                "name": "",
+                "header": "0",
+                "hasMargin": "0",
+                "protect": "0",
+                "editable": "0",
+                "dirty": "1",
+                "borderFillIDRef": fallback_border_fill,
+            }
+        
+        new_cell = ET.Element(f"{HP_NS}tc", cell_attrs)
+        
+        # Copy subList structure from template or create new
+        if template_cell is not None:
+            template_sublist = template_cell.find(f"{HP_NS}subList")
+            if template_sublist is not None:
+                new_sublist = copy.deepcopy(template_sublist)
+                # Update text content
+                para = new_sublist.find(f"{HP_NS}p")
+                if para is not None:
+                    run = para.find(f"{HP_NS}run")
+                    if run is not None:
+                        text_elem = run.find(f"{HP_NS}t")
+                        if text_elem is not None:
+                            text_elem.text = text
+                        else:
+                            text_elem = ET.SubElement(run, f"{HP_NS}t")
+                            text_elem.text = text
+                new_cell.append(new_sublist)
+            else:
+                self._add_default_sublist(new_cell, text)
+        else:
+            self._add_default_sublist(new_cell, text)
+        
+        # Add cellAddr
+        ET.SubElement(new_cell, f"{HP_NS}cellAddr", {
+            "colAddr": str(col_index),
+            "rowAddr": str(row_index),
+        })
+        
+        # Add cellSpan (no merge for new rows)
+        ET.SubElement(new_cell, f"{HP_NS}cellSpan", {
+            "colSpan": "1",
+            "rowSpan": "1",
+        })
+        
+        # Copy or create cellSz
+        if template_cell is not None:
+            template_size = template_cell.find(f"{HP_NS}cellSz")
+            if template_size is not None:
+                new_size = copy.deepcopy(template_size)
+                new_cell.append(new_size)
+            else:
+                ET.SubElement(new_cell, f"{HP_NS}cellSz", {"width": "0", "height": "0"})
+        else:
+            ET.SubElement(new_cell, f"{HP_NS}cellSz", {"width": "0", "height": "0"})
+        
+        # Copy or create cellMargin
+        if template_cell is not None:
+            template_margin = template_cell.find(f"{HP_NS}cellMargin")
+            if template_margin is not None:
+                new_margin = copy.deepcopy(template_margin)
+                new_cell.append(new_margin)
+            else:
+                ET.SubElement(new_cell, f"{HP_NS}cellMargin", {
+                    "left": "510", "right": "510", "top": "141", "bottom": "141"
+                })
+        else:
+            ET.SubElement(new_cell, f"{HP_NS}cellMargin", {
+                "left": "510", "right": "510", "top": "141", "bottom": "141"
+            })
+        
+        return new_cell
+
+    def _add_default_sublist(self, cell: ET.Element, text: str) -> None:
+        """Add a default subList structure to a cell."""
+        sublist = ET.SubElement(cell, f"{HP_NS}subList", {
+            "id": "",
+            "textDirection": "HORIZONTAL",
+            "lineWrap": "BREAK",
+            "vertAlign": "CENTER",
+            "linkListIDRef": "0",
+            "linkListNextIDRef": "0",
+            "textWidth": "0",
+            "textHeight": "0",
+            "hasTextRef": "0",
+            "hasNumRef": "0",
+        })
+        para = ET.SubElement(sublist, f"{HP_NS}p", {
+            "id": "0",
+            "paraPrIDRef": "0",
+            "styleIDRef": "0",
+            "pageBreak": "0",
+            "columnBreak": "0",
+            "merged": "0",
+        })
+        run = ET.SubElement(para, f"{HP_NS}run", {"charPrIDRef": "0"})
+        text_elem = ET.SubElement(run, f"{HP_NS}t")
+        text_elem.text = text
+
+    def _renumber_table_rows(self, table: "HwpxOxmlTable") -> None:
+        """Renumber all cellAddr rowAddr values based on actual row positions."""
+        row_elements = list(table.element.findall(f"{HP_NS}tr"))
+        for row_idx, row_elem in enumerate(row_elements):
+            for cell in row_elem.findall(f"{HP_NS}tc"):
+                cell_addr = cell.find(f"{HP_NS}cellAddr")
+                if cell_addr is not None:
+                    cell_addr.set("rowAddr", str(row_idx))
+                cell.set("dirty", "1")
+
+    def _find_first_tr_index(self, table_element: ET.Element) -> int:
+        """Find the index of the first <hp:tr> element in the table."""
+        for idx, child in enumerate(table_element):
+            if child.tag == f"{HP_NS}tr":
+                return idx
+        return len(table_element)
+
     def add_shape(
         self,
         path: str,

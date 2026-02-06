@@ -307,6 +307,36 @@ class SplitTableCellOutput(_BaseModel):
     colSpan: int
 
 
+class AddTableRowsInput(DocumentLocatorInput):
+    """Input model for adding rows to an existing table."""
+    table_index: int = Field(alias="tableIndex", description="Zero-based index of the target table")
+    count: int = Field(1, ge=1, description="Number of rows to add")
+    position: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Row index after which to insert. None=append at end, 0=insert before first row"
+    )
+    copy_style_from: Optional[int] = Field(
+        None,
+        alias="copyStyleFrom",
+        ge=0,
+        description="Row index to copy cell styles from. None=use last row"
+    )
+    values: Optional[Sequence[Sequence[str]]] = Field(
+        None,
+        description="2D list of cell values. Length must match count parameter"
+    )
+    dry_run: bool = Field(False, alias="dryRun", description="If true, validate without saving")
+
+
+class AddTableRowsOutput(_BaseModel):
+    """Output model for add_table_rows operation."""
+    addedRows: int
+    totalRows: int
+    insertedAfter: Optional[int] = None
+    expandedSpanCells: int = 0
+
+
 class AddShapeInput(DocumentLocatorInput):
     shape_type: str = Field("RECTANGLE", alias="shapeType")
     section_index: Optional[int] = Field(None, alias="sectionIndex")
@@ -652,6 +682,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=SplitTableCellInput,
             output_model=SplitTableCellOutput,
             func=_simple("split_table_cell"),
+        ),
+        ToolDefinition(
+            name="add_table_rows",
+            description="Add one or more rows to an existing table. Copies cell styles from a specified row (default: last row). Supports inserting at specific positions and initializing with values.",
+            input_model=AddTableRowsInput,
+            output_model=AddTableRowsOutput,
+            func=_simple("add_table_rows"),
         ),
         ToolDefinition(
             name="add_shape",

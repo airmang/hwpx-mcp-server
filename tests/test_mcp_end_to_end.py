@@ -129,7 +129,7 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
     import hwpx_mcp_server.server as server_module
 
     tools = build_tool_definitions()
-    assert len(tools) == 38
+    assert len(tools) == 39
 
     created_servers: list = []
 
@@ -175,7 +175,7 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
 
     result = response.root
     assert isinstance(result, types.ListToolsResult)
-    assert len(result.tools) == 38
+    assert len(result.tools) == 39
     assert result.nextCursor is None
 
 
@@ -554,6 +554,252 @@ def test_table_workflow(
                 position.cell.element.get("borderFillIDRef")
                 == border_fill_result["borderFillIDRef"]
             )
+
+
+def test_add_table_rows(
+    ops: HwpxOps,
+    tool_map: Dict[str, ToolDefinition],
+    sample_workspace: tuple[Path, Path],
+) -> None:
+    """Test adding rows to an existing table."""
+    _, doc_path = sample_workspace
+    rel_path = doc_path.name
+
+    # First, get the existing table info
+    document = HwpxDocument.open(doc_path)
+    tables: list = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    assert len(tables) >= 1, "Sample should have at least one table"
+
+    table_index = 0
+    original_row_count = tables[table_index].row_count
+    original_col_count = tables[table_index].column_count
+
+    # Test 1: Add single row at the end (default behavior)
+    result = _call(
+        tool_map,
+        "add_table_rows",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        count=1,
+    )
+    assert result["addedRows"] == 1
+    assert result["totalRows"] == original_row_count + 1
+    assert result["insertedAfter"] == original_row_count - 1
+
+    # Verify the table structure
+    document = HwpxDocument.open(doc_path)
+    tables = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    assert tables[table_index].row_count == original_row_count + 1
+    assert tables[table_index].column_count == original_col_count
+
+    # Test 2: Add multiple rows with values
+    new_row_count = tables[table_index].row_count
+    values = [
+        ["Data1", "Data2", "Data3"][:original_col_count],
+        ["Data4", "Data5", "Data6"][:original_col_count],
+    ]
+    result = _call(
+        tool_map,
+        "add_table_rows",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        count=2,
+        values=values,
+    )
+    assert result["addedRows"] == 2
+    assert result["totalRows"] == new_row_count + 2
+
+    # Verify values were set correctly
+    document = HwpxDocument.open(doc_path)
+    tables = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    last_row_idx = tables[table_index].row_count - 1
+    # Check that the cell values are set
+    assert tables[table_index].cell(last_row_idx, 0).text == values[1][0]
+
+    # Test 3: Add row at specific position (after first row)
+    current_row_count = tables[table_index].row_count
+    result = _call(
+        tool_map,
+        "add_table_rows",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        count=1,
+        position=1,  # Insert after the first row
+    )
+    assert result["addedRows"] == 1
+    assert result["totalRows"] == current_row_count + 1
+    assert result["insertedAfter"] == 0
+
+    # Test 4: Dry run should not save changes
+    document = HwpxDocument.open(doc_path)
+    tables = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    count_before_dry_run = tables[table_index].row_count
+
+    result = _call(
+        tool_map,
+        "add_table_rows",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        count=1,
+        dryRun=True,
+    )
+    assert result["addedRows"] == 1
+
+    # Verify no changes were saved
+    document = HwpxDocument.open(doc_path)
+    tables = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    assert tables[table_index].row_count == count_before_dry_run
+
+
+def test_add_table_rows_with_rowspan(
+    ops: HwpxOps,
+    tool_map: Dict[str, ToolDefinition],
+    sample_workspace: tuple[Path, Path],
+) -> None:
+    """Test adding rows to a table with rowSpan cells expands the span correctly."""
+    _, doc_path = sample_workspace
+    rel_path = doc_path.name
+
+    # Create a new table with merged cells for this test
+    table_result = _call(
+        tool_map,
+        "add_table",
+        ops,
+        path=rel_path,
+        rows=4,
+        cols=3,
+    )
+    table_index = table_result["tableIndex"]
+
+    # Merge cells in first column (rows 1-3) to create a rowSpan cell
+    document = HwpxDocument.open(doc_path)
+    tables: list = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    table = tables[table_index]
+
+    # Merge col=0 from row 1 to row 3 (3 rows -> rowSpan=3)
+    table.merge_cells(1, 0, 3, 0)
+    document.save(doc_path)
+
+    # Verify the merge
+    document = HwpxDocument.open(doc_path)
+    tables = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    table = tables[table_index]
+    merged_cell = table.cell(1, 0)
+    assert merged_cell.span == (3, 1), f"Expected rowSpan=3, got {merged_cell.span}"
+
+    # Now add 2 rows at the end of the span (after row 3, which is the last row)
+    result = _call(
+        tool_map,
+        "add_table_rows",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        count=2,
+        position=4,  # After row 3 (0-indexed row 3 -> position 4)
+    )
+    assert result["addedRows"] == 2
+    assert result["totalRows"] == 6
+    assert result["expandedSpanCells"] == 1  # The merged cell should be expanded
+
+    # Verify the rowSpan was expanded
+    document = HwpxDocument.open(doc_path)
+    tables = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    table = tables[table_index]
+
+    # The merged cell should now span 5 rows (original 3 + 2 new)
+    merged_cell = table.cell(1, 0)
+    assert merged_cell.span == (5, 1), f"Expected rowSpan=5 after expansion, got {merged_cell.span}"
+
+    # Verify new rows have correct structure (only col 1 and 2, not col 0)
+    # Access new rows' cells - they should exist for col 1 and 2
+    assert table.cell(4, 1) is not None
+    assert table.cell(4, 2) is not None
+    assert table.cell(5, 1) is not None
+    assert table.cell(5, 2) is not None
+
+
+def test_add_table_rows_with_values_and_spanning(
+    ops: HwpxOps,
+    tool_map: Dict[str, ToolDefinition],
+    sample_workspace: tuple[Path, Path],
+) -> None:
+    """Test adding rows with values when spanning columns exist.
+    
+    Values are provided for all columns, but spanning columns' values are ignored.
+    """
+    _, doc_path = sample_workspace
+    rel_path = doc_path.name
+
+    # Create a table
+    table_result = _call(
+        tool_map,
+        "add_table",
+        ops,
+        path=rel_path,
+        rows=3,
+        cols=3,
+    )
+    table_index = table_result["tableIndex"]
+
+    # Merge col=0 from row 1 to row 2 (2 rows -> rowSpan=2)
+    document = HwpxDocument.open(doc_path)
+    tables: list = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    table = tables[table_index]
+    table.merge_cells(1, 0, 2, 0)
+    document.save(doc_path)
+
+    # Add 1 row with values for all 3 columns
+    # Column 0 is spanned, so its value ("IGNORED") should be skipped
+    result = _call(
+        tool_map,
+        "add_table_rows",
+        ops,
+        path=rel_path,
+        tableIndex=table_index,
+        count=1,
+        position=3,  # After last row (row 2)
+        values=[["IGNORED", "ValueB", "ValueC"]],
+    )
+    assert result["addedRows"] == 1
+    assert result["expandedSpanCells"] == 1
+
+    # Verify the values were set correctly
+    document = HwpxDocument.open(doc_path)
+    tables = []
+    for paragraph in document.paragraphs:
+        tables.extend(paragraph.tables)
+    table = tables[table_index]
+
+    # New row is at index 3
+    # Col 0 should be part of the spanning cell, so we access col 1 and 2
+    assert table.cell(3, 1).text == "ValueB"
+    assert table.cell(3, 2).text == "ValueC"
+
+    # Verify spanning cell was expanded (original span=2, now span=3)
+    merged_cell = table.cell(1, 0)
+    assert merged_cell.span == (3, 1)
 
 
 def test_shape_control_and_memo_tools(
