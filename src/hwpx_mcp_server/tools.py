@@ -131,6 +131,33 @@ class TextExtractReportOutput(_BaseModel):
     content: str
 
 
+class AnalyzeTemplateInput(DocumentLocatorInput):
+    placeholder_patterns: Optional[Sequence[str]] = Field(None, alias="placeholderPatterns")
+    lock_keywords: Optional[Sequence[str]] = Field(None, alias="lockKeywords")
+
+
+class TemplateRegion(_BaseModel):
+    name: str
+    startParagraph: int
+    endParagraph: int
+    editable: bool
+    reason: str
+
+
+class TemplatePlaceholder(_BaseModel):
+    token: str
+    paragraphIndex: int
+    zone: str
+    editable: bool
+    context: str
+
+
+class AnalyzeTemplateOutput(_BaseModel):
+    summary: Dict[str, Any]
+    regions: List[TemplateRegion]
+    placeholders: List[TemplatePlaceholder]
+
+
 class FindInput(DocumentLocatorInput):
     query: str
     is_regex: bool = Field(False, alias="isRegex")
@@ -602,6 +629,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=TextExtractReportInput,
             output_model=TextExtractReportOutput,
             func=_simple("text_extract_report"),
+        ),
+        ToolDefinition(
+            name="analyze_template_structure",
+            description="Analyze template-like regions and placeholder candidates.",
+            input_model=AnalyzeTemplateInput,
+            output_model=AnalyzeTemplateOutput,
+            func=_simple("analyze_template_structure"),
         ),
         ToolDefinition(
             name="find",
