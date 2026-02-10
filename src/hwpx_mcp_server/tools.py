@@ -418,6 +418,20 @@ class OutPathOutput(_BaseModel):
     outPath: str
 
 
+class ConvertHwpToHwpxInput(_BaseModel):
+    source: str
+    output: Optional[str] = None
+
+
+class ConvertHwpToHwpxOutput(_BaseModel):
+    success: bool
+    outputPath: str
+    paragraphsConverted: int
+    tablesConverted: int
+    skippedElements: List[str]
+    warnings: List[str]
+
+
 class FillTemplateInput(_BaseModel):
     source: str
     output: str
@@ -763,6 +777,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=MakeBlankInput,
             output_model=OutPathOutput,
             func=_simple("make_blank"),
+        ),
+        ToolDefinition(
+            name="convert_hwp_to_hwpx",
+            description="Convert a .hwp binary document into .hwpx.",
+            input_model=ConvertHwpToHwpxInput,
+            output_model=ConvertHwpToHwpxOutput,
+            func=_simple("convert_hwp_to_hwpx", require_path=False),
         ),
         ToolDefinition(
             name="list_master_pages_histories_versions",

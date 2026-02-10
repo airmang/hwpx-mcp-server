@@ -40,6 +40,7 @@ from .core.plan import (
     SearchOutput,
 )
 from .hwp_support import HwpBinaryError, extract_hwp_text
+from .hwp_converter import HwpConversionError, convert_hwp_to_hwpx
 from .metadata import tools_meta
 from .storage import DocumentStorage, LocalDocumentStorage
 
@@ -123,7 +124,7 @@ class HwpxOps:
         resolved = self._resolve_path(path)
         if resolved.suffix.lower() == ".hwp":
             raise HwpxOperationError(
-                "HWP(.hwp)는 현재 읽기 전용입니다. 편집 작업은 HWPX로 변환 후 다시 시도하세요."
+                "HWP 파일은 편집이 불가합니다. 먼저 convert_hwp_to_hwpx 도구로 HWPX 변환 후 편집하세요."
             )
         try:
             document, resolved = self.storage.open_document(path)
@@ -1633,6 +1634,30 @@ class HwpxOps:
         out_path = self._resolve_output_path(out)
         document.save(out_path)
         return {"outPath": str(out_path)}
+
+    def convert_hwp_to_hwpx(self, source: str, output: Optional[str] = None) -> Dict[str, Any]:
+        resolved_source = self._resolve_path(source)
+        if resolved_source.suffix.lower() != ".hwp":
+            raise HwpxOperationError("source는 .hwp 파일이어야 합니다")
+
+        if output:
+            resolved_output = self._resolve_output_path(output)
+        else:
+            resolved_output = resolved_source.with_suffix(".hwpx")
+
+        try:
+            result = convert_hwp_to_hwpx(str(resolved_source), str(resolved_output))
+        except HwpConversionError as exc:
+            raise HwpxOperationError(f"HWP 변환 실패: {exc}") from exc
+
+        return {
+            "success": result.success,
+            "outputPath": result.output_path,
+            "paragraphsConverted": result.paragraphs_converted,
+            "tablesConverted": result.tables_converted,
+            "skippedElements": result.skipped_elements,
+            "warnings": result.warnings,
+        }
 
     # ------------------------------------------------------------------
     # Package & metadata queries

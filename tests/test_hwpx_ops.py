@@ -713,4 +713,4 @@ def test_hwp_edit_tools_raise_clear_error(tmp_path):
     with pytest.raises(Exception) as exc_info:
         ops.replace_text_in_runs(hwp_path.name, "A", "B")
 
-    assert "읽기 전용" in str(exc_info.value)
+    assert "convert_hwp_to_hwpx" in str(exc_info.value)
