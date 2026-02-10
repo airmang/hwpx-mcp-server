@@ -765,6 +765,134 @@ class HwpxOps:
             )
         return {"content": content}
 
+    def analyze_template_structure(
+        self,
+        path: str,
+        *,
+        placeholder_patterns: Optional[Sequence[str]] = None,
+        lock_keywords: Optional[Sequence[str]] = None,
+    ) -> Dict[str, Any]:
+        resolved = self._resolve_path(path)
+        if resolved.suffix.lower() == ".hwp":
+            paragraphs, _, source = self._read_only_hwp_paragraphs(path)
+        else:
+            paragraphs = []
+            with TextExtractor(resolved) as extractor:
+                for paragraph in extractor.iter_document_paragraphs():
+                    paragraphs.append(paragraph.text(preserve_breaks=True))
+            source = "hwpx.text_extractor"
+
+        paragraph_count = len(paragraphs)
+        if paragraph_count == 0:
+            return {
+                "summary": {
+                    "isTemplate": False,
+                    "paragraphCount": 0,
+                    "placeholderCount": 0,
+                    "extractionSource": source,
+                },
+                "regions": [],
+                "placeholders": [],
+            }
+
+        top_band = max(1, min(3, max(1, paragraph_count // 10)))
+        bottom_band = max(1, min(3, max(1, paragraph_count // 10)))
+        if top_band + bottom_band > paragraph_count:
+            bottom_band = max(1, paragraph_count - top_band)
+
+        header_range = (0, max(0, top_band - 1))
+        body_range = (top_band, max(top_band, paragraph_count - bottom_band - 1))
+        footer_range = (max(0, paragraph_count - bottom_band), paragraph_count - 1)
+
+        default_placeholder_patterns = [
+            r"\{\{[^{}]+\}\}",
+            r"\[[^\[\]]*(입력|작성|기재)[^\[\]]*\]",
+            r"(본문 영역|제목을 입력하세요|날짜를 입력하세요|제20\d{2}년)",
+        ]
+        default_lock_keywords = [
+            "로고",
+            "교훈",
+            "연락처",
+            "슬로건",
+            "학교장",
+            "직인",
+        ]
+
+        compiled_patterns = [
+            re.compile(pattern)
+            for pattern in (placeholder_patterns or default_placeholder_patterns)
+        ]
+        lock_terms = [term.strip() for term in (lock_keywords or default_lock_keywords) if term and term.strip()]
+
+        def paragraph_zone(index: int) -> str:
+            if header_range[0] <= index <= header_range[1]:
+                return "header"
+            if footer_range[0] <= index <= footer_range[1]:
+                return "footer"
+            return "body"
+
+        placeholders: List[Dict[str, Any]] = []
+        locked_indexes: set[int] = set()
+        for index, text in enumerate(paragraphs):
+            stripped = text.strip()
+            if not stripped:
+                continue
+
+            zone = paragraph_zone(index)
+            contains_lock_keyword = any(keyword in stripped for keyword in lock_terms)
+            if zone in {"header", "footer"} or contains_lock_keyword:
+                locked_indexes.add(index)
+
+            for pattern in compiled_patterns:
+                for match in pattern.finditer(stripped):
+                    token = match.group(0)
+                    placeholders.append(
+                        {
+                            "token": token,
+                            "paragraphIndex": index,
+                            "zone": zone,
+                            "editable": index not in locked_indexes,
+                            "context": stripped[:200],
+                        }
+                    )
+
+        is_template = bool(placeholders) or any(index in locked_indexes for index in range(paragraph_count))
+        regions = [
+            {
+                "name": "header",
+                "startParagraph": header_range[0],
+                "endParagraph": header_range[1],
+                "editable": False,
+                "reason": "상단 고정 영역(휴리스틱)",
+            },
+            {
+                "name": "body",
+                "startParagraph": body_range[0],
+                "endParagraph": body_range[1],
+                "editable": True,
+                "reason": "본문 편집 가능 영역(휴리스틱)",
+            },
+            {
+                "name": "footer",
+                "startParagraph": footer_range[0],
+                "endParagraph": footer_range[1],
+                "editable": False,
+                "reason": "하단 고정 영역(휴리스틱)",
+            },
+        ]
+
+        return {
+            "summary": {
+                "isTemplate": is_template,
+                "paragraphCount": paragraph_count,
+                "placeholderCount": len(placeholders),
+                "lockedParagraphCount": len(locked_indexes),
+                "extractionSource": source,
+            },
+            "regions": regions,
+            "placeholders": placeholders,
+        }
+
     # ------------------------------------------------------------------
     # Search & replace
     # ------------------------------------------------------------------

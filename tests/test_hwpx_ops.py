@@ -714,3 +714,19 @@ def test_hwp_edit_tools_raise_clear_error(tmp_path):
         ops.replace_text_in_runs(hwp_path.name, "A", "B")
 
     assert "convert_hwp_to_hwpx" in str(exc_info.value)
+
+
+def test_analyze_template_structure_returns_regions_and_placeholders(ops_with_sample):
+    ops, path = ops_with_sample
+
+    result = ops.analyze_template_structure(
+        str(path),
+        placeholder_patterns=[r"HWPX"],
+        lock_keywords=["sample"],
+    )
+
+    assert result["summary"]["paragraphCount"] >= 1
+    assert len(result["regions"]) == 3
+    assert any(item["name"] == "body" for item in result["regions"])
+    assert result["placeholders"]
+    assert result["placeholders"][0]["token"] == "HWPX"

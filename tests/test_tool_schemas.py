@@ -70,3 +70,7 @@ def test_open_info_meta_allows_additional_properties():
 def test_convert_hwp_to_hwpx_tool_is_exposed():
     names = {definition.name for definition in build_tool_definitions()}
     assert "convert_hwp_to_hwpx" in names
+
+def test_analyze_template_structure_tool_is_exposed():
+    names = {definition.name for definition in build_tool_definitions()}
+    assert "analyze_template_structure" in names
