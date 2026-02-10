@@ -1495,6 +1495,39 @@ class HwpxOps:
         document.save(out_path)
         return {"outPath": str(out_path)}
 
+    def fill_template(
+        self,
+        source: str,
+        output: str,
+        replacements: Dict[str, str],
+        *,
+        preserve_style: bool = True,
+        split_newlines: bool = True,
+    ) -> Dict[str, Any]:
+        document, _ = self._open_document(source)
+        out_path = self._resolve_output_path(output)
+
+        replaced_count = 0
+        for needle, replacement in replacements.items():
+            if not needle:
+                continue
+            content = replacement
+            if not split_newlines:
+                content = content.replace("\r\n", " ").replace("\n", " ")
+
+            replaced_count += document.replace_text_in_runs(needle, content)
+
+        if not preserve_style:
+            logger.debug(
+                "fill_template called with preserve_style=False, but current backend always preserves run style"
+            )
+
+        document.save(out_path)
+        return {
+            "outPath": str(out_path),
+            "replacedCount": replaced_count,
+        }
+
     def make_blank(self, out: str) -> Dict[str, Any]:
         document = HwpxDocument.new()
         out_path = self._resolve_output_path(out)
@@ -1762,4 +1795,3 @@ class HwpxOps:
 
         xml_string = ET.tostring(element, encoding="unicode")
         return {"xmlString": xml_string}
-

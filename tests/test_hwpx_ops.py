@@ -258,6 +258,26 @@ def test_save_as_creates_new_file(ops_with_sample, tmp_path):
     result = ops.save_as(str(path), str(out))
     assert Path(result["outPath"]).exists()
 
+
+def test_fill_template_replaces_multiple_tokens_without_modifying_source(ops_with_sample):
+    ops, path = ops_with_sample
+    out = path.with_name("filled.hwpx")
+
+    result = ops.fill_template(
+        str(path),
+        str(out),
+        {"HWPX": "DOCX", "sample": "example"},
+    )
+
+    assert result["replacedCount"] >= 2
+    assert Path(result["outPath"]).exists()
+
+    source_text = ops.read_text(str(path), limit=5)["textChunk"]
+    filled_text = ops.read_text(str(out), limit=5)["textChunk"]
+    assert "HWPX" in source_text
+    assert "DOCX" in filled_text
+    assert "example DOCX" in filled_text
+
 def test_add_table_returns_valid_index(ops_with_sample):
     ops, path = ops_with_sample
     result = ops.add_table(str(path), rows=2, cols=2)
