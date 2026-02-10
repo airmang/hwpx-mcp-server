@@ -129,7 +129,7 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
     import hwpx_mcp_server.server as server_module
 
     tools = build_tool_definitions()
-    assert len(tools) == 38
+    assert len(tools) == 39
 
     created_servers: list = []
 
@@ -175,7 +175,7 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
 
     result = response.root
     assert isinstance(result, types.ListToolsResult)
-    assert len(result.tools) == 38
+    assert len(result.tools) == 39
     assert result.nextCursor is None
 
 

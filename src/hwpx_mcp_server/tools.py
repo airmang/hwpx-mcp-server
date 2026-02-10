@@ -418,6 +418,19 @@ class OutPathOutput(_BaseModel):
     outPath: str
 
 
+class FillTemplateInput(_BaseModel):
+    source: str
+    output: str
+    replacements: Dict[str, str]
+    preserve_style: bool = Field(True, alias="preserveStyle")
+    split_newlines: bool = Field(True, alias="splitNewlines")
+
+
+class FillTemplateOutput(_BaseModel):
+    outPath: str
+    replacedCount: int
+
+
 class MakeBlankInput(_BaseModel):
     out: str
 
@@ -736,6 +749,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=SaveAsInput,
             output_model=OutPathOutput,
             func=_simple("save_as"),
+        ),
+        ToolDefinition(
+            name="fill_template",
+            description="Copy a template and apply multiple text replacements in one call.",
+            input_model=FillTemplateInput,
+            output_model=FillTemplateOutput,
+            func=_simple("fill_template", require_path=False),
         ),
         ToolDefinition(
             name="make_blank",
