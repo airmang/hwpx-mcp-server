@@ -39,6 +39,7 @@ from .core.plan import (
     SearchInput,
     SearchOutput,
 )
+from .hwp_support import HwpBinaryError, extract_hwp_text
 from .metadata import tools_meta
 from .storage import DocumentStorage, LocalDocumentStorage
 
@@ -119,6 +120,11 @@ class HwpxOps:
         self.storage.maybe_backup(path)
 
     def _open_document(self, path: str) -> Tuple[HwpxDocument, Path]:
+        resolved = self._resolve_path(path)
+        if resolved.suffix.lower() == ".hwp":
+            raise HwpxOperationError(
+                "HWP(.hwp)는 현재 읽기 전용입니다. 편집 작업은 HWPX로 변환 후 다시 시도하세요."
+            )
         try:
             document, resolved = self.storage.open_document(path)
         except FileNotFoundError:
@@ -126,6 +132,14 @@ class HwpxOps:
         except Exception as exc:  # pragma: no cover - delegated to backend
             raise HwpxOperationError(f"failed to open '{path}': {exc}") from exc
         return document, resolved
+
+    def _read_only_hwp_paragraphs(self, path: str) -> Tuple[List[str], Path, str]:
+        resolved = self._resolve_path(path)
+        try:
+            snapshot = extract_hwp_text(resolved)
+        except HwpBinaryError as exc:
+            raise HwpxOperationError(f"HWP 텍스트 추출 실패: {exc}") from exc
+        return snapshot.paragraphs, resolved, snapshot.source
 
     def _ensure_planner_document(self, doc_id: str, path: str) -> None:
         resolved = self._resolve_path(path)
@@ -517,6 +531,26 @@ class HwpxOps:
     # Document information
     # ------------------------------------------------------------------
     def open_info(self, path: str) -> Dict[str, Any]:
+        resolved = self._resolve_path(path)
+        if resolved.suffix.lower() == ".hwp":
+            paragraphs, _, source = self._read_only_hwp_paragraphs(path)
+            stat = resolved.stat()
+            meta = {
+                "path": self._relative_path(resolved),
+                "absolutePath": str(resolved),
+                "size": stat.st_size,
+                "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "format": "hwp",
+                "readOnly": True,
+                "extractionSource": source,
+            }
+            return {
+                "meta": meta,
+                "sectionCount": 0,
+                "paragraphCount": len(paragraphs),
+                "headerCount": 0,
+            }
+
         document, resolved = self._open_document(path)
         sections = document.sections
         section_count = len(sections)
@@ -591,6 +625,16 @@ class HwpxOps:
         with_footnotes: bool = False,
     ) -> Dict[str, Any]:
         resolved = self._resolve_path(path)
+        if resolved.suffix.lower() == ".hwp":
+            paragraphs, _, _ = self._read_only_hwp_paragraphs(path)
+            effective_limit = self.paging_limit if limit is None else max(1, limit)
+            start = max(0, offset)
+            chunk = paragraphs[start : start + effective_limit]
+            next_offset = None
+            if start + effective_limit < len(paragraphs):
+                next_offset = start + effective_limit
+            return {"textChunk": "\n".join(chunk), "nextOffset": next_offset}
+
         if limit is None:
             effective_limit = self.paging_limit
         else:
@@ -648,6 +692,22 @@ class HwpxOps:
             normalized_indexes.append(int(index))
             unique_indexes.add(int(index))
 
+        resolved = self._resolve_path(path)
+        if resolved.suffix.lower() == ".hwp":
+            paragraphs, _, _ = self._read_only_hwp_paragraphs(path)
+            collected = {idx: paragraphs[idx] for idx in unique_indexes if idx < len(paragraphs)}
+            missing = [index for index in normalized_indexes if index not in collected]
+            if missing:
+                raise ValueError(
+                    "paragraphIndexes out of range: " + ", ".join(str(idx) for idx in sorted(set(missing)))
+                )
+            return {
+                "paragraphs": [
+                    {"paragraphIndex": index, "text": collected[index]}
+                    for index in normalized_indexes
+                ]
+            }
+
         annotations = None
         if with_highlights or with_footnotes:
             annotations = AnnotationOptions(
@@ -656,7 +716,6 @@ class HwpxOps:
                 endnote="inline" if with_footnotes else "ignore",
             )
 
-        resolved = self._resolve_path(path)
         collected: Dict[int, str] = {}
         with TextExtractor(resolved) as extractor:
             for paragraph in extractor.iter_document_paragraphs():
@@ -683,6 +742,13 @@ class HwpxOps:
 
     def text_extract_report(self, path: str, mode: str = "plain") -> Dict[str, Any]:
         resolved = self._resolve_path(path)
+        if resolved.suffix.lower() == ".hwp":
+            paragraphs, _, source = self._read_only_hwp_paragraphs(path)
+            return {
+                "content": "\n".join(paragraphs)
+                + f"\n\n[HWP read-only mode] extraction_source={source}; annotations/structure are unavailable."
+            }
+
         annotations = None
         if mode == "with_annotations":
             annotations = AnnotationOptions(
@@ -727,6 +793,40 @@ class HwpxOps:
             return snippet
 
         pattern = re.compile(query) if is_regex else None
+        if resolved.suffix.lower() == ".hwp":
+            paragraphs, _, _ = self._read_only_hwp_paragraphs(path)
+            for para_index, text in enumerate(paragraphs):
+                if is_regex:
+                    for match in pattern.finditer(text):  # type: ignore[union-attr]
+                        matches.append(
+                            {
+                                "paragraphIndex": para_index,
+                                "start": match.start(),
+                                "end": match.end(),
+                                "context": build_context(text, match.start(), match.end()),
+                            }
+                        )
+                        if len(matches) >= max_results:
+                            return {"matches": matches}
+                else:
+                    start = 0
+                    while True:
+                        found = text.find(query, start)
+                        if found == -1:
+                            break
+                        matches.append(
+                            {
+                                "paragraphIndex": para_index,
+                                "start": found,
+                                "end": found + len(query),
+                                "context": build_context(text, found, found + len(query)),
+                            }
+                        )
+                        if len(matches) >= max_results:
+                            return {"matches": matches}
+                        start = found + len(query)
+            return {"matches": matches}
+
         with TextExtractor(resolved) as extractor:
             for paragraph in extractor.iter_document_paragraphs():
                 text = paragraph.text()
