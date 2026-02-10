@@ -666,3 +666,51 @@ def test_replace_table_region_auto_fit_scales_each_column(ops_with_sample):
     ]
 
     assert widths[2] > widths[1] > widths[0]
+
+def test_hwp_open_info_returns_read_only_metadata(monkeypatch, tmp_path):
+    ops = HwpxOps(base_directory=tmp_path)
+    hwp_path = tmp_path / "sample.hwp"
+    hwp_path.write_bytes(b"fake")
+
+    monkeypatch.setattr(
+        ops,
+        "_read_only_hwp_paragraphs",
+        lambda path: (["첫 문단", "둘째 문단"], hwp_path, "PrvText"),
+    )
+
+    info = ops.open_info(hwp_path.name)
+
+    assert info["paragraphCount"] == 2
+    assert info["meta"]["format"] == "hwp"
+    assert info["meta"]["readOnly"] is True
+    assert info["meta"]["extractionSource"] == "PrvText"
+
+
+def test_hwp_read_text_and_find_use_read_only_pipeline(monkeypatch, tmp_path):
+    ops = HwpxOps(base_directory=tmp_path)
+    hwp_path = tmp_path / "sample.hwp"
+    hwp_path.write_bytes(b"fake")
+
+    monkeypatch.setattr(
+        ops,
+        "_read_only_hwp_paragraphs",
+        lambda path: (["학교 안내문", "2026년 행사 공지", "문의처"], hwp_path, "PrvText"),
+    )
+
+    page = ops.read_text(hwp_path.name, offset=1, limit=1)
+    assert page["textChunk"] == "2026년 행사 공지"
+    assert page["nextOffset"] == 2
+
+    found = ops.find(hwp_path.name, "2026")
+    assert found["matches"][0]["paragraphIndex"] == 1
+
+
+def test_hwp_edit_tools_raise_clear_error(tmp_path):
+    ops = HwpxOps(base_directory=tmp_path)
+    hwp_path = tmp_path / "sample.hwp"
+    hwp_path.write_bytes(b"fake")
+
+    with pytest.raises(Exception) as exc_info:
+        ops.replace_text_in_runs(hwp_path.name, "A", "B")
+
+    assert "읽기 전용" in str(exc_info.value)
