@@ -19,7 +19,7 @@ Gemini CLI, Claude Desktop과 같은 MCP 클라이언트에 연결하여 문서 
   * **✅ 표준 MCP 서버 구현**: 공식 `mcp` SDK를 사용하여 안정적인 표준 입/출력 기반 서버를 제공합니다.
   * **📂 제로 설정**: 별도 설정 없이 현재 작업 디렉터리를 기준으로 즉시 경로를 처리합니다.
   * **📄 강력한 문서 편집**: 텍스트 추출, 페이지네이션부터 스타일, 표, 메모, 개체 편집까지 모두 가능합니다.
-  * **🧩 HWP 호환(읽기 전용)**: `.hwp` 바이너리 문서도 텍스트 조회/검색은 가능하며, 편집은 `.hwpx` 변환 후 진행하도록 명확히 안내합니다.
+  * **🧩 HWP 호환 + 자동 변환**: `.hwp` 바이너리 문서를 읽기 전용으로 조회/검색할 수 있고, `convert_hwp_to_hwpx` 도구로 `.hwpx`로 자동 변환해 편집 파이프라인에 바로 연결할 수 있습니다.
   * **🛡️ 안전한 저장**: 자동 백업(`*.bak`) 옵션으로 예기치 않은 데이터 손실을 방지합니다.
   * **🚀 즉시 실행**: `uv`만 있으면 `uvx hwpx-mcp-server` 한 줄로 바로 시작할 수 있습니다.
 
@@ -170,6 +170,7 @@ uvx hwpx-mcp-server
   - **파일 관리**
       - `save`, `save_as`: 문서 저장
       - `make_blank`: 새 빈 문서 생성
+      - `convert_hwp_to_hwpx`: HWP 바이너리를 HWPX로 변환(기본 텍스트/표 중심)
   - **구조 검증 및 고급 검색**
       - `object_find_by_tag`, `object_find_by_attr`: XML 요소 검색
       - `validate_structure`, `lint_text_conventions`: 문서 구조 검증 및 텍스트 린트
@@ -284,6 +285,38 @@ uvx hwpx-mcp-server
 
 1.  `package_parts` 도구에 `{"path": "sample.hwpx"}`를 전달하여 `Contents/Styles.xml`과 같은 파트 이름을 찾습니다.
 2.  `package_get_xml` 도구에 `{"path": "sample.hwpx", "partName": "Contents/Styles.xml"}`을 전달하여 해당 파트의 원본 XML을 안전하게 검토합니다.
+
+
+## 🔁 HWP → HWPX 자동 변환
+
+`convert_hwp_to_hwpx` 도구는 내부적으로 `hwp5proc xml` 결과를 매핑해 `.hwp` 문서를 `.hwpx`로 변환합니다.
+
+- 입력: `source`(필수, `.hwp` 경로), `output`(선택, 미지정 시 같은 경로에 `.hwpx`)
+- 출력: 변환 성공 여부, 변환된 문단/표 개수, 변환 제외 요소 목록, 경고 메시지
+
+예시:
+
+```json
+{
+  "name": "convert_hwp_to_hwpx",
+  "arguments": {
+    "source": "legacy/report.hwp",
+    "output": "legacy/report.hwpx"
+  }
+}
+```
+
+### 지원 범위
+
+- **P0**: 일반 문단 텍스트
+- **P1(부분 지원)**: 표의 행/열과 셀 텍스트
+- **P2/P3**: OLE, 각주/미주, 변경 추적, 양식 컨트롤 등은 경고와 함께 스킵될 수 있음
+
+### 알려진 제한사항
+
+- 변환 목표는 100% 시각 재현이 아니라 **텍스트 보존 + 기본 구조 이관**입니다.
+- 복잡한 서식(세밀한 스타일, 고급 개체, 일부 병합 표)은 결과 문서에서 수동 보정이 필요할 수 있습니다.
+- `hwp5proc` 실행 환경이 없으면 변환 도구는 실패하며 설치 안내 오류를 반환합니다.
 
 ## 🧪 테스트
 
