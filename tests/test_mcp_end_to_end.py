@@ -923,3 +923,64 @@ async def test_resource_handler_returns_standard_error_for_unknown_handle(sample
 
     assert exc_info.value.error.code == -32040
     assert exc_info.value.error.data["error"] == "HANDLE_NOT_FOUND"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_prompt_handlers_list_and_get(sample_workspace: tuple[Path, Path]) -> None:
+    import hwpx_mcp_server.server as server_module
+
+    workspace, _ = sample_workspace
+    ops = HwpxOps(base_directory=workspace, auto_backup=False)
+    server = server_module._build_server(ops, build_tool_definitions())
+
+    list_handler = server.request_handlers[types.ListPromptsRequest]
+    list_result = await list_handler(types.ListPromptsRequest())
+    listed = list_result.root
+
+    assert isinstance(listed, types.ListPromptsResult)
+    prompt_names = {prompt.name for prompt in listed.prompts}
+    assert "summary@v1" in prompt_names
+    assert "table_to_csv@v1" in prompt_names
+    assert "document_lint@v1" in prompt_names
+
+    get_handler = server.request_handlers[types.GetPromptRequest]
+    response = await get_handler(
+        types.GetPromptRequest(
+            params=types.GetPromptRequestParams(
+                name="summary@v1",
+                arguments={
+                    "path": "sample.hwpx",
+                    "summaryStyle": "일반 설명",
+                    "maxSentences": "3",
+                },
+            )
+        )
+    )
+    rendered = response.root
+    assert isinstance(rendered, types.GetPromptResult)
+    assert rendered.messages
+    content = rendered.messages[0].content
+    assert isinstance(content, types.TextContent)
+    assert '"path": "sample.hwpx"' in content.text
+    assert "3문장" in content.text
+
+
+@pytest.mark.anyio("asyncio")
+async def test_prompt_handler_returns_standard_error_for_unknown_prompt(sample_workspace: tuple[Path, Path]) -> None:
+    import hwpx_mcp_server.server as server_module
+    from mcp.shared.exceptions import McpError
+
+    workspace, _ = sample_workspace
+    ops = HwpxOps(base_directory=workspace, auto_backup=False)
+    server = server_module._build_server(ops, build_tool_definitions())
+
+    get_handler = server.request_handlers[types.GetPromptRequest]
+    with pytest.raises(McpError) as exc_info:
+        await get_handler(
+            types.GetPromptRequest(
+                params=types.GetPromptRequestParams(name="unknown@v1", arguments={"path": "sample.hwpx"})
+            )
+        )
+
+    assert exc_info.value.error.code == -32602
+    assert "지원하지 않는 prompt ID" in exc_info.value.error.message

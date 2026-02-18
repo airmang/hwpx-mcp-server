@@ -25,6 +25,8 @@ from .hwpx_ops import (
     HwpxOperationError,
 )
 from .logging_conf import configure_logging
+from .prompts import get_prompt as render_prompt
+from .prompts import list_prompts
 from .storage import DocumentStorage, HttpDocumentStorage, LocalDocumentStorage
 from .tools import ToolDefinition, build_tool_definitions
 
@@ -223,6 +225,31 @@ def _build_server(ops: HwpxOps, tools: List[ToolDefinition]) -> Server:
     server.request_handlers[types.ListResourcesRequest] = _list_resources
     server.request_handlers[types.ListResourceTemplatesRequest] = _list_resource_templates
     server.request_handlers[types.ReadResourceRequest] = _read_resource
+
+    async def _list_prompts(req: types.ListPromptsRequest | None) -> types.ServerResult:
+        del req
+        result = types.ListPromptsResult(prompts=list_prompts(), nextCursor=None)
+        return types.ServerResult(result)
+
+    async def _get_prompt(req: types.GetPromptRequest) -> types.ServerResult:
+        params = req.params
+        name = params.name if params else None
+        if not name:
+            raise McpError(types.ErrorData(code=-32602, message="name 파라미터가 필요합니다."))
+
+        try:
+            rendered = render_prompt(name, params.arguments if params else None)
+        except KeyError as exc:
+            raise McpError(
+                types.ErrorData(code=-32602, message=f"지원하지 않는 prompt ID입니다: {name}")
+            ) from exc
+        except ValueError as exc:
+            raise McpError(types.ErrorData(code=-32602, message=str(exc))) from exc
+
+        return types.ServerResult(rendered)
+
+    server.request_handlers[types.ListPromptsRequest] = _list_prompts
+    server.request_handlers[types.GetPromptRequest] = _get_prompt
 
     @server.call_tool()
     async def _call_tool(name: str, arguments: Dict[str, object] | None) -> Dict[str, object]:
