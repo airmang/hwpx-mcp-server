@@ -179,6 +179,70 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
     assert result.nextCursor is None
 
 
+@pytest.mark.anyio("asyncio")
+@pytest.mark.parametrize(
+    ("toolset", "expected_names"),
+    [
+        (
+            "core",
+            {
+                "open_info",
+                "read_text",
+                "save",
+                "fill_template",
+                "convert_hwp_to_hwpx",
+            },
+        ),
+        (
+            "core,tables",
+            {
+                "open_info",
+                "read_text",
+                "add_table",
+                "replace_table_region",
+                "split_table_cell",
+            },
+        ),
+        (
+            "pipeline",
+            {"analyze_template_structure"},
+        ),
+    ],
+)
+async def test_list_tools_respects_toolset_env(
+    monkeypatch,
+    tmp_path: Path,
+    toolset: str,
+    expected_names: set[str],
+) -> None:
+    import hwpx_mcp_server.server as server_module
+
+    monkeypatch.setenv("HWPX_MCP_HARDENING", "0")
+    monkeypatch.setenv("HWPX_MCP_TOOLSET", toolset)
+
+    ops = HwpxOps(base_directory=tmp_path, auto_backup=False)
+    server = server_module._build_server(ops, build_tool_definitions())
+    handler = server.request_handlers[types.ListToolsRequest]
+
+    request = types.ListToolsRequest()
+    object.__setattr__(request, "params", SimpleNamespace(cursor=None, limit=200))
+
+    response = await handler(request)
+    result = response.root
+    assert isinstance(result, types.ListToolsResult)
+
+    names = {tool.name for tool in result.tools}
+    assert expected_names.issubset(names)
+
+    if toolset == "core":
+        assert "add_table" not in names
+        assert "apply_style_to_paragraphs" not in names
+        assert "package_get_xml" not in names
+    if toolset == "pipeline":
+        assert names == {"analyze_template_structure"}
+
+
+
 def _call(tool_map: Dict[str, ToolDefinition], name: str, ops: HwpxOps, **arguments):
     return tool_map[name].call(ops, arguments)
 
