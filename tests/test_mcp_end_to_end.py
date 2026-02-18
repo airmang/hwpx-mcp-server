@@ -913,8 +913,9 @@ def test_failure_paths_raise_runtime_errors(
     ops = HwpxOps(base_directory=workspace, auto_backup=True)
     rel_path = doc_path.name
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(HwpxOperationError) as missing_exc:
         ops._resolve_path("missing.hwpx", must_exist=True)
+    assert missing_exc.value.code == "DOCUMENT_NOT_FOUND"
 
     with pytest.raises(RuntimeError):
         _call(
@@ -931,6 +932,29 @@ def test_failure_paths_raise_runtime_errors(
 
 def test_hwpx_operation_error_inheritance() -> None:
     assert issubclass(HwpxOperationError, RuntimeError)
+
+
+def test_table_index_error_has_explicit_code(
+    tool_map: Dict[str, ToolDefinition],
+    sample_workspace: tuple[Path, Path],
+) -> None:
+    workspace, doc_path = sample_workspace
+    ops = HwpxOps(base_directory=workspace, auto_backup=True)
+
+    with pytest.raises(HwpxOperationError) as exc_info:
+        _call(
+            tool_map,
+            "replace_table_region",
+            ops,
+            path=doc_path.name,
+            tableIndex=99,
+            startRow=0,
+            startCol=0,
+            values=[["X"]],
+        )
+
+    assert exc_info.value.code == "TABLE_INDEX_OUT_OF_RANGE"
+    assert exc_info.value.details == {"tableIndex": 99}
 
 @pytest.mark.anyio("asyncio")
 async def test_resource_handlers_list_and_read(sample_workspace: tuple[Path, Path]) -> None:
@@ -1048,3 +1072,23 @@ async def test_prompt_handler_returns_standard_error_for_unknown_prompt(sample_w
 
     assert exc_info.value.error.code == -32602
     assert "지원하지 않는 prompt ID" in exc_info.value.error.message
+
+
+@pytest.mark.anyio("asyncio")
+async def test_call_tool_returns_mcp_error_payload(sample_workspace: tuple[Path, Path]) -> None:
+    import hwpx_mcp_server.server as server_module
+    from mcp.shared.exceptions import McpError
+
+    workspace, _ = sample_workspace
+    ops = HwpxOps(base_directory=workspace, auto_backup=False)
+    server = server_module._build_server(ops, build_tool_definitions())
+
+    call_handler = getattr(server, "_tool_handlers", {}).get("call_tool")
+    if call_handler is None:
+        pytest.skip("MCP Server 구현에서 call_tool 핸들 접근이 불가능합니다.")
+
+    with pytest.raises(McpError) as exc_info:
+        await call_handler("open_info", {"path": "missing.hwpx"})
+
+    assert exc_info.value.error.data["code"] == "DOCUMENT_NOT_FOUND"
+    assert exc_info.value.error.data["details"]["path"] == "missing.hwpx"
