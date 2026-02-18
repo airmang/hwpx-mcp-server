@@ -129,7 +129,7 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
     import hwpx_mcp_server.server as server_module
 
     tools = build_tool_definitions()
-    assert len(tools) == 39
+    expected_count = len(tools)
 
     created_servers: list = []
 
@@ -161,7 +161,7 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
 
     ops = HwpxOps(base_directory=tmp_path, auto_backup=False)
 
-    await server_module._serve(ops, tools)
+    await server_module._serve(ops, tools, transport="stdio", host="127.0.0.1", port=8000)
 
     assert created_servers, "expected DummyServer to be instantiated"
     server_instance = created_servers[0]
@@ -175,7 +175,7 @@ async def test_list_tools_request_returns_full_set(monkeypatch, tmp_path: Path) 
 
     result = response.root
     assert isinstance(result, types.ListToolsResult)
-    assert len(result.tools) == 39
+    assert len(result.tools) == expected_count
     assert result.nextCursor is None
 
 

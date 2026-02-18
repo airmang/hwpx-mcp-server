@@ -1,4 +1,4 @@
-"""표준 입력/출력 기반 MCP 서버의 진입점."""
+"""MCP 서버 진입점(표준 입출력/Streamable HTTP transport 지원)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import anyio
 import mcp.types as types
 from mcp.server import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
+from mcp.server.streamable_http import StreamableHTTPServerTransport
 
 from .hwpx_ops import (
     DEFAULT_PAGING_PARAGRAPH_LIMIT,
@@ -69,7 +70,7 @@ def _resolve_version() -> str:
         return "0.0.0"
 
 
-async def _serve(ops: HwpxOps, tools: List[ToolDefinition]) -> None:
+def _build_server(ops: HwpxOps, tools: List[ToolDefinition]) -> Server:
     server = Server(DEFAULT_SERVER_NAME, version=_resolve_version())
     tool_map: Dict[str, ToolDefinition] = {tool.name: tool for tool in tools}
     cached_tools: List[types.Tool] | None = None
@@ -137,13 +138,76 @@ async def _serve(ops: HwpxOps, tools: List[ToolDefinition]) -> None:
             raise RuntimeError(str(exc)) from exc
         return payload
 
+    return server
+
+
+async def _serve_stdio(server: Server) -> None:
     init_options = server.create_initialization_options(NotificationOptions())
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, init_options)
 
 
+async def _serve_streamable_http(server: Server, *, host: str, port: int) -> None:
+    import uvicorn
+
+    init_options = server.create_initialization_options(NotificationOptions())
+    transport = StreamableHTTPServerTransport(mcp_session_id=None)
+
+    async def _app(scope, receive, send):
+        await transport.handle_request(scope, receive, send)
+
+    http_server = uvicorn.Server(
+        uvicorn.Config(
+            _app,
+            host=host,
+            port=port,
+            log_level=os.getenv("LOG_LEVEL", "info").lower(),
+        )
+    )
+
+    async with transport.connect() as (read_stream, write_stream):
+        async with anyio.create_task_group() as task_group:
+            task_group.start_soon(server.run, read_stream, write_stream, init_options)
+            await http_server.serve()
+            task_group.cancel_scope.cancel()
+
+
+async def _serve(
+    ops: HwpxOps,
+    tools: List[ToolDefinition],
+    *,
+    transport: str,
+    host: str,
+    port: int,
+) -> None:
+    server = _build_server(ops, tools)
+    if transport == "streamable-http":
+        LOGGER.info("Starting MCP server over streamable HTTP", extra={"host": host, "port": port})
+        await _serve_streamable_http(server, host=host, port=port)
+        return
+
+    await _serve_stdio(server)
+
+
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog=DEFAULT_SERVER_NAME)
+    parser.add_argument(
+        "--transport",
+        choices=("stdio", "streamable-http"),
+        default="stdio",
+        help="MCP transport to use",
+    )
+    parser.add_argument(
+        "--host",
+        default=os.getenv("HWPX_MCP_HOST", "127.0.0.1"),
+        help="Host interface used by streamable-http transport",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("HWPX_MCP_PORT", "8000")),
+        help="TCP port used by streamable-http transport",
+    )
     parser.add_argument(
         "--storage",
         choices=("local", "http"),
@@ -274,7 +338,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     tools = build_tool_definitions()
 
     try:
-        anyio.run(_serve, ops, tools)
+        anyio.run(
+            lambda: _serve(
+                ops,
+                tools,
+                transport=args.transport,
+                host=args.host,
+                port=args.port,
+            )
+        )
     except KeyboardInterrupt:  # pragma: no cover - graceful shutdown
         LOGGER.info("Received interrupt, shutting down")
         return 130
