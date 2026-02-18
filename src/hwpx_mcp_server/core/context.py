@@ -85,3 +85,26 @@ def window_for_paragraph(
         "focus": focus,
         "after": after,
     }
+
+
+@dataclass(frozen=True)
+class SessionLifecyclePolicy:
+    """문서 handle 레지스트리 수명 정책."""
+
+    registry_scope: str = "process"
+    request_scope: str = "request"
+    eviction: tuple[str, ...] = (
+        "close_document_handle 호출 시",
+        "프로세스 종료 시",
+    )
+
+    def as_dict(self) -> dict:
+        return {
+            "registryScope": self.registry_scope,
+            "requestScope": self.request_scope,
+            "eviction": list(self.eviction),
+        }
+
+
+def default_session_lifecycle_policy() -> SessionLifecyclePolicy:
+    return SessionLifecyclePolicy()

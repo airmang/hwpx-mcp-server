@@ -130,21 +130,29 @@ uvx hwpx-mcp-server --transport streamable-http --host 0.0.0.0 --port 8080
   }
   ```
 
-- **사전 등록된 핸들 사용** — 하드닝 파이프라인에서 이미 로드된 문서에 대해 후속 검색/컨텍스트/편집을 수행할 때는 `handleId`를 전달하면 됩니다.
+- **사전 등록된 핸들 사용** — 이제 일반 도구(`open_info`, `read_text`, `set_table_cell_text` 등)도 `handleId`를 공식 지원합니다.
 
   ```jsonc
   {
-    "name": "hwpx.plan_edit",
+    "name": "open_info",
     "arguments": {
       "type": "handle",
-      "handleId": "doc-1234",
-      "operations": [
-        {
-          "target": {"nodeId": "n_deadbeef"},
-          "match": "needle",
-          "replacement": "haystack"
-        }
-      ]
+      "handleId": "h_0123456789abcdef"
+    }
+  }
+  ```
+
+- **멀티 문서 교차 작업 예시** — 문서 A의 표를 문서 B로 복사하는 흐름입니다.
+
+  ```jsonc
+  {
+    "name": "copy_table_between_documents",
+    "arguments": {
+      "sourceDocument": {"type": "handle", "handleId": "h_source"},
+      "sourceTableIndex": 0,
+      "targetDocument": {"type": "handle", "handleId": "h_target"},
+      "targetSectionIndex": 0,
+      "autoFit": true
     }
   }
   ```
@@ -480,6 +488,23 @@ python -m pytest
 }
 ```
 
+## 🗂️ 문서 Handle Registry 도구 및 세션 수명 정책
+
+### 신규 도구
+
+- `open_document_handle`: 로케이터(path/uri/handleId)를 등록하고 표준 `handle` 객체를 반환
+- `list_open_documents`: 현재 프로세스에 등록된 handle 목록과 세션 정책(`sessionPolicy`) 반환
+- `close_document_handle`: 특정 handle을 레지스트리에서 해제
+- `copy_table_between_documents`: 문서 A의 표를 읽어 문서 B에 복사(교차 문서 작업)
+
+### 세션 수명 정책
+
+- **레지스트리 범위**: 프로세스 단위(`registryScope=process`)
+- **요청 처리 단위**: 요청 단위(`requestScope=request`) — 각 MCP 요청은 독립 실행되지만, handle 레지스트리는 프로세스 내에서 유지
+- **캐시/레지스트리 해제 조건**
+  1. `close_document_handle` 호출 시 해당 handle 즉시 해제
+  2. 서버 프로세스 종료/재시작 시 전체 레지스트리 해제
+
 ## 📚 Resources 사용 예시 및 URI 계약
 
 MCP Resources를 통해 **등록된 handle 기반 읽기 전용 조회**를 사용할 수 있습니다. 서버는 도구 호출 과정에서 실제 문서 경로를 해석할 때 handle을 자동 등록하며, `resources/list`에서는 현재 등록된 handle만 노출합니다.
@@ -494,7 +519,7 @@ MCP Resources를 통해 **등록된 handle 기반 읽기 전용 조회**를 사�
 
 ### 호출 흐름 예시
 
-1. 먼저 도구(예: `open_info`, `read_text`)를 호출해 문서를 열면 해당 문서 handle이 등록됩니다.
+1. 먼저 `open_document_handle`(또는 `open_info`/`read_text`)를 호출해 문서를 열면 해당 문서 handle이 등록됩니다.
 2. `resources/list`를 호출하면 해당 handle의 `metadata/paragraphs/tables` URI가 나타납니다.
 3. `resources/read`로 원하는 URI를 읽어 JSON(`application/json`) 본문을 받습니다.
 

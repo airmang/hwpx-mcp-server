@@ -746,3 +746,75 @@ def test_analyze_template_structure_returns_regions_and_placeholders(ops_with_sa
     assert any(item["name"] == "body" for item in result["regions"])
     assert result["placeholders"]
     assert result["placeholders"][0]["token"] == "HWPX"
+
+
+def test_handle_registry_lifecycle(ops_with_sample):
+    ops, path = ops_with_sample
+    opened = ops.open_document_handle(str(path))
+    handle = opened["handle"]
+
+    listed = ops.list_open_documents()
+    assert listed["documents"]
+    assert listed["sessionPolicy"]["registryScope"] == "process"
+    assert any(item["handleId"] == handle["handleId"] for item in listed["documents"])
+
+    closed = ops.close_document_handle(handle["handleId"])
+    assert closed == {"closed": True}
+
+
+def test_copy_table_between_documents_with_handles(ops_with_sample):
+    ops, source_path = ops_with_sample
+    target_path = source_path.with_name("target.hwpx")
+    target_path.write_bytes(source_path.read_bytes())
+
+    source_handle = ops.open_document_handle(str(source_path))["handle"]["handleId"]
+    target_handle = ops.open_document_handle(str(target_path))["handle"]["handleId"]
+
+    source_path_from_handle = ops.resolve_document_path(handle_id=source_handle)
+    target_path_from_handle = ops.resolve_document_path(handle_id=target_handle)
+
+    source_document = HwpxDocument.open(ops.storage.resolve_path(source_path_from_handle))
+    source_tables_before: list = []
+    for paragraph in source_document.paragraphs:
+        source_tables_before.extend(paragraph.tables)
+
+    target_document_before = HwpxDocument.open(ops.storage.resolve_path(target_path_from_handle))
+    target_tables_before: list = []
+    for paragraph in target_document_before.paragraphs:
+        target_tables_before.extend(paragraph.tables)
+    result = ops.copy_table_between_documents(
+        source_path=source_path_from_handle,
+        source_table_index=0,
+        target_path=target_path_from_handle,
+    )
+
+    assert result["copiedCells"] >= 1
+    assert result["rowCount"] >= 1
+    assert result["columnCount"] >= 1
+
+    target_document_after = HwpxDocument.open(ops.storage.resolve_path(target_path_from_handle))
+    target_tables_after: list = []
+    for paragraph in target_document_after.paragraphs:
+        target_tables_after.extend(paragraph.tables)
+
+    assert len(source_tables_before) >= 1
+    assert len(target_tables_after) == len(target_tables_before) + 1
+
+
+def test_read_text_tool_supports_handle_locator(ops_with_sample):
+    ops, path = ops_with_sample
+    handle_id = ops.open_document_handle(str(path))["handle"]["handleId"]
+    read_text_tool = next(
+        tool for tool in build_tool_definitions() if tool.name == "read_text"
+    )
+
+    result = read_text_tool.call(
+        ops,
+        {
+            "type": "handle",
+            "handleId": handle_id,
+            "limit": 2,
+        },
+    )
+
+    assert result["textChunk"]
