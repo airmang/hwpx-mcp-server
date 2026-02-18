@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import hashlib
 import logging
 import math
 import re
@@ -42,6 +43,14 @@ from .core.plan import (
 from .hwp_support import HwpBinaryError, extract_hwp_text
 from .hwp_converter import HwpConversionError, convert_hwp_to_hwpx
 from .metadata import tools_meta
+from .core.locator import RegisteredHandle
+from .core.resources import (
+    DocumentMetadataResource,
+    DocumentParagraphsResource,
+    DocumentTablesResource,
+    ParagraphResourceEntry,
+    TableResourceEntry,
+)
 from .storage import DocumentStorage, LocalDocumentStorage
 
 HH_NS = "{http://www.hancom.co.kr/hwpml/2011/head}"
@@ -67,6 +76,10 @@ DEFAULT_PAGING_PARAGRAPH_LIMIT = 200
 
 class HwpxOperationError(RuntimeError):
     """문서 단위 작업이 실패했을 때 사용하는 예외."""
+
+
+class HwpxHandleNotFoundError(HwpxOperationError):
+    """등록되지 않은 핸들 조회 시 사용하는 예외."""
 
 
 class HwpxOps:
@@ -97,6 +110,7 @@ class HwpxOps:
         self.base_directory = storage.base_directory
         self.paging_limit = max(1, paging_paragraph_limit)
         self._plan_manager = PlanManager()
+        self._registered_handles: Dict[str, RegisteredHandle] = {}
 
     @property
     def plan_manager(self) -> PlanManager:
@@ -106,7 +120,87 @@ class HwpxOps:
     # Basic helpers
     # ------------------------------------------------------------------
     def _resolve_path(self, path: str, *, must_exist: bool = True) -> Path:
-        return self.storage.resolve_path(path, must_exist=must_exist)
+        resolved = self.storage.resolve_path(path, must_exist=must_exist)
+        self._register_handle(path, resolved)
+        return resolved
+
+    def _make_handle_id(self, path: str, backend: Optional[str] = None) -> str:
+        seed = f"{backend or 'local'}::{path}"
+        digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
+        return f"h_{digest}"
+
+    def _register_handle(self, path: str, resolved: Path) -> RegisteredHandle:
+        relative = self._relative_path(resolved)
+        handle_id = self._make_handle_id(relative)
+        handle = RegisteredHandle(handleId=handle_id, path=relative)
+        self._registered_handles[handle_id] = handle
+        return handle
+
+    def list_registered_handles(self) -> List[RegisteredHandle]:
+        return sorted(self._registered_handles.values(), key=lambda item: item.handle_id)
+
+    def get_registered_handle(self, handle_id: str) -> RegisteredHandle:
+        handle = self._registered_handles.get(handle_id)
+        if handle is None:
+            raise HwpxHandleNotFoundError(f"등록되지 않은 handleId입니다: {handle_id}")
+        return handle
+
+    def get_metadata_by_handle(self, handle_id: str) -> Dict[str, Any]:
+        handle = self.get_registered_handle(handle_id)
+        payload = self.open_info(handle.path)
+        model = DocumentMetadataResource(
+            handleId=handle.handle_id,
+            locator=handle.model_dump(by_alias=True),
+            meta=payload["meta"],
+            sectionCount=payload["sectionCount"],
+            paragraphCount=payload["paragraphCount"],
+            headerCount=payload["headerCount"],
+        )
+        return model.model_dump(by_alias=True)
+
+    def get_paragraphs_by_handle(self, handle_id: str) -> Dict[str, Any]:
+        handle = self.get_registered_handle(handle_id)
+        resolved = self._resolve_path(handle.path)
+        if resolved.suffix.lower() == ".hwp":
+            paragraphs, _, _ = self._read_only_hwp_paragraphs(handle.path)
+            serialized = [
+                ParagraphResourceEntry(paragraphIndex=index, text=text)
+                for index, text in enumerate(paragraphs)
+            ]
+            model = DocumentParagraphsResource(handleId=handle.handle_id, paragraphs=serialized)
+            return model.model_dump(by_alias=True)
+
+        serialized: List[ParagraphResourceEntry] = []
+        with TextExtractor(resolved) as extractor:
+            for paragraph in extractor.iter_document_paragraphs():
+                serialized.append(
+                    ParagraphResourceEntry(
+                        paragraphIndex=paragraph.index,
+                        text=paragraph.text(preserve_breaks=True),
+                    )
+                )
+        model = DocumentParagraphsResource(handleId=handle.handle_id, paragraphs=serialized)
+        return model.model_dump(by_alias=True)
+
+    def get_tables_by_handle(self, handle_id: str) -> Dict[str, Any]:
+        handle = self.get_registered_handle(handle_id)
+        resolved = self._resolve_path(handle.path)
+        if resolved.suffix.lower() == ".hwp":
+            model = DocumentTablesResource(handleId=handle.handle_id, tables=[])
+            return model.model_dump(by_alias=True)
+
+        document, _ = self._open_document(handle.path)
+        tables = self._iter_tables(document)
+        serialized = [
+            TableResourceEntry(
+                tableIndex=index,
+                rowCount=len(table.rows),
+                columnCount=len(table.columns),
+            )
+            for index, table in enumerate(tables)
+        ]
+        model = DocumentTablesResource(handleId=handle.handle_id, tables=serialized)
+        return model.model_dump(by_alias=True)
 
     def _resolve_output_path(self, path: str) -> Path:
         return self.storage.resolve_output_path(path)

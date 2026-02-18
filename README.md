@@ -409,3 +409,29 @@ python -m pytest
   }
 }
 ```
+
+## 📚 Resources 사용 예시 및 URI 계약
+
+MCP Resources를 통해 **등록된 handle 기반 읽기 전용 조회**를 사용할 수 있습니다. 서버는 도구 호출 과정에서 실제 문서 경로를 해석할 때 handle을 자동 등록하며, `resources/list`에서는 현재 등록된 handle만 노출합니다.
+
+### URI 스킴
+
+- `hwpx://documents/{handle}/metadata`: 문서 메타데이터/섹션·문단·헤더 개수
+- `hwpx://documents/{handle}/paragraphs`: 문서 전체 문단 텍스트
+- `hwpx://documents/{handle}/tables`: 표 인덱스/행/열 요약
+
+`{handle}`은 `h_<16자리해시>` 형태의 불투명 식별자이며, 등록되지 않은 handle은 표준화된 `HANDLE_NOT_FOUND` 에러로 반환됩니다.
+
+### 호출 흐름 예시
+
+1. 먼저 도구(예: `open_info`, `read_text`)를 호출해 문서를 열면 해당 문서 handle이 등록됩니다.
+2. `resources/list`를 호출하면 해당 handle의 `metadata/paragraphs/tables` URI가 나타납니다.
+3. `resources/read`로 원하는 URI를 읽어 JSON(`application/json`) 본문을 받습니다.
+
+예시 URI:
+
+```text
+hwpx://documents/h_0123456789abcdef/metadata
+hwpx://documents/h_0123456789abcdef/paragraphs
+hwpx://documents/h_0123456789abcdef/tables
+```

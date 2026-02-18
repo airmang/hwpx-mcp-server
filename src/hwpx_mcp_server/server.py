@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
+import re
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Dict, List, Mapping, Sequence
@@ -12,12 +14,14 @@ from typing import Dict, List, Mapping, Sequence
 import anyio
 import mcp.types as types
 from mcp.server import NotificationOptions, Server
+from mcp.shared.exceptions import McpError
 from mcp.server.stdio import stdio_server
 from mcp.server.streamable_http import StreamableHTTPServerTransport
 
 from .hwpx_ops import (
     DEFAULT_PAGING_PARAGRAPH_LIMIT,
     HwpxOps,
+    HwpxHandleNotFoundError,
     HwpxOperationError,
 )
 from .logging_conf import configure_logging
@@ -27,6 +31,17 @@ from .tools import ToolDefinition, build_tool_definitions
 LOGGER = logging.getLogger(__name__)
 DEFAULT_SERVER_NAME = "hwpx-mcp-server"
 
+
+
+RESOURCE_URI_PATTERN = re.compile(r"^hwpx://documents/(?P<handle>[A-Za-z0-9_-]+)/(?P<kind>metadata|paragraphs|tables)$")
+_RESOURCE_ERROR_HANDLE_NOT_FOUND = -32040
+
+
+def _parse_resource_uri(uri: str) -> tuple[str, str]:
+    match = RESOURCE_URI_PATTERN.match(uri.strip())
+    if match is None:
+        raise McpError(types.ErrorData(code=-32602, message=f"지원하지 않는 resource URI입니다: {uri}"))
+    return match.group("handle"), match.group("kind")
 
 def _bool_env(name: str, default: bool = False) -> bool:
     raw = os.getenv(name)
@@ -123,6 +138,91 @@ def _build_server(ops: HwpxOps, tools: List[ToolDefinition]) -> Server:
         return types.ServerResult(result)
 
     server.request_handlers[types.ListToolsRequest] = _list_tools
+
+    async def _list_resources(req: types.ListResourcesRequest | None) -> types.ServerResult:
+        del req
+        resources: list[types.Resource] = []
+        for handle in ops.list_registered_handles():
+            for suffix, label in (("metadata", "메타데이터"), ("paragraphs", "문단"), ("tables", "표")):
+                uri = f"hwpx://documents/{handle.handle_id}/{suffix}"
+                resources.append(
+                    types.Resource(
+                        name=f"{handle.handle_id}-{suffix}",
+                        title=f"{handle.path} {label}",
+                        uri=uri,
+                        description=f"등록 handle {handle.handle_id}의 {label} 리소스",
+                        mimeType="application/json",
+                    )
+                )
+        result = types.ListResourcesResult(resources=resources, nextCursor=None)
+        return types.ServerResult(result)
+
+    async def _list_resource_templates(req: types.ListResourceTemplatesRequest | None) -> types.ServerResult:
+        del req
+        templates = [
+            types.ResourceTemplate(
+                name="document-metadata",
+                title="문서 메타데이터",
+                uriTemplate="hwpx://documents/{handle}/metadata",
+                description="등록된 handle의 메타데이터 요약",
+                mimeType="application/json",
+            ),
+            types.ResourceTemplate(
+                name="document-paragraphs",
+                title="문서 문단",
+                uriTemplate="hwpx://documents/{handle}/paragraphs",
+                description="등록된 handle의 전체 문단 텍스트",
+                mimeType="application/json",
+            ),
+            types.ResourceTemplate(
+                name="document-tables",
+                title="문서 표",
+                uriTemplate="hwpx://documents/{handle}/tables",
+                description="등록된 handle의 표 구조 요약",
+                mimeType="application/json",
+            ),
+        ]
+        result = types.ListResourceTemplatesResult(resourceTemplates=templates, nextCursor=None)
+        return types.ServerResult(result)
+
+    async def _read_resource(req: types.ReadResourceRequest) -> types.ServerResult:
+        params = req.params
+        if params is None or params.uri is None:
+            raise McpError(types.ErrorData(code=-32602, message="uri 파라미터가 필요합니다."))
+
+        handle_id, kind = _parse_resource_uri(str(params.uri))
+
+        try:
+            if kind == "metadata":
+                payload = ops.get_metadata_by_handle(handle_id)
+            elif kind == "paragraphs":
+                payload = ops.get_paragraphs_by_handle(handle_id)
+            else:
+                payload = ops.get_tables_by_handle(handle_id)
+        except HwpxHandleNotFoundError as exc:
+            raise McpError(
+                types.ErrorData(
+                    code=_RESOURCE_ERROR_HANDLE_NOT_FOUND,
+                    message=str(exc),
+                    data={"error": "HANDLE_NOT_FOUND", "handleId": handle_id},
+                )
+            ) from exc
+        except HwpxOperationError as exc:
+            raise McpError(types.ErrorData(code=-32000, message=str(exc))) from exc
+
+        contents = [
+            types.TextResourceContents(
+                uri=str(params.uri),
+                mimeType="application/json",
+                text=json.dumps(payload, ensure_ascii=False, indent=2),
+            )
+        ]
+        result = types.ReadResourceResult(contents=contents)
+        return types.ServerResult(result)
+
+    server.request_handlers[types.ListResourcesRequest] = _list_resources
+    server.request_handlers[types.ListResourceTemplatesRequest] = _list_resource_templates
+    server.request_handlers[types.ReadResourceRequest] = _read_resource
 
     @server.call_tool()
     async def _call_tool(name: str, arguments: Dict[str, object] | None) -> Dict[str, object]:

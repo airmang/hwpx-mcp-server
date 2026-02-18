@@ -42,6 +42,15 @@ class HandleLocator(_LocatorModel):
     backend: Optional[str] = None
 
 
+class RegisteredHandle(_LocatorModel):
+    """서버가 관리하는 등록 핸들의 읽기 전용 직렬화 모델."""
+
+    type: Literal["handle"] = Field("handle", alias="type")
+    handle_id: str = Field(alias="handleId")
+    path: str
+    backend: Optional[str] = None
+
+
 DocumentLocator = Annotated[
     PathLocator | UriLocator | HandleLocator,
     Field(discriminator="type"),
