@@ -1,0 +1,48 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 빌드/검증 도구 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[test]
+          pip install build twine
+
+      - name: 테스트 실행
+        run: pytest
+
+      - name: 패키지 빌드
+        run: python -m build
+
+      - name: 패키지 무결성 검사
+        run: python -m twine check dist/*
+
+      - name: PyPI 배포 (API 토큰)
+        if: ${{ secrets.PYPI_API_TOKEN != '' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: PyPI 배포 (Trusted Publisher)
+        if: ${{ secrets.PYPI_API_TOKEN == '' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
