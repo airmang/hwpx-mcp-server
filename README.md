@@ -156,6 +156,66 @@ uvx hwpx-mcp-server --transport streamable-http --host 0.0.0.0 --port 8080
 - **`hwpx.search`**: 정규식 또는 키워드 기반으로 문서 전반을 검색하여 노출 가능한 문맥만 포함한 일치 결과를 제공합니다.
 - **`hwpx.get_context`**: 특정 문단 주변의 제한된 창(window)만 추출하여 프라이버시를 유지한 채 리뷰에 활용할 수 있습니다.
 
+
+## 🧠 Prompt 템플릿 (prompts/list, prompts/get)
+
+서버는 바로 호출 가능한 버전드 프롬프트 ID를 제공합니다. 버전 호환성 관리를 위해 `prompt_id@vN` 네이밍 규칙을 사용합니다.
+
+- `summary@v1`: 문서 전체 텍스트 요약
+- `table_to_csv@v1`: 표 추출 후 CSV 변환
+- `document_lint@v1`: 텍스트 규칙 린트
+
+각 프롬프트는 설명에 **도구 이름/인자명 ↔ 템플릿 변수 매핑**, 인자 스키마, 예시 입력/출력을 포함합니다.
+
+### 예시 1) prompts/get으로 요약 프롬프트 요청
+
+```json
+{
+  "method": "prompts/get",
+  "params": {
+    "name": "summary@v1",
+    "arguments": {
+      "path": "sample.hwpx",
+      "summaryStyle": "임원 보고",
+      "maxSentences": "4"
+    }
+  }
+}
+```
+
+### 예시 2) prompts/get으로 표 CSV 프롬프트 요청
+
+```json
+{
+  "method": "prompts/get",
+  "params": {
+    "name": "table_to_csv@v1",
+    "arguments": {
+      "path": "sample.hwpx",
+      "tableIndex": "0",
+      "delimiter": ",",
+      "headerPolicy": "첫 행 헤더 유지"
+    }
+  }
+}
+```
+
+### 예시 3) prompts/get으로 문서 린트 프롬프트 요청
+
+```json
+{
+  "method": "prompts/get",
+  "params": {
+    "name": "document_lint@v1",
+    "arguments": {
+      "path": "sample.hwpx",
+      "maxLineLen": "100",
+      "forbidPatterns": "\"TODO\", \"TBD\""
+    }
+  }
+}
+```
+
 ## 🛠️ 제공 도구
 
 다양한 문서 편집 및 관리 도구를 제공합니다. 각 도구의 상세한 입출력 형식은 `ListTools` 응답에 포함된 JSON 스키마를 통해 확인할 수 있습니다.
