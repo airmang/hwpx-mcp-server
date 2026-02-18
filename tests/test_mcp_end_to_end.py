@@ -867,3 +867,59 @@ def test_failure_paths_raise_runtime_errors(
 
 def test_hwpx_operation_error_inheritance() -> None:
     assert issubclass(HwpxOperationError, RuntimeError)
+
+@pytest.mark.anyio("asyncio")
+async def test_resource_handlers_list_and_read(sample_workspace: tuple[Path, Path]) -> None:
+    import hwpx_mcp_server.server as server_module
+
+    workspace, doc_path = sample_workspace
+    ops = HwpxOps(base_directory=workspace, auto_backup=False)
+    tools = build_tool_definitions()
+    server = server_module._build_server(ops, tools)
+
+    # handle 등록 유도
+    ops.open_info(doc_path.name)
+    handles = ops.list_registered_handles()
+    assert handles
+    handle_id = handles[0].handle_id
+
+    list_handler = server.request_handlers[types.ListResourcesRequest]
+    list_result = await list_handler(types.ListResourcesRequest())
+    listed = list_result.root
+    assert isinstance(listed, types.ListResourcesResult)
+    uris = {str(resource.uri) for resource in listed.resources}
+    assert f"hwpx://documents/{handle_id}/metadata" in uris
+    assert f"hwpx://documents/{handle_id}/paragraphs" in uris
+    assert f"hwpx://documents/{handle_id}/tables" in uris
+
+    read_handler = server.request_handlers[types.ReadResourceRequest]
+    response = await read_handler(
+        types.ReadResourceRequest(
+            params=types.ReadResourceRequestParams(uri=f"hwpx://documents/{handle_id}/metadata")
+        )
+    )
+    payload = response.root
+    assert isinstance(payload, types.ReadResourceResult)
+    assert payload.contents and payload.contents[0].mimeType == "application/json"
+    assert handle_id in payload.contents[0].text
+
+
+@pytest.mark.anyio("asyncio")
+async def test_resource_handler_returns_standard_error_for_unknown_handle(sample_workspace: tuple[Path, Path]) -> None:
+    import hwpx_mcp_server.server as server_module
+    from mcp.shared.exceptions import McpError
+
+    workspace, _ = sample_workspace
+    ops = HwpxOps(base_directory=workspace, auto_backup=False)
+    server = server_module._build_server(ops, build_tool_definitions())
+
+    read_handler = server.request_handlers[types.ReadResourceRequest]
+    with pytest.raises(McpError) as exc_info:
+        await read_handler(
+            types.ReadResourceRequest(
+                params=types.ReadResourceRequestParams(uri="hwpx://documents/h_unknown/metadata")
+            )
+        )
+
+    assert exc_info.value.error.code == -32040
+    assert exc_info.value.error.data["error"] == "HANDLE_NOT_FOUND"
