@@ -24,6 +24,7 @@ from .hwpx_ops import (
     HwpxHandleNotFoundError,
     HwpxOperationError,
 )
+from .errors import mcp_code_for_error
 from .logging_conf import configure_logging
 from .prompts import get_prompt as render_prompt
 from .prompts import list_prompts
@@ -210,7 +211,14 @@ def _build_server(ops: HwpxOps, tools: List[ToolDefinition]) -> Server:
                 )
             ) from exc
         except HwpxOperationError as exc:
-            raise McpError(types.ErrorData(code=-32000, message=str(exc))) from exc
+            payload = exc.to_payload()
+            raise McpError(
+                types.ErrorData(
+                    code=mcp_code_for_error(exc.code),
+                    message=exc.message,
+                    data=payload,
+                )
+            ) from exc
 
         contents = [
             types.TextResourceContents(
@@ -259,10 +267,27 @@ def _build_server(ops: HwpxOps, tools: List[ToolDefinition]) -> Server:
         try:
             payload = definition.call(ops, arguments or {})
         except HwpxOperationError as exc:
-            raise RuntimeError(str(exc)) from exc
+            payload = exc.to_payload()
+            raise McpError(
+                types.ErrorData(
+                    code=mcp_code_for_error(exc.code),
+                    message=exc.message,
+                    data=payload,
+                )
+            ) from exc
         except Exception as exc:  # pragma: no cover - defensive
             LOGGER.exception("tool '%s' failed", name)
-            raise RuntimeError(str(exc)) from exc
+            raise McpError(
+                types.ErrorData(
+                    code=-32000,
+                    message=str(exc),
+                    data={
+                        "code": "INTERNAL_ERROR",
+                        "message": str(exc),
+                        "details": {"tool": name},
+                    },
+                )
+            ) from exc
         return payload
 
     return server

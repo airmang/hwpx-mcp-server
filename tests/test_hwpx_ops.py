@@ -164,6 +164,22 @@ def test_read_text_consumes_only_requested_slice(monkeypatch, tmp_path):
         assert paragraph.text_calls == expected_calls
 
 
+
+
+def test_resolve_path_permission_error_maps_code(tmp_path, monkeypatch):
+    ops = HwpxOps(base_directory=tmp_path)
+
+    def deny(path: str, *, must_exist: bool = True):
+        raise PermissionError(path)
+
+    monkeypatch.setattr(ops.storage, "resolve_path", deny)
+
+    with pytest.raises(ops_module.HwpxOperationError) as exc_info:
+        ops.open_info("secret.hwpx")
+
+    assert exc_info.value.code == "PERMISSION_DENIED"
+    assert exc_info.value.details == {"path": "secret.hwpx"}
+
 def test_find_returns_matches(ops_with_sample):
     ops, path = ops_with_sample
     matches = ops.find(str(path), "HWPX")

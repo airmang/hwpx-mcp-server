@@ -51,6 +51,7 @@ from .core.resources import (
     ParagraphResourceEntry,
     TableResourceEntry,
 )
+from .errors import build_error_payload
 from .storage import DocumentStorage, LocalDocumentStorage
 
 HH_NS = "{http://www.hancom.co.kr/hwpml/2011/head}"
@@ -76,6 +77,28 @@ DEFAULT_PAGING_PARAGRAPH_LIMIT = 200
 
 class HwpxOperationError(RuntimeError):
     """문서 단위 작업이 실패했을 때 사용하는 예외."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "OPERATION_FAILED",
+        details: Optional[Dict[str, Any]] = None,
+        hint: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.details = details
+        self.hint = hint
+
+    def to_payload(self) -> Dict[str, Any]:
+        return build_error_payload(
+            code=self.code,
+            message=self.message,
+            details=self.details,
+            hint=self.hint,
+        )
 
 
 class HwpxHandleNotFoundError(HwpxOperationError):
@@ -119,8 +142,31 @@ class HwpxOps:
     # ------------------------------------------------------------------
     # Basic helpers
     # ------------------------------------------------------------------
+    def _new_error(
+        self,
+        code: str,
+        message: str,
+        *,
+        details: Optional[Dict[str, Any]] = None,
+        hint: Optional[str] = None,
+    ) -> HwpxOperationError:
+        return HwpxOperationError(message, code=code, details=details, hint=hint)
+
     def _resolve_path(self, path: str, *, must_exist: bool = True) -> Path:
-        resolved = self.storage.resolve_path(path, must_exist=must_exist)
+        try:
+            resolved = self.storage.resolve_path(path, must_exist=must_exist)
+        except FileNotFoundError as exc:
+            raise self._new_error(
+                "DOCUMENT_NOT_FOUND",
+                f"문서를 찾을 수 없습니다: {path}",
+                details={"path": path},
+            ) from exc
+        except PermissionError as exc:
+            raise self._new_error(
+                "PERMISSION_DENIED",
+                f"문서 접근 권한이 없습니다: {path}",
+                details={"path": path},
+            ) from exc
         self._register_handle(path, resolved)
         return resolved
 
@@ -217,15 +263,30 @@ class HwpxOps:
     def _open_document(self, path: str) -> Tuple[HwpxDocument, Path]:
         resolved = self._resolve_path(path)
         if resolved.suffix.lower() == ".hwp":
-            raise HwpxOperationError(
-                "HWP 파일은 편집이 불가합니다. 먼저 convert_hwp_to_hwpx 도구로 HWPX 변환 후 편집하세요."
+            raise self._new_error(
+                "READ_ONLY_HWP_DOCUMENT",
+                "HWP 파일은 편집이 불가합니다. 먼저 convert_hwp_to_hwpx 도구로 HWPX 변환 후 편집하세요.",
             )
         try:
             document, resolved = self.storage.open_document(path)
-        except FileNotFoundError:
-            raise
+        except FileNotFoundError as exc:
+            raise self._new_error(
+                "DOCUMENT_NOT_FOUND",
+                f"문서를 찾을 수 없습니다: {path}",
+                details={"path": path},
+            ) from exc
+        except PermissionError as exc:
+            raise self._new_error(
+                "PERMISSION_DENIED",
+                f"문서 접근 권한이 없습니다: {path}",
+                details={"path": path},
+            ) from exc
         except Exception as exc:  # pragma: no cover - delegated to backend
-            raise HwpxOperationError(f"failed to open '{path}': {exc}") from exc
+            raise self._new_error(
+                "DOCUMENT_OPEN_FAILED",
+                f"failed to open '{path}': {exc}",
+                details={"path": path},
+            ) from exc
         return document, resolved
 
     def _read_only_hwp_paragraphs(self, path: str) -> Tuple[List[str], Path, str]:
@@ -233,7 +294,7 @@ class HwpxOps:
         try:
             snapshot = extract_hwp_text(resolved)
         except HwpBinaryError as exc:
-            raise HwpxOperationError(f"HWP 텍스트 추출 실패: {exc}") from exc
+            raise self._new_error("HWP_TEXT_EXTRACT_FAILED", f"HWP 텍스트 추출 실패: {exc}") from exc
         return snapshot.paragraphs, resolved, snapshot.source
 
     def _ensure_planner_document(self, doc_id: str, path: str) -> None:
@@ -247,8 +308,18 @@ class HwpxOps:
     def _save_document(self, document: HwpxDocument, target: Path) -> None:
         try:
             self.storage.save_document(document, target)
+        except PermissionError as exc:
+            raise self._new_error(
+                "PERMISSION_DENIED",
+                f"문서 저장 권한이 없습니다: {target}",
+                details={"path": str(target)},
+            ) from exc
         except Exception as exc:  # pragma: no cover - delegated to backend
-            raise HwpxOperationError(f"failed to save '{target}': {exc}") from exc
+            raise self._new_error(
+                "DOCUMENT_SAVE_FAILED",
+                f"failed to save '{target}': {exc}",
+                details={"path": str(target)},
+            ) from exc
 
     def _iter_paragraphs(self, document: HwpxDocument) -> List[HwpxOxmlParagraph]:
         return list(document.paragraphs)
@@ -345,7 +416,7 @@ class HwpxOps:
         if color is None:
             return base_id
         if not document.headers:
-            raise HwpxOperationError("document does not contain any headers to host styles")
+            raise self._new_error("STYLE_HEADER_MISSING", "document does not contain any headers to host styles")
         header = document.headers[0]
         target_flags = (bold, italic, underline)
 
@@ -386,7 +457,7 @@ class HwpxOps:
         )
         char_id = char_element.get("id")
         if not char_id:
-            raise HwpxOperationError("char property does not expose an identifier")
+            raise self._new_error("STYLE_CHAR_PROPERTY_ID_MISSING", "char property does not expose an identifier")
         return char_id
 
     def _create_underline_element(self, color: str) -> Any:
@@ -427,8 +498,9 @@ class HwpxOps:
             return document.oxml.ensure_basic_border_fill()
 
         if not document.headers:
-            raise HwpxOperationError(
-                "document does not contain any headers to host border fills"
+            raise self._new_error(
+                "STYLE_BORDER_FILL_HEADER_MISSING",
+                "document does not contain any headers to host border fills",
             )
 
         header = document.headers[0]
@@ -566,7 +638,7 @@ class HwpxOps:
                 return identifier
 
         if not hasattr(header, "_allocate_border_fill_id"):
-            raise HwpxOperationError("header does not expose ID allocation helpers")
+            raise self._new_error("STYLE_ID_ALLOCATOR_MISSING", "header does not expose ID allocation helpers")
 
         new_id = header._allocate_border_fill_id(border_fills_element)  # type: ignore[attr-defined]
         border_fill_element = ET.Element(
@@ -1263,7 +1335,7 @@ class HwpxOps:
         try:
             table = tables[table_index]
         except IndexError as exc:
-            raise HwpxOperationError("tableIndex out of range") from exc
+            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
 
         border_fill = self._ensure_table_border_fill(
             document,
@@ -1295,7 +1367,7 @@ class HwpxOps:
         try:
             table = tables[table_index]
         except IndexError as exc:
-            raise HwpxOperationError("tableIndex out of range") from exc
+            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
 
         grid_positions = table.get_cell_map()
         serialized: List[List[Dict[str, Any]]] = []
@@ -1341,7 +1413,7 @@ class HwpxOps:
         try:
             table = tables[table_index]
         except IndexError as exc:
-            raise HwpxOperationError("tableIndex out of range") from exc
+            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
         kwargs: Dict[str, bool] = {}
         if logical is not None:
             kwargs["logical"] = logical
@@ -1354,7 +1426,7 @@ class HwpxOps:
         try:
             table.set_cell_text(row, col, text, **kwargs)
         except (IndexError, ValueError) as exc:
-            raise HwpxOperationError(f"{guidance}: {exc}") from exc
+            raise self._new_error("TABLE_CELL_OPERATION_FAILED", f"{guidance}: {exc}") from exc
         if auto_fit and not dry_run:
             self._auto_fit_table_columns(table)
         if not dry_run:
@@ -1379,7 +1451,7 @@ class HwpxOps:
         try:
             table = tables[table_index]
         except IndexError as exc:
-            raise HwpxOperationError("tableIndex out of range") from exc
+            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
         kwargs: Dict[str, bool] = {}
         if logical is not None:
             kwargs["logical"] = logical
@@ -1400,7 +1472,7 @@ class HwpxOps:
                     message = (
                         f"{guidance} while writing cell ({logical_row}, {logical_col})"
                     )
-                    raise HwpxOperationError(f"{message}: {exc}") from exc
+                    raise self._new_error("TABLE_CELL_OPERATION_FAILED", f"{message}: {exc}", details={"row": logical_row, "col": logical_col}) from exc
                 updated += 1
         if auto_fit and not dry_run and updated > 0:
             self._auto_fit_table_columns(table)
@@ -1420,12 +1492,14 @@ class HwpxOps:
         try:
             table = tables[table_index]
         except IndexError as exc:
-            raise HwpxOperationError("tableIndex out of range") from exc
+            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
         try:
             target = table.cell(row, col)
         except (IndexError, ValueError) as exc:
-            raise HwpxOperationError(
-                "table cell coordinates out of range; enable logical addressing to verify merged grids"
+            raise self._new_error(
+                "TABLE_CELL_INDEX_OUT_OF_RANGE",
+                "table cell coordinates out of range; enable logical addressing to verify merged grids",
+                details={"row": row, "col": col},
             ) from exc
         anchor_row, anchor_col = target.address
         span_row, span_col = target.span
@@ -1436,7 +1510,7 @@ class HwpxOps:
         try:
             table.split_merged_cell(row, col)
         except (IndexError, ValueError) as exc:
-            raise HwpxOperationError(f"{guidance}: {exc}") from exc
+            raise self._new_error("TABLE_CELL_OPERATION_FAILED", f"{guidance}: {exc}") from exc
         if changed:
             self._save_document(document, resolved)
         return {
@@ -1506,10 +1580,10 @@ class HwpxOps:
         try:
             paragraph = paragraphs[paragraph_index]
         except IndexError as exc:
-            raise HwpxOperationError("paragraphIndex out of range") from exc
+            raise self._new_error("PARAGRAPH_INDEX_OUT_OF_RANGE", "paragraphIndex out of range", details={"paragraphIndex": paragraph_index}) from exc
         memo = self._find_memo(document, memo_id)
         if memo is None:
-            raise HwpxOperationError(f"memo '{memo_id}' not found")
+            raise self._new_error("MEMO_NOT_FOUND", f"memo '{memo_id}' not found", details={"memoId": memo_id})
         field_id = document.attach_memo_field(paragraph, memo)
         self._save_document(document, resolved)
         return {"fieldId": field_id}
@@ -1860,7 +1934,7 @@ class HwpxOps:
     def convert_hwp_to_hwpx(self, source: str, output: Optional[str] = None) -> Dict[str, Any]:
         resolved_source = self._resolve_path(source)
         if resolved_source.suffix.lower() != ".hwp":
-            raise HwpxOperationError("source는 .hwp 파일이어야 합니다")
+            raise self._new_error("SOURCE_FILE_TYPE_INVALID", "source는 .hwp 파일이어야 합니다")
 
         if output:
             resolved_output = self._resolve_output_path(output)
@@ -1870,7 +1944,7 @@ class HwpxOps:
         try:
             result = convert_hwp_to_hwpx(str(resolved_source), str(resolved_output))
         except HwpConversionError as exc:
-            raise HwpxOperationError(f"HWP 변환 실패: {exc}") from exc
+            raise self._new_error("HWP_CONVERSION_FAILED", f"HWP 변환 실패: {exc}") from exc
 
         return {
             "success": result.success,
@@ -2071,7 +2145,7 @@ class HwpxOps:
             )
         plan_record = self._plan_manager.get_plan_record(payload.plan_id)
         if plan_record is None:  # pragma: no cover - defensive
-            raise HwpxOperationError("plan record missing after apply")
+            raise self._new_error("PLAN_RECORD_MISSING", "plan record missing after apply", details={"planId": payload.plan_id})
         return self._plan_manager.apply_response(plan_record, result, trace)
 
     def search(
@@ -2098,7 +2172,7 @@ class HwpxOps:
         try:
             hits = self._plan_manager.search_document(payload.doc_id, payload)
         except PipelineError as error:
-            raise HwpxOperationError(error.message) from error
+            raise self._new_error("PIPELINE_ERROR", error.message, details={"pipelineCode": error.error_code}, hint=error.hint) from error
         models = [
             SearchHitModel(
                 nodeId=hit.node_id,
@@ -2128,7 +2202,7 @@ class HwpxOps:
                 payload.doc_id, payload.target, window=payload.window
             )
         except PipelineError as error:
-            raise HwpxOperationError(error.message) from error
+            raise self._new_error("PIPELINE_ERROR", error.message, details={"pipelineCode": error.error_code}, hint=error.hint) from error
         return view.model_dump(by_alias=True)
 
     # ------------------------------------------------------------------
