@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import logging
 
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Literal
@@ -28,6 +29,11 @@ from .core.locator import (
 )
 from .schema.builder import build_tool_schema
 from .hwpx_ops import HwpxOps
+
+
+LOGGER = logging.getLogger(__name__)
+ToolCategory = Literal["core", "tables", "styles", "pipeline", "debug"]
+_TOOL_CATEGORY_SET: set[str] = {"core", "tables", "styles", "pipeline", "debug"}
 
 
 class _BaseModel(BaseModel):
@@ -535,6 +541,7 @@ class ToolDefinition:
     input_model: type[_BaseModel]
     output_model: type[_BaseModel]
     func: Callable[[HwpxOps, _BaseModel], Dict[str, Any]]
+    category: ToolCategory = "core"
 
     def to_tool(self) -> types.Tool:
         return types.Tool(
@@ -570,6 +577,21 @@ def _simple(
         return method(**payload)
 
     return caller
+
+
+def _parse_toolset_env() -> set[str] | None:
+    raw = os.getenv("HWPX_MCP_TOOLSET")
+    if raw is None or not raw.strip():
+        return None
+
+    requested = {item.strip().lower() for item in raw.split(",") if item.strip()}
+    unknown = sorted(requested - _TOOL_CATEGORY_SET)
+    if unknown:
+        LOGGER.warning(
+            "Ignoring unknown tool categories from HWPX_MCP_TOOLSET: %s",
+            ", ".join(unknown),
+        )
+    return requested & _TOOL_CATEGORY_SET
 
 
 def build_tool_definitions() -> List[ToolDefinition]:
@@ -636,6 +658,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=AnalyzeTemplateInput,
             output_model=AnalyzeTemplateOutput,
             func=_simple("analyze_template_structure"),
+            category="pipeline",
         ),
         ToolDefinition(
             name="find",
@@ -650,6 +673,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=FindRunsInput,
             output_model=FindRunsOutput,
             func=_simple("find_runs_by_style"),
+            category="styles",
         ),
         ToolDefinition(
             name="replace_text_in_runs",
@@ -657,6 +681,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ReplaceRunsInput,
             output_model=ReplaceRunsOutput,
             func=_simple("replace_text_in_runs"),
+            category="styles",
         ),
         ToolDefinition(
             name="add_paragraph",
@@ -678,6 +703,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=AddTableInput,
             output_model=AddTableOutput,
             func=_simple("add_table"),
+            category="tables",
         ),
         ToolDefinition(
             name="set_table_border_fill",
@@ -685,6 +711,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=SetTableBorderFillInput,
             output_model=SetTableBorderFillOutput,
             func=_simple("set_table_border_fill"),
+            category="tables",
         ),
         ToolDefinition(
             name="get_table_cell_map",
@@ -692,6 +719,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=GetTableCellMapInput,
             output_model=TableCellMapOutput,
             func=_simple("get_table_cell_map"),
+            category="tables",
         ),
         ToolDefinition(
             name="set_table_cell_text",
@@ -699,6 +727,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=SetTableCellInput,
             output_model=SetTableCellOutput,
             func=_simple("set_table_cell_text"),
+            category="tables",
         ),
         ToolDefinition(
             name="replace_table_region",
@@ -706,6 +735,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ReplaceTableRegionInput,
             output_model=ReplaceTableRegionOutput,
             func=_simple("replace_table_region"),
+            category="tables",
         ),
         ToolDefinition(
             name="split_table_cell",
@@ -713,6 +743,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=SplitTableCellInput,
             output_model=SplitTableCellOutput,
             func=_simple("split_table_cell"),
+            category="tables",
         ),
         ToolDefinition(
             name="add_shape",
@@ -762,6 +793,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=EnsureRunStyleInput,
             output_model=EnsureRunStyleOutput,
             func=_simple("ensure_run_style"),
+            category="styles",
         ),
         ToolDefinition(
             name="list_styles_and_bullets",
@@ -769,6 +801,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=DocumentLocatorInput,
             output_model=StylesAndBulletsOutput,
             func=_simple("list_styles_and_bullets"),
+            category="styles",
         ),
         ToolDefinition(
             name="apply_style_to_text_ranges",
@@ -776,6 +809,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ApplyStyleToTextInput,
             output_model=ApplyStyleToTextOutput,
             func=_simple("apply_style_to_text_ranges"),
+            category="styles",
         ),
         ToolDefinition(
             name="apply_style_to_paragraphs",
@@ -783,6 +817,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ApplyStyleInput,
             output_model=ApplyStyleOutput,
             func=_simple("apply_style_to_paragraphs"),
+            category="styles",
         ),
         ToolDefinition(
             name="save",
@@ -825,6 +860,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=DocumentLocatorInput,
             output_model=MasterHistoryVersionOutput,
             func=_simple("list_master_pages_histories_versions"),
+            category="debug",
         ),
         ToolDefinition(
             name="object_find_by_tag",
@@ -832,6 +868,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ObjectFindByTagInput,
             output_model=ObjectsOutput,
             func=_simple("object_find_by_tag"),
+            category="debug",
         ),
         ToolDefinition(
             name="object_find_by_attr",
@@ -839,6 +876,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ObjectFindByAttrInput,
             output_model=ObjectsOutput,
             func=_simple("object_find_by_attr"),
+            category="debug",
         ),
         ToolDefinition(
             name="validate_structure",
@@ -846,6 +884,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ValidateStructureInput,
             output_model=ValidateStructureOutput,
             func=_simple("validate_structure"),
+            category="debug",
         ),
         ToolDefinition(
             name="lint_text_conventions",
@@ -856,6 +895,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
                 data.to_hwpx_payload()["path"],
                 **(data.rules.model_dump()),
             ),
+            category="debug",
         ),
         ToolDefinition(
             name="package_get_xml",
@@ -863,6 +903,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=PackageXmlInput,
             output_model=PackageXmlOutput,
             func=_simple("package_get_xml"),
+            category="debug",
         ),
     ]
     if _hardening_enabled():
@@ -873,6 +914,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
                 input_model=PlanEditInput,
                 output_model=ServerResponse,
                 func=_simple("plan_edit", require_path=False),
+                category="pipeline",
             ),
             ToolDefinition(
                 name="hwpx.preview_edit",
@@ -880,6 +922,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
                 input_model=PreviewEditInput,
                 output_model=ServerResponse,
                 func=_simple("preview_edit"),
+                category="pipeline",
             ),
             ToolDefinition(
                 name="hwpx.apply_edit",
@@ -887,6 +930,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
                 input_model=ApplyEditInput,
                 output_model=ServerResponse,
                 func=_simple("apply_edit"),
+                category="pipeline",
             ),
             ToolDefinition(
                 name="hwpx.search",
@@ -894,6 +938,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
                 input_model=SearchInput,
                 output_model=SearchOutput,
                 func=_simple("search", require_path=False),
+                category="pipeline",
             ),
             ToolDefinition(
                 name="hwpx.get_context",
@@ -901,6 +946,10 @@ def build_tool_definitions() -> List[ToolDefinition]:
                 input_model=GetContextInput,
                 output_model=ContextOutput,
                 func=_simple("get_context", require_path=False),
+                category="pipeline",
             ),
         ])
-    return tools
+    selected_categories = _parse_toolset_env()
+    if selected_categories is None:
+        return tools
+    return [tool for tool in tools if tool.category in selected_categories]
