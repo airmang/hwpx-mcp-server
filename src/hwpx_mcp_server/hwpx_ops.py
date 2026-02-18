@@ -44,6 +44,7 @@ from .hwp_support import HwpBinaryError, extract_hwp_text
 from .hwp_converter import HwpConversionError, convert_hwp_to_hwpx
 from .metadata import tools_meta
 from .core.locator import RegisteredHandle
+from .core.context import default_session_lifecycle_policy
 from .core.resources import (
     DocumentMetadataResource,
     DocumentParagraphsResource,
@@ -185,11 +186,45 @@ class HwpxOps:
     def list_registered_handles(self) -> List[RegisteredHandle]:
         return sorted(self._registered_handles.values(), key=lambda item: item.handle_id)
 
+    def open_document_handle(self, path: str) -> Dict[str, Any]:
+        resolved = self._resolve_path(path)
+        handle = self._register_handle(path, resolved)
+        return {"handle": handle.model_dump(by_alias=True)}
+
+    def list_open_documents(self) -> Dict[str, Any]:
+        policy = default_session_lifecycle_policy()
+        return {
+            "documents": [
+                handle.model_dump(by_alias=True)
+                for handle in self.list_registered_handles()
+            ],
+            "sessionPolicy": policy.as_dict(),
+        }
+
+    def close_document_handle(self, handle_id: str) -> Dict[str, Any]:
+        removed = self._registered_handles.pop(handle_id, None)
+        return {"closed": removed is not None}
+
     def get_registered_handle(self, handle_id: str) -> RegisteredHandle:
         handle = self._registered_handles.get(handle_id)
         if handle is None:
             raise HwpxHandleNotFoundError(f"등록되지 않은 handleId입니다: {handle_id}")
         return handle
+
+    def resolve_document_path(
+        self,
+        *,
+        path: Optional[str] = None,
+        handle_id: Optional[str] = None,
+    ) -> str:
+        if path:
+            return path
+        if handle_id:
+            return self.get_registered_handle(handle_id).path
+        raise self._new_error(
+            "DOCUMENT_LOCATOR_REQUIRED",
+            "path 또는 handleId 중 하나를 제공해야 합니다.",
+        )
 
     def get_metadata_by_handle(self, handle_id: str) -> Dict[str, Any]:
         handle = self.get_registered_handle(handle_id)
@@ -1518,6 +1553,55 @@ class HwpxOps:
             "startCol": anchor_col,
             "rowSpan": span_row,
             "colSpan": span_col,
+        }
+
+    def copy_table_between_documents(
+        self,
+        source_path: str,
+        source_table_index: int,
+        target_path: str,
+        *,
+        target_section_index: Optional[int] = None,
+        auto_fit: bool = False,
+    ) -> Dict[str, Any]:
+        source_map = self.get_table_cell_map(source_path, source_table_index)
+        row_count = int(source_map["rowCount"])
+        column_count = int(source_map["columnCount"])
+        if row_count <= 0 or column_count <= 0:
+            raise self._new_error(
+                "TABLE_EMPTY",
+                "복사할 표 셀이 비어 있습니다.",
+                details={"tableIndex": source_table_index},
+            )
+
+        values: List[List[str]] = []
+        for row in source_map["grid"]:
+            row_values: List[str] = []
+            for cell in row:
+                row_values.append((cell.get("text") or "").strip())
+            values.append(row_values)
+
+        created = self.add_table(
+            target_path,
+            rows=row_count,
+            cols=column_count,
+            section_index=target_section_index,
+            auto_fit=auto_fit,
+        )
+        target_table_index = int(created["tableIndex"])
+        updated = self.replace_table_region(
+            target_path,
+            table_index=target_table_index,
+            start_row=0,
+            start_col=0,
+            values=values,
+            auto_fit=auto_fit,
+        )
+        return {
+            "targetTableIndex": target_table_index,
+            "copiedCells": updated["updatedCells"],
+            "rowCount": row_count,
+            "columnCount": column_count,
         }
 
     def add_shape(

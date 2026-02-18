@@ -1,5 +1,3 @@
-import pytest
-
 from hwpx_mcp_server.core.plan import PlanEditInput
 from hwpx_mcp_server.tools import DocumentLocatorInput
 
@@ -16,11 +14,10 @@ def test_document_locator_input_accepts_uri_variant() -> None:
     assert data["path"] == uri
 
 
-def test_document_locator_handle_requires_explicit_opt_in() -> None:
+def test_document_locator_handle_supports_handle_id_flow() -> None:
     payload = DocumentLocatorInput.model_validate({"type": "handle", "handleId": "doc-123"})
-    with pytest.raises(ValueError):
-        payload.to_hwpx_payload()
-    assert payload.to_hwpx_payload(require_path=False) == {}
+    assert payload.to_hwpx_payload() == {"path": None, "handleId": "doc-123"}
+    assert payload.to_hwpx_payload(require_path=False) == {"handleId": "doc-123"}
 
 
 def test_plan_edit_input_surface_doc_id_for_handle() -> None:

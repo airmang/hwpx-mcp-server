@@ -23,6 +23,7 @@ from .core.plan import (
 )
 from .core.locator import (
     DocumentLocator,
+    HandleLocator,
     document_locator_schema,
     normalize_locator_payload,
     locator_path,
@@ -58,11 +59,18 @@ class DocumentLocatorInput(_BaseModel):
     def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
         payload = self.model_dump(exclude={"document"})
         path = locator_path(self.document)
-        if path is None:
-            if require_path:
-                raise ValueError("document locator must include a path or uri")
-        else:
+        if path is not None:
             payload["path"] = path
+            return payload
+
+        if isinstance(self.document, HandleLocator):
+            payload["handleId"] = self.document.handle_id
+            if require_path:
+                payload["path"] = None
+            return payload
+
+        if require_path:
+            raise ValueError("document locator must include a path, uri, or handleId")
         return payload
 
     @classmethod
@@ -439,6 +447,101 @@ class ApplyStyleOutput(_BaseModel):
     updated: int
 
 
+
+
+class OpenDocumentHandleOutput(_BaseModel):
+    handle: Dict[str, Any]
+
+
+class ListOpenDocumentsOutput(_BaseModel):
+    documents: List[Dict[str, Any]]
+    sessionPolicy: Dict[str, Any]
+
+
+class CloseDocumentHandleInput(_BaseModel):
+    handle_id: str = Field(alias="handleId")
+
+
+class CloseDocumentHandleOutput(_BaseModel):
+    closed: bool
+
+
+class CopyTableBetweenDocumentsInput(_BaseModel):
+    source_document: DocumentLocator = Field(alias="sourceDocument")
+    source_table_index: int = Field(alias="sourceTableIndex")
+    target_document: DocumentLocator = Field(alias="targetDocument")
+    target_section_index: Optional[int] = Field(None, alias="targetSectionIndex")
+    auto_fit: bool = Field(False, alias="autoFit")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inflate_documents(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+
+        source_data = dict(data)
+        if "sourceDocument" not in source_data:
+            source_data = normalize_locator_payload(source_data, field_name="sourceDocument")
+
+        target_payload = source_data.get("targetDocument")
+        if target_payload is None:
+            target_payload = {}
+            for key in ("targetPath", "targetUri", "targetHandleId", "targetBackend"):
+                if key in source_data:
+                    target_payload[key] = source_data.pop(key)
+            if target_payload:
+                normalized_target: Dict[str, Any] = {}
+                if "targetPath" in target_payload:
+                    normalized_target["path"] = target_payload["targetPath"]
+                    normalized_target["type"] = "path"
+                if "targetUri" in target_payload:
+                    normalized_target["uri"] = target_payload["targetUri"]
+                    normalized_target["type"] = "uri"
+                if "targetHandleId" in target_payload:
+                    normalized_target["handleId"] = target_payload["targetHandleId"]
+                    normalized_target["type"] = "handle"
+                if "targetBackend" in target_payload:
+                    normalized_target["backend"] = target_payload["targetBackend"]
+                source_data["targetDocument"] = normalized_target
+        return source_data
+
+    @classmethod
+    def model_json_schema(cls, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        schema = super().model_json_schema(*args, **kwargs)
+        properties = schema.get("properties")
+        if isinstance(properties, dict):
+            if "sourceDocument" in properties:
+                properties["sourceDocument"] = document_locator_schema()
+            if "targetDocument" in properties:
+                properties["targetDocument"] = document_locator_schema()
+        return schema
+
+    def to_hwpx_payload(self, ops: HwpxOps) -> Dict[str, Any]:
+        source_locator = DocumentLocatorInput(document=self.source_document).to_hwpx_payload(require_path=False)
+        source_path = ops.resolve_document_path(
+            path=source_locator.get("path"),
+            handle_id=source_locator.get("handleId"),
+        )
+        target_locator = DocumentLocatorInput(document=self.target_document).to_hwpx_payload(require_path=False)
+        target_path = ops.resolve_document_path(
+            path=target_locator.get("path"),
+            handle_id=target_locator.get("handleId"),
+        )
+        return {
+            "source_path": source_path,
+            "source_table_index": self.source_table_index,
+            "target_path": target_path,
+            "target_section_index": self.target_section_index,
+            "auto_fit": self.auto_fit,
+        }
+
+
+class CopyTableBetweenDocumentsOutput(_BaseModel):
+    targetTableIndex: int
+    copiedCells: int
+    rowCount: int
+    columnCount: int
+
 class SaveOutput(_BaseModel):
     ok: bool
 
@@ -574,9 +677,20 @@ def _simple(
                 payload = to_payload()
         else:
             payload = data.model_dump()
+
+        if payload.get("path") is None and payload.get("handleId"):
+            payload["path"] = ops.resolve_document_path(handle_id=payload["handleId"])
+        payload.pop("handleId", None)
         return method(**payload)
 
     return caller
+
+
+
+
+def _copy_table_between_documents(ops: HwpxOps, data: CopyTableBetweenDocumentsInput) -> Dict[str, Any]:
+    payload = data.to_hwpx_payload(ops)
+    return ops.copy_table_between_documents(**payload)
 
 
 def _parse_toolset_env() -> set[str] | None:
@@ -596,6 +710,27 @@ def _parse_toolset_env() -> set[str] | None:
 
 def build_tool_definitions() -> List[ToolDefinition]:
     tools = [
+        ToolDefinition(
+            name="open_document_handle",
+            description="문서 로케이터를 등록하고 handleId를 반환합니다.",
+            input_model=DocumentLocatorInput,
+            output_model=OpenDocumentHandleOutput,
+            func=_simple("open_document_handle"),
+        ),
+        ToolDefinition(
+            name="list_open_documents",
+            description="현재 세션에 등록된 문서 handle 목록을 반환합니다.",
+            input_model=_BaseModel,
+            output_model=ListOpenDocumentsOutput,
+            func=_simple("list_open_documents", require_path=False),
+        ),
+        ToolDefinition(
+            name="close_document_handle",
+            description="지정한 handleId를 세션 레지스트리에서 제거합니다.",
+            input_model=CloseDocumentHandleInput,
+            output_model=CloseDocumentHandleOutput,
+            func=_simple("close_document_handle", require_path=False),
+        ),
         ToolDefinition(
             name="open_info",
             description="Return metadata about an HWPX document.",
@@ -743,6 +878,14 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=SplitTableCellInput,
             output_model=SplitTableCellOutput,
             func=_simple("split_table_cell"),
+            category="tables",
+        ),
+        ToolDefinition(
+            name="copy_table_between_documents",
+            description="원본 문서의 표를 대상 문서로 복사합니다.",
+            input_model=CopyTableBetweenDocumentsInput,
+            output_model=CopyTableBetweenDocumentsOutput,
+            func=_copy_table_between_documents,
             category="tables",
         ),
         ToolDefinition(

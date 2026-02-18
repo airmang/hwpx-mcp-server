@@ -74,3 +74,11 @@ def test_convert_hwp_to_hwpx_tool_is_exposed():
 def test_analyze_template_structure_tool_is_exposed():
     names = {definition.name for definition in build_tool_definitions()}
     assert "analyze_template_structure" in names
+
+
+def test_document_handle_tools_are_exposed():
+    names = {definition.name for definition in build_tool_definitions()}
+    assert "open_document_handle" in names
+    assert "list_open_documents" in names
+    assert "close_document_handle" in names
+    assert "copy_table_between_documents" in names
