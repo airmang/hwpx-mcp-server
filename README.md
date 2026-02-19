@@ -369,7 +369,7 @@ hwpx-mcp-server
 
 ## License
 
-[MIT](LICENSE) © 고규현 (Gyuhyun Ko)
+[MIT](LICENSE) © 고규현 (Kyuhyun Koh)
 
 <br>
 
