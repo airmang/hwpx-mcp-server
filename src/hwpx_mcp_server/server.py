@@ -1,510 +1,172 @@
-"""MCP 서버 진입점(표준 입출력/Streamable HTTP transport 지원)."""
+"""Stateless HWPX MCP 서버."""
 
 from __future__ import annotations
 
-import argparse
-import json
-import logging
 import os
-import re
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Dict, List, Mapping, Sequence
 
-import anyio
-import mcp.types as types
-from mcp.server import NotificationOptions, Server
-from mcp.shared.exceptions import McpError
-from mcp.server.stdio import stdio_server
-from mcp.server.streamable_http import StreamableHTTPServerTransport
+from mcp.server.fastmcp import FastMCP
 
-from .hwpx_ops import (
-    DEFAULT_PAGING_PARAGRAPH_LIMIT,
-    HwpxOps,
-    HwpxHandleNotFoundError,
-    HwpxOperationError,
-)
-from .errors import mcp_code_for_error
-from .logging_conf import configure_logging
-from .prompts import get_prompt as render_prompt
-from .prompts import list_prompts
-from .storage import DocumentStorage, HttpDocumentStorage, LocalDocumentStorage
-from .tools import ToolDefinition, build_tool_definitions
+from .core.content import collect_full_text
+from .core.document import create_blank, open_doc, save_doc
+from .core.search import batch_replace_in_doc, find_in_doc, replace_in_doc
+from .utils.helpers import resolve_path, truncate_response
 
-LOGGER = logging.getLogger(__name__)
-DEFAULT_SERVER_NAME = "hwpx-mcp-server"
+mcp = FastMCP("hwpx-mcp-server")
 
 
-
-RESOURCE_URI_PATTERN = re.compile(r"^hwpx://documents/(?P<handle>[A-Za-z0-9_-]+)/(?P<kind>metadata|paragraphs|tables)$")
-_RESOURCE_ERROR_HANDLE_NOT_FOUND = -32040
-
-
-def _parse_resource_uri(uri: str) -> tuple[str, str]:
-    match = RESOURCE_URI_PATTERN.match(uri.strip())
-    if match is None:
-        raise McpError(types.ErrorData(code=-32602, message=f"지원하지 않는 resource URI입니다: {uri}"))
-    return match.group("handle"), match.group("kind")
-
-def _bool_env(name: str, default: bool = False) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+def _advanced_enabled() -> bool:
+    return os.environ.get("HWPX_MCP_ADVANCED", "0").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _float_env(name: str) -> float | None:
-    raw = os.getenv(name)
-    if raw is None:
-        return None
+def _paragraph_count(doc) -> int:
+    return len(doc.paragraphs)
+
+
+def _table_count(doc) -> int:
+    count = 0
+    seen: set[int] = set()
+    for paragraph in doc.paragraphs:
+        for table in getattr(paragraph, "tables", []):
+            key = id(table)
+            if key not in seen:
+                seen.add(key)
+                count += 1
+    return count
+
+
+def _outline_level(text: str) -> int:
+    stripped = (text or "").strip()
+    if not stripped:
+        return 0
+    if stripped.startswith("#"):
+        return min(6, len(stripped) - len(stripped.lstrip("#")))
+    if stripped[:2].isdigit() and "." in stripped[:6]:
+        return 2
+    if stripped[:1].isdigit() and "." in stripped[:4]:
+        return 1
+    return 1 if len(stripped) < 60 else 0
+
+
+@mcp.tool()
+def create_document(filename: str, title: str = None, author: str = None) -> dict:
+    """새 HWPX 문서를 생성합니다."""
+    del title, author
+    path = resolve_path(filename)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    create_blank(path)
+    return {"filename": filename, "created": True}
+
+
+@mcp.tool()
+def get_document_info(filename: str) -> dict:
+    """HWPX 문서의 메타데이터와 구조 정보를 반환합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    file_size = Path(path).stat().st_size
+    return {
+        "filename": filename,
+        "sections": len(doc.sections),
+        "paragraphs": _paragraph_count(doc),
+        "tables": _table_count(doc),
+        "file_size": str(file_size),
+    }
+
+
+@mcp.tool()
+def get_document_text(filename: str, max_chars: int = 10000) -> dict:
+    """HWPX 문서의 전체 텍스트를 추출합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    return truncate_response(collect_full_text(doc), max_chars=max_chars)
+
+
+@mcp.tool()
+def get_document_outline(filename: str) -> dict:
+    """문서의 헤더와 섹션 구조를 반환합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    outline: list[dict] = []
+    for index, para in enumerate(doc.paragraphs):
+        text = (para.text or "").strip()
+        level = _outline_level(text)
+        if level > 0 and text:
+            outline.append({"level": level, "text": text, "paragraph_index": index})
+    return {"outline": outline}
+
+
+@mcp.tool()
+def get_paragraph_text(filename: str, paragraph_index: int) -> dict:
+    """지정한 문단의 텍스트를 반환합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
     try:
-        return float(raw)
-    except ValueError:
-        LOGGER.warning("Invalid value for %s: expected float", name)
-        return None
+        text = doc.paragraphs[paragraph_index].text or ""
+    except IndexError as exc:
+        raise ValueError(f"유효하지 않은 paragraph_index: {paragraph_index}") from exc
+    return {"paragraph_index": paragraph_index, "text": text}
 
 
-def _parse_header_assignments(assignments: Sequence[str]) -> Dict[str, str]:
-    headers: Dict[str, str] = {}
-    for assignment in assignments:
-        item = assignment.strip()
-        if not item:
-            continue
-        if "=" in item:
-            key, value = item.split("=", 1)
-        elif ":" in item:
-            key, value = item.split(":", 1)
-        else:
-            LOGGER.warning("Ignoring malformed HTTP header assignment '%s'", item)
-            continue
-        headers[key.strip()] = value.strip()
-    return headers
+@mcp.tool()
+def get_paragraphs_text(filename: str, start_index: int = 0, end_index: int = None, max_chars: int = 10000) -> dict:
+    """지정 범위의 문단 텍스트를 반환합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    total = len(doc.paragraphs)
+    end = total if end_index is None else min(end_index, total)
+    start = max(0, start_index)
+    picked = []
+    used = 0
+    truncated = False
+    for index in range(start, end):
+        text = doc.paragraphs[index].text or ""
+        next_size = used + len(text)
+        if next_size > max_chars:
+            remaining = max(0, max_chars - used)
+            picked.append({"index": index, "text": text[:remaining]})
+            truncated = True
+            break
+        picked.append({"index": index, "text": text})
+        used = next_size
+    return {"paragraphs": picked, "truncated": truncated}
 
 
-def _resolve_version() -> str:
-    try:
-        return version("hwpx-mcp-server")
-    except PackageNotFoundError:  # pragma: no cover - local development fallback
-        return "0.0.0"
+@mcp.tool()
+def find_text(filename: str, text_to_find: str, match_case: bool = True, max_results: int = 50) -> dict:
+    """문서에서 텍스트를 검색합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    return find_in_doc(doc, text_to_find=text_to_find, match_case=match_case, max_results=max_results)
 
 
-def _build_server(ops: HwpxOps, tools: List[ToolDefinition]) -> Server:
-    server = Server(DEFAULT_SERVER_NAME, version=_resolve_version())
-    tool_map: Dict[str, ToolDefinition] = {tool.name: tool for tool in tools}
-    cached_tools: List[types.Tool] | None = None
-
-    async def _list_tools(req: types.ListToolsRequest | None) -> types.ServerResult:
-        nonlocal cached_tools
-
-        if cached_tools is None or len(cached_tools) != len(tools):
-            cached_tools = [tool.to_tool() for tool in tools]
-            server._tool_cache.clear()
-            for tool in cached_tools:
-                server._tool_cache[tool.name] = tool
-
-        cursor_value = "0"
-        if req is not None and req.params and req.params.cursor is not None:
-            cursor_value = req.params.cursor
-
-        try:
-            start = int(cursor_value)
-        except (TypeError, ValueError):
-            start = 0
-
-        if start < 0:
-            start = 0
-
-        total_tools = len(cached_tools)
-
-        if start == 0:
-            page_size = total_tools
-        else:
-            remaining = max(total_tools - start, 0)
-            page_size = remaining
-            if remaining and req is not None and req.params:
-                limit = getattr(req.params, "limit", None)
-                try:
-                    parsed_limit = int(limit) if limit is not None else None
-                except (TypeError, ValueError):
-                    parsed_limit = None
-
-                if parsed_limit is not None and parsed_limit > 0:
-                    page_size = min(parsed_limit, remaining)
-
-        end = min(start + page_size, total_tools)
-        page_tools = cached_tools[start:end]
-        next_cursor: str | None = None
-        if end < len(cached_tools):
-            next_cursor = str(end)
-
-        result = types.ListToolsResult(tools=page_tools, nextCursor=next_cursor)
-        return types.ServerResult(result)
-
-    server.request_handlers[types.ListToolsRequest] = _list_tools
-
-    async def _list_resources(req: types.ListResourcesRequest | None) -> types.ServerResult:
-        del req
-        resources: list[types.Resource] = []
-        for handle in ops.list_registered_handles():
-            for suffix, label in (("metadata", "메타데이터"), ("paragraphs", "문단"), ("tables", "표")):
-                uri = f"hwpx://documents/{handle.handle_id}/{suffix}"
-                resources.append(
-                    types.Resource(
-                        name=f"{handle.handle_id}-{suffix}",
-                        title=f"{handle.path} {label}",
-                        uri=uri,
-                        description=f"등록 handle {handle.handle_id}의 {label} 리소스",
-                        mimeType="application/json",
-                    )
-                )
-        result = types.ListResourcesResult(resources=resources, nextCursor=None)
-        return types.ServerResult(result)
-
-    async def _list_resource_templates(req: types.ListResourceTemplatesRequest | None) -> types.ServerResult:
-        del req
-        templates = [
-            types.ResourceTemplate(
-                name="document-metadata",
-                title="문서 메타데이터",
-                uriTemplate="hwpx://documents/{handle}/metadata",
-                description="등록된 handle의 메타데이터 요약",
-                mimeType="application/json",
-            ),
-            types.ResourceTemplate(
-                name="document-paragraphs",
-                title="문서 문단",
-                uriTemplate="hwpx://documents/{handle}/paragraphs",
-                description="등록된 handle의 전체 문단 텍스트",
-                mimeType="application/json",
-            ),
-            types.ResourceTemplate(
-                name="document-tables",
-                title="문서 표",
-                uriTemplate="hwpx://documents/{handle}/tables",
-                description="등록된 handle의 표 구조 요약",
-                mimeType="application/json",
-            ),
-        ]
-        result = types.ListResourceTemplatesResult(resourceTemplates=templates, nextCursor=None)
-        return types.ServerResult(result)
-
-    async def _read_resource(req: types.ReadResourceRequest) -> types.ServerResult:
-        params = req.params
-        if params is None or params.uri is None:
-            raise McpError(types.ErrorData(code=-32602, message="uri 파라미터가 필요합니다."))
-
-        handle_id, kind = _parse_resource_uri(str(params.uri))
-
-        try:
-            if kind == "metadata":
-                payload = ops.get_metadata_by_handle(handle_id)
-            elif kind == "paragraphs":
-                payload = ops.get_paragraphs_by_handle(handle_id)
-            else:
-                payload = ops.get_tables_by_handle(handle_id)
-        except HwpxHandleNotFoundError as exc:
-            raise McpError(
-                types.ErrorData(
-                    code=_RESOURCE_ERROR_HANDLE_NOT_FOUND,
-                    message=str(exc),
-                    data={"error": "HANDLE_NOT_FOUND", "handleId": handle_id},
-                )
-            ) from exc
-        except HwpxOperationError as exc:
-            payload = exc.to_payload()
-            raise McpError(
-                types.ErrorData(
-                    code=mcp_code_for_error(exc.code),
-                    message=exc.message,
-                    data=payload,
-                )
-            ) from exc
-
-        contents = [
-            types.TextResourceContents(
-                uri=str(params.uri),
-                mimeType="application/json",
-                text=json.dumps(payload, ensure_ascii=False, indent=2),
-            )
-        ]
-        result = types.ReadResourceResult(contents=contents)
-        return types.ServerResult(result)
-
-    server.request_handlers[types.ListResourcesRequest] = _list_resources
-    server.request_handlers[types.ListResourceTemplatesRequest] = _list_resource_templates
-    server.request_handlers[types.ReadResourceRequest] = _read_resource
-
-    async def _list_prompts(req: types.ListPromptsRequest | None) -> types.ServerResult:
-        del req
-        result = types.ListPromptsResult(prompts=list_prompts(), nextCursor=None)
-        return types.ServerResult(result)
-
-    async def _get_prompt(req: types.GetPromptRequest) -> types.ServerResult:
-        params = req.params
-        name = params.name if params else None
-        if not name:
-            raise McpError(types.ErrorData(code=-32602, message="name 파라미터가 필요합니다."))
-
-        try:
-            rendered = render_prompt(name, params.arguments if params else None)
-        except KeyError as exc:
-            raise McpError(
-                types.ErrorData(code=-32602, message=f"지원하지 않는 prompt ID입니다: {name}")
-            ) from exc
-        except ValueError as exc:
-            raise McpError(types.ErrorData(code=-32602, message=str(exc))) from exc
-
-        return types.ServerResult(rendered)
-
-    server.request_handlers[types.ListPromptsRequest] = _list_prompts
-    server.request_handlers[types.GetPromptRequest] = _get_prompt
-
-    @server.call_tool()
-    async def _call_tool(name: str, arguments: Dict[str, object] | None) -> Dict[str, object]:
-        definition = tool_map.get(name)
-        if definition is None:
-            raise ValueError(f"tool '{name}' is not registered")
-        try:
-            payload = definition.call(ops, arguments or {})
-        except HwpxOperationError as exc:
-            payload = exc.to_payload()
-            raise McpError(
-                types.ErrorData(
-                    code=mcp_code_for_error(exc.code),
-                    message=exc.message,
-                    data=payload,
-                )
-            ) from exc
-        except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.exception("tool '%s' failed", name)
-            raise McpError(
-                types.ErrorData(
-                    code=-32000,
-                    message=str(exc),
-                    data={
-                        "code": "INTERNAL_ERROR",
-                        "message": str(exc),
-                        "details": {"tool": name},
-                    },
-                )
-            ) from exc
-        return payload
-
-    return server
+@mcp.tool()
+def search_and_replace(filename: str, find_text: str, replace_text: str) -> dict:
+    """문서에서 텍스트를 찾아 모두 치환합니다. 스타일은 보존됩니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    replaced_count = replace_in_doc(doc, find_text=find_text, replace_text=replace_text)
+    save_doc(doc, path)
+    return {"replaced_count": replaced_count, "find_text": find_text, "replace_text": replace_text}
 
 
-async def _serve_stdio(server: Server) -> None:
-    init_options = server.create_initialization_options(NotificationOptions())
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, init_options)
+@mcp.tool()
+def batch_replace(filename: str, replacements: list[dict]) -> dict:
+    """여러 텍스트를 순서대로 치환합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    result = batch_replace_in_doc(doc, replacements)
+    save_doc(doc, path)
+    return result
 
 
-async def _serve_streamable_http(server: Server, *, host: str, port: int) -> None:
-    import uvicorn
+def main() -> None:
+    if _advanced_enabled():
+        from .legacy_server import main as legacy_main
 
-    init_options = server.create_initialization_options(NotificationOptions())
-    transport = StreamableHTTPServerTransport(mcp_session_id=None)
-
-    async def _app(scope, receive, send):
-        await transport.handle_request(scope, receive, send)
-
-    http_server = uvicorn.Server(
-        uvicorn.Config(
-            _app,
-            host=host,
-            port=port,
-            log_level=os.getenv("LOG_LEVEL", "info").lower(),
-        )
-    )
-
-    async with transport.connect() as (read_stream, write_stream):
-        async with anyio.create_task_group() as task_group:
-            task_group.start_soon(server.run, read_stream, write_stream, init_options)
-            await http_server.serve()
-            task_group.cancel_scope.cancel()
-
-
-async def _serve(
-    ops: HwpxOps,
-    tools: List[ToolDefinition],
-    *,
-    transport: str,
-    host: str,
-    port: int,
-) -> None:
-    server = _build_server(ops, tools)
-    if transport == "streamable-http":
-        LOGGER.info("Starting MCP server over streamable HTTP", extra={"host": host, "port": port})
-        await _serve_streamable_http(server, host=host, port=port)
+        legacy_main()
         return
-
-    await _serve_stdio(server)
-
-
-def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog=DEFAULT_SERVER_NAME)
-    parser.add_argument(
-        "--transport",
-        choices=("stdio", "streamable-http"),
-        default="stdio",
-        help="MCP transport to use",
-    )
-    parser.add_argument(
-        "--host",
-        default=os.getenv("HWPX_MCP_HOST", "127.0.0.1"),
-        help="Host interface used by streamable-http transport",
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=int(os.getenv("HWPX_MCP_PORT", "8000")),
-        help="TCP port used by streamable-http transport",
-    )
-    parser.add_argument(
-        "--storage",
-        choices=("local", "http"),
-        help="Storage backend to use (overrides HWPX_MCP_STORAGE)",
-    )
-    parser.add_argument(
-        "--http-base-url",
-        help="Base URL for the HTTP storage backend (overrides HWPX_MCP_HTTP_BASE_URL)",
-    )
-    parser.add_argument(
-        "--http-timeout",
-        type=float,
-        help="Timeout in seconds for HTTP storage operations",
-    )
-    parser.add_argument(
-        "--http-auth-token",
-        help="Bearer token to send with HTTP storage requests (overrides HWPX_MCP_HTTP_AUTH_TOKEN)",
-    )
-    parser.add_argument(
-        "--http-header",
-        action="append",
-        default=[],
-        help=(
-            "Additional HTTP header to send with storage requests. Format key=value or key:value. "
-            "May be specified multiple times."
-        ),
-    )
-    return parser.parse_args(argv)
+    mcp.run(transport="stdio")
 
 
-def _select_storage(
-    *,
-    mode: str,
-    base_directory: Path,
-    auto_backup: bool,
-    http_base_url: str | None,
-    http_timeout: float | None,
-    http_headers: Mapping[str, str] | None,
-) -> DocumentStorage:
-    if mode == "http":
-        base_url = http_base_url or os.getenv("HWPX_MCP_HTTP_BASE_URL")
-        if not base_url:
-            raise ValueError("HTTP storage selected but no base URL provided")
-        if auto_backup:
-            LOGGER.info("Auto-backup is not supported for HTTP storage; ignoring flag")
-        headers = dict(http_headers or {})
-        timeout_value = http_timeout
-        if timeout_value is None:
-            timeout_value = _float_env("HWPX_MCP_HTTP_TIMEOUT")
-        has_auth = any(key.lower() == "authorization" for key in headers)
-        LOGGER.info(
-            "Using HTTP storage backend",
-            extra={
-                "baseUrl": base_url,
-                "headers": sorted(
-                    key for key in headers if key.lower() != "authorization"
-                ),
-                "authorization": "provided" if has_auth else "absent",
-            },
-        )
-        return HttpDocumentStorage(
-            base_url,
-            timeout=timeout_value,
-            headers=headers,
-            logger=LOGGER,
-        )
-
-    LOGGER.info(
-        "Using current working directory for file operations",
-        extra={"root": str(base_directory)},
-    )
-    return LocalDocumentStorage(
-        base_directory=base_directory,
-        auto_backup=auto_backup,
-        logger=LOGGER,
-    )
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    configure_logging(os.getenv("LOG_LEVEL"))
-
-    args = _parse_args(argv)
-
-    storage_mode = (args.storage or os.getenv("HWPX_MCP_STORAGE") or "local").strip().lower()
-    if storage_mode not in {"local", "http"}:
-        LOGGER.warning("Unknown storage mode '%s', falling back to local", storage_mode)
-        storage_mode = "local"
-
-    base_directory = Path.cwd()
-    auto_backup = _bool_env("HWPX_MCP_AUTOBACKUP")
-
-    paging_limit = os.getenv("HWPX_MCP_PAGING_PARA_LIMIT")
-    try:
-        paging_value = int(paging_limit) if paging_limit else DEFAULT_PAGING_PARAGRAPH_LIMIT
-    except ValueError:
-        LOGGER.warning(
-            "Invalid HWPX_MCP_PAGING_PARA_LIMIT, falling back to %s",
-            DEFAULT_PAGING_PARAGRAPH_LIMIT,
-        )
-        paging_value = DEFAULT_PAGING_PARAGRAPH_LIMIT
-
-    header_tokens: List[str] = []
-    env_header_raw = os.getenv("HWPX_MCP_HTTP_HEADERS")
-    if env_header_raw:
-        env_header_normalized = env_header_raw.replace(";", "\n")
-        header_tokens.extend(env_header_normalized.splitlines())
-    header_tokens.extend(args.http_header)
-    http_headers = _parse_header_assignments(header_tokens)
-
-    auth_token = args.http_auth_token or os.getenv("HWPX_MCP_HTTP_AUTH_TOKEN")
-    if auth_token:
-        http_headers.setdefault("Authorization", f"Bearer {auth_token.strip()}")
-
-    storage = _select_storage(
-        mode=storage_mode,
-        base_directory=base_directory,
-        auto_backup=auto_backup,
-        http_base_url=args.http_base_url,
-        http_timeout=args.http_timeout,
-        http_headers=http_headers,
-    )
-
-    ops = HwpxOps(
-        paging_paragraph_limit=paging_value,
-        storage=storage,
-    )
-
-    tools = build_tool_definitions()
-
-    try:
-        anyio.run(
-            lambda: _serve(
-                ops,
-                tools,
-                transport=args.transport,
-                host=args.host,
-                port=args.port,
-            )
-        )
-    except KeyboardInterrupt:  # pragma: no cover - graceful shutdown
-        LOGGER.info("Received interrupt, shutting down")
-        return 130
-
-    return 0
-
-
-if __name__ == "__main__":  # pragma: no cover
-    raise SystemExit(main())
+if __name__ == "__main__":
+    main()
