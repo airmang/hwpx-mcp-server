@@ -44,7 +44,7 @@
 uvx hwpx-mcp-server
 ```
 
-> `python-hwpx >= 1.9` 이상이 필요하며, 첫 실행 시 자동 설치됩니다.
+> `python-hwpx >= 1.9, < 2.0` 버전이 필요하며, 첫 실행 시 자동 설치됩니다.
 
 ### 2. MCP 클라이언트 설정
 
@@ -327,7 +327,7 @@ hwpx-mcp-server
 └── pyproject.toml
 ```
 
-- **순수 파이썬**: `python-hwpx >= 1.9` · `mcp` · `anyio` · `pydantic`
+- **순수 파이썬**: `python-hwpx >= 1.9, < 2.0` · `mcp` · `anyio` · `pydantic`
 - **경로 해석**: 서버 실행 디렉터리 기준, 별도 설정 불필요
 - **안전 장치**: 파괴적 작업에 `dryRun` 플래그 우선 제공 · 자동 `.bak` 백업
 - **스키마**: draft-07 호환 Sanitizer를 거쳐 `$ref` / `anyOf` 없이 평탄화
