@@ -3,11 +3,24 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-from .core.content import collect_full_text
+from .core.content import (
+    add_heading_to_doc,
+    add_memo_to_doc,
+    add_page_break_to_doc,
+    add_paragraph_to_doc,
+    add_table_to_doc,
+    collect_full_text,
+    delete_paragraph_from_doc,
+    get_table_data,
+    insert_paragraph_to_doc,
+    remove_memo_from_doc,
+    set_cell_text,
+)
 from .core.document import create_blank, open_doc, save_doc
 from .core.search import batch_replace_in_doc, find_in_doc, replace_in_doc
 from .utils.helpers import resolve_path, truncate_response
@@ -157,6 +170,130 @@ def batch_replace(filename: str, replacements: list[dict]) -> dict:
     result = batch_replace_in_doc(doc, replacements)
     save_doc(doc, path)
     return result
+
+
+@mcp.tool()
+def add_heading(filename: str, text: str, level: int = 1) -> dict:
+    """문서 끝에 제목(헤딩)을 추가합니다. level: 1~6"""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    idx = add_heading_to_doc(doc, text, level)
+    save_doc(doc, path)
+    return {"paragraph_index": idx}
+
+
+@mcp.tool()
+def add_paragraph(filename: str, text: str, style: str = None) -> dict:
+    """문서 끝에 문단을 추가합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    idx = add_paragraph_to_doc(doc, text, style)
+    save_doc(doc, path)
+    return {"paragraph_index": idx}
+
+
+@mcp.tool()
+def insert_paragraph(filename: str, paragraph_index: int, text: str, style: str = None) -> dict:
+    """지정한 위치 앞에 문단을 삽입합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    idx = insert_paragraph_to_doc(doc, paragraph_index, text, style)
+    save_doc(doc, path)
+    return {"inserted_index": idx}
+
+
+@mcp.tool()
+def delete_paragraph(filename: str, paragraph_index: int) -> dict:
+    """지정한 문단을 삭제합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    remaining = delete_paragraph_from_doc(doc, paragraph_index)
+    save_doc(doc, path)
+    return {"deleted_index": paragraph_index, "remaining_paragraphs": remaining}
+
+
+@mcp.tool()
+def add_table(filename: str, rows: int, cols: int, data: list[list[str]] = None) -> dict:
+    """문서 끝에 표를 추가합니다. data가 None이면 빈 표를 생성합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    idx = add_table_to_doc(doc, rows, cols, data)
+    save_doc(doc, path)
+    return {"table_index": idx}
+
+
+@mcp.tool()
+def get_table_text(filename: str, table_index: int = 0) -> dict:
+    """표의 모든 셀 텍스트를 2D 배열로 반환합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    result = get_table_data(doc, table_index)
+    return {
+        "table_index": table_index,
+        "rows": result["rows"],
+        "cols": result["cols"],
+        "data": result["data"],
+    }
+
+
+@mcp.tool()
+def set_table_cell_text(filename: str, table_index: int, row: int, col: int, text: str) -> dict:
+    """표의 특정 셀 텍스트를 변경합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    set_cell_text(doc, table_index, row, col, text)
+    save_doc(doc, path)
+    return {"table_index": table_index, "row": row, "col": col, "text": text}
+
+
+@mcp.tool()
+def add_page_break(filename: str) -> dict:
+    """문서 끝에 페이지 나누기를 추가합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    add_page_break_to_doc(doc)
+    save_doc(doc, path)
+    return {"success": True}
+
+
+@mcp.tool()
+def add_memo(filename: str, paragraph_index: int, text: str) -> dict:
+    """문단에 메모(코멘트)를 추가합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    add_memo_to_doc(doc, paragraph_index, text)
+    save_doc(doc, path)
+    return {"memo_added": True, "paragraph_index": paragraph_index}
+
+
+@mcp.tool()
+def remove_memo(filename: str, paragraph_index: int) -> dict:
+    """문단의 메모를 제거합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    remove_memo_from_doc(doc, paragraph_index)
+    save_doc(doc, path)
+    return {"memo_removed": True, "paragraph_index": paragraph_index}
+
+
+@mcp.tool()
+def list_available_documents(directory: str = ".") -> dict:
+    """지정 디렉토리의 HWPX 파일 목록을 반환합니다."""
+    import glob
+
+    path = resolve_path(directory)
+    files = glob.glob(os.path.join(path, "*.hwpx"))
+    docs = []
+    for file_path in sorted(files):
+        stat = os.stat(file_path)
+        docs.append(
+            {
+                "filename": os.path.basename(file_path),
+                "size": f"{stat.st_size / 1024:.1f}KB",
+                "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            }
+        )
+    return {"directory": directory, "documents": docs, "count": len(docs)}
 
 
 def main() -> None:
