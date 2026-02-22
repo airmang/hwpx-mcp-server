@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from typing import Any
 
 from hwpx.document import HwpxDocument
@@ -133,6 +134,108 @@ def set_cell_text(doc: HwpxDocument, table_index: int, row: int, col: int, text:
     if col < 0 or col >= len(table.rows[row].cells):
         raise ValueError(f"유효하지 않은 col: {col}")
     table.rows[row].cells[col].text = text or ""
+
+
+def merge_cells_in_table(
+    doc: HwpxDocument,
+    table_index: int,
+    start_row: int,
+    start_col: int,
+    end_row: int,
+    end_col: int,
+) -> None:
+    """표의 셀을 병합한다."""
+    tables = list(_iter_tables(doc))
+    if table_index < 0 or table_index >= len(tables):
+        raise ValueError(f"유효하지 않은 table_index: {table_index}")
+    if start_row > end_row or start_col > end_col:
+        raise ValueError("시작 좌표는 종료 좌표보다 작거나 같아야 합니다.")
+
+    table = tables[table_index]
+    if start_row < 0 or end_row >= len(table.rows):
+        raise ValueError("유효하지 않은 row 범위입니다.")
+    if start_col < 0 or end_col >= len(table.rows[start_row].cells):
+        raise ValueError("유효하지 않은 col 범위입니다.")
+
+    anchor = table.rows[start_row].cells[start_col]
+    anchor_span = anchor.element.find("{http://www.hancom.co.kr/hwpml/2011/paragraph}cellSpan")
+    if anchor_span is None:
+        raise RuntimeError("anchor 셀에서 cellSpan 요소를 찾을 수 없습니다.")
+    anchor_span.set("rowSpan", str(end_row - start_row + 1))
+    anchor_span.set("colSpan", str(end_col - start_col + 1))
+
+    for row in range(start_row, end_row + 1):
+        for col in range(start_col, end_col + 1):
+            if row == start_row and col == start_col:
+                continue
+            cell = table.rows[row].cells[col]
+            span = cell.element.find("{http://www.hancom.co.kr/hwpml/2011/paragraph}cellSpan")
+            if span is not None:
+                span.set("rowSpan", "0")
+                span.set("colSpan", "0")
+            cell.text = ""
+
+
+def split_cell_in_table(doc: HwpxDocument, table_index: int, row: int, col: int) -> dict:
+    """병합된 셀을 분할한다. 원래 span 정보를 반환한다."""
+    tables = list(_iter_tables(doc))
+    if table_index < 0 or table_index >= len(tables):
+        raise ValueError(f"유효하지 않은 table_index: {table_index}")
+    table = tables[table_index]
+    if row < 0 or row >= len(table.rows):
+        raise ValueError(f"유효하지 않은 row: {row}")
+    if col < 0 or col >= len(table.rows[row].cells):
+        raise ValueError(f"유효하지 않은 col: {col}")
+
+    cell = table.rows[row].cells[col]
+    span = cell.element.find("{http://www.hancom.co.kr/hwpml/2011/paragraph}cellSpan")
+    if span is None:
+        return {"rowSpan": 1, "colSpan": 1}
+
+    original = {
+        "rowSpan": int(span.get("rowSpan", "1")),
+        "colSpan": int(span.get("colSpan", "1")),
+    }
+    span.set("rowSpan", "1")
+    span.set("colSpan", "1")
+
+    for r in range(row, row + max(1, original["rowSpan"])):
+        if r >= len(table.rows):
+            break
+        for c in range(col, col + max(1, original["colSpan"])):
+            if c >= len(table.rows[r].cells) or (r == row and c == col):
+                continue
+            child = table.rows[r].cells[c]
+            child_span = child.element.find("{http://www.hancom.co.kr/hwpml/2011/paragraph}cellSpan")
+            if child_span is not None:
+                child_span.set("rowSpan", "1")
+                child_span.set("colSpan", "1")
+    return original
+
+
+def format_table_in_doc(doc: HwpxDocument, table_index: int, has_header_row: bool = None) -> None:
+    """표 서식을 변경한다. 헤더 행 강조 등."""
+    if has_header_row is None:
+        return
+    tables = list(_iter_tables(doc))
+    if table_index < 0 or table_index >= len(tables):
+        raise ValueError(f"유효하지 않은 table_index: {table_index}")
+    table = tables[table_index]
+    if not table.rows:
+        return
+    for cell in table.rows[0].cells:
+        for paragraph in getattr(cell, "paragraphs", []):
+            for run in paragraph.runs:
+                run.bold = bool(has_header_row)
+
+
+def copy_document_file(source: str, destination: str = None) -> str:
+    """문서를 복사한다. destination이 None이면 자동 이름 생성."""
+    if destination is None:
+        stem, ext = source.rsplit(".", 1) if "." in source else (source, "hwpx")
+        destination = f"{stem}_copy.{ext}"
+    shutil.copy2(source, destination)
+    return destination
 
 
 # ── 메모 ──────────────────────────────────────────────

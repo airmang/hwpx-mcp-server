@@ -15,21 +15,30 @@ from .core.content import (
     add_paragraph_to_doc,
     add_table_to_doc,
     collect_full_text,
+    copy_document_file,
     delete_paragraph_from_doc,
+    format_table_in_doc,
     get_table_data,
     insert_paragraph_to_doc,
+    merge_cells_in_table,
     remove_memo_from_doc,
     set_cell_text,
+    split_cell_in_table,
 )
 from .core.document import create_blank, open_doc, save_doc
+from .core.formatting import create_style_in_doc, format_text_range, list_styles_in_doc
 from .core.search import batch_replace_in_doc, find_in_doc, replace_in_doc
+from .hwpx_ops import HwpxOps
 from .utils.helpers import resolve_path, truncate_response
 
 mcp = FastMCP("hwpx-mcp-server")
 
 
 def _advanced_enabled() -> bool:
-    return os.environ.get("HWPX_MCP_ADVANCED", "0").strip().lower() in {"1", "true", "yes", "on"}
+    return os.environ.get("HWPX_MCP_ADVANCED", "0") == "1"
+
+
+_OPS = HwpxOps(auto_backup=False)
 
 
 def _paragraph_count(doc) -> int:
@@ -296,12 +305,185 @@ def list_available_documents(directory: str = ".") -> dict:
     return {"directory": directory, "documents": docs, "count": len(docs)}
 
 
-def main() -> None:
-    if _advanced_enabled():
-        from .legacy_server import main as legacy_main
+@mcp.tool()
+def format_text(
+    filename: str,
+    paragraph_index: int,
+    start_pos: int,
+    end_pos: int,
+    bold: bool = None,
+    italic: bool = None,
+    underline: bool = None,
+    font_size: float = None,
+    font_name: str = None,
+    color: str = None,
+) -> dict:
+    """지정 범위의 텍스트 서식을 변경합니다. color는 hex 형식 (예: "FF0000"은 빨간색)"""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    format_text_range(
+        doc,
+        paragraph_index,
+        start_pos,
+        end_pos,
+        bold=bold,
+        italic=italic,
+        underline=underline,
+        font_size=font_size,
+        font_name=font_name,
+        color=color,
+    )
+    save_doc(doc, path)
+    return {"formatted": True, "paragraph_index": paragraph_index, "range": [start_pos, end_pos]}
 
-        legacy_main()
-        return
+
+@mcp.tool()
+def create_custom_style(
+    filename: str,
+    style_name: str,
+    bold: bool = None,
+    italic: bool = None,
+    font_size: float = None,
+    font_name: str = None,
+    color: str = None,
+) -> dict:
+    """문서에 커스텀 스타일을 생성합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    create_style_in_doc(
+        doc,
+        style_name,
+        bold=bold,
+        italic=italic,
+        font_size=font_size,
+        font_name=font_name,
+        color=color,
+    )
+    save_doc(doc, path)
+    return {"style_name": style_name, "created": True}
+
+
+@mcp.tool()
+def list_styles(filename: str) -> dict:
+    """문서에 정의된 스타일 목록을 반환합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    styles = list_styles_in_doc(doc)
+    return {"styles": styles, "count": len(styles)}
+
+
+@mcp.tool()
+def merge_table_cells(
+    filename: str,
+    table_index: int,
+    start_row: int,
+    start_col: int,
+    end_row: int,
+    end_col: int,
+) -> dict:
+    """표의 셀을 병합합니다. (start_row, start_col) ~ (end_row, end_col) 범위."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    merge_cells_in_table(doc, table_index, start_row, start_col, end_row, end_col)
+    save_doc(doc, path)
+    return {"merged": True, "range": f"({start_row},{start_col})~({end_row},{end_col})"}
+
+
+@mcp.tool()
+def split_table_cell(filename: str, table_index: int, row: int, col: int) -> dict:
+    """병합된 셀을 분할합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    span_info = split_cell_in_table(doc, table_index, row, col)
+    save_doc(doc, path)
+    return {"split": True, "original_span": span_info}
+
+
+@mcp.tool()
+def format_table(filename: str, table_index: int, has_header_row: bool = None) -> dict:
+    """표 서식을 변경합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    format_table_in_doc(doc, table_index, has_header_row=has_header_row)
+    save_doc(doc, path)
+    return {"formatted": True, "table_index": table_index}
+
+
+@mcp.tool()
+def copy_document(source_filename: str, destination_filename: str = None) -> dict:
+    """HWPX 문서를 복사합니다."""
+    source = resolve_path(source_filename)
+    destination = destination_filename
+    if destination_filename is not None:
+        destination = resolve_path(destination_filename)
+    dest = copy_document_file(source, destination)
+    return {"source": source_filename, "destination": os.path.basename(dest)}
+
+
+if _advanced_enabled():
+
+    @mcp.tool()
+    def package_parts(filename: str) -> dict:
+        """[고급] HWPX 패키지의 파트(파일) 목록을 반환합니다."""
+        path = resolve_path(filename)
+        return _OPS.package_parts(path)
+
+    @mcp.tool()
+    def package_get_xml(filename: str, part_name: str, max_chars: int = 5000) -> dict:
+        """[고급] HWPX 패키지의 특정 XML 파트 내용을 반환합니다."""
+        path = resolve_path(filename)
+        result = _OPS.package_get_xml(path, part_name)
+        return truncate_response(result.get("xmlString", ""), max_chars=max_chars)
+
+    @mcp.tool()
+    def package_get_text(filename: str, part_name: str, max_chars: int = 5000) -> dict:
+        """[고급] HWPX 패키지의 특정 파트에서 텍스트만 추출합니다."""
+        path = resolve_path(filename)
+        result = _OPS.package_get_text(path, part_name)
+        return truncate_response(result.get("text", ""), max_chars=max_chars)
+
+    @mcp.tool()
+    def object_find_by_tag(filename: str, tag_name: str, max_results: int = 20) -> dict:
+        """[고급] 문서 XML에서 특정 태그를 검색합니다."""
+        path = resolve_path(filename)
+        return _OPS.object_find_by_tag(path, tag_name, max_results=max_results)
+
+    @mcp.tool()
+    def object_find_by_attr(filename: str, attr_name: str, attr_value: str = None, max_results: int = 20) -> dict:
+        """[고급] 문서 XML에서 특정 속성을 검색합니다."""
+        path = resolve_path(filename)
+        return _OPS.object_find_by_attr(path, "*", attr_name, attr_value or "", max_results=max_results)
+
+    @mcp.tool()
+    def plan_edit(filename: str, instruction: str) -> dict:
+        """[고급/하드닝] 편집 계획을 생성합니다. preview_edit → apply_edit 순으로 사용하세요."""
+        operation = {"op": "searchReplace", "args": {"find": instruction, "replace": instruction}}
+        return _OPS.plan_edit(path=resolve_path(filename), operations=[operation])
+
+    @mcp.tool()
+    def preview_edit(filename: str, plan_id: str) -> dict:
+        """[고급/하드닝] 편집 계획의 미리보기를 반환합니다."""
+        del filename
+        return _OPS.preview_edit(plan_id=plan_id)
+
+    @mcp.tool()
+    def apply_edit(filename: str, plan_id: str) -> dict:
+        """[고급/하드닝] 편집 계획을 적용합니다."""
+        del filename
+        return _OPS.apply_edit(plan_id=plan_id, confirm=True)
+
+    @mcp.tool()
+    def validate_structure(filename: str) -> dict:
+        """[고급] HWPX 문서 구조의 유효성을 검사합니다."""
+        return _OPS.validate_structure(resolve_path(filename))
+
+    @mcp.tool()
+    def lint_text_conventions(filename: str) -> dict:
+        """[고급] 텍스트 규칙(띄어쓰기, 맞춤법 등)을 검사합니다."""
+        return _OPS.lint_text_conventions(resolve_path(filename))
+
+
+def main() -> None:
     mcp.run(transport="stdio")
 
 
