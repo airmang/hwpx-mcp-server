@@ -12,13 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 def _iter_tables(doc: HwpxDocument):
-    seen: set[int] = set()
     for paragraph in doc.paragraphs:
         for table in getattr(paragraph, "tables", []):
-            key = id(table)
-            if key not in seen:
-                seen.add(key)
-                yield table
+            yield table
 
 
 def _resolve_style(style: str | None) -> str | None:
@@ -73,19 +69,27 @@ def insert_paragraph_to_doc(doc: HwpxDocument, paragraph_index: int, text: str, 
 
 
 def delete_paragraph_from_doc(doc: HwpxDocument, paragraph_index: int) -> int:
-    """지정 문단 내용을 비워 삭제 효과를 낸다. 남은 문단 수를 반환."""
+    """지정 문단을 실제 제거한다. 남은 문단 수를 반환."""
     paragraphs = doc.paragraphs
     total = len(paragraphs)
     if paragraph_index < 0 or paragraph_index >= total:
         raise ValueError(f"유효하지 않은 paragraph_index: {paragraph_index}")
+    if total <= 1:
+        # 최소 1개 문단은 유지해 문서 구조를 보존한다.
+        target = paragraphs[paragraph_index]
+        for run in target.runs:
+            run.text = ""
+        return total
+
     target = paragraphs[paragraph_index]
-    for run in target.runs:
-        run.text = ""
-    for table in getattr(target, "tables", []):
-        for row in table.rows:
-            for cell in row.cells:
-                cell.text = ""
-    return total
+    section = target.section
+    section_element = section.element
+    try:
+        section_element.remove(target.element)
+    except ValueError as exc:
+        raise RuntimeError("삭제할 문단 요소를 섹션에서 찾을 수 없습니다.") from exc
+    section.mark_dirty()
+    return total - 1
 
 
 # ── 표 ────────────────────────────────────────────────

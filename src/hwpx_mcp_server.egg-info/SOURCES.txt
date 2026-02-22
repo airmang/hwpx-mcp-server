@@ -38,6 +38,8 @@ src/hwpx_mcp_server/utils/__init__.py
 src/hwpx_mcp_server/utils/helpers.py
 tests/test_advanced.py
 tests/test_content.py
+tests/test_contract.py
+tests/test_file_edit_e2e.py
 tests/test_formatting.py
 tests/test_http_storage.py
 tests/test_hwp_converter.py

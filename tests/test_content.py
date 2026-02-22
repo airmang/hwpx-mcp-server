@@ -64,7 +64,7 @@ def test_delete_paragraph(tmp_path: Path):
     after = len(get_paragraphs_text(str(target))["paragraphs"])
 
     assert result["remaining_paragraphs"] == after
-    assert after == before
+    assert after == before - 1
     texts = [entry["text"] for entry in get_paragraphs_text(str(target))["paragraphs"]]
     assert "삭제 대상" not in texts
 

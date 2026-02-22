@@ -15,6 +15,10 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
+from .compat import patch_python_hwpx
+
+patch_python_hwpx()
+
 from hwpx import ObjectFinder
 from hwpx.document import (
     HwpxDocument,

@@ -133,15 +133,7 @@ def _paragraph_count(doc) -> int:
 
 
 def _table_count(doc) -> int:
-    count = 0
-    seen: set[int] = set()
-    for paragraph in doc.paragraphs:
-        for table in getattr(paragraph, "tables", []):
-            key = id(table)
-            if key not in seen:
-                seen.add(key)
-                count += 1
-    return count
+    return sum(len(getattr(paragraph, "tables", [])) for paragraph in doc.paragraphs)
 
 
 def _outline_level(text: str) -> int:
@@ -267,7 +259,7 @@ def search_and_replace(filename: str, find_text: str, replace_text: str) -> dict
 
 
 @mcp.tool()
-def batch_replace(filename: str, replacements: list[dict]) -> dict:
+def batch_replace(filename: str, replacements: list[dict[str, str]]) -> dict:
     """여러 텍스트를 순서대로 치환합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
@@ -287,7 +279,7 @@ def add_heading(filename: str, text: str, level: int = 1) -> dict:
 
 
 @mcp.tool()
-def add_paragraph(filename: str, text: str, style: str = None) -> dict:
+def add_paragraph(filename: str, text: str, style: str | None = None) -> dict:
     """문서 끝에 문단을 추가합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
@@ -297,7 +289,7 @@ def add_paragraph(filename: str, text: str, style: str = None) -> dict:
 
 
 @mcp.tool()
-def insert_paragraph(filename: str, paragraph_index: int, text: str, style: str = None) -> dict:
+def insert_paragraph(filename: str, paragraph_index: int, text: str, style: str | None = None) -> dict:
     """지정한 위치 앞에 문단을 삽입합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)

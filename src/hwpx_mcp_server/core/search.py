@@ -40,18 +40,14 @@ def replace_in_doc(doc: Any, find_text: str, replace_text: str) -> int:
     count = 0
     try:
         for para in doc.paragraphs:
-            for run in para.runs:
-                if run.text and find_text in run.text:
-                    count += run.text.count(find_text)
-                    run.text = run.text.replace(find_text, replace_text)
+            text = para.text or ""
+            replaced = text.count(find_text)
+            if replaced:
+                para.text = text.replace(find_text, replace_text)
+                count += replaced
 
-        seen: set[int] = set()
         for para in doc.paragraphs:
             for table in getattr(para, "tables", []):
-                key = id(table)
-                if key in seen:
-                    continue
-                seen.add(key)
                 for row in table.rows:
                     for cell in row.cells:
                         if cell.text and find_text in cell.text:
