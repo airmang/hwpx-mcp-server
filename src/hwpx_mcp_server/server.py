@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime
 from pathlib import Path
 
+import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
 
 from .core.content import (
@@ -32,6 +34,91 @@ from .hwpx_ops import HwpxOps
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
 mcp = FastMCP("hwpx-mcp-server")
+
+
+def _error_data(
+    message: str,
+    *,
+    tool_name: str | None = None,
+    arguments: dict | None = None,
+    code: int = -32000,
+) -> mcp_types.ErrorData:
+    data: dict[str, object] = {}
+    if tool_name is not None:
+        data["tool"] = tool_name
+    if arguments is not None:
+        data["arguments"] = arguments
+    return mcp_types.ErrorData(code=code, message=message, data=data)
+
+
+def _first_text_content(content: object) -> str | None:
+    if not isinstance(content, list):
+        return None
+    for item in content:
+        text = getattr(item, "text", None)
+        if isinstance(text, str):
+            stripped = text.strip()
+            if stripped:
+                return stripped
+        if isinstance(item, dict):
+            value = item.get("text")
+            if isinstance(value, str):
+                stripped = value.strip()
+                if stripped:
+                    return stripped
+    return None
+
+
+async def _strict_call_tool_handler(req: mcp_types.CallToolRequest):
+    tool_name = req.params.name
+    arguments = req.params.arguments or {}
+    try:
+        result = await mcp.call_tool(tool_name, arguments)
+    except Exception as exc:
+        return _error_data(str(exc), tool_name=tool_name, arguments=arguments)
+
+    if isinstance(result, mcp_types.CreateTaskResult):
+        return mcp_types.ServerResult(result)
+
+    if isinstance(result, mcp_types.CallToolResult):
+        if bool(result.isError):
+            text = _first_text_content(result.content) or f"Tool '{tool_name}' returned an error"
+            return _error_data(text, tool_name=tool_name, arguments=arguments)
+        return mcp_types.ServerResult(result)
+
+    if isinstance(result, tuple) and len(result) == 2:
+        unstructured_content = list(result[0])
+        structured_content = result[1]
+    elif isinstance(result, dict):
+        structured_content = result
+        unstructured_content = [
+            mcp_types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))
+        ]
+    elif isinstance(result, str):
+        structured_content = None
+        unstructured_content = [mcp_types.TextContent(type="text", text=result)]
+    elif hasattr(result, "__iter__"):
+        structured_content = None
+        unstructured_content = list(result)
+    else:
+        return _error_data(
+            f"Unexpected return type from tool '{tool_name}': {type(result).__name__}",
+            tool_name=tool_name,
+            arguments=arguments,
+        )
+
+    return mcp_types.ServerResult(
+        mcp_types.CallToolResult(
+            content=unstructured_content,
+            structuredContent=structured_content,
+            isError=False,
+        )
+    )
+
+
+# FastMCP default call_tool handler serializes exceptions as result.isError.
+# Replace it so real tool failures surface as JSON-RPC error objects.
+mcp._mcp_server.request_handlers[mcp_types.CallToolRequest] = _strict_call_tool_handler
 
 
 def _advanced_enabled() -> bool:
@@ -492,6 +579,7 @@ if _advanced_enabled():
 
 
 def main() -> None:
+    os.environ.setdefault("HWPX_MCP_SANDBOX_ROOT", str(Path.cwd()))
     mcp.run(transport="stdio")
 
 

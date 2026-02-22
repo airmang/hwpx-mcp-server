@@ -33,6 +33,24 @@ def test_create_custom_style(tmp_path: Path):
     assert any(style.get("name") == "강조체" for style in styles)
 
 
+def test_create_custom_style_increases_style_count_without_overwrite(tmp_path: Path):
+    target = tmp_path / "style_count.hwpx"
+    create_document(str(target))
+
+    before = list_styles(str(target))["styles"]
+    before_by_id = {entry.get("id"): entry.get("name") for entry in before}
+
+    create_custom_style(str(target), "신규스타일", bold=True)
+
+    after = list_styles(str(target))["styles"]
+    after_by_id = {entry.get("id"): entry.get("name") for entry in after}
+
+    assert len(after) == len(before) + 1
+    assert any(entry.get("name") == "신규스타일" for entry in after)
+    for style_id, name in before_by_id.items():
+        assert after_by_id.get(style_id) == name
+
+
 def test_list_styles(tmp_path: Path):
     target = tmp_path / "test.hwpx"
     create_document(str(target))

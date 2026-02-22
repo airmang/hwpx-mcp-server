@@ -126,6 +126,8 @@ def create_style_in_doc(
 
     header = doc.headers[0]
     styles_element = header._styles_element()
+    if styles_element is None:
+        raise RuntimeError("스타일 정보를 찾을 수 없습니다.")
 
     for style_element in styles_element.findall(f"{HH_NS}style"):
         if style_element.get("name") == name:
@@ -134,9 +136,26 @@ def create_style_in_doc(
     styles = styles_element.findall(f"{HH_NS}style")
     if not styles:
         raise RuntimeError("스타일 정보를 찾을 수 없습니다.")
-    target = styles[-1]
+
+    def _next_style_id() -> str:
+        max_id = -1
+        for style_element in styles:
+            raw = style_element.get("id")
+            try:
+                if raw is not None:
+                    max_id = max(max_id, int(raw))
+            except ValueError:
+                continue
+        return str(max_id + 1)
+
+    # 기존 스타일을 덮어쓰지 않고 새 노드를 복제/추가한다.
+    target = deepcopy(styles[-1])
+    new_id = _next_style_id()
+    target.set("id", new_id)
     target.set("name", name)
     target.set("engName", name)
+    target.set("nextStyleIDRef", new_id)
+    styles_element.append(target)
     header.mark_dirty()
 
 
