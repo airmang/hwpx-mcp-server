@@ -29,7 +29,7 @@ from .core.document import create_blank, open_doc, save_doc
 from .core.formatting import create_style_in_doc, format_text_range, list_styles_in_doc
 from .core.search import batch_replace_in_doc, find_in_doc, replace_in_doc
 from .hwpx_ops import HwpxOps
-from .utils.helpers import resolve_path, truncate_response
+from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
 mcp = FastMCP("hwpx-mcp-server")
 
@@ -96,7 +96,7 @@ def get_document_info(filename: str) -> dict:
 
 
 @mcp.tool()
-def get_document_text(filename: str, max_chars: int = 10000) -> dict:
+def get_document_text(filename: str, max_chars: int | None = None) -> dict:
     """HWPX 문서의 전체 텍스트를 추출합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
@@ -130,10 +130,18 @@ def get_paragraph_text(filename: str, paragraph_index: int) -> dict:
 
 
 @mcp.tool()
-def get_paragraphs_text(filename: str, start_index: int = 0, end_index: int = None, max_chars: int = 10000) -> dict:
+def get_paragraphs_text(
+    filename: str,
+    start_index: int = 0,
+    end_index: int = None,
+    max_chars: int | None = None,
+) -> dict:
     """지정 범위의 문단 텍스트를 반환합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
+    if max_chars is None:
+        max_chars = default_max_chars()
+
     total = len(doc.paragraphs)
     end = total if end_index is None else min(end_index, total)
     start = max(0, start_index)

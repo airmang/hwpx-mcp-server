@@ -4,6 +4,8 @@ from typing import Any
 
 
 def find_in_doc(doc: Any, text_to_find: str, match_case: bool = True, max_results: int = 50) -> dict:
+    if text_to_find == "":
+        raise ValueError("text_to_find는 빈 문자열일 수 없습니다.")
     matches: list[dict] = []
     needle = text_to_find if match_case else text_to_find.lower()
 
@@ -32,6 +34,9 @@ def find_in_doc(doc: Any, text_to_find: str, match_case: bool = True, max_result
 
 
 def replace_in_doc(doc: Any, find_text: str, replace_text: str) -> int:
+    if find_text == "":
+        raise ValueError("find_text는 빈 문자열일 수 없습니다.")
+
     count = 0
     try:
         for para in doc.paragraphs:
@@ -60,9 +65,15 @@ def replace_in_doc(doc: Any, find_text: str, replace_text: str) -> int:
 def batch_replace_in_doc(doc: Any, replacements: list[dict]) -> dict:
     results: list[dict] = []
     total = 0
-    for item in replacements:
+    for index, item in enumerate(replacements):
+        if not isinstance(item, dict):
+            raise ValueError(f"replacements[{index}]는 dict여야 합니다.")
+
         found = str(item.get("find", ""))
         repl = str(item.get("replace", ""))
+        if found == "":
+            raise ValueError(f"replacements[{index}].find는 빈 문자열일 수 없습니다.")
+
         replaced = replace_in_doc(doc, found, repl)
         total += replaced
         results.append({"find": found, "replace": repl, "replaced_count": replaced})

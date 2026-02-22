@@ -90,3 +90,27 @@ def test_find_text(sample_file: Path):
     first = result["matches"][0]
     assert "paragraph_index" in first
     assert "context" in first
+
+
+def test_search_and_replace_rejects_empty_find(sample_file: Path):
+    _append_paragraph(sample_file, "abc")
+
+    with pytest.raises(ValueError):
+        search_and_replace(str(sample_file), "", "X")
+
+
+def test_batch_replace_rejects_empty_find(sample_file: Path):
+    _append_paragraph(sample_file, "abc")
+
+    with pytest.raises(ValueError):
+        batch_replace(str(sample_file), [{"find": "", "replace": "X"}])
+
+
+def test_get_document_text_uses_env_default_limit(sample_file: Path, monkeypatch: pytest.MonkeyPatch):
+    _append_paragraph(sample_file, "가" * 300)
+    monkeypatch.setenv("HWPX_MCP_MAX_CHARS", "40")
+
+    result = get_document_text(str(sample_file))
+
+    assert result["truncated"] is True
+    assert len(result["text"]) == 40

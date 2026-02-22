@@ -3,6 +3,8 @@ pydantic>=2.7
 anyio>=4.0
 mcp>=1.14.1
 modelcontextprotocol>=0.1.0
+olefile>=0.47
+uvicorn>=0.30
 
 [test]
 pytest>=8.0

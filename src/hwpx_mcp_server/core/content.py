@@ -28,14 +28,6 @@ def _resolve_style(style: str | None) -> str | None:
     return value or None
 
 
-def _ensure_lxml_et_for_memo() -> None:
-    """python-hwpx memo API의 ET 타입 불일치를 보정한다."""
-    import hwpx.oxml.document as oxml_document
-    from lxml import etree
-
-    oxml_document.ET = etree
-
-
 # ── 문단 ──────────────────────────────────────────────
 
 def add_heading_to_doc(doc: HwpxDocument, text: str, level: int = 1) -> int:
@@ -64,19 +56,19 @@ def insert_paragraph_to_doc(doc: HwpxDocument, paragraph_index: int, text: str, 
         return add_paragraph_to_doc(doc, text, style)
 
     target = doc.paragraphs[paragraph_index]
+    section = target.section
     style_id = _resolve_style(style)
-    inserted = target.section.add_paragraph(text or "", style_id_ref=style_id)
+    inserted = section.add_paragraph(text or "", style_id_ref=style_id)
 
-    target_parent = target.element.getparent()
-    if target_parent is None:
-        raise RuntimeError("대상 문단의 부모 요소를 찾을 수 없습니다.")
+    section_element = section.element
+    try:
+        target_position = list(section_element).index(target.element)
+    except ValueError as exc:
+        raise RuntimeError("대상 문단 요소를 섹션에서 찾을 수 없습니다.") from exc
 
-    inserted_parent = inserted.element.getparent()
-    if inserted_parent is None:
-        raise RuntimeError("삽입 문단의 부모 요소를 찾을 수 없습니다.")
-
-    inserted_parent.remove(inserted.element)
-    target_parent.insert(target_parent.index(target.element), inserted.element)
+    # add_paragraph는 항상 끝에 붙으므로, 생성한 요소를 제거한 뒤 목표 위치에 재삽입한다.
+    section_element.remove(inserted.element)
+    section_element.insert(target_position, inserted.element)
     return paragraph_index
 
 
@@ -246,7 +238,6 @@ def add_memo_to_doc(doc: HwpxDocument, paragraph_index: int, text: str) -> None:
     if paragraph_index < 0 or paragraph_index >= len(paragraphs):
         raise ValueError(f"유효하지 않은 paragraph_index: {paragraph_index}")
 
-    _ensure_lxml_et_for_memo()
     paragraph = paragraphs[paragraph_index]
     doc.add_memo_with_anchor(text or "", paragraph=paragraph)
 

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: hwpx-mcp-server
-Version: 0.4.5
+Version: 2.0.0
 Summary: Model Context Protocol server for local HWPX document automation.
 Author: Kohkyuhyun
 License: MIT License
@@ -33,45 +33,200 @@ Requires-Dist: pydantic>=2.7
 Requires-Dist: anyio>=4.0
 Requires-Dist: mcp>=1.14.1
 Requires-Dist: modelcontextprotocol>=0.1.0
+Requires-Dist: olefile>=0.47
+Requires-Dist: uvicorn>=0.30
 Provides-Extra: test
 Requires-Dist: pytest>=8.0; extra == "test"
 Dynamic: license-file
 
-# 한글 MCP (HWPX) 서버 - 한글 자동화 HWPX 문서 자동 생성·편집·검증mcp #
+<p align="center">
+  <h1 align="center">📄 hwpx-mcp-server</h1>
+  <p align="center">
+    <strong>한글(HWPX) 문서를 AI로 자동화하는 MCP 서버</strong>
+  </p>
+  <p align="center">
+    한글 워드프로세서 없이 · 순수 파이썬 · 크로스 플랫폼
+  </p>
+  <p align="center">
+    <a href="https://pypi.org/project/hwpx-mcp-server/"><img src="https://img.shields.io/pypi/v/hwpx-mcp-server?style=flat-square&color=blue" alt="PyPI"></a>
+    <a href="https://pypi.org/project/hwpx-mcp-server/"><img src="https://img.shields.io/pypi/pyversions/hwpx-mcp-server?style=flat-square" alt="Python"></a>
+    <a href="https://github.com/airmang/hwpx-mcp-server/blob/main/LICENSE"><img src="https://img.shields.io/github/license/airmang/hwpx-mcp-server?style=flat-square" alt="License"></a>
+    <a href="https://github.com/airmang/hwpx-mcp-server/actions"><img src="https://img.shields.io/github/actions/workflow/status/airmang/hwpx-mcp-server/test.yml?style=flat-square&label=tests" alt="Tests"></a>
+  </p>
+</p>
 
-이 프로젝트는 **한글 MCP(HWPX) 서버**로, HWPX 문서를 한글 워드프로세서 없이 직접 열고 자동화할 수 있도록 설계되었습니다.  
-Gemini CLI, Claude Desktop과 같은 MCP 클라이언트에 연결하여 문서 생성·편집·탐색 기능을 제공합니다.
+---
 
-[](https://www.google.com/search?q=https://pypi.org/project/hwpx-mcp-server/)
-[](https://opensource.org/licenses/MIT)
-[](https://www.google.com/search?q=https://github.com/your-repo/hwpx-mcp-server/actions/workflows/ci.yml)
+**hwpx-mcp-server**는 [Model Context Protocol(MCP)](https://modelcontextprotocol.io) 표준을 따르는 서버로, [python-hwpx](https://github.com/airmang/python-hwpx) 라이브러리 기반으로 HWPX 문서의 열람 · 검색 · 편집 · 저장을 AI 클라이언트에서 직접 수행할 수 있게 합니다.
 
-**순수 파이썬으로 HWPX 문서를 자유롭게 다루는 가장 강력한 방법.**
+> **Note** — 이 서버는 Open XML 기반 `.hwpx` 포맷을 지원합니다. 레거시 바이너리 `.hwp` 포맷은 지원하지 않습니다.
 
+<br>
 
-`hwpx-mcp-server`는 [Model Context Protocol](https://github.com/modelcontextprotocol/specification) 표준을 따르는 서버로, 강력한 [`python-hwpx`](https://www.google.com/search?q=%5Bhttps://github.com/airmang/python-hwpx%5D\(https://github.com/airmang/python-hwpx\)) 라이브러리를 기반으로 합니다. Gemini, Claude와 같은 최신 AI 클라이언트와 완벽하게 연동하여 한글 워드 프로세서 로컬 HWPX 문서를 열람, 검색, 편집, 저장하는 풍부한 기능을 제공합니다.
+## Why?
 
------
+한국의 공공기관·학교·기업에서 매일 수만 건의 한글 문서가 오갑니다. 그런데 이 문서를 프로그래밍으로 다루려면? 한글 워드프로세서가 설치된 Windows에서만, COM 자동화로만 가능했습니다.
 
-## ✨ 주요 기능
+**hwpx-mcp-server**는 이 제약을 없앱니다.
 
-  * **✅ 표준 MCP 서버 구현**: 공식 `mcp` SDK를 사용하여 안정적인 표준 입/출력 기반 서버를 제공합니다.
-  * **📂 제로 설정**: 별도 설정 없이 현재 작업 디렉터리를 기준으로 즉시 경로를 처리합니다.
-  * **📄 강력한 문서 편집**: 텍스트 추출, 페이지네이션부터 스타일, 표, 메모, 개체 편집까지 모두 가능합니다.
-  * **🛡️ 안전한 저장**: 자동 백업(`*.bak`) 옵션으로 예기치 않은 데이터 손실을 방지합니다.
-  * **🚀 즉시 실행**: `uv`만 있으면 `uvx hwpx-mcp-server` 한 줄로 바로 시작할 수 있습니다.
+- ✅ **OS 무관** — Windows, macOS, Linux 어디서든 동작
+- ✅ **한글 워드프로세서 불필요** — 순수 파이썬으로 HWPX를 직접 파싱
+- ✅ **AI 네이티브** — Claude Desktop, Gemini CLI 등 MCP 클라이언트와 바로 연결
 
-## 🚀 빠른 시작
+<br>
 
-### 1\. `uv` 설치
+## Quick Start
 
-가장 먼저 파이썬 패키지 설치 도구인 `uv`를 설치하세요.
-[👉 Astral uv 설치 가이드](https://docs.astral.sh/uv/getting-started/installation/)
+### 1. 설치 & 실행
 
+[uv](https://docs.astral.sh/uv/getting-started/installation/)만 있으면 한 줄로 시작합니다.
 
-### 2\. MCP 클라이언트 설정
+```bash
+uvx hwpx-mcp-server
+```
 
-사용 중인 MCP 클라이언트 설정에 아래와 같이 서버 정보를 추가하세요.
+> `python-hwpx >= 1.9` 이상이 필요하며, 첫 실행 시 자동 설치됩니다.
+
+### 2. MCP 클라이언트 설정
+
+<details>
+<summary><b>Claude Desktop</b></summary>
+
+`claude_desktop_config.json`에 추가:
+
+```json
+{
+  "mcpServers": {
+    "hwpx": {
+      "command": "uvx",
+      "args": ["hwpx-mcp-server"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Gemini CLI</b></summary>
+
+`~/.gemini/settings.json`에 추가:
+
+```json
+{
+  "mcpServers": {
+    "hwpx": {
+      "command": "uvx",
+      "args": ["hwpx-mcp-server"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (Copilot Chat)</b></summary>
+
+`.vscode/mcp.json`에 추가:
+
+```json
+{
+  "servers": {
+    "hwpx": {
+      "command": "uvx",
+      "args": ["hwpx-mcp-server"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Cursor / Windsurf</b></summary>
+
+각 에디터의 MCP 설정 파일에 동일한 JSON 블록을 추가하세요:
+
+```json
+{
+  "mcpServers": {
+    "hwpx": {
+      "command": "uvx",
+      "args": ["hwpx-mcp-server"]
+    }
+  }
+}
+```
+
+</details>
+
+<br>
+
+## Features
+
+### 📖 읽기 & 탐색
+
+| 도구 | 설명 |
+|------|------|
+| `open_info` | 문서 메타데이터 · 문단 수 · 헤더 개수 요약 |
+| `read_text` | 페이지네이션 기반 텍스트 추출 (기본 200문단 단위) |
+| `read_paragraphs` | 특정 문단만 선택적으로 추출 |
+| `text_extract_report` | 주석 포함 전체 텍스트 리포트 |
+| `find` | 키워드 검색 + 전후 컨텍스트 스니펫 반환 |
+| `find_runs_by_style` | 스타일 기반 런(run) 검색 |
+| `list_sections` / `list_headers` | 섹션 · 헤더 구조 탐색 |
+
+### ✏️ 편집
+
+| 도구 | 설명 |
+|------|------|
+| `replace_text_in_runs` | 스타일 보존 텍스트 치환 (`dryRun` 지원) |
+| `add_paragraph` / `insert_paragraphs_bulk` | 문단 추가 (단일 · 벌크) |
+| `add_table` / `set_table_cell_text` / `replace_table_region` | 표 생성 · 셀 편집 · 영역 치환 |
+| `get_table_cell_map` / `split_table_cell` | 병합 셀 매핑 · 분할 |
+| `add_memo` / `add_memo_with_anchor` / `remove_memo` | 메모 관리 |
+| `add_shape` / `add_control` | 개체 · 컨트롤 추가 |
+
+### 🎨 스타일링
+
+| 도구 | 설명 |
+|------|------|
+| `ensure_run_style` | 스타일 존재 확인 · 생성 |
+| `apply_style_to_text_ranges` | 단어 단위 스타일 적용 |
+| `apply_style_to_paragraphs` | 문단 단위 스타일 적용 |
+| `list_styles_and_bullets` | 사용 가능한 스타일 · 글머리표 목록 |
+
+### 💾 파일 관리
+
+| 도구 | 설명 |
+|------|------|
+| `save` / `save_as` | 저장 (자동 `.bak` 백업 옵션) |
+| `make_blank` | 새 빈 문서 생성 |
+| `validate_structure` / `lint_text_conventions` | 구조 검증 · 텍스트 린트 |
+
+### 🔬 OPC 패키지 내부 (읽기 전용)
+
+| 도구 | 설명 |
+|------|------|
+| `package_parts` | 패키지 내 모든 파트 경로 목록 |
+| `package_get_text` / `package_get_xml` | 파트를 텍스트 또는 XML로 조회 |
+| `object_find_by_tag` / `object_find_by_attr` | XML 요소 검색 |
+
+<br>
+
+## Configuration
+
+환경 변수로 서버 동작을 조정합니다.
+
+| 변수 | 설명 | 기본값 |
+|------|------|--------|
+| `HWPX_MCP_PAGING_PARA_LIMIT` | `read_text`가 반환하는 최대 문단 수 | `200` |
+| `HWPX_MCP_AUTOBACKUP` | `1`이면 저장 전 `.bak` 백업 생성 | `0` |
+| `LOG_LEVEL` | stderr JSONL 로그 레벨 | `INFO` |
+| `HWPX_MCP_HARDENING` | `1`이면 3단계 편집 파이프라인 + 검색/컨텍스트 도구 활성화 | `0` |
+
+환경 변수를 포함한 전체 설정 예시:
 
 ```json
 {
@@ -88,155 +243,88 @@ Gemini CLI, Claude Desktop과 같은 MCP 클라이언트에 연결하여 문서 
   }
 }
 ```
-### 3\. 서버 실행 (로컬 환경에서 사용할 경우)
 
-터미널에서 아래 명령어를 실행하면 서버가 바로 시작됩니다.
+<br>
 
-```bash
-uvx hwpx-mcp-server
+## Advanced
+
+<details>
+<summary><b>📁 문서 로케이터 (Document Locator)</b></summary>
+
+모든 도구는 문서를 가리키는 **discriminated union** 로케이터를 사용합니다.
+
+**로컬 파일** (기본값 — 기존 스키마와 동일):
+
+```json
+{ "path": "sample.hwpx" }
 ```
 
-> `uvx` 명령은 첫 실행 시 필요한 종속성을 자동으로 설치하며, 반드시 `python-hwpx 1.9` 이상의 버전이 준비되어야 합니다.
+**HTTP 백엔드 연계**:
 
+```json
+{ "type": "uri", "uri": "reports/weekly.hwpx", "backend": "http" }
+```
 
-> 서버는 실행된 현재 디렉터리를 기준으로 경로를 해석하므로, 별도의 작업 디렉터리 설정 없이 바로 사용할 수 있습니다.
+**사전 등록된 핸들** (하드닝 모드에서 후속 편집 시):
 
-## ⚙️ 환경 변수
+```json
+{ "type": "handle", "handleId": "doc-1234" }
+```
 
-| 변수 | 설명 | 기본값 |
-| --- | --- | --- |
-| `HWPX_MCP_PAGING_PARA_LIMIT` | 페이지네이션 도구가 반환할 최대 문단 수 | `200` |
-| `HWPX_MCP_AUTOBACKUP` | `1`이면 저장 전 `<file>.bak` 백업 생성 | `0` |
-| `LOG_LEVEL` | stderr에 JSONL 형식으로 출력할 로그 레벨 | `INFO` |
-| `HWPX_MCP_HARDENING` | `1`로 설정 시 하드닝 편집 파이프라인과 검색/컨텍스트 도구 활성화 | `0` |
+</details>
 
-> ℹ️ `read_text` 도구는 기본적으로 최대 200개의 문단을 반환합니다. 더 큰 덤프가 필요하면 도구 호출 시 `limit` 인수를 직접 지정하거나 `HWPX_MCP_PAGING_PARA_LIMIT` 환경 변수를 확장하세요. 이는 Microsoft Office Word에서 필요한 범위만 순차적으로 읽는 워크플로와 동일합니다.
+<details>
+<summary><b>🔐 하드닝 편집 파이프라인</b></summary>
 
-> 🔐 `HWPX_MCP_HARDENING=1`로 실행하면 새 편집 파이프라인(`plan → preview → apply`)과 검색/컨텍스트 도구가 함께 노출됩니다. 값이 `0` 또는 미설정이면 기존 도구 표면만 유지됩니다.
+`HWPX_MCP_HARDENING=1`로 활성화하면 모든 편집이 **Plan → Preview → Apply** 3단계를 거칩니다.
 
-### 📁 문서 로케이터(Document Locator)
+| 단계 | 도구 | 설명 |
+|------|------|------|
+| 1. 계획 | `hwpx.plan_edit` | 변경 대상과 의도를 설명하면 `planId`와 작업 요약을 반환 |
+| 2. 검토 | `hwpx.preview_edit` | diff, 모호성 경고, 안전 점수를 포함한 미리보기 |
+| 3. 적용 | `hwpx.apply_edit` | `confirm: true` 명시 시 실제 문서 변경 수행 |
 
-모든 도구의 입력은 이제 문서를 가리키는 **discriminated union** 로케이터를 사용합니다. 기본값은 기존과 동일하게 상위 수준의 `path` 필드이며, 별도 선언 없이도 계속 사용할 수 있습니다. 필요에 따라 명시적으로 `type`을 지정해 HTTP 백엔드나 사전 등록된 핸들을 사용할 수 있습니다.
+추가 지원 도구:
 
-- **로컬 파일 (기존 스키마와 동일)**
+- **`hwpx.search`** — 정규식/키워드 기반 문서 검색
+- **`hwpx.get_context`** — 특정 문단 주변 제한 창(window) 추출
 
-  ```jsonc
-  {
-    "name": "open_info",
-    "arguments": {
-      "path": "sample.hwpx"
-    }
-  }
-  ```
+에러 코드: `PREVIEW_REQUIRED` · `AMBIGUOUS_TARGET` · `UNSAFE_WILDCARD` · `IDEMPOTENT_REPLAY`
 
-- **HTTP 백엔드와 연계** — 서버를 HTTP 스토리지 모드로 실행한 경우, 원격 경로를 `uri` 필드로 지정하고 필요 시 `backend` 힌트를 제공할 수 있습니다.
+</details>
 
-  ```jsonc
-  {
-    "name": "open_info",
-    "arguments": {
-      "type": "uri",
-      "uri": "reports/weekly.hwpx",
-      "backend": "http"
-    }
-  }
-  ```
+<details>
+<summary><b>📐 표 편집 고급 옵션</b></summary>
 
-- **사전 등록된 핸들 사용** — 하드닝 파이프라인에서 이미 로드된 문서에 대해 후속 검색/컨텍스트/편집을 수행할 때는 `handleId`를 전달하면 됩니다.
+`get_table_cell_map`으로 전체 격자를 직렬화하여 각 위치의 앵커 셀, 병합 범위를 확인합니다.
 
-  ```jsonc
-  {
-    "name": "hwpx.plan_edit",
-    "arguments": {
-      "type": "handle",
-      "handleId": "doc-1234",
-      "operations": [
-        {
-          "target": {"nodeId": "n_deadbeef"},
-          "match": "needle",
-          "replacement": "haystack"
-        }
-      ]
-    }
-  }
-  ```
-
-각 변형은 필요에 따라 `backend` 필드를 추가로 가질 수 있으며, 명시적으로 `document` 객체를 중첩하여 전달하는 것도 허용됩니다. 스키마는 Sanitizer를 거쳐 `$ref` 없이 평탄화된 형태로 제공됩니다.
-
-### 🔐 하드닝 편집 파이프라인 (옵션)
-
-하드닝 플래그를 켜면 모든 편집 요청이 **계획(Plan) → 검토(Preview) → 적용(Apply)**의 3단계를 거치도록 설계된 신규 도구가 함께 노출됩니다. 하드닝 플래그는 저렴한 LLM 모델의 요청에도 성공적인 작업을 수행하기 위해서 도입한 테스트중인 기능입니다. 
-
-1. **`hwpx.plan_edit`**: 변경 대상과 의도한 작업을 설명하면 서버가 안정적인 `planId`와 예상 작업 요약을 제공합니다.
-2. **`hwpx.preview_edit`**: 발급된 `planId`로 미리보기를 요청하면 실제 diff, 모호성 경고, 안전 점수 등을 포함한 리뷰 데이터를 반환합니다. 이 단계가 기록되지 않으면 적용 단계로 넘어갈 수 없습니다.
-3. **`hwpx.apply_edit`**: `preview`를 거친 동일한 `planId`에 `confirm: true`를 명시해야 실제 문서 변경이 이루어집니다. `idempotencyKey`를 지정하면 동일 요청이 반복되더라도 안전하게 무시됩니다.
-
-각 단계는 표준 `ServerResponse` 래퍼를 사용하며, 오류 발생 시 `PREVIEW_REQUIRED`, `AMBIGUOUS_TARGET`, `UNSAFE_WILDCARD`, `IDEMPOTENT_REPLAY` 등의 코드와 함께 후속 행동 예시(`next_actions`)를 반환합니다. 모든 스키마는 draft-07 호환 Sanitizer를 통해 `$ref`, `anyOf` 없이 평탄화되어 노출됩니다.
-
-또한 하드닝 모드에서는 지원 도구가 확장됩니다.
-
-- **`hwpx.search`**: 정규식 또는 키워드 기반으로 문서 전반을 검색하여 노출 가능한 문맥만 포함한 일치 결과를 제공합니다.
-- **`hwpx.get_context`**: 특정 문단 주변의 제한된 창(window)만 추출하여 프라이버시를 유지한 채 리뷰에 활용할 수 있습니다.
-
-## 🛠️ 제공 도구
-
-다양한 문서 편집 및 관리 도구를 제공합니다. 각 도구의 상세한 입출력 형식은 `ListTools` 응답에 포함된 JSON 스키마를 통해 확인할 수 있습니다.
-
-\<details\>
-\<summary\>\<b\>전체 도구 목록 펼쳐보기...\</b\>\</summary\>
-
-  - **문서 정보 및 탐색**
-      - `open_info`: 문서 메타데이터 및 단락·헤더 개수 요약
-      - `list_sections`, `list_headers`: 섹션/헤더 구조 탐색
-      - `list_master_pages_histories_versions`: 마스터 페이지/히스토리/버전 요약
-  - **콘텐츠 추출 및 검색**
-      - `read_text`, `read_paragraphs`, `text_extract_report`: 페이지네이션, 선택 문단, 주석 포함 텍스트 추출
-      - `find`, `find_runs_by_style`: 텍스트 검색 및 스타일 기반 검색
-      - `hwpx.search` *(플래그 활성 시)*: 정규식/키워드 검색과 안정적인 노드 식별자 반환
-      - `hwpx.get_context` *(플래그 활성 시)*: 문단 전후 문맥만 제한적으로 조회
-  - **문서 편집**
-      - `replace_text_in_runs`: 스타일을 보존하며 텍스트 치환 (기본적으로 문서를 저장하므로,
-        미리보기만 원하면 `dryRun: true`를 지정하세요.)
-      - `add_paragraph`, `insert_paragraphs_bulk`: 문단 추가
-      - `add_table`, `get_table_cell_map`, `set_table_cell_text`, `replace_table_region`, `split_table_cell`: 표 생성·편집 및 병합 해제
-      - `add_shape`, `add_control`: 개체 추가
-      - `add_memo`, `attach_memo_field`, `add_memo_with_anchor`, `remove_memo`: 메모 관리
-      - `hwpx.plan_edit`, `hwpx.preview_edit`, `hwpx.apply_edit` *(플래그 활성 시)*: 검증된 3단계 편집 파이프라인
-  - **스타일링**
-      - `ensure_run_style`, `list_styles_and_bullets`: 스타일 및 글머리표 목록 확인/생성
-      - `apply_style_to_text_ranges`, `apply_style_to_paragraphs`: 단어/문단 단위 스타일 적용
-  - **파일 관리**
-      - `save`, `save_as`: 문서 저장
-      - `make_blank`: 새 빈 문서 생성
-  - **구조 검증 및 고급 검색**
-      - `object_find_by_tag`, `object_find_by_attr`: XML 요소 검색
-      - `validate_structure`, `lint_text_conventions`: 문서 구조 검증 및 텍스트 린트
-
-\</details\>
-
-### 🎯 필요한 문단만 빠르게 읽기
-
-대용량 문서를 순차적으로 확인할 때는 `read_text` 페이지네이션이 편리하지만, 특정 문단만 바로 확인하고 싶을 때는 `read_paragraphs` 도구가 더 적합합니다. `paragraphIndexes` 배열에 원하는 문단 번호만 전달하면, 요청한 문단만 순서대로 반환합니다. 각 항목에는 원본 문단 인덱스(`paragraphIndex`)와 추출된 텍스트가 함께 포함되므로, 이전 호출에서 기억한 문단을 정확히 다시 불러올 수 있습니다.
-
-```jsonc
+```json
 {
-  "name": "read_paragraphs",
+  "name": "set_table_cell_text",
   "arguments": {
     "path": "sample.hwpx",
-    "paragraphIndexes": [1, 4, 9],
-    "withHighlights": false,
-    "withFootnotes": false
+    "tableIndex": 0,
+    "row": 1, "col": 1,
+    "text": "논리 좌표 편집",
+    "logical": true,
+    "splitMerged": true,
+    "autoFit": true
   }
 }
 ```
 
-선택된 문단만 처리하므로 큰 문서를 반복해서 탐색할 때 불필요한 텍스트 복사를 줄이고, 하이라이트/각주 옵션도 `read_text`와 동일하게 활용할 수 있습니다. 존재하지 않는 인덱스를 요청하면 오류가 발생하므로, 이전에 받은 문단 개수 정보를 활용해 안전하게 요청하세요.
+- `logical: true` — 논리 좌표계 사용
+- `splitMerged: true` — 쓰기 전 병합 영역 자동 분할
+- `autoFit: true` — 셀 내용에 맞춰 열 너비 재계산
 
-### 🔍 검색 문맥 길이 조절
+</details>
 
-`find` 도구는 각 일치 항목 주변의 전후 80자를 기본으로 잘라 `context` 스니펫을 반환하며, 잘린 경우 문자열 앞뒤에 `...`이 붙습니다. 더 넓은 범위가 필요하면 `contextRadius` 인수를 사용해 유지할 문자 수를 조정할 수 있습니다.
+<details>
+<summary><b>🔍 검색 컨텍스트 길이 조절</b></summary>
 
-```jsonc
+`find` 도구는 기본 전후 80자의 컨텍스트 스니펫을 반환합니다. `contextRadius` 인수로 조정 가능합니다:
+
+```json
 {
   "name": "find",
   "arguments": {
@@ -247,113 +335,88 @@ uvx hwpx-mcp-server
 }
 ```
 
-`contextRadius` 값은 일치 구간 앞뒤 각각에 포함할 문자 수를 의미합니다.
+</details>
 
-### 📐 표 편집 고급 옵션
+<br>
 
-`get_table_cell_map` 도구를 사용하면 표의 전체 격자를 그대로 직렬화하여 각 위치가 어느 앵커 셀(`anchor`)에 속하는지, 병합 범위(`rowSpan`, `colSpan`)는 얼마인지 한눈에 확인할 수 있습니다. 응답은 항상 행×열 전체를 채우며, 각 위치에 대해 `row`/`column` 좌표와 병합된 앵커 셀의 텍스트를 알려 줍니다.
-
-```jsonc
-{
-  "name": "get_table_cell_map",
-  "arguments": {"path": "sample.hwpx", "tableIndex": 0},
-  "result": {
-    "rowCount": 3,
-    "columnCount": 3,
-    "grid": [
-      [
-        {"row": 0, "column": 0, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
-        {"row": 0, "column": 1, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
-        {"row": 0, "column": 2, "anchor": {"row": 0, "column": 2}, "rowSpan": 3, "colSpan": 1, "text": "요약"}
-      ],
-      [
-        {"row": 1, "column": 0, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
-        {"row": 1, "column": 1, "anchor": {"row": 0, "column": 0}, "rowSpan": 2, "colSpan": 2, "text": "제목"},
-        {"row": 1, "column": 2, "anchor": {"row": 0, "column": 2}, "rowSpan": 3, "colSpan": 1, "text": "요약"}
-      ],
-      "... 생략 ..."
-    ]
-  }
-}
-```
-
-`set_table_cell_text`와 `replace_table_region`은 선택적인 `logical`/`splitMerged` 플래그를 지원합니다. `logical: true`로 지정하면 방금 확인한 논리 좌표계를 그대로 사용할 수 있고, `splitMerged: true`를 함께 전달하면 쓰기 전에 자동으로 해당 병합 영역을 분할합니다. 긴 텍스트를 채울 때는 `autoFit: true`를 추가로 지정하면 각 열 너비가 셀 내용 길이에 맞춰 다시 계산되어 표 전체 폭(`hp:sz`)과 셀 크기(`hp:cellSz`)가 함께 업데이트됩니다. 병합을 직접 해제해야 할 때는 `split_table_cell` 도구가 원래 범위를 알려주면서 셀을 분할합니다.
-
-```jsonc
-{
-  "name": "set_table_cell_text",
-  "arguments": {
-    "path": "sample.hwpx",
-    "tableIndex": 0,
-    "row": 1,
-    "col": 1,
-    "text": "논리 좌표 편집",
-    "logical": true,
-    "splitMerged": true,
-    "autoFit": true,
-    "dryRun": false
-  }
-}
-```
-
-위 예시는 2×2로 병합된 셀에 논리 좌표 `(1, 1)`을 지정하여 자동 분할 후 텍스트를 기록합니다. 분할 여부와 원래 범위를 확인하려면 `split_table_cell`을 호출하세요.
-
-```jsonc
-{
-  "name": "split_table_cell",
-  "arguments": {"path": "sample.hwpx", "tableIndex": 0, "row": 0, "col": 0},
-  "result": {"startRow": 0, "startCol": 0, "rowSpan": 2, "colSpan": 2}
-}
-```
-
-응답의 `rowSpan`/`colSpan` 값은 분할되기 전 병합 범위를 알려주므로, 프런트엔드 클라이언트가 UI 상태를 즉시 갱신할 수 있습니다.
-
-## ☢️ 고급 기능: OPC 패키지 내부 살펴보기
-
-> **⚠️ 경고:** 아래 도구들은 HWPX 문서의 내부 OPC 파트를 그대로 노출합니다. 구조를 잘못 해석하면 문서를 오해할 수 있으니, 스키마와 관계를 충분히 이해한 상태에서 활용하세요. 현재 MCP 서버는 의도치 않은 손상을 막기 위해 **읽기 전용 도구만** 제공합니다.
-
-  * `package_parts`: 패키지에 포함된 모든 OPC 파트의 경로 목록을 확인합니다.
-  * `package_get_text`: 지정한 파트를 텍스트로 읽어옵니다 (인코딩 지정 가능).
-  * `package_get_xml`: 지정한 파트를 XML 문자열로 반환합니다.
-
-#### 시나리오 예시
-
-스타일 정의 XML 파일(`Styles.xml`)의 내용을 확인하고 싶다면:
-
-1.  `package_parts` 도구에 `{"path": "sample.hwpx"}`를 전달하여 `Contents/Styles.xml`과 같은 파트 이름을 찾습니다.
-2.  `package_get_xml` 도구에 `{"path": "sample.hwpx", "partName": "Contents/Styles.xml"}`을 전달하여 해당 파트의 원본 XML을 안전하게 검토합니다.
-
-## 🧪 테스트
-
-핵심 기능부터 모든 MCP 도구의 실제 호출까지 검증하는 엔드투엔드 테스트 스위트가 포함되어 있습니다.
+## Testing
 
 ```bash
-# 1. 테스트 의존성 설치
-python -m pip install -e .[test]
+# 의존성 설치
+python -m pip install -e ".[test]"
 
-# 2. 테스트 실행
+# 전체 테스트 실행
 python -m pytest
 ```
 
-`tests/test_mcp_end_to_end.py`는 서버가 노출하는 대부분의 도구를 실제로 호출하여 텍스트, 표, 메모 편집, OPC 패키지 읽기, 자동 백업 생성 등 핵심 동작을 완벽하게 검증합니다.
+엔드투엔드 테스트가 서버의 대부분의 도구를 실제 호출하여 텍스트 · 표 · 메모 편집, OPC 패키지 읽기, 자동 백업 등을 검증합니다.
 
-## 🧑‍💻 개발 참고
+<br>
 
-  * 이 서버는 `python-hwpx>=1.9`, `mcp`, `anyio`, `pydantic` 등 순수 파이썬 라이브러리로만 구성됩니다.
-  * 모든 도구 핸들러는 `HwpxOps`의 경로 헬퍼와 `HwpxDocument` API를 통해 문서를 안전하게 조작합니다.
-  * 파괴적 작업(수정/저장)에는 `dryRun` 플래그를 우선 제공하며, 자동 백업 옵션이 활성화되어 있으면 `.bak` 파일을 생성하여 안정성을 높입니다.
-  * JSON 스키마는 내부 `schema.builder` 경로를 통해 draft-07 호환 Sanitizer를 거친 후 노출되므로 `$ref`/`anyOf`가 제거된 평탄한 구조를 기대할 수 있습니다.
+## Architecture
 
-### 🔒 서버 하드닝 & JSON 스키마 (draft-07) — 선택 사용
+```
+hwpx-mcp-server
+├── src/
+│   └── hwpx_mcp_server/
+│       ├── server.py          # MCP 서버 진입점
+│       ├── tools/             # 도구 핸들러
+│       └── schema/            # JSON 스키마 빌더 (draft-07, $ref 제거)
+├── tests/
+│   └── test_mcp_end_to_end.py # E2E 테스트 스위트
+├── docs/                      # 문서
+└── pyproject.toml
+```
 
-- `HWPX_MCP_HARDENING=1`을 설정하면 plan/preview/apply 파이프라인, `hwpx.search`, `hwpx.get_context`가 활성화됩니다.
-- 플래그를 끄면 (`0` 또는 미설정) 기존 도구만 유지하면서도 강화된 스키마 Sanitizer는 계속 적용됩니다.
-- `pytest -q`를 실행하면 스키마 회귀, 파이프라인 게이트, 멱등성 검증 테스트가 함께 수행되어 배포 전 안전성을 확인할 수 있습니다.
+- **순수 파이썬**: `python-hwpx >= 1.9` · `mcp` · `anyio` · `pydantic`
+- **경로 해석**: 서버 실행 디렉터리 기준, 별도 설정 불필요
+- **안전 장치**: 파괴적 작업에 `dryRun` 플래그 우선 제공 · 자동 `.bak` 백업
+- **스키마**: draft-07 호환 Sanitizer를 거쳐 `$ref` / `anyOf` 없이 평탄화
 
-## 📜 라이선스
+<br>
 
-이 프로젝트는 [MIT 라이선스](https://www.google.com/search?q=LICENSE)로 배포됩니다. 자세한 내용은 라이선스 파일을 확인하세요.
+## Comparison
 
-## 이메일
+| | hwpx-mcp-server | [hwp-mcp](https://github.com/jkf87/hwp-mcp) |
+|---|---|---|
+| **포맷** | `.hwpx` (Open XML) | `.hwp` (바이너리) |
+| **OS** | Windows · macOS · Linux | Windows only |
+| **한글 필요** | ❌ 불필요 | ✅ 필수 (COM 자동화) |
+| **방식** | 순수 파이썬 파싱 | 한글 프로세스 제어 |
+| **편집 도구 수** | 30+ | ~10 |
 
-광교고등학교 교사 고규현 : kokyuhyun@hotmail.com
+<br>
+
+## Roadmap
+
+- [ ] Streamable HTTP transport 지원
+- [ ] MCP Resources 노출 (문서 메타데이터 URI)
+- [ ] MCP Prompts 템플릿 (문서 요약, 표 추출 등)
+- [ ] Docker 이미지 배포
+- [ ] GitHub Actions CI/CD 파이프라인
+- [ ] MCP Registry 등록
+
+<br>
+
+## Contributing
+
+기여를 환영합니다! 버그 리포트, 기능 요청, PR 모두 감사합니다.
+
+1. Fork → Branch (`feat/amazing-feature`) → Commit → PR
+2. 테스트를 추가하거나 기존 테스트가 통과하는지 확인해주세요
+3. 한글/영문 모두 OK
+
+<br>
+
+## License
+
+[MIT](LICENSE) © 고규현 (Kyuhyun Koh)
+
+<br>
+
+## Author
+
+**고규현** — 광교고등학교 정보·컴퓨터 교사
+
+- ✉️ [kokyuhyun@hotmail.com](mailto:kokyuhyun@hotmail.com)
+- 🐙 [@airmang](https://github.com/airmang)

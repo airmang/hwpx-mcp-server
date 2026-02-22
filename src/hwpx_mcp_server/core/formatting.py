@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from copy import deepcopy
-from lxml import etree as ET
+from xml.etree import ElementTree as ET
 
 from hwpx.document import HwpxDocument
 
