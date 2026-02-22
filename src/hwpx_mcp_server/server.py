@@ -133,7 +133,14 @@ def _paragraph_count(doc) -> int:
 
 
 def _table_count(doc) -> int:
-    return sum(len(getattr(paragraph, "tables", [])) for paragraph in doc.paragraphs)
+    table_tag = "{http://www.hancom.co.kr/hwpml/2011/paragraph}tbl"
+    count = 0
+    for section in getattr(doc, "sections", []):
+        section_element = getattr(section, "element", None)
+        if section_element is None or not hasattr(section_element, "iter"):
+            continue
+        count += sum(1 for _ in section_element.iter(table_tag))
+    return count
 
 
 def _outline_level(text: str) -> int:

@@ -44,6 +44,7 @@ tests/test_formatting.py
 tests/test_http_storage.py
 tests/test_hwp_converter.py
 tests/test_hwpx_ops.py
+tests/test_hwpx_report_regressions.py
 tests/test_locator_models.py
 tests/test_mcp_end_to_end.py
 tests/test_pipeline.py

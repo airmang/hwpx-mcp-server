@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from hwpx_mcp_server.core.document import open_doc
 from hwpx_mcp_server.server import (
     add_heading,
     add_memo,
@@ -96,7 +97,10 @@ def test_add_and_remove_memo(tmp_path: Path):
 
     add_paragraph(str(target), "메모 대상")
     added = add_memo(str(target), 1, "검토 필요")
+    assert len(open_doc(str(target)).memos) == 1
+
     removed = remove_memo(str(target), 1)
+    assert len(open_doc(str(target)).memos) == 0
 
     assert added["memo_added"] is True
     assert removed["memo_removed"] is True

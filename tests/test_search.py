@@ -1,4 +1,5 @@
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -22,6 +23,16 @@ def sample_file(tmp_path: Path) -> Path:
 def _append_paragraph(path: Path, text: str) -> None:
     doc = open_doc(str(path))
     doc.add_paragraph(text)
+    save_doc(doc, str(path))
+
+
+def _set_split_runs(path: Path, paragraph_index: int, chunks: list[str]) -> None:
+    doc = open_doc(str(path))
+    paragraph = doc.paragraphs[paragraph_index]
+    for run in list(paragraph.runs):
+        run.remove()
+    for index, chunk in enumerate(chunks):
+        paragraph.add_run(chunk, bold=(index == 0), italic=(index == 1))
     save_doc(doc, str(path))
 
 
@@ -62,6 +73,61 @@ def test_search_and_replace_in_table(sample_file: Path):
 
     assert result["replaced_count"] == 1
     assert "표 안의 2026 데이터" in text_result["text"]
+
+
+def test_search_and_replace_cross_run_in_paragraph(sample_file: Path):
+    _append_paragraph(sample_file, "")
+    _set_split_runs(sample_file, 1, ["20", "26학년도 운영"])
+
+    result = search_and_replace(str(sample_file), "2026", "2027")
+    find_result = find_text(str(sample_file), "2026")
+    doc = open_doc(str(sample_file))
+    paragraph = doc.paragraphs[1]
+
+    assert result["replaced_count"] == 1
+    assert find_result["total_matches"] == 0
+    assert paragraph.text.startswith("2027")
+    assert len(paragraph.runs) >= 2
+
+
+def test_search_and_replace_cross_run_in_table_cell(sample_file: Path):
+    doc = open_doc(str(sample_file))
+    table = doc.add_table(rows=1, cols=1)
+    cell = table.rows[0].cells[0]
+    cell.text = "2026 데이터"
+
+    hp = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
+    para_element = cell.element.find(f".//{hp}p")
+    assert para_element is not None
+    run_elements = list(para_element.findall(f"{hp}run"))
+    assert run_elements
+    first_run = run_elements[0]
+    for run_element in run_elements[1:]:
+        para_element.remove(run_element)
+
+    text_node = first_run.find(f"{hp}t")
+    if text_node is None:
+        text_node = ET.SubElement(first_run, f"{hp}t")
+    text_node.text = "20"
+
+    maker = getattr(para_element, "makeelement", None)
+    if callable(maker):
+        second_run = maker(f"{hp}run", {"charPrIDRef": "0"})
+        second_text = second_run.makeelement(f"{hp}t", {})
+        second_text.text = "26 데이터"
+        second_run.append(second_text)
+    else:
+        second_run = ET.Element(f"{hp}run", {"charPrIDRef": "0"})
+        ET.SubElement(second_run, f"{hp}t").text = "26 데이터"
+    para_element.append(second_run)
+    save_doc(doc, str(sample_file))
+
+    result = search_and_replace(str(sample_file), "2026", "2027")
+    table_result = get_document_text(str(sample_file))
+
+    assert result["replaced_count"] == 1
+    assert "2027 데이터" in table_result["text"]
+    assert "2026 데이터" not in table_result["text"]
 
 
 def test_get_document_text_truncation(sample_file: Path):

@@ -143,3 +143,28 @@ def test_add_table_and_document_info_table_count_stay_consistent(tmp_path: Path)
     assert after["tables"] == before["tables"] + 1
     assert added["table_index"] == after["tables"] - 1
     assert table["data"][0][0] == "A"
+
+
+def test_table_count_uses_section_xml_tree_not_paragraph_tables():
+    server = _reload_server()
+    hp = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
+
+    section_element = ET.Element(f"{hp}sec")
+    para = ET.SubElement(section_element, f"{hp}p")
+    ET.SubElement(para, f"{hp}tbl")
+    outer = ET.SubElement(section_element, f"{hp}tbl")
+    row = ET.SubElement(outer, f"{hp}tr")
+    ET.SubElement(row, f"{hp}tbl")
+
+    class _Section:
+        def __init__(self, element):
+            self.element = element
+
+    class _Paragraph:
+        tables = []
+
+    class _Doc:
+        sections = [_Section(section_element)]
+        paragraphs = [_Paragraph()]
+
+    assert server._table_count(_Doc()) == 3
