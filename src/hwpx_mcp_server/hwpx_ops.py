@@ -8,6 +8,7 @@ import hashlib
 import logging
 import math
 import re
+import re as _re
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -63,6 +64,26 @@ HH_NS = "{http://www.hancom.co.kr/hwpml/2011/head}"
 HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 logger = logging.getLogger(__name__)
+
+_CELL_TEXT_ILLEGAL = _re.compile(
+    r"[\x00-\x08\x09\x0b\x0c\x0d\x0e-\x1f\ufffe\uffff]"
+)
+
+
+def _sanitize_cell_text(value: str) -> str:
+    """Remove characters illegal inside HWPML <hp:t> nodes.
+
+    Tab (U+0009) is stripped - it must live in a separate cell column,
+    not be concatenated with the text. \r is stripped; \n is kept.
+    Logs a warning when anything is actually removed.
+    """
+    cleaned = _CELL_TEXT_ILLEGAL.sub("", value)
+    if cleaned != value:
+        logger.warning(
+            "cell text contained illegal characters and was sanitised",
+            extra={"original_len": len(value), "cleaned_len": len(cleaned)},
+        )
+    return cleaned
 
 try:  # pragma: no cover - fallback only used if python-hwpx internals change
     from hwpx.oxml import document as _hwpx_document_module
@@ -1463,7 +1484,7 @@ class HwpxOps:
             "or split merged cells first"
         )
         try:
-            table.set_cell_text(row, col, text, **kwargs)
+            table.set_cell_text(row, col, _sanitize_cell_text(text), **kwargs)
         except (IndexError, ValueError) as exc:
             raise self._new_error("TABLE_CELL_OPERATION_FAILED", f"{guidance}: {exc}") from exc
         if auto_fit and not dry_run:
@@ -1506,7 +1527,12 @@ class HwpxOps:
                 logical_row = start_row + row_offset
                 logical_col = start_col + col_offset
                 try:
-                    table.set_cell_text(logical_row, logical_col, cell_text, **kwargs)
+                    table.set_cell_text(
+                        logical_row,
+                        logical_col,
+                        _sanitize_cell_text(cell_text),
+                        **kwargs,
+                    )
                 except (IndexError, ValueError) as exc:
                     message = (
                         f"{guidance} while writing cell ({logical_row}, {logical_col})"

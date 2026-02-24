@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -397,6 +398,94 @@ def test_add_table_custom_border_fill_reuses_definition(ops_with_sample):
         refreshed_tables.extend(paragraph.tables)
 
     assert refreshed_tables[second["tableIndex"]].element.get("borderFillIDRef") == border_id
+
+
+def test_set_table_cell_text_sanitizes_tab_character(ops_with_sample):
+    ops, path = ops_with_sample
+
+    result = ops.set_table_cell_text(
+        str(path),
+        table_index=0,
+        row=0,
+        col=0,
+        text="hello\tworld",
+    )
+
+    assert result == {"ok": True}
+
+    refreshed = HwpxDocument.open(path)
+    refreshed_tables: list = []
+    for paragraph in refreshed.paragraphs:
+        refreshed_tables.extend(paragraph.tables)
+    assert refreshed_tables[0].cell(0, 0).text == "helloworld"
+
+
+def test_set_table_cell_text_strips_cr_keeps_lf(ops_with_sample):
+    ops, path = ops_with_sample
+
+    result = ops.set_table_cell_text(
+        str(path),
+        table_index=0,
+        row=0,
+        col=0,
+        text="line1\r\nline2",
+    )
+
+    assert result == {"ok": True}
+
+    refreshed = HwpxDocument.open(path)
+    refreshed_tables: list = []
+    for paragraph in refreshed.paragraphs:
+        refreshed_tables.extend(paragraph.tables)
+    assert refreshed_tables[0].cell(0, 0).text == "line1\nline2"
+
+
+def test_set_table_cell_text_keeps_normal_text_unchanged(ops_with_sample):
+    ops, path = ops_with_sample
+    text = "plain text 123"
+
+    result = ops.set_table_cell_text(
+        str(path),
+        table_index=0,
+        row=0,
+        col=0,
+        text=text,
+    )
+
+    assert result == {"ok": True}
+
+    refreshed = HwpxDocument.open(path)
+    refreshed_tables: list = []
+    for paragraph in refreshed.paragraphs:
+        refreshed_tables.extend(paragraph.tables)
+    assert refreshed_tables[0].cell(0, 0).text == text
+
+
+def test_set_table_cell_text_logs_warning_when_sanitised(ops_with_sample, caplog):
+    ops, path = ops_with_sample
+    value = "bad\ttext"
+    expected_message = "cell text contained illegal characters and was sanitised"
+
+    with caplog.at_level(logging.WARNING, logger=ops_module.logger.name):
+        ops.set_table_cell_text(
+            str(path),
+            table_index=0,
+            row=0,
+            col=0,
+            text=value,
+        )
+
+    warning_records = [
+        record
+        for record in caplog.records
+        if record.name == ops_module.logger.name
+        and record.levelno == logging.WARNING
+        and record.getMessage() == expected_message
+    ]
+
+    assert warning_records
+    assert warning_records[0].original_len == len(value)
+    assert warning_records[0].cleaned_len == len("badtext")
 
 
 def test_set_table_cell_supports_logical_and_split_flags(ops_with_sample):
