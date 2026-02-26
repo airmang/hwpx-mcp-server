@@ -1,18 +1,52 @@
+# Python bytecode/cache
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.bak
-/dist/
-.build/
-
 *.py[cod]
-*.egg-info/
+*$py.class
+
+# Build/package artifacts
+build/
+dist/
+.build/
 *.egg
-/dist/
-/build/
-/.pytest_cache/
-/.mypy_cache/
-/.ruff_cache/
-/.venv/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# Coverage outputs
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Logs/temp/backups
 *.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# IDE/OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

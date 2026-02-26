@@ -48,6 +48,7 @@ tests/test_hwpx_report_regressions.py
 tests/test_locator_models.py
 tests/test_mcp_end_to_end.py
 tests/test_pipeline.py
+tests/test_read_export_tools.py
 tests/test_search.py
 tests/test_streamable_http_transport.py
 tests/test_tool_schemas.py

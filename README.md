@@ -333,3 +333,93 @@ hwpx-mcp-server
 
 - ✉️ [kokyuhyun@hotmail.com](mailto:kokyuhyun@hotmail.com)
 - 🐙 [@airmang](https://github.com/airmang)
+
+<br>
+
+## Transport Modes (Stdio + HTTP)
+
+Existing stdio usage is unchanged:
+
+```bash
+hwpx-mcp-server
+```
+
+Run the same MCP tool set over Streamable HTTP:
+
+```bash
+hwpx-mcp-server --transport streamable-http --host 127.0.0.1 --port 8000
+```
+
+Environment variables are also supported:
+
+- `HWPX_MCP_TRANSPORT` (`stdio` or `streamable-http`)
+- `HWPX_MCP_HOST` (default: `127.0.0.1`)
+- `HWPX_MCP_PORT` (default: `8000`)
+
+Note: HTTP auth is intentionally kept simple for now (dev mode). A production auth hook is left as a TODO in the server entrypoint.
+
+## New Read/Extract Tools
+
+All three tools accept exactly one input source:
+
+- `hwpx_base64`: base64 encoded `.hwpx` bytes
+- `url`: downloadable `https://...` URL
+
+Common options:
+
+- `output`: `full` or `chunks`
+- `chunk_strategy`: `section` or `paragraph`
+- `max_chars_per_chunk`: integer, default via server setting
+
+### 1) `hwpx_to_markdown`
+
+Response:
+
+```json
+{
+  "markdown": "# Title\n\nParagraph...",
+  "chunks": ["..."],
+  "meta": {
+    "source_type": "base64",
+    "section_count": 2,
+    "paragraph_count": 10,
+    "table_count": 1,
+    "figure_caption_count": 1
+  }
+}
+```
+
+### 2) `hwpx_to_html`
+
+Response:
+
+```json
+{
+  "html": "<!doctype html><html>...</html>",
+  "chunks": ["<section>...</section>"],
+  "meta": {
+    "source_type": "url",
+    "image_policy": "omitted"
+  }
+}
+```
+
+### 3) `hwpx_extract_json`
+
+Response:
+
+```json
+{
+  "doc": {
+    "title": "Title",
+    "toc": [{ "level": 1, "text": "Title", "paragraph_index": 0 }],
+    "sections": [{ "index": 0, "title": "Title", "paragraphs": [] }],
+    "tables": [],
+    "figures": []
+  },
+  "chunks": [{ "chunk_index": 0, "strategy": "section", "section": {} }],
+  "meta": {
+    "source_type": "base64"
+  }
+}
+```
