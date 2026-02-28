@@ -498,7 +498,7 @@ def test_set_table_cell_supports_logical_and_split_flags(ops_with_sample):
     for paragraph in document.paragraphs:
         tables.extend(paragraph.tables)
     tables[index].merge_cells(0, 0, 1, 1)
-    document.save(path)
+    document.save_to_path(path)
 
     logical_result = ops.set_table_cell_text(
         str(path),
@@ -554,7 +554,7 @@ def test_replace_region_and_split_tool_handle_merged_cells(ops_with_sample):
         tables.extend(paragraph.tables)
     target_table = tables[index]
     target_table.merge_cells(0, 0, 1, 1)
-    document.save(path)
+    document.save_to_path(path)
 
     region_result = ops.replace_table_region(
         str(path),
@@ -581,7 +581,7 @@ def test_replace_region_and_split_tool_handle_merged_cells(ops_with_sample):
 
     # Merge a new column region and split it using the dedicated tool
     updated_table.merge_cells(0, 2, 1, 2)
-    updated_state.save(path)
+    updated_state.save_to_path(path)
 
     split_meta = ops.split_table_cell(str(path), table_index=index, row=0, col=2)
 
@@ -610,7 +610,7 @@ def test_get_table_cell_map_serializes_grid_with_merges(ops_with_sample):
             target_table.cell(row, col).text = f"R{row}C{col}"
     target_table.merge_cells(0, 0, 1, 1)
     target_table.merge_cells(0, 2, 2, 2)
-    document.save(path)
+    document.save_to_path(path)
 
     grid_info = ops.get_table_cell_map(str(path), table_index=index)
     grid = grid_info["grid"]

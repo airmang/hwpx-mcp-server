@@ -554,6 +554,11 @@ class OutPathOutput(_BaseModel):
     outPath: str
 
 
+class ExportOutput(_BaseModel):
+    content: str
+    format: str
+
+
 class ConvertHwpToHwpxInput(_BaseModel):
     source: str
     output: Optional[str] = None
@@ -635,6 +640,74 @@ class PackageXmlInput(DocumentLocatorInput):
 
 class PackageXmlOutput(_BaseModel):
     xmlString: str
+
+
+class GetToolGuideInput(_BaseModel):
+    workflow: Optional[str] = Field(
+        None,
+        description="Workflow name (read, edit, template, export, table, style). If omitted, returns the full guide.",
+    )
+
+
+class GetToolGuideOutput(_BaseModel):
+    guide: str
+
+
+_TOOL_GUIDE: Dict[str, str] = {
+    "read": (
+        "## 문서 읽기 워크플로\n"
+        "1. `open_info` — 문서 메타(문단 수, 표 수, 섹션) 파악\n"
+        "2. `read_text` — 페이지네이션된 텍스트 읽기\n"
+        "3. `read_paragraphs` — 특정 문단 인덱스로 상세 읽기\n"
+        "4. `text_extract_report` — 전체 텍스트 한번에 추출\n"
+        "5. `export_text` / `export_html` / `export_markdown` — 형식별 내보내기\n"
+    ),
+    "edit": (
+        "## 문서 편집 워크플로\n"
+        "1. `open_info`로 문서 구조 확인\n"
+        "2. `read_paragraphs`로 편집 대상 문단 확인\n"
+        "3. `find`로 편집할 텍스트 위치 검색\n"
+        "4. `replace_text` / `insert_paragraph` / `delete_paragraph` 등으로 편집\n"
+        "5. `save`로 저장 (atomic save — 임시파일→검증→이동 방식)\n"
+        "⚠️ 항상 편집 전 `read_paragraphs`로 현재 상태를 확인하세요.\n"
+    ),
+    "template": (
+        "## 템플릿 워크플로\n"
+        "1. `analyze_template_structure`로 템플릿 구조/플레이스홀더 분석\n"
+        "2. `fill_template`로 일괄 치환 (source → output 복사 후 치환)\n"
+        "3. 결과 파일을 `read_text`로 검증\n"
+    ),
+    "export": (
+        "## 내보내기 워크플로\n"
+        "- `export_text` — 순수 텍스트 (python-hwpx 2.4 네이티브)\n"
+        "- `export_html` — HTML 변환\n"
+        "- `export_markdown` — Markdown 변환\n"
+        "- `text_extract_report` — 구조화된 텍스트 추출\n"
+    ),
+    "table": (
+        "## 표 편집 워크플로\n"
+        "1. `get_table_cell_map`으로 셀 구조(grid) 파악\n"
+        "2. `read_table_cell`로 특정 셀 내용 읽기\n"
+        "3. `write_table_cell` / `insert_table_row` / `delete_table_row` 등 편집\n"
+        "4. `merge_table_cells` / `split_table_cell`로 병합/분할\n"
+        "5. `set_cell_border`로 테두리 스타일 설정\n"
+    ),
+    "style": (
+        "## 스타일 워크플로\n"
+        "1. `list_styles_and_bullets`로 현재 스타일 목록 확인\n"
+        "2. `apply_style_to_paragraphs`로 문단 스타일 적용\n"
+        "3. `apply_style_to_text_ranges`로 텍스트 범위 스타일 적용\n"
+    ),
+}
+
+
+def _get_tool_guide(ops: HwpxOps, data: GetToolGuideInput) -> Dict[str, Any]:
+    if data.workflow and data.workflow in _TOOL_GUIDE:
+        return {"guide": _TOOL_GUIDE[data.workflow]}
+    # Return full guide
+    full = "# HWPX MCP 도구 사용 가이드\n\n"
+    full += "\n".join(_TOOL_GUIDE.values())
+    return {"guide": full}
 
 
 @dataclass
@@ -723,6 +796,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=_BaseModel,
             output_model=ListOpenDocumentsOutput,
             func=_simple("list_open_documents", require_path=False),
+        ),
+        ToolDefinition(
+            name="get_tool_guide",
+            description="Return workflow guidance for HWPX MCP tools. Specify a workflow name (read/edit/template/export/table/style) or omit for the full guide.",
+            input_model=GetToolGuideInput,
+            output_model=GetToolGuideOutput,
+            func=_get_tool_guide,
         ),
         ToolDefinition(
             name="close_document_handle",
@@ -975,6 +1055,27 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=SaveAsInput,
             output_model=OutPathOutput,
             func=_simple("save_as"),
+        ),
+        ToolDefinition(
+            name="export_text",
+            description="Export document content as plain text.",
+            input_model=DocumentLocatorInput,
+            output_model=ExportOutput,
+            func=_simple("export_text"),
+        ),
+        ToolDefinition(
+            name="export_html",
+            description="Export document content as HTML.",
+            input_model=DocumentLocatorInput,
+            output_model=ExportOutput,
+            func=_simple("export_html"),
+        ),
+        ToolDefinition(
+            name="export_markdown",
+            description="Export document content as Markdown.",
+            input_model=DocumentLocatorInput,
+            output_model=ExportOutput,
+            func=_simple("export_markdown"),
         ),
         ToolDefinition(
             name="fill_template",

@@ -99,7 +99,21 @@ class LocalDocumentStorage:
 
     def save_document(self, document: HwpxDocument, target: Path) -> None:
         self.maybe_backup(target)
-        document.save(target)
+        # Atomic save: write to temp file → verify → rename
+        tmp_fd, tmp_path_str = tempfile.mkstemp(
+            suffix=target.suffix, dir=str(target.parent)
+        )
+        tmp_path = Path(tmp_path_str)
+        try:
+            import os
+            os.close(tmp_fd)
+            document.save_to_path(tmp_path)
+            # Verify the saved file is a valid HWPX package
+            HwpxDocument.open(tmp_path)
+            shutil.move(str(tmp_path), str(target))
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
 
 
 class RemoteDocumentClient(Protocol):
@@ -222,7 +236,7 @@ class HttpDocumentStorage:
             self._cache[remote_key] = cache_path
 
         try:
-            document.save(cache_path)
+            document.save_to_path(cache_path)
             payload = cache_path.read_bytes()
         except Exception as exc:  # pragma: no cover - unexpected save error
             raise RuntimeError(f"HTTP storage save failed: {exc}") from exc

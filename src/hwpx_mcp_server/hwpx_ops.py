@@ -28,7 +28,7 @@ from hwpx.document import (
     HwpxOxmlRun,
     HwpxOxmlTable,
 )
-from hwpx.package import HwpxPackage
+from hwpx.opc.package import HwpxPackage
 from hwpx.tools.text_extractor import AnnotationOptions, TextExtractor
 from hwpx.tools.validator import ValidationReport, validate_document
 from .core.plan import (
@@ -60,8 +60,7 @@ from .core.resources import (
 from .errors import build_error_payload
 from .storage import DocumentStorage, LocalDocumentStorage
 
-HH_NS = "{http://www.hancom.co.kr/hwpml/2011/head}"
-HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
+from hwpx.oxml.namespaces import HP as HP_NS, HH as HH_NS
 
 logger = logging.getLogger(__name__)
 
@@ -701,7 +700,8 @@ class HwpxOps:
             raise self._new_error("STYLE_ID_ALLOCATOR_MISSING", "header does not expose ID allocation helpers")
 
         new_id = header._allocate_border_fill_id(border_fills_element)  # type: ignore[attr-defined]
-        border_fill_element = ET.Element(
+        border_fill_element = ET.SubElement(
+            border_fills_element,
             f"{HH_NS}borderFill",
             {
                 "id": new_id,
@@ -745,7 +745,6 @@ class HwpxOps:
                 {"type": "SOLID", "color": normalized_fill_color, "alpha": "255"},
             )
 
-        border_fills_element.append(border_fill_element)
         if hasattr(header, "_update_border_fills_item_count"):
             header._update_border_fills_item_count(border_fills_element)  # type: ignore[attr-defined]
         else:
@@ -2003,7 +2002,7 @@ class HwpxOps:
     def save_as(self, path: str, out: str) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         out_path = self._resolve_output_path(out)
-        document.save(out_path)
+        document.save_to_path(out_path)
         return {"outPath": str(out_path)}
 
     def fill_template(
@@ -2033,16 +2032,34 @@ class HwpxOps:
                 "fill_template called with preserve_style=False, but current backend always preserves run style"
             )
 
-        document.save(out_path)
+        document.save_to_path(out_path)
         return {
             "outPath": str(out_path),
             "replacedCount": replaced_count,
         }
 
+    # ------------------------------------------------------------------
+    # Export helpers (python-hwpx ≥ 2.4)
+    # ------------------------------------------------------------------
+    def export_text(self, path: str) -> Dict[str, Any]:
+        """Export document content as plain text."""
+        document, _ = self._open_document(path)
+        return {"content": document.export_text(), "format": "text"}
+
+    def export_html(self, path: str) -> Dict[str, Any]:
+        """Export document content as HTML."""
+        document, _ = self._open_document(path)
+        return {"content": document.export_html(), "format": "html"}
+
+    def export_markdown(self, path: str) -> Dict[str, Any]:
+        """Export document content as Markdown."""
+        document, _ = self._open_document(path)
+        return {"content": document.export_markdown(), "format": "markdown"}
+
     def make_blank(self, out: str) -> Dict[str, Any]:
         document = HwpxDocument.new()
         out_path = self._resolve_output_path(out)
-        document.save(out_path)
+        document.save_to_path(out_path)
         return {"outPath": str(out_path)}
 
     def convert_hwp_to_hwpx(self, source: str, output: Optional[str] = None) -> Dict[str, Any]:

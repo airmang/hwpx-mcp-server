@@ -7,11 +7,9 @@ from copy import deepcopy
 from xml.etree import ElementTree as ET
 
 from hwpx.document import HwpxDocument
+from hwpx.oxml.namespaces import HP as HP_NS, HH as HH_NS
 
 logger = logging.getLogger(__name__)
-
-HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
-HH_NS = "{http://www.hancom.co.kr/hwpml/2011/head}"
 
 
 def _run_text_length(run) -> int:

@@ -10,12 +10,11 @@ from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 from hwpx.document import HwpxDocument
+from hwpx.oxml.namespaces import HP as _HP_NS
 
 from ..compat import patch_python_hwpx
 
 logger = logging.getLogger(__name__)
-
-_HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 
 def _iter_tables(doc: HwpxDocument):
@@ -88,14 +87,10 @@ def delete_paragraph_from_doc(doc: HwpxDocument, paragraph_index: int) -> int:
             run.text = ""
         return total
 
-    target = paragraphs[paragraph_index]
-    section = target.section
-    section_element = section.element
     try:
-        section_element.remove(target.element)
-    except ValueError as exc:
+        doc.remove_paragraph(paragraph_index)
+    except (ValueError, IndexError) as exc:
         raise RuntimeError("삭제할 문단 요소를 섹션에서 찾을 수 없습니다.") from exc
-    section.mark_dirty()
     return total - 1
 
 
@@ -147,7 +142,7 @@ def merge_cells_in_table(
     end_row: int,
     end_col: int,
 ) -> None:
-    """표의 셀을 병합한다."""
+    """표의 셀을 병합한다. python-hwpx 네이티브 API 사용."""
     tables = list(_iter_tables(doc))
     if table_index < 0 or table_index >= len(tables):
         raise ValueError(f"유효하지 않은 table_index: {table_index}")
@@ -155,32 +150,11 @@ def merge_cells_in_table(
         raise ValueError("시작 좌표는 종료 좌표보다 작거나 같아야 합니다.")
 
     table = tables[table_index]
-    if start_row < 0 or end_row >= len(table.rows):
-        raise ValueError("유효하지 않은 row 범위입니다.")
-    if start_col < 0 or end_col >= len(table.rows[start_row].cells):
-        raise ValueError("유효하지 않은 col 범위입니다.")
-
-    anchor = table.rows[start_row].cells[start_col]
-    anchor_span = anchor.element.find("{http://www.hancom.co.kr/hwpml/2011/paragraph}cellSpan")
-    if anchor_span is None:
-        raise RuntimeError("anchor 셀에서 cellSpan 요소를 찾을 수 없습니다.")
-    anchor_span.set("rowSpan", str(end_row - start_row + 1))
-    anchor_span.set("colSpan", str(end_col - start_col + 1))
-
-    for row in range(start_row, end_row + 1):
-        for col in range(start_col, end_col + 1):
-            if row == start_row and col == start_col:
-                continue
-            cell = table.rows[row].cells[col]
-            span = cell.element.find("{http://www.hancom.co.kr/hwpml/2011/paragraph}cellSpan")
-            if span is not None:
-                span.set("rowSpan", "0")
-                span.set("colSpan", "0")
-            cell.text = ""
+    table.merge_cells(start_row, start_col, end_row, end_col)
 
 
 def split_cell_in_table(doc: HwpxDocument, table_index: int, row: int, col: int) -> dict:
-    """병합된 셀을 분할한다. 원래 span 정보를 반환한다."""
+    """병합된 셀을 분할한다. 원래 span 정보를 반환한다. python-hwpx 네이티브 API 사용."""
     tables = list(_iter_tables(doc))
     if table_index < 0 or table_index >= len(tables):
         raise ValueError(f"유효하지 않은 table_index: {table_index}")
@@ -191,7 +165,7 @@ def split_cell_in_table(doc: HwpxDocument, table_index: int, row: int, col: int)
         raise ValueError(f"유효하지 않은 col: {col}")
 
     cell = table.rows[row].cells[col]
-    span = cell.element.find("{http://www.hancom.co.kr/hwpml/2011/paragraph}cellSpan")
+    span = cell.element.find(f"{_HP_NS}cellSpan")
     if span is None:
         return {"rowSpan": 1, "colSpan": 1}
 
@@ -199,20 +173,11 @@ def split_cell_in_table(doc: HwpxDocument, table_index: int, row: int, col: int)
         "rowSpan": int(span.get("rowSpan", "1")),
         "colSpan": int(span.get("colSpan", "1")),
     }
-    span.set("rowSpan", "1")
-    span.set("colSpan", "1")
 
-    for r in range(row, row + max(1, original["rowSpan"])):
-        if r >= len(table.rows):
-            break
-        for c in range(col, col + max(1, original["colSpan"])):
-            if c >= len(table.rows[r].cells) or (r == row and c == col):
-                continue
-            child = table.rows[r].cells[c]
-            child_span = child.element.find("{http://www.hancom.co.kr/hwpml/2011/paragraph}cellSpan")
-            if child_span is not None:
-                child_span.set("rowSpan", "1")
-                child_span.set("colSpan", "1")
+    if original["rowSpan"] <= 1 and original["colSpan"] <= 1:
+        return original
+
+    table.split_merged_cell(row, col)
     return original
 
 
@@ -388,11 +353,20 @@ def add_memo_to_doc(doc: HwpxDocument, paragraph_index: int, text: str) -> None:
         raise ValueError(f"유효하지 않은 paragraph_index: {paragraph_index}")
 
     paragraph = paragraphs[paragraph_index]
+    memo_count_before = len(doc.memos)
     try:
         doc.add_memo_with_anchor(text or "", paragraph=paragraph)
     except Exception as exc:  # noqa: BLE001
         if not _looks_like_mixed_xml_type_error(exc):
             raise
+        # Clean up any partially-created memo from the failed native call
+        current_memos = doc.memos
+        while len(current_memos) > memo_count_before:
+            try:
+                doc.remove_memo(current_memos[-1])
+            except Exception:  # noqa: BLE001
+                break
+            current_memos = doc.memos
         logger.warning("메모 추가 중 혼합 XML 타입 충돌 감지, fallback 경로 사용: %s", exc)
         _add_memo_with_anchor_fallback(paragraph, text or "")
 

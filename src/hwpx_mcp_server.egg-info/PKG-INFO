@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: hwpx-mcp-server
-Version: 2.1.0
+Version: 2.2.0
 Summary: Model Context Protocol server for local HWPX document automation.
 Author: Kohkyuhyun
 License: MIT License
@@ -28,7 +28,7 @@ License: MIT License
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: python-hwpx>=1.9
+Requires-Dist: python-hwpx>=2.4
 Requires-Dist: pydantic>=2.7
 Requires-Dist: anyio>=4.0
 Requires-Dist: mcp>=1.14.1
@@ -103,7 +103,7 @@ hwpx-mcp-server
 요구사항:
 
 - `Python >= 3.10`
-- `python-hwpx >= 1.9`
+- `python-hwpx >= 2.4`
 
 ### 2. MCP 클라이언트 설정
 
@@ -183,7 +183,13 @@ hwpx-mcp-server
 
 ## Features
 
-기본 모드에서 27개 도구, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서 추가 도구가 활성화됩니다.
+기본 모드에서 31개 도구, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서 추가 도구가 활성화됩니다.
+
+### 🧭 가이드
+
+| 도구 | 설명 |
+|---|---|
+| `get_tool_guide` | 워크플로별 도구 사용 가이드 반환 (read/edit/template/export/table/style) |
 
 ### 📖 읽기 & 탐색
 
@@ -230,6 +236,14 @@ hwpx-mcp-server
 | `format_text` | 텍스트 범위 서식 적용(굵기, 기울임, 밑줄, 색상 등) |
 | `create_custom_style` | 커스텀 스타일 생성 |
 | `list_styles` | 문서 스타일 목록 조회 |
+
+### 📤 내보내기
+
+| 도구 | 설명 |
+|---|---|
+| `export_text` | 문서를 순수 텍스트로 내보내기 (python-hwpx 네이티브) |
+| `export_html` | 문서를 HTML로 내보내기 |
+| `export_markdown` | 문서를 Markdown으로 내보내기 |
 
 ### 🔬 고급 (옵션)
 
@@ -317,7 +331,7 @@ python -m pip install -e ".[test]"
 python -m pytest -q
 ```
 
-로컬 기준(2026-02-22) 전체 테스트가 통과했습니다.
+로컬 기준(2026-02-28) 전체 113개 테스트가 통과했습니다.
 
 - 실전 사용 사례: `docs/use-cases.md`
 - 종합 리포트: `tests/hwpx_mcp_report_updated.md`
@@ -332,6 +346,7 @@ hwpx-mcp-server
 ├── src/hwpx_mcp_server/
 │   ├── server.py            # Stateless MCP 진입점
 │   ├── hwpx_ops.py          # 고급/내부 연산 래퍼
+│   ├── storage.py           # 저장 백엔드 (atomic save)
 │   ├── core/                # 문단/표/검색/서식 핵심 로직
 │   ├── tools.py             # 확장 도구 스키마/정의
 │   └── schema/              # JSON 스키마 빌더/정리기
@@ -349,6 +364,24 @@ hwpx-mcp-server
 | OS | Windows · macOS · Linux | 대체로 Windows 중심 |
 | 한글 프로그램 의존 | 불필요 | 필요한 경우가 많음 |
 | 연동 방식 | MCP + 파이썬 라이브러리 | 데스크톱 앱 자동화 |
+
+<br>
+
+## Changelog (v2.2.0)
+
+### python-hwpx 2.4 마이그레이션
+
+- `document.save()` → `document.save_to_path()` 전환 (deprecated API 제거)
+- `from hwpx.package` → `from hwpx.opc.package` 임포트 경로 수정
+- 하드코딩된 네임스페이스 문자열 → `hwpx.oxml.namespaces` 상수 임포트로 교체
+- 수동 XML 조작 → 네이티브 API 전환: `doc.remove_paragraph()`, `table.merge_cells()`, `table.split_merged_cell()`
+- lxml/stdlib ElementTree 혼합 타입 충돌 수정 (border-fill 생성, 메모 추가)
+
+### 신규 기능
+
+- **`export_text` / `export_html` / `export_markdown`** — python-hwpx 2.4 네이티브 익스포터 활용
+- **`get_tool_guide`** — LLM 워크플로 가이드 도구 (읽기/편집/템플릿/내보내기/표/스타일)
+- **Atomic save** — 임시파일 → 무결성 검증 → 이동 방식의 안전한 저장
 
 <br>
 

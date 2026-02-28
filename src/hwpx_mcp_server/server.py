@@ -587,7 +587,8 @@ def _paragraph_count(doc) -> int:
 
 
 def _table_count(doc) -> int:
-    table_tag = "{http://www.hancom.co.kr/hwpml/2011/paragraph}tbl"
+    from hwpx.oxml.namespaces import HP as _HP
+    table_tag = f"{_HP}tbl"
     count = 0
     for section in getattr(doc, "sections", []):
         section_element = getattr(section, "element", None)

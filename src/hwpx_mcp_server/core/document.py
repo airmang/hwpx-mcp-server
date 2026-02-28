@@ -21,10 +21,10 @@ def open_doc(path: str) -> HwpxDocument:
 def save_doc(doc: HwpxDocument, path: str) -> None:
     if AUTOBACKUP and os.path.exists(path):
         shutil.copy2(path, path + ".bak")
-    doc.save(path)
+    doc.save_to_path(path)
 
 
 def create_blank(path: str, title=None, author=None) -> None:
     source = BytesIO(blank_document_bytes())
     doc = HwpxDocument.open(source)
-    doc.save(path)
+    doc.save_to_path(path)

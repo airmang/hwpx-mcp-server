@@ -204,7 +204,7 @@ def convert_hwp_to_hwpx(hwp_path: str, output_path: str) -> ConversionResult:
             for col_index, text in enumerate(row):
                 table.rows[row_index].cells[col_index].text = text
 
-    document.save(target)
+    document.save_to_path(target)
 
     if skipped_elements:
         warnings.append(
