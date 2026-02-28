@@ -21,6 +21,26 @@ import pytest
 # Keep legacy global alias used by existing tests.
 builtins.ET = _ET
 
+
+@pytest.fixture(autouse=True)
+def _clear_path_sandbox_for_inprocess_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure local/in-process tests aren't affected by an inherited sandbox.
+
+    The MCP server CLI (`python -m hwpx_mcp_server.server`) enables sandboxing in
+    `main()` via `os.environ.setdefault("HWPX_MCP_SANDBOX_ROOT", cwd)`.
+
+    But unit tests often operate on pytest tmp directories and may call helpers
+    directly in-process. If the environment variable is already set in the
+    parent shell, those tests would fail.
+
+    We *remove* the variable here so:
+    - in-process tests run without sandbox restrictions
+    - subprocess-based traversal/security tests still get sandboxing via
+      `server.main()` (because the var is absent, setdefault will apply).
+    """
+
+    monkeypatch.delenv("HWPX_MCP_SANDBOX_ROOT", raising=False)
+
 EMBEDDED_ERROR_RE = re.compile(
     r"traceback \(most recent call last\)|\bexception\b|error executing tool",
     re.IGNORECASE,
