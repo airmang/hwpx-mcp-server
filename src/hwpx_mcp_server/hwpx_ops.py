@@ -16,21 +16,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
-from .compat import patch_python_hwpx
-
-patch_python_hwpx()
-
-from hwpx import ObjectFinder
-from hwpx.document import (
-    HwpxDocument,
-    HwpxOxmlMemo,
-    HwpxOxmlParagraph,
-    HwpxOxmlRun,
-    HwpxOxmlTable,
-)
-from hwpx.opc.package import HwpxPackage
-from hwpx.tools.text_extractor import AnnotationOptions, TextExtractor
-from hwpx.tools.validator import ValidationReport, validate_document
 from .core.plan import (
     ApplyData,
     ApplyEditInput,
@@ -59,8 +44,26 @@ from .core.resources import (
 )
 from .errors import build_error_payload
 from .storage import DocumentStorage, LocalDocumentStorage
-
-from hwpx.oxml.namespaces import HP as HP_NS, HH as HH_NS
+from .upstream import (
+    AnnotationOptions,
+    HH_NS,
+    HP_NS,
+    HwpxDocument,
+    HwpxOxmlMemo,
+    HwpxOxmlParagraph,
+    HwpxOxmlRun,
+    HwpxOxmlTable,
+    ValidationReport,
+    create_object_finder,
+    create_text_extractor,
+    default_cell_width,
+    ensure_char_style,
+    export_document,
+    new_document,
+    normalize_hex_color,
+    open_package,
+    validate_document_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +87,7 @@ def _sanitize_cell_text(value: str) -> str:
         )
     return cleaned
 
-try:  # pragma: no cover - fallback only used if python-hwpx internals change
-    from hwpx.oxml import document as _hwpx_document_module
-
-    _DEFAULT_CELL_WIDTH = getattr(_hwpx_document_module, "_DEFAULT_CELL_WIDTH", 7200)
-except Exception:  # pragma: no cover - safeguard against unexpected import errors
-    _DEFAULT_CELL_WIDTH = 7200
+_DEFAULT_CELL_WIDTH = default_cell_width()
 
 _AUTO_FIT_CHAR_UNIT = max(360, _DEFAULT_CELL_WIDTH // 10)
 _AUTO_FIT_PADDING_CHARS = 2
@@ -276,7 +274,7 @@ class HwpxOps:
             return model.model_dump(by_alias=True)
 
         serialized: List[ParagraphResourceEntry] = []
-        with TextExtractor(resolved) as extractor:
+        with create_text_extractor(resolved) as extractor:
             for paragraph in extractor.iter_document_paragraphs():
                 serialized.append(
                     ParagraphResourceEntry(
@@ -359,7 +357,7 @@ class HwpxOps:
     def _ensure_planner_document(self, doc_id: str, path: str) -> None:
         resolved = self._resolve_path(path)
         paragraphs: List[str] = []
-        with TextExtractor(resolved) as extractor:
+        with create_text_extractor(resolved) as extractor:
             for paragraph in extractor.iter_document_paragraphs():
                 paragraphs.append(paragraph.text(preserve_breaks=True))
         self._plan_manager.register_document(doc_id, "\n".join(paragraphs))
@@ -449,16 +447,7 @@ class HwpxOps:
         return column_widths
 
     def _normalize_color(self, color: str | None) -> Optional[str]:
-        if color is None:
-            return None
-        value = color.strip()
-        if not value:
-            return None
-        if not value.startswith("#"):
-            value = "#" + value
-        if not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
-            raise ValueError("colorHex must be a 6-digit hexadecimal value")
-        return value.upper()
+        return normalize_hex_color(color, field_name="colorHex")
 
     def _ensure_char_style(
         self,
@@ -471,61 +460,22 @@ class HwpxOps:
         italic = bool(run_style.get("italic", False))
         underline = bool(run_style.get("underline", False))
         color = self._normalize_color(run_style.get("colorHex"))
-        base_id = document.ensure_run_style(bold=bold, italic=italic, underline=underline)
-        if color is None:
-            return base_id
-        if not document.headers:
-            raise self._new_error("STYLE_HEADER_MISSING", "document does not contain any headers to host styles")
-        header = document.headers[0]
-        target_flags = (bold, italic, underline)
-
-        def element_flags(element) -> Tuple[bool, bool, bool]:
-            bold_present = element.find(f"{HH_NS}bold") is not None
-            italic_present = element.find(f"{HH_NS}italic") is not None
-            underline_element = element.find(f"{HH_NS}underline")
-            underline_present = False
-            if underline_element is not None:
-                underline_present = (underline_element.get("type", "").upper() or "NONE") != "NONE"
-            return bold_present, italic_present, underline_present
-
-        normalized_color = color
-
-        def predicate(element) -> bool:
-            if element.get("textColor", "").upper() != normalized_color:
-                return False
-            return element_flags(element) == target_flags
-
-        def modifier(element) -> None:
-            element.set("textColor", normalized_color)
-            underline_nodes = list(element.findall(f"{HH_NS}underline"))
-            for node in underline_nodes:
-                node.set("color", normalized_color)
-                if underline:
-                    node.set("type", node.get("type", "SOLID") or "SOLID")
-                else:
-                    node.set("type", "NONE")
-            if underline and not underline_nodes:
-                element.append(
-                    self._create_underline_element(color=normalized_color)
-                )
-
-        char_element = header.ensure_char_property(
-            predicate=predicate,
-            modifier=modifier,
-            base_char_pr_id=base_id,
-        )
-        char_id = char_element.get("id")
-        if not char_id:
-            raise self._new_error("STYLE_CHAR_PROPERTY_ID_MISSING", "char property does not expose an identifier")
-        return char_id
-
-    def _create_underline_element(self, color: str) -> Any:
-        from xml.etree import ElementTree as ET
-
-        return ET.Element(
-            f"{HH_NS}underline",
-            {"type": "SOLID", "shape": "SOLID", "color": color},
-        )
+        try:
+            return ensure_char_style(
+                document,
+                base_char_pr_id=None,
+                bold=bold,
+                italic=italic,
+                underline=underline,
+                color=color,
+            )
+        except (ValueError, RuntimeError) as exc:
+            message = str(exc)
+            if "document does not contain any headers" in message:
+                raise self._new_error("STYLE_HEADER_MISSING", message) from exc
+            if "char property does not expose an identifier" in message:
+                raise self._new_error("STYLE_CHAR_PROPERTY_ID_MISSING", message) from exc
+            raise
 
     def _ensure_table_border_fill(
         self,
@@ -696,6 +646,8 @@ class HwpxOps:
             if matches(candidate):
                 return identifier
 
+        # Upstream still does not expose a public border-fill creation API.
+        # Keep the private helper usage isolated here until python-hwpx offers one.
         if not hasattr(header, "_allocate_border_fill_id"):
             raise self._new_error("STYLE_ID_ALLOCATOR_MISSING", "header does not expose ID allocation helpers")
 
@@ -827,13 +779,13 @@ class HwpxOps:
 
     def package_parts(self, path: str) -> Dict[str, Any]:
         resolved = self._resolve_path(path)
-        package = HwpxPackage.open(resolved)
+        package = open_package(resolved)
         parts = sorted(package.part_names())
         return {"parts": parts}
 
     def package_get_text(self, path: str, part_name: str, encoding: str | None = None) -> Dict[str, Any]:
         resolved = self._resolve_path(path)
-        package = HwpxPackage.open(resolved)
+        package = open_package(resolved)
         text = package.get_text(part_name, encoding=encoding or "utf-8")
         return {"text": text}
 
@@ -875,7 +827,7 @@ class HwpxOps:
         paragraphs: List[str] = []
         next_offset: Optional[int] = None
         start = max(0, offset)
-        with TextExtractor(resolved) as extractor:
+        with create_text_extractor(resolved) as extractor:
             paragraph_iter = extractor.iter_document_paragraphs()
             sentinel = object()
 
@@ -943,7 +895,7 @@ class HwpxOps:
             )
 
         collected: Dict[int, str] = {}
-        with TextExtractor(resolved) as extractor:
+        with create_text_extractor(resolved) as extractor:
             for paragraph in extractor.iter_document_paragraphs():
                 para_index = paragraph.index
                 if para_index in unique_indexes and para_index not in collected:
@@ -983,7 +935,7 @@ class HwpxOps:
                 endnote="inline",
                 control="placeholder",
             )
-        with TextExtractor(resolved) as extractor:
+        with create_text_extractor(resolved) as extractor:
             content = extractor.extract_text(
                 annotations=annotations,
                 include_nested=True,
@@ -1002,7 +954,7 @@ class HwpxOps:
             paragraphs, _, source = self._read_only_hwp_paragraphs(path)
         else:
             paragraphs = []
-            with TextExtractor(resolved) as extractor:
+            with create_text_extractor(resolved) as extractor:
                 for paragraph in extractor.iter_document_paragraphs():
                     paragraphs.append(paragraph.text(preserve_breaks=True))
             source = "hwpx.text_extractor"
@@ -1181,7 +1133,7 @@ class HwpxOps:
                         start = found + len(query)
             return {"matches": matches}
 
-        with TextExtractor(resolved) as extractor:
+        with create_text_extractor(resolved) as extractor:
             for paragraph in extractor.iter_document_paragraphs():
                 text = paragraph.text()
                 if is_regex:
@@ -2044,20 +1996,20 @@ class HwpxOps:
     def export_text(self, path: str) -> Dict[str, Any]:
         """Export document content as plain text."""
         document, _ = self._open_document(path)
-        return {"content": document.export_text(), "format": "text"}
+        return {"content": export_document(document, "text"), "format": "text"}
 
     def export_html(self, path: str) -> Dict[str, Any]:
         """Export document content as HTML."""
         document, _ = self._open_document(path)
-        return {"content": document.export_html(), "format": "html"}
+        return {"content": export_document(document, "html"), "format": "html"}
 
     def export_markdown(self, path: str) -> Dict[str, Any]:
         """Export document content as Markdown."""
         document, _ = self._open_document(path)
-        return {"content": document.export_markdown(), "format": "markdown"}
+        return {"content": export_document(document, "markdown"), "format": "markdown"}
 
     def make_blank(self, out: str) -> Dict[str, Any]:
-        document = HwpxDocument.new()
+        document = new_document()
         out_path = self._resolve_output_path(out)
         self._save_document(document, out_path)
         return {"outPath": str(out_path)}
@@ -2112,7 +2064,7 @@ class HwpxOps:
         max_results: int = 200,
     ) -> Dict[str, Any]:
         resolved = self._resolve_path(path)
-        finder = ObjectFinder(resolved)
+        finder = create_object_finder(resolved)
         objects = []
         for found in finder.iter(tag=tag_name, limit=max_results):
             element = found.element
@@ -2129,16 +2081,18 @@ class HwpxOps:
     def object_find_by_attr(
         self,
         path: str,
-        element_type: str,
+        element_type: str | None,
         attr: str,
-        value: str,
+        value: str | None,
         *,
         max_results: int = 200,
     ) -> Dict[str, Any]:
         resolved = self._resolve_path(path)
-        finder = ObjectFinder(resolved)
+        finder = create_object_finder(resolved)
+        tag_filter = None if element_type in {None, "", "*"} else element_type
+        attr_matcher: Any = value if value is not None else (lambda _: True)
         objects = []
-        for found in finder.iter(tag=element_type, attrs={attr: value}, limit=max_results):
+        for found in finder.iter(tag=tag_filter, attrs={attr: attr_matcher}, limit=max_results):
             element = found.element
             objects.append(
                 {
@@ -2155,7 +2109,7 @@ class HwpxOps:
     # ------------------------------------------------------------------
     def validate_structure(self, path: str, level: str = "basic") -> Dict[str, Any]:
         resolved = self._resolve_path(path)
-        report: ValidationReport = validate_document(resolved)
+        report: ValidationReport = validate_document_path(resolved)
         issues = [
             {
                 "part": issue.part_name,
@@ -2175,7 +2129,7 @@ class HwpxOps:
         resolved = self._resolve_path(path)
         patterns = [re.compile(pat) for pat in (forbid_patterns or [])]
         warnings: List[Dict[str, Any]] = []
-        with TextExtractor(resolved) as extractor:
+        with create_text_extractor(resolved) as extractor:
             for paragraph in extractor.iter_document_paragraphs():
                 text = paragraph.text()
                 if max_line_len is not None and len(text) > max_line_len:
@@ -2341,7 +2295,7 @@ class HwpxOps:
     # ------------------------------------------------------------------
     def package_get_xml(self, path: str, part_name: str) -> Dict[str, Any]:
         resolved = self._resolve_path(path)
-        package = HwpxPackage.open(resolved)
+        package = open_package(resolved)
         element = package.get_xml(part_name)
         from xml.etree import ElementTree as ET
 

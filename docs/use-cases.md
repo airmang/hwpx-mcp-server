@@ -12,7 +12,7 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 
 기본 모드 30개(고급 모드 포함 40개)의 도구로 문서 생성, 검색, 치환, 표 편집, 서식 적용까지 처리할 수 있습니다.
 
-현재 문서화/테스트 기준 upstream 버전 바닥은 `python-hwpx >= 2.6`이며, 로컬 editable checkout 기준 `python-hwpx 2.7.1`과 동기화해 검증합니다.
+현재 문서화/테스트 기준 upstream 버전 바닥은 `python-hwpx >= 2.6`이며, clean venv에서 released `python-hwpx 2.7.1` 기준으로 검증합니다.
 
 ---
 

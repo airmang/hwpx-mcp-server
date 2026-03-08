@@ -76,7 +76,7 @@ def test_read_text_uses_default_limit(monkeypatch, tmp_path):
         def iter_document_paragraphs(self):
             yield from paragraphs
 
-    monkeypatch.setattr(ops_module, "TextExtractor", FakeExtractor)
+    monkeypatch.setattr(ops_module, "create_text_extractor", FakeExtractor)
 
     ops = HwpxOps(base_directory=tmp_path)
     dummy = tmp_path / "dummy.hwpx"
@@ -146,7 +146,7 @@ def test_read_text_consumes_only_requested_slice(monkeypatch, tmp_path):
                 yielded_indexes.append(paragraph.index)
                 yield paragraph
 
-    monkeypatch.setattr(ops_module, "TextExtractor", FakeExtractor)
+    monkeypatch.setattr(ops_module, "create_text_extractor", FakeExtractor)
 
     ops = HwpxOps(base_directory=tmp_path)
     dummy = tmp_path / "dummy.hwpx"
@@ -212,7 +212,7 @@ def test_find_truncates_context_and_respects_radius(monkeypatch, tmp_path):
         def iter_document_paragraphs(self):
             yield FakeParagraph(0, text)
 
-    monkeypatch.setattr(ops_module, "TextExtractor", FakeExtractor)
+    monkeypatch.setattr(ops_module, "create_text_extractor", FakeExtractor)
 
     ops = HwpxOps(base_directory=tmp_path)
     dummy = tmp_path / "dummy.hwpx"
@@ -235,6 +235,24 @@ def test_replace_text_in_runs_dry_run_does_not_modify(ops_with_sample):
     ops.replace_text_in_runs(str(path), "HWPX", "DOCX", dry_run=True)
     text = ops.read_text(str(path), limit=5)["textChunk"]
     assert "DOCX" not in text
+
+
+def test_ensure_char_style_applies_shared_color_style_logic(ops_with_sample):
+    ops, path = ops_with_sample
+    document = HwpxDocument.open(path)
+
+    char_id = ops._ensure_char_style(
+        document,
+        {"bold": True, "underline": True, "colorHex": "FF0000"},
+    )
+
+    assert char_id is not None
+    style = document.char_property(char_id)
+    assert style is not None
+    assert style.text_color() == "#FF0000"
+    assert "bold" in style.child_attributes
+    underline_attrs = style.child_attributes.get("underline") or {}
+    assert underline_attrs.get("type") != "NONE"
 
 
 def test_planning_flow_registers_document(ops_with_sample):
@@ -274,6 +292,11 @@ def test_save_as_creates_new_file(ops_with_sample, tmp_path):
     out = path.with_name("copy.hwpx")
     result = ops.save_as(str(path), str(out))
     assert Path(result["outPath"]).exists()
+    assert Path(result["outPath"]) == out
+
+    source_text = ops.read_text(str(path), limit=5)["textChunk"]
+    copied_text = ops.read_text(str(out), limit=5)["textChunk"]
+    assert copied_text == source_text
 
 
 def test_fill_template_replaces_multiple_tokens_without_modifying_source(ops_with_sample):

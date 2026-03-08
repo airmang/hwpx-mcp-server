@@ -96,11 +96,14 @@ def test_add_and_remove_memo(tmp_path: Path):
     create_document(str(target))
 
     add_paragraph(str(target), "메모 대상")
+    original_text = open_doc(str(target)).paragraphs[1].text
     added = add_memo(str(target), 1, "검토 필요")
     assert len(open_doc(str(target)).memos) == 1
 
     removed = remove_memo(str(target), 1)
-    assert len(open_doc(str(target)).memos) == 0
+    refreshed = open_doc(str(target))
+    assert len(refreshed.memos) == 0
+    assert refreshed.paragraphs[1].text == original_text
 
     assert added["memo_added"] is True
     assert removed["memo_removed"] is True

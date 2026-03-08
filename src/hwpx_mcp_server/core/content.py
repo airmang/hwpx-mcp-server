@@ -9,10 +9,8 @@ from typing import Any
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
-from hwpx.document import HwpxDocument
-from hwpx.oxml.namespaces import HP as _HP_NS
-
 from ..compat import patch_python_hwpx
+from ..upstream import HP_NS as _HP_NS, HwpxDocument
 from .formatting import resolve_style_id
 
 logger = logging.getLogger(__name__)
@@ -345,6 +343,52 @@ def _extract_memo_id_from_field_begin(field_begin: Any) -> str | None:
     return None
 
 
+def _memo_anchor_runs(paragraph: Any, memo_ids: set[str]) -> list[Any]:
+    if not memo_ids:
+        return []
+
+    field_ids: set[str] = set()
+    runs_to_remove: list[Any] = []
+
+    for run_element in list(paragraph.element.findall(f"{_HP_NS}run")):
+        for ctrl in run_element.findall(f"{_HP_NS}ctrl"):
+            field_begin = ctrl.find(f"{_HP_NS}fieldBegin")
+            if field_begin is None:
+                continue
+            memo_id = _extract_memo_id_from_field_begin(field_begin)
+            if memo_id not in memo_ids:
+                continue
+            field_id = (field_begin.get("id") or field_begin.get("fieldid") or "").strip()
+            if field_id:
+                field_ids.add(field_id)
+            runs_to_remove.append(run_element)
+            break
+
+    if not field_ids:
+        return runs_to_remove
+
+    for run_element in list(paragraph.element.findall(f"{_HP_NS}run")):
+        for ctrl in run_element.findall(f"{_HP_NS}ctrl"):
+            field_end = ctrl.find(f"{_HP_NS}fieldEnd")
+            if field_end is None:
+                continue
+            begin_id = (field_end.get("beginIDRef") or field_end.get("fieldid") or "").strip()
+            if begin_id not in field_ids:
+                continue
+            runs_to_remove.append(run_element)
+            break
+
+    unique_runs: list[Any] = []
+    seen: set[int] = set()
+    for run_element in runs_to_remove:
+        marker = id(run_element)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        unique_runs.append(run_element)
+    return unique_runs
+
+
 def add_memo_to_doc(doc: HwpxDocument, paragraph_index: int, text: str) -> None:
     """문단에 메모를 추가한다."""
     patch_python_hwpx()
@@ -392,6 +436,13 @@ def remove_memo_from_doc(doc: HwpxDocument, paragraph_index: int) -> None:
     for memo in list(doc.memos):
         if memo.id in memo_ids:
             doc.remove_memo(memo)
+
+    removed_anchor = False
+    for run_element in _memo_anchor_runs(paragraph, memo_ids):
+        paragraph.element.remove(run_element)
+        removed_anchor = True
+    if removed_anchor and paragraph.section is not None:
+        paragraph.section.mark_dirty()
 
 
 # ── 페이지 ────────────────────────────────────────────

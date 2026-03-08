@@ -133,6 +133,17 @@ def test_list_styles(tmp_path: Path):
     result = list_styles(str(target))
 
     assert result["count"] > 0
+    assert len(result["styles"]) == result["count"]
+    sample = result["styles"][0]
+    assert set(sample) >= {
+        "id",
+        "name",
+        "eng_name",
+        "type",
+        "para_pr_id_ref",
+        "char_pr_id_ref",
+    }
+    assert any(style.get("char_pr_id_ref") for style in result["styles"])
 
 
 def test_merge_table_cells(tmp_path: Path):

@@ -26,7 +26,7 @@ This PR makes the documented Phase 1/2 core behavior true before adding new MCP 
 
 ### Upstream alignment
 
-- audited installed upstream `python-hwpx 2.7.1` and the sibling editable checkout
+- audited the sibling editable upstream checkout and re-validated downstream behavior in a clean venv against released `python-hwpx 2.7.1`
 - set the downstream documented/package floor to `python-hwpx >= 2.6`
 - added [`docs/upstream-audit.md`](docs/upstream-audit.md)
 - updated README / changelog / use-case docs to match the actual MCP tool surface and version truth
@@ -60,6 +60,10 @@ Focused regression pass:
 python -m pytest -q tests/test_formatting.py tests/test_http_storage.py tests/test_hwpx_ops.py::test_save_as_creates_new_file tests/test_hwpx_ops.py::test_fill_template_replaces_multiple_tokens_without_modifying_source
 ```
 
+Note:
+- the active development shell may import a dirty sibling `python-hwpx` checkout
+- compatibility validation for this PR was therefore re-run in a clean virtualenv against released `python-hwpx 2.7.1`
+
 Full verification:
 
 ```bash
@@ -67,11 +71,13 @@ python -m pytest -ra
 ```
 
 Result:
-- `114 passed`
+- `113 passed`
 - `1 skipped` (`tests/test_file_edit_e2e.py:327`, POSIX-only permission denial case)
 
 ## Risks / Follow-ups
 
 - custom style creation still relies on direct header XML mutation because upstream has no public style-creation API yet
 - font family overrides still depend on the current `<hh:fontfaces>` layout
+- the sibling editable `python-hwpx` checkout is useful for API audit but not a safe release-validation baseline while dirty
+- `legacy_server.py` / `tools.py` still contain a broader legacy tool inventory than the active `server.py` FastMCP surface
 - future Phase 4 reference-preserving analysis tools are tracked in [`docs/follow-up-roadmap.md`](docs/follow-up-roadmap.md)

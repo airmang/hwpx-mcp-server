@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, Mapping, Optional, Protocol, Tuple
 from urllib import error, parse, request
 
-from hwpx.document import HwpxDocument
+from .upstream import HwpxDocument, open_document
 
 
 class DocumentStorage(Protocol):
@@ -95,7 +95,7 @@ class LocalDocumentStorage:
 
     def open_document(self, path: str) -> Tuple[HwpxDocument, Path]:
         resolved = self.resolve_path(path)
-        document = HwpxDocument.open(resolved)
+        document = open_document(resolved)
         return document, resolved
 
     def save_document(self, document: HwpxDocument, target: Path) -> None:
@@ -108,7 +108,7 @@ class LocalDocumentStorage:
         try:
             os.close(tmp_fd)
             document.save_to_path(tmp_path)
-            HwpxDocument.open(tmp_path)
+            open_document(tmp_path)
             os.replace(tmp_path, target)
         except Exception:
             tmp_path.unlink(missing_ok=True)
@@ -224,7 +224,7 @@ class HttpDocumentStorage:
         local_path.write_bytes(payload)
         self._cache[path] = local_path
 
-        document = HwpxDocument.open(local_path)
+        document = open_document(local_path)
         return document, Path(path)
 
     def save_document(self, document: HwpxDocument, target: Path) -> None:

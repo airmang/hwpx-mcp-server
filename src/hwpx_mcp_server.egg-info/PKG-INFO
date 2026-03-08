@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: hwpx-mcp-server
-Version: 2.2.1
+Version: 2.2.2
 Summary: Model Context Protocol server for local HWPX document automation.
 Author: Kohkyuhyun
 License: MIT License
@@ -105,7 +105,7 @@ hwpx-mcp-server
 - `Python >= 3.10`
 - `python-hwpx >= 2.6`
 
-현재 검증 기준 upstream 버전: `python-hwpx 2.7.1`
+현재 검증 기준 upstream 버전: `python-hwpx 2.7.1` (clean venv, released package)
 
 ### 2. MCP 클라이언트 설정
 
@@ -330,7 +330,7 @@ python -m pip install -e ".[test]"
 python -m pytest -q
 ```
 
-회귀 테스트는 실제 HWPX 출력 변경을 검증하도록 유지합니다. 최신 결과는 `python -m pytest -q`로 확인하세요.
+Phase 1/2 핵심 회귀 테스트는 실제 HWPX 출력 변경을 검증합니다. 최신 결과는 `python -m pytest -q`로 확인하세요.
 
 - 실전 사용 사례: `docs/use-cases.md`
 - 종합 리포트: `tests/hwpx_mcp_report_updated.md`
@@ -369,7 +369,8 @@ hwpx-mcp-server
 ## Upstream Compatibility Notes
 
 - 문서화된 MCP 기능 기준 최소 upstream 버전은 `python-hwpx >= 2.6`입니다.
-- 현재 저장소는 로컬 editable checkout 기준 `python-hwpx 2.7.1`과 호환성을 검증했습니다.
+- 현재 저장소는 clean venv에서 released `python-hwpx 2.7.1` 기준으로 호환성을 검증했습니다.
+- 로컬 sibling `python-hwpx` editable checkout은 upstream API audit 용도로만 참고하며, dirty 상태에서는 release validation 기준으로 사용하지 않습니다.
 - `format_text`는 실제 run-level `charPrIDRef`를 분리/갱신하며 저장 후 다시 열어도 서식 변경이 유지됩니다.
 - `create_custom_style`는 재사용 가능한 `style_id`를 반환하며, 서식 오버라이드가 있으면 별도의 upstream `charPr`를 생성합니다.
 - 로컬 파일 쓰기는 `storage.py`의 atomic save 경로를 공통 사용합니다.

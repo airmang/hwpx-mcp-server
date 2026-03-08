@@ -6,12 +6,31 @@ from copy import deepcopy
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from hwpx.document import HwpxDocument, HwpxOxmlParagraph, HwpxOxmlRun
-from hwpx.oxml.namespaces import HH as HH_NS, HP as HP_NS
-
-from ..compat import patch_python_hwpx
-
-patch_python_hwpx()
+from ..upstream import (
+    HH_NS,
+    HP_NS,
+    HwpxDocument,
+    HwpxOxmlParagraph,
+    HwpxOxmlRun,
+    append_xml_child,
+    char_style_matches,
+    default_base_style_id,
+    document_styles_element,
+    element_font_refs,
+    element_style_flags,
+    ensure_char_style,
+    ensure_font_face_refs,
+    iter_unique_styles,
+    next_numeric_style_id,
+    normalize_font_size,
+    normalize_hex_color,
+    resolve_style_id as upstream_resolve_style_id,
+    run_style_flags,
+    run_style_font_refs,
+    run_style_height,
+    style_element_by_id,
+    update_styles_item_count,
+)
 
 _FONT_REF_KEYS = (
     "hangul",
@@ -36,96 +55,39 @@ _DEFAULT_CHAR_HEIGHT = "1000"
 
 
 def _append_child(parent: ET.Element, tag: str, attrs: dict[str, str] | None = None) -> ET.Element:
-    payload = dict(attrs or {})
-    try:
-        return ET.SubElement(parent, tag, payload)
-    except TypeError:
-        maker = getattr(parent, "makeelement", None)
-        if not callable(maker):
-            raise
-        child = maker(tag, payload)
-        parent.append(child)
-        return child
+    return append_xml_child(parent, tag, attrs)
 
 
 def _iter_unique_styles(doc: HwpxDocument):
-    seen: set[str] = set()
-    for style in doc.styles.values():
-        raw_id = getattr(style, "raw_id", None)
-        if not raw_id and getattr(style, "id", None) is not None:
-            raw_id = str(style.id)
-        if not raw_id or raw_id in seen:
-            continue
-        seen.add(raw_id)
-        yield style
+    yield from iter_unique_styles(doc)
 
 
 def _normalize_color(color: str | None) -> str | None:
-    if color is None:
-        return None
-    value = color.strip()
-    if not value:
-        return None
-    if not value.startswith("#"):
-        value = "#" + value
-    if len(value) != 7 or any(ch not in "0123456789abcdefABCDEF#" for ch in value):
-        raise ValueError("color must be a 6-digit hexadecimal value")
-    return value.upper()
+    return normalize_hex_color(color)
 
 
 def _normalize_font_size(font_size: float | None) -> str | None:
-    if font_size is None:
-        return None
-    if font_size <= 0:
-        raise ValueError("font_size must be greater than 0")
-    return str(int(round(font_size * 100)))
+    return normalize_font_size(font_size)
 
 
 def _run_style_flags(run_style: Any) -> tuple[bool, bool, bool]:
-    if run_style is None:
-        return False, False, False
-    children = getattr(run_style, "child_attributes", {})
-    underline_attrs = children.get("underline")
-    underline = False
-    if underline_attrs is not None:
-        underline = underline_attrs.get("type", "").upper() != "NONE"
-    return "bold" in children, "italic" in children, underline
+    return run_style_flags(run_style)
 
 
 def _run_style_height(run_style: Any) -> str | None:
-    if run_style is None:
-        return None
-    return getattr(run_style, "attributes", {}).get("height")
+    return run_style_height(run_style)
 
 
 def _run_style_font_refs(run_style: Any) -> dict[str, str]:
-    if run_style is None:
-        return {}
-    refs = dict(getattr(run_style, "child_attributes", {}).get("fontRef", {}))
-    return {key: str(value) for key, value in refs.items() if key in _FONT_REF_KEYS}
+    return run_style_font_refs(run_style)
 
 
 def _element_flags(element: ET.Element) -> tuple[bool, bool, bool]:
-    underline_node = element.find(f"{HH_NS}underline")
-    underline = False
-    if underline_node is not None:
-        underline = underline_node.get("type", "").upper() != "NONE"
-    return (
-        element.find(f"{HH_NS}bold") is not None,
-        element.find(f"{HH_NS}italic") is not None,
-        underline,
-    )
+    return element_style_flags(element)
 
 
 def _element_font_refs(element: ET.Element) -> dict[str, str]:
-    font_ref = element.find(f"{HH_NS}fontRef")
-    if font_ref is None:
-        return {}
-    return {
-        key: str(value)
-        for key, value in font_ref.attrib.items()
-        if key in _FONT_REF_KEYS
-    }
+    return element_font_refs(element)
 
 
 def _char_style_matches(
@@ -136,17 +98,7 @@ def _char_style_matches(
     height: str,
     font_refs: dict[str, str],
 ) -> bool:
-    if _run_style_flags(run_style) != flags:
-        return False
-    if ((run_style.text_color() if run_style is not None else None) or _DEFAULT_TEXT_COLOR).upper() != color:
-        return False
-    if (_run_style_height(run_style) or _DEFAULT_CHAR_HEIGHT) != height:
-        return False
-    current_font_refs = _run_style_font_refs(run_style)
-    for key in _FONT_REF_KEYS:
-        if current_font_refs.get(key) != font_refs.get(key):
-            return False
-    return True
+    return char_style_matches(run_style, flags=flags, color=color, height=height, font_refs=font_refs)
 
 
 def _ref_list_element(header: Any) -> ET.Element:
@@ -185,75 +137,11 @@ def _next_font_id(bucket: ET.Element) -> str:
 
 
 def _ensure_font_face_refs(header: Any, font_name: str) -> dict[str, str]:
-    name = (font_name or "").strip()
-    if not name:
-        raise ValueError("font_name cannot be empty")
-
-    fontfaces = _fontfaces_element(header)
-    refs: dict[str, str] = {}
-    changed = False
-
-    for lang, ref_key in _FONT_FACE_LANGS.items():
-        bucket = _find_fontface_bucket(fontfaces, lang)
-        if bucket is None:
-            bucket = _append_child(fontfaces, f"{HH_NS}fontface", {"lang": lang, "fontCnt": "0"})
-            changed = True
-
-        font_element = None
-        for candidate in bucket.findall(f"{HH_NS}font"):
-            if (candidate.get("face") or "").strip() == name:
-                font_element = candidate
-                break
-
-        if font_element is None:
-            font_element = _append_child(
-                bucket,
-                f"{HH_NS}font",
-                {
-                    "id": _next_font_id(bucket),
-                    "face": name,
-                    "type": "TTF",
-                    "isEmbedded": "0",
-                },
-            )
-            bucket.set("fontCnt", str(len(bucket.findall(f"{HH_NS}font"))))
-            changed = True
-
-        font_id = font_element.get("id")
-        if not font_id:
-            raise RuntimeError("fontface entry is missing an id")
-        refs[ref_key] = font_id
-
-    if changed:
-        header.mark_dirty()
-    return refs
+    return ensure_font_face_refs(header, font_name)
 
 
 def resolve_style_id(doc: HwpxDocument, style: str | None) -> str | None:
-    if style is None:
-        return None
-    value = style.strip()
-    if not value:
-        return None
-
-    resolved = doc.style(value)
-    if resolved is not None:
-        raw_id = getattr(resolved, "raw_id", None)
-        if raw_id:
-            return raw_id
-        if getattr(resolved, "id", None) is not None:
-            return str(resolved.id)
-
-    for candidate in _iter_unique_styles(doc):
-        if value not in {candidate.name, candidate.eng_name}:
-            continue
-        raw_id = getattr(candidate, "raw_id", None)
-        if raw_id:
-            return raw_id
-        if getattr(candidate, "id", None) is not None:
-            return str(candidate.id)
-
-    raise ValueError(f"unknown style reference: {value}")
+    return upstream_resolve_style_id(doc, style)
 
 
 def _ensure_char_style(
@@ -267,101 +155,16 @@ def _ensure_char_style(
     font_name: str | None = None,
     color: str | None = None,
 ) -> str:
-    if not doc.headers:
-        raise RuntimeError("document does not contain any headers to host styles")
-
-    header = doc.headers[0]
-    base_style = doc.char_property(base_char_pr_id)
-    base_flags = _run_style_flags(base_style)
-    target_flags = (
-        base_flags[0] if bold is None else bool(bold),
-        base_flags[1] if italic is None else bool(italic),
-        base_flags[2] if underline is None else bool(underline),
-    )
-    target_color = _normalize_color(color) or (
-        (base_style.text_color() if base_style is not None else None) or _DEFAULT_TEXT_COLOR
-    ).upper()
-    target_height = _normalize_font_size(font_size) or _run_style_height(base_style) or _DEFAULT_CHAR_HEIGHT
-    target_font_refs = {
-        key: value
-        for key, value in _run_style_font_refs(base_style).items()
-        if key in _FONT_REF_KEYS
-    }
-    if not target_font_refs:
-        target_font_refs = {key: "0" for key in _FONT_REF_KEYS}
-    if font_name is not None:
-        target_font_refs.update(_ensure_font_face_refs(header, font_name))
-
-    if base_char_pr_id is not None and _char_style_matches(
-        base_style,
-        flags=target_flags,
-        color=target_color,
-        height=target_height,
-        font_refs=target_font_refs,
-    ):
-        return str(base_char_pr_id)
-
-    def predicate(element: ET.Element) -> bool:
-        if _element_flags(element) != target_flags:
-            return False
-        if (element.get("textColor", _DEFAULT_TEXT_COLOR) or _DEFAULT_TEXT_COLOR).upper() != target_color:
-            return False
-        if element.get("height", _DEFAULT_CHAR_HEIGHT) != target_height:
-            return False
-        element_font_refs = _element_font_refs(element)
-        for key in _FONT_REF_KEYS:
-            if element_font_refs.get(key) != target_font_refs.get(key):
-                return False
-        return True
-
-    def modifier(element: ET.Element) -> None:
-        underline_nodes = list(element.findall(f"{HH_NS}underline"))
-        existing_underline = dict(underline_nodes[0].attrib) if underline_nodes else {}
-
-        for child in list(element.findall(f"{HH_NS}bold")):
-            element.remove(child)
-        for child in list(element.findall(f"{HH_NS}italic")):
-            element.remove(child)
-        for child in underline_nodes:
-            element.remove(child)
-
-        if target_flags[0]:
-            _append_child(element, f"{HH_NS}bold")
-        if target_flags[1]:
-            _append_child(element, f"{HH_NS}italic")
-
-        underline_attrs = dict(existing_underline)
-        underline_attrs.setdefault("shape", existing_underline.get("shape", "SOLID"))
-        underline_attrs["color"] = underline_attrs.get("color", target_color) or target_color
-        if target_flags[2]:
-            underline_attrs["type"] = underline_attrs.get("type", "SOLID") or "SOLID"
-            if underline_attrs["type"].upper() == "NONE":
-                underline_attrs["type"] = "SOLID"
-            underline_attrs["color"] = target_color
-        else:
-            underline_attrs["type"] = "NONE"
-        _append_child(element, f"{HH_NS}underline", underline_attrs)
-
-        element.set("textColor", target_color)
-        element.set("height", target_height)
-
-        font_ref = element.find(f"{HH_NS}fontRef")
-        if font_ref is None:
-            font_ref = _append_child(element, f"{HH_NS}fontRef")
-        for key in _FONT_REF_KEYS:
-            value = target_font_refs.get(key)
-            if value is not None:
-                font_ref.set(key, str(value))
-
-    char_element = header.ensure_char_property(
-        predicate=predicate,
-        modifier=modifier,
+    return ensure_char_style(
+        doc,
         base_char_pr_id=base_char_pr_id,
+        bold=bold,
+        italic=italic,
+        underline=underline,
+        font_size=font_size,
+        font_name=font_name,
+        color=color,
     )
-    char_id = char_element.get("id")
-    if not char_id:
-        raise RuntimeError("char property does not expose an identifier")
-    return char_id
 
 
 class _Segment:
@@ -488,36 +291,19 @@ def _paragraph_length(paragraph: HwpxOxmlParagraph) -> int:
 
 
 def _style_element_by_id(styles_element: ET.Element, style_id: str) -> ET.Element | None:
-    for style_element in styles_element.findall(f"{HH_NS}style"):
-        raw_id = style_element.get("id")
-        if raw_id == style_id:
-            return style_element
-        try:
-            if raw_id is not None and str(int(raw_id)) == style_id:
-                return style_element
-        except ValueError:
-            continue
-    return None
+    return style_element_by_id(styles_element, style_id)
 
 
 def _next_style_id(styles_element: ET.Element) -> str:
-    numeric_ids: list[int] = []
-    for style_element in styles_element.findall(f"{HH_NS}style"):
-        raw_id = style_element.get("id")
-        if raw_id is None:
-            continue
-        try:
-            numeric_ids.append(int(raw_id))
-        except ValueError:
-            continue
-    return "0" if not numeric_ids else str(max(numeric_ids) + 1)
+    return next_numeric_style_id(styles_element)
 
 
 def _update_styles_item_count(styles_element: ET.Element) -> None:
-    styles_element.set("itemCnt", str(len(styles_element.findall(f"{HH_NS}style"))))
+    update_styles_item_count(styles_element)
 
 
 def _default_base_style_id(doc: HwpxDocument) -> str:
+    return default_base_style_id(doc)
     for candidate in ("1", "본문", "Body", "0", "바탕글", "Normal"):
         try:
             resolved = resolve_style_id(doc, candidate)
@@ -623,9 +409,7 @@ def create_style_in_doc(
         raise RuntimeError("document does not contain any headers to host styles")
 
     header = doc.headers[0]
-    styles_element = header._styles_element()
-    if styles_element is None:
-        raise RuntimeError("document header does not expose styles")
+    styles_element = document_styles_element(doc)
 
     for style in _iter_unique_styles(doc):
         if name not in {style.name, style.eng_name}:
@@ -689,10 +473,7 @@ def create_style_in_doc(
 
 def list_styles_in_doc(doc: HwpxDocument) -> list[dict[str, str | None]]:
     """Return styles defined in the document."""
-    header = doc.headers[0]
-    styles_element = header._styles_element()
-    if styles_element is None:
-        return []
+    styles_element = document_styles_element(doc)
 
     styles: list[dict[str, str | None]] = []
     for style_element in styles_element.findall(f"{HH_NS}style"):

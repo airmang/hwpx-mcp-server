@@ -19,7 +19,6 @@ from urllib.request import Request, urlopen
 
 import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
-from hwpx.document import HwpxDocument
 
 from .core.content import (
     add_heading_to_doc,
@@ -42,6 +41,7 @@ from .core.document import create_blank, open_doc, save_doc
 from .core.formatting import create_style_in_doc, format_text_range, list_styles_in_doc
 from .core.search import batch_replace_in_doc, find_in_doc, replace_in_doc
 from .hwpx_ops import HwpxOps
+from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
 mcp = FastMCP("hwpx-mcp-server")
@@ -203,6 +203,31 @@ def _looks_like_figure_caption(text: str) -> bool:
     return bool(_FIGURE_CAPTION_RE.match((text or "").strip()))
 
 
+def _build_verification_plan_operation(path: str, instruction: str) -> dict[str, Any]:
+    needle = (instruction or "").strip()
+    if not needle:
+        raise ValueError("instruction cannot be empty")
+
+    with create_text_extractor(path) as extractor:
+        for paragraph in extractor.iter_document_paragraphs():
+            text = paragraph.text(preserve_breaks=True)
+            if needle not in text:
+                continue
+            # FastMCP currently exposes only a single instruction string here.
+            # Anchor the hardened pipeline on the first matching paragraph and
+            # keep the replacement as a no-op so preview/apply remain truthful.
+            return {
+                "target": {"sectionIndex": 0, "paraIndex": paragraph.index},
+                "match": text,
+                "replacement": text,
+                "limit": 1,
+                "dryRun": True,
+                "atomic": True,
+            }
+
+    raise ValueError("instruction text was not found in the document")
+
+
 def _download_hwpx_from_url(url: str, *, max_input_bytes: int) -> bytes:
     parsed = urlsplit(url)
     if parsed.scheme.lower() != "https":
@@ -251,7 +276,7 @@ def _load_hwpx_payload(hwpx_base64: str | None, url: str | None) -> tuple[bytes,
 def _open_hwpx_from_payload(hwpx_base64: str | None, url: str | None):
     payload, source_meta = _load_hwpx_payload(hwpx_base64, url)
     try:
-        doc = HwpxDocument.open(BytesIO(payload))
+        doc = open_document(BytesIO(payload))
     except Exception as exc:  # pragma: no cover - delegated to parser
         raise ValueError(f"failed to parse hwpx payload: {exc}") from exc
     return doc, source_meta
@@ -587,8 +612,7 @@ def _paragraph_count(doc) -> int:
 
 
 def _table_count(doc) -> int:
-    from hwpx.oxml.namespaces import HP as _HP
-    table_tag = f"{_HP}tbl"
+    table_tag = f"{HP_NS}tbl"
     count = 0
     for section in getattr(doc, "sections", []):
         section_element = getattr(section, "element", None)
@@ -1102,23 +1126,24 @@ if _advanced_enabled():
     def object_find_by_attr(filename: str, attr_name: str, attr_value: str = None, max_results: int = 20) -> dict:
         """[고급] 문서 XML에서 특정 속성을 검색합니다."""
         path = resolve_path(filename)
-        return _OPS.object_find_by_attr(path, "*", attr_name, attr_value or "", max_results=max_results)
+        return _OPS.object_find_by_attr(path, None, attr_name, attr_value, max_results=max_results)
 
     @mcp.tool()
     def plan_edit(filename: str, instruction: str) -> dict:
-        """[고급/하드닝] 편집 계획을 생성합니다. preview_edit → apply_edit 순으로 사용하세요."""
-        operation = {"op": "searchReplace", "args": {"find": instruction, "replace": instruction}}
-        return _OPS.plan_edit(path=resolve_path(filename), operations=[operation])
+        """[고급/하드닝] instruction이 포함된 첫 문단 기준 검증용 no-op 계획을 생성합니다."""
+        path = resolve_path(filename)
+        operation = _build_verification_plan_operation(path, instruction)
+        return _OPS.plan_edit(path=path, operations=[operation])
 
     @mcp.tool()
     def preview_edit(filename: str, plan_id: str) -> dict:
-        """[고급/하드닝] 편집 계획의 미리보기를 반환합니다."""
+        """[고급/하드닝] plan_edit로 생성한 검증 계획 미리보기를 반환합니다."""
         del filename
         return _OPS.preview_edit(plan_id=plan_id)
 
     @mcp.tool()
     def apply_edit(filename: str, plan_id: str) -> dict:
-        """[고급/하드닝] 편집 계획을 적용합니다."""
+        """[고급/하드닝] 검증 계획을 파이프라인 상태에 적용합니다. 원본 HWPX는 직접 수정하지 않습니다."""
         del filename
         return _OPS.apply_edit(plan_id=plan_id, confirm=True)
 

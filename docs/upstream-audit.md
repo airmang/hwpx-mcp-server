@@ -3,13 +3,14 @@
 Audit date: 2026-03-08
 
 Inspected upstream sources:
-- Installed package: `python-hwpx 2.7.1`
-- Installed location: editable checkout from sibling repo `../python-hwpx`
+- Active development runtime during audit: editable checkout from sibling repo `../python-hwpx`
+- Clean validation runtime: released `python-hwpx 2.7.1` in an isolated virtualenv
 - Local upstream tags present during audit: `v2.6`, `v2.7`, `v2.7.1`
 
 ## Version Truth
 
-- Verified downstream runtime during audit: `python-hwpx 2.7.1`
+- Verified downstream behavior for this review: released `python-hwpx 2.7.1` in a clean virtualenv
+- Active shell during code audit imported the sibling editable checkout, which was dirty and not a stable validation baseline
 - Documented downstream floor after this sync: `python-hwpx >= 2.6`
 - Reason for `2.6` floor:
   - this repo depends on upstream exporter APIs used by the current read/extract surface
@@ -20,15 +21,31 @@ Inspected upstream sources:
 
 | Downstream file | Upstream surface used | Notes |
 |---|---|---|
-| `src/hwpx_mcp_server/server.py` | `HwpxDocument`, paragraph/table wrappers, tool-facing open/save flow | Main MCP entrypoint; accuracy depends on core helpers staying aligned with upstream wrappers. |
-| `src/hwpx_mcp_server/core/document.py` | `HwpxDocument.open()`, `blank_document_bytes()`, `save_to_path()` | Central local filesystem open/create/save path. |
+| `src/hwpx_mcp_server/upstream.py` | `HwpxDocument.open()/new()`, `blank_document_bytes()`, `HwpxPackage.open()`, `TextExtractor`, `ObjectFinder`, `validate_document()`, exporters, header/style helpers | Phase 3 adapter boundary for non-obvious or version-sensitive upstream usage. |
+| `src/hwpx_mcp_server/server.py` | payload parse/open flow, paragraph/table wrappers | Main MCP entrypoint; now relies on `upstream.py` for raw payload parsing instead of importing `HwpxDocument` directly. |
+| `src/hwpx_mcp_server/core/document.py` | document open/create flow, `save_to_path()` via storage | Central local filesystem open/create/save path; direct open/template calls now route through `upstream.py`. |
 | `src/hwpx_mcp_server/core/content.py` | `add_paragraph()`, `remove_paragraph()`, `add_table()`, `merge_cells()`, `split_merged_cell()`, `add_memo_with_anchor()`, `remove_memo()` | Mostly public upstream editing APIs. |
-| `src/hwpx_mcp_server/core/formatting.py` | `doc.style()`, `doc.char_property()`, `header.ensure_char_property()`, run wrappers, header XML refs | Most version-sensitive area; mixes public helpers with direct header XML edits because upstream has no public style creation API. |
+| `src/hwpx_mcp_server/core/formatting.py` | `doc.style()`, `doc.char_property()`, `header.ensure_char_property()`, run wrappers, header XML refs | Now delegates shared style/header logic to `upstream.py`; still version-sensitive because upstream has no public style creation API. |
 | `src/hwpx_mcp_server/core/search.py` | paragraph/run traversal and text replacement behavior | Depends on upstream paragraph/run layout semantics. |
-| `src/hwpx_mcp_server/storage.py` | `HwpxDocument.open()`, `save_to_path()` | Local atomic save validates temp output by reopening it through upstream. |
-| `src/hwpx_mcp_server/hwpx_ops.py` | `ObjectFinder`, `HwpxPackage`, `TextExtractor`, `validate_document`, `ensure_run_style()`, table/run helpers | High-density upstream integration layer. |
+| `src/hwpx_mcp_server/storage.py` | document open validation, `save_to_path()` | Local atomic save now reopens through `upstream.py` so parser entrypoints are centralized. |
+| `src/hwpx_mcp_server/hwpx_ops.py` | package/extractor/finder/validator/exporter helpers, run-style helpers, table/run helpers | High-density integration layer; Phase 3 moved duplicated upstream imports and char-style logic behind `upstream.py`. |
 | `src/hwpx_mcp_server/hwp_converter.py` | `HwpxDocument.new()`, paragraph/table creation, save path | Conversion output must follow the same save semantics as the rest of the product. |
 | `tests/` | direct `HwpxDocument` inspection | Regression coverage depends on inspecting real persisted HWPX output, not only return payloads. |
+
+## Phase 3 Hardening Status
+
+- Added `src/hwpx_mcp_server/upstream.py` as the downstream adapter boundary for `python-hwpx`.
+- Centralized the following previously duplicated or scattered upstream touchpoints:
+  - document open/new/template creation
+  - package open
+  - text extractor creation
+  - object finder creation
+  - structure validation
+  - document exporters
+  - private `_DEFAULT_CELL_WIDTH` lookup
+  - shared char-style/style-id/style-element helpers
+- `server.py`, `core/document.py`, `storage.py`, `core/formatting.py`, and `hwpx_ops.py` now consume that adapter instead of repeating direct upstream imports and helper logic.
+- Regression tests were updated to patch adapter entrypoints (`create_text_extractor`) and to verify that `hwpx_ops` shares the same char-style integration path as `core/formatting.py`.
 
 ## Drift Found
 
@@ -58,11 +75,16 @@ Inspected upstream sources:
 
 ## Risky Integration Points
 
-- Style authoring still depends on direct header XML mutation via `_styles_element()` because `python-hwpx` does not yet expose a public style-creation API.
+- Style authoring still depends on direct header XML mutation via `_styles_element()`, now isolated in `upstream.document_styles_element()`, because `python-hwpx` does not yet expose a public style-creation API.
+- Shared char-style creation still depends on header-level `ensure_char_property()` hooks, now isolated in `upstream.ensure_char_style()`.
 - Font family overrides require editing `<hh:fontfaces>` buckets directly; upstream schema/layout changes there would affect downstream style creation.
+- Border-fill creation in `hwpx_ops.py` still depends on private header helpers such as `_allocate_border_fill_id()` and `_update_border_fills_item_count()`.
+- `core/content.py` memo fallback still writes raw section XML when the native upstream memo call fails on mixed ET/lxml parents.
 - Run-range formatting depends on splitting/cloning `HwpxOxmlRun` content while preserving nested `<hp:t>` fragments.
 - Atomic save correctness depends on upstream `save_to_path()` continuing to produce fully reopenable packages before replacement.
+- `hwp_converter.py` still constructs new documents directly through upstream instead of the Phase 3 adapter.
 - The repo still carries an ET/lxml compatibility patch (`compat.py`) for mixed XML parent handling.
+- Local developer environments can accidentally import a dirty sibling `python-hwpx` checkout and invalidate downstream test results unless validation is isolated.
 
 ## Recommended Fix Order
 
@@ -75,11 +97,15 @@ Inspected upstream sources:
 4. Unify write safety.
    - done in this phase by routing local writes through the shared atomic save path
 5. Reduce future upgrade cost.
-   - follow-up: move more `hwpx_ops.py` style/save logic onto the same shared adapter helpers used by `core/formatting.py`
+   - done in this phase by introducing `src/hwpx_mcp_server/upstream.py` and routing shared style/package/extractor/export/document-open logic through it
+6. Continue shrinking the private-upstream surface.
+   - follow-up: move border-fill creation, memo fallback XML writes, and converter bootstrapping onto the same adapter boundary where practical
 
 ## Required Follow-up Work
 
 - Add CI coverage against at least one `python-hwpx 2.6.x` build and the current `2.7.x` line.
+- Extend the adapter boundary to remaining private-upstream paths (`hwp_converter.py`, memo fallback XML, border-fill allocation helpers).
 - Keep MCP docs generated from the actual registered tool list to avoid future tool-surface drift.
+- Either align or explicitly retire the legacy `legacy_server.py` / `tools.py` tool inventory so stale tool descriptions cannot be mistaken for the active FastMCP surface.
 - Build the Phase 4 reference-preserving analysis tools on top of MCP/Python logic rather than skill-only instructions.
 - Watch upstream for a public style-creation API; replace direct `_styles_element()` mutation when that exists.

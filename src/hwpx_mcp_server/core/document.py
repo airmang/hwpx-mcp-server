@@ -2,13 +2,8 @@ import os
 from io import BytesIO
 from pathlib import Path
 
-from ..compat import patch_python_hwpx
-
-patch_python_hwpx()
-
-from hwpx.document import HwpxDocument
-from hwpx.templates import blank_document_bytes
 from ..storage import LocalDocumentStorage
+from ..upstream import HwpxDocument, blank_document_template_bytes, open_document
 
 
 def _local_storage() -> LocalDocumentStorage:
@@ -21,7 +16,7 @@ def _local_storage() -> LocalDocumentStorage:
 def open_doc(path: str) -> HwpxDocument:
     if not os.path.exists(path):
         raise FileNotFoundError(f"파일을 찾을 수 없습니다: {path}")
-    return HwpxDocument.open(path)
+    return open_document(path)
 
 
 def save_doc(doc: HwpxDocument, path: str) -> None:
@@ -31,6 +26,6 @@ def save_doc(doc: HwpxDocument, path: str) -> None:
 
 
 def create_blank(path: str, title=None, author=None) -> None:
-    source = BytesIO(blank_document_bytes())
-    doc = HwpxDocument.open(source)
+    source = BytesIO(blank_document_template_bytes())
+    doc = open_document(source)
     save_doc(doc, path)
