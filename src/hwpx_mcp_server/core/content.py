@@ -13,6 +13,7 @@ from hwpx.document import HwpxDocument
 from hwpx.oxml.namespaces import HP as _HP_NS
 
 from ..compat import patch_python_hwpx
+from .formatting import resolve_style_id
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +24,10 @@ def _iter_tables(doc: HwpxDocument):
             yield table
 
 
-def _resolve_style(style: str | None) -> str | None:
+def _resolve_style(doc: HwpxDocument, style: str | None) -> str | None:
     if style is None:
         return None
-    value = style.strip()
-    return value or None
+    return resolve_style_id(doc, style)
 
 
 # ── 문단 ──────────────────────────────────────────────
@@ -43,7 +43,7 @@ def add_heading_to_doc(doc: HwpxDocument, text: str, level: int = 1) -> int:
 
 def add_paragraph_to_doc(doc: HwpxDocument, text: str, style: str = None) -> int:
     """문서 끝에 일반 문단을 추가한다. 추가된 paragraph_index를 반환."""
-    style_id = _resolve_style(style)
+    style_id = _resolve_style(doc, style)
     doc.add_paragraph(text or "", style_id_ref=style_id)
     return len(doc.paragraphs) - 1
 
@@ -59,7 +59,7 @@ def insert_paragraph_to_doc(doc: HwpxDocument, paragraph_index: int, text: str, 
 
     target = doc.paragraphs[paragraph_index]
     section = target.section
-    style_id = _resolve_style(style)
+    style_id = _resolve_style(doc, style)
     inserted = section.add_paragraph(text or "", style_id_ref=style_id)
 
     section_element = section.element

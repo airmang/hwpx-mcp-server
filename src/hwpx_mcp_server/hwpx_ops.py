@@ -2002,7 +2002,7 @@ class HwpxOps:
     def save_as(self, path: str, out: str) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         out_path = self._resolve_output_path(out)
-        document.save_to_path(out_path)
+        self._save_document(document, out_path)
         return {"outPath": str(out_path)}
 
     def fill_template(
@@ -2032,7 +2032,7 @@ class HwpxOps:
                 "fill_template called with preserve_style=False, but current backend always preserves run style"
             )
 
-        document.save_to_path(out_path)
+        self._save_document(document, out_path)
         return {
             "outPath": str(out_path),
             "replacedCount": replaced_count,
@@ -2059,7 +2059,7 @@ class HwpxOps:
     def make_blank(self, out: str) -> Dict[str, Any]:
         document = HwpxDocument.new()
         out_path = self._resolve_output_path(out)
-        document.save_to_path(out_path)
+        self._save_document(document, out_path)
         return {"outPath": str(out_path)}
 
     def convert_hwp_to_hwpx(self, source: str, output: Optional[str] = None) -> Dict[str, Any]:

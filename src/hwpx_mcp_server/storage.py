@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -99,18 +100,16 @@ class LocalDocumentStorage:
 
     def save_document(self, document: HwpxDocument, target: Path) -> None:
         self.maybe_backup(target)
-        # Atomic save: write to temp file → verify → rename
+        # Atomic save: write to a sibling temp file, verify it, then replace.
         tmp_fd, tmp_path_str = tempfile.mkstemp(
             suffix=target.suffix, dir=str(target.parent)
         )
         tmp_path = Path(tmp_path_str)
         try:
-            import os
             os.close(tmp_fd)
             document.save_to_path(tmp_path)
-            # Verify the saved file is a valid HWPX package
             HwpxDocument.open(tmp_path)
-            shutil.move(str(tmp_path), str(target))
+            os.replace(tmp_path, target)
         except Exception:
             tmp_path.unlink(missing_ok=True)
             raise

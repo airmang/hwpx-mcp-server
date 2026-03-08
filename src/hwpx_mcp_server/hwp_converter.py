@@ -10,6 +10,7 @@ from typing import Iterable, List, Sequence
 
 from hwpx.document import HwpxDocument
 
+from .core.document import save_doc
 from .hwp_support import HwpBinaryError, extract_hwp_text
 
 
@@ -204,7 +205,7 @@ def convert_hwp_to_hwpx(hwp_path: str, output_path: str) -> ConversionResult:
             for col_index, text in enumerate(row):
                 table.rows[row_index].cells[col_index].text = text
 
-    document.save_to_path(target)
+    save_doc(document, str(target))
 
     if skipped_elements:
         warnings.append(

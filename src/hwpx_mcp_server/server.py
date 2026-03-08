@@ -1000,7 +1000,7 @@ def create_custom_style(
     """문서에 커스텀 스타일을 생성합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
-    create_style_in_doc(
+    result = create_style_in_doc(
         doc,
         style_name,
         bold=bold,
@@ -1010,7 +1010,7 @@ def create_custom_style(
         color=color,
     )
     save_doc(doc, path)
-    return {"style_name": style_name, "created": True}
+    return result
 
 
 @mcp.tool()
