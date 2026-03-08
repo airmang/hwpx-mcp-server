@@ -42,6 +42,36 @@
 
 <br>
 
+## Skill-First Workflows
+
+See the workflow guide and example skills:
+
+- [`docs/skill-first-workflows.md`](docs/skill-first-workflows.md)
+- [`examples/skills/reference-preserving-edit/SKILL.md`](examples/skills/reference-preserving-edit/SKILL.md)
+- [`examples/skills/form-fill/SKILL.md`](examples/skills/form-fill/SKILL.md)
+- [`examples/skills/template-generation/SKILL.md`](examples/skills/template-generation/SKILL.md)
+
+The active FastMCP surface already supports the main reference-preserving workflows without adding new public tools.
+
+- Reference-preserving edit: `copy_document`, read/extract tools, advanced package inspection tools, bounded mutators, `validate_structure`
+- Government/public-form fill: `copy_document`, `batch_replace`, `search_and_replace`, `set_table_cell_text`, read/validate tools
+- Template-based generation: `copy_document` plus replacements, or `create_document` plus paragraph/table builders
+- Cautious edit-review-save: `copy_document`, `plan_edit`, `preview_edit`, bounded mutators, `validate_structure`
+
+Advanced package inspection, validation, and review-pipeline steps require `HWPX_MCP_ADVANCED=1`.
+
+Important surface boundary:
+
+- The active FastMCP server does not expose a public `fill_template` tool.
+- The active FastMCP server does not expose a public `save_as` tool.
+- Mutating tools persist immediately through the shared atomic save path, so cautious workflows should start from `copy_document`.
+- `plan_edit`, `preview_edit`, and `apply_edit` are review/verification pipeline tools, not a general direct-edit replacement for the core HWPX mutators.
+
+Prompt/resource note:
+
+- A legacy prompt/resource implementation exists in the repository, but it is not the authoritative FastMCP product surface.
+- This pass keeps workflow guidance in docs and example skills instead of widening the active server contract.
+
 ## Quick Start
 
 ### 1. 설치 & 실행
@@ -324,6 +354,13 @@ hwpx-mcp-server
 | 연동 방식 | MCP + 파이썬 라이브러리 | 데스크톱 앱 자동화 |
 
 <br>
+
+## Layer Ownership
+
+- `python-hwpx` is the upstream engine layer. It owns package parsing, document semantics, exporters, and version-sensitive HWPX behavior.
+- `hwpx-mcp-server` is the downstream MCP product surface. The authoritative public tool inventory is the FastMCP registration in `src/hwpx_mcp_server/server.py`.
+- Skills and workflow docs are orchestration only. They should compose existing MCP tools instead of duplicating Python business logic or inventing new engine semantics.
+- `src/hwpx_mcp_server/legacy_server.py`, `src/hwpx_mcp_server/tools.py`, and `src/hwpx_mcp_server/prompts.py` are legacy/non-authoritative for release-facing tool documentation unless and until they are re-aligned with the active FastMCP surface.
 
 ## Upstream Compatibility Notes
 

@@ -231,3 +231,27 @@ MCP 설정 예시:
 - ✅ 대량 작업 스트레스 테스트 (50문단, 50건 치환)
 
 상세 검증 로그는 `tests/hwpx_mcp_report_updated.md`를 참고하세요.
+
+---
+
+## Skill-first workflow guide
+
+For reference-preserving workflows on the current FastMCP surface, see:
+
+- `docs/skill-first-workflows.md`
+- `examples/skills/reference-preserving-edit/SKILL.md`
+- `examples/skills/form-fill/SKILL.md`
+- `examples/skills/template-generation/SKILL.md`
+
+Current workflow boundary:
+
+- No new public MCP tools are required for these flows.
+- There is no active public `fill_template` or `save_as` tool on the FastMCP surface.
+- Use `copy_document` first when you need a reviewable or low-risk edit path because mutating tools persist immediately.
+- Use advanced mode for package inspection and validation steps: `package_parts`, `package_get_xml`, `package_get_text`, `plan_edit`, `preview_edit`, `apply_edit`, `validate_structure`.
+
+Layer ownership:
+
+- `python-hwpx` stays the upstream engine for HWPX/package behavior.
+- `hwpx-mcp-server` exposes the stable MCP product surface through `src/hwpx_mcp_server/server.py`.
+- Skills and workflow examples orchestrate those tools; they do not replace core editing logic.

@@ -17,6 +17,13 @@ Inspected upstream sources:
   - local upstream history shows the exporter commit (`93413af`, "Add HWPX document exporters and integration tests") is contained in `v2.6+`
   - earlier downstream docs claiming `2.4` or `2.5` could not be justified from the audited upstream checkout
 
+## Layer Ownership After Scope Pivot
+
+- `python-hwpx` remains the upstream engine layer. Engine-level package semantics, structure comparison primitives, exporter behavior, and version-sensitive XML/layout handling belong there first.
+- `hwpx-mcp-server` remains the downstream MCP product surface. The authoritative public contract is the FastMCP tool registration in `src/hwpx_mcp_server/server.py`.
+- Workflow docs and example skills are orchestration only. They should compose the current MCP surface instead of duplicating engine logic or implying new public tools.
+- `src/hwpx_mcp_server/legacy_server.py`, `src/hwpx_mcp_server/tools.py`, and `src/hwpx_mcp_server/prompts.py` still exist, but they are not the release-facing source of truth for the current MCP tool inventory.
+
 ## Upstream Dependency Touchpoints
 
 | Downstream file | Upstream surface used | Notes |
@@ -107,5 +114,33 @@ Inspected upstream sources:
 - Extend the adapter boundary to remaining private-upstream paths (`hwp_converter.py`, memo fallback XML, border-fill allocation helpers).
 - Keep MCP docs generated from the actual registered tool list to avoid future tool-surface drift.
 - Either align or explicitly retire the legacy `legacy_server.py` / `tools.py` tool inventory so stale tool descriptions cannot be mistaken for the active FastMCP surface.
-- Build the Phase 4 reference-preserving analysis tools on top of MCP/Python logic rather than skill-only instructions.
+- Keep Phase 4 scope narrowed: do not add new public MCP tools unless the current product surface is proven insufficient.
+- Record future reference-structure engine needs in `python-hwpx` before duplicating semantics in the MCP layer.
 - Watch upstream for a public style-creation API; replace direct `_styles_element()` mutation when that exists.
+
+## Phase 4 Scope Pivot
+
+Default direction after the Phase 3 hardening pass:
+
+- `python-hwpx` remains the engine layer for package/structure semantics.
+- the existing FastMCP surface remains the stable product API.
+- reference-preserving workflows are mostly orchestration concerns unless a missing engine capability is clearly proven.
+
+| Proposed tool | Bucket | Decision | Existing coverage / follow-up |
+|---|---|---|---|
+| `validate_hwpx_package` | already covered by an existing MCP tool | Do not add a new public alias. | Use `validate_structure` for package/schema validation, and combine `package_parts`, `package_get_xml`, and `package_get_text` when a workflow needs to inspect specific package parts. |
+| `extract_reference_parts` | better expressed as a workflow/skill instruction | Do not add a public MCP tool. | "Reference parts" depends on the template/workflow context. Orchestration can already select and fetch the relevant parts with `package_parts`, `package_get_xml`, `package_get_text`, and `copy_document`. |
+| `compare_reference_structure` | better implemented upstream in `python-hwpx` | Do not implement downstream first. | A trustworthy structure diff needs reusable engine semantics for manifests, package relationships, and normalization. If this becomes important, add comparison primitives upstream and consume them downstream later. |
+| `layout_drift_report` | better kept as an internal helper, not a public MCP tool | Do not expose a stable public contract for heuristic layout drift yet. | Any near-term reporting should stay private Python helper logic, feeding orchestration or human review, until there is an engine-backed and testable model for layout comparison. |
+
+Current conclusion:
+
+- none of the four proposed Phase 4 candidates currently belongs in the "truly worth exposing as a future public MCP tool" bucket
+- the near-term downstream work should focus on better docs and orchestration patterns around the existing MCP surface, not on widening that surface
+
+## Final Consistency Pass
+
+- Re-scanned the active FastMCP registration and confirmed the public surface remains `30` default tools and `40` tools with `HWPX_MCP_ADVANCED=1`.
+- No deferred Phase 4 tools were added to `server.py`.
+- Remaining surface-expansion risk is documentation drift from legacy inventories in `tools.py` and `legacy_server.py`, not from the active FastMCP server contract itself.
+- Skill examples stay on the orchestration side of the boundary: they call existing MCP tools only and do not restate Python-side business logic from `hwpx_ops.py`, `core/`, or `python-hwpx`.
