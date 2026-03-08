@@ -16,65 +16,35 @@
 
 ---
 
-**hwpx-mcp-server**는 [Model Context Protocol(MCP)](https://modelcontextprotocol.io) 표준을 따르는 서버로, [python-hwpx](https://github.com/airmang/python-hwpx) 기반에서 HWPX 문서의 열람 · 검색 · 편집 · 저장을 AI 클라이언트에서 직접 수행할 수 있게 합니다.
+**hwpx-mcp-server**는 [모델 컨텍스트 프로토콜(MCP)](https://modelcontextprotocol.io) 표준을 따르는 서버로, [python-hwpx](https://github.com/airmang/python-hwpx) 기반에서 HWPX 문서의 열람 · 검색 · 편집 · 추출을 AI 클라이언트에서 직접 수행할 수 있게 합니다.
 
-> **Note** — 이 서버는 Open XML 기반 `.hwpx` 포맷을 지원합니다. 레거시 바이너리 `.hwp` 포맷은 직접 편집 대상이 아닙니다.
+> **참고** 이 서버는 Open XML 기반 `.hwpx` 포맷을 지원합니다. 바이너리 `.hwp` 포맷은 직접 편집 대상이 아닙니다.
 
 <br>
 
-## Why?
+## 왜 필요한가?
 
-국내 공공기관·학교·기업에서는 한글 문서 기반 업무가 매우 많지만, 자동화는 오랫동안 OS/프로그램 의존성이 컸습니다.
+국내 공공기관·학교·기업에서는 한글 문서 기반 업무가 많지만, 자동화는 오랫동안 운영체제와 프로그램에 크게 의존했습니다.
 
-**hwpx-mcp-server**는 이 제약을 줄이는 데 초점을 맞춥니다.
+**hwpx-mcp-server**는 이 제약을 줄이는 데 초점을 둡니다.
 
-- ✅ **OS 무관** — Windows, macOS, Linux에서 동작
+- ✅ **운영체제 무관** — Windows, macOS, Linux에서 동작
 - ✅ **한글 워드프로세서 불필요** — 순수 파이썬 기반 처리
-- ✅ **AI 네이티브** — Claude Desktop, VS Code, Gemini CLI 등 MCP 클라이언트와 직접 연결
-- ✅ **Stateless 기본 설계** — 도구 호출마다 `filename`을 명시해 일관적으로 실행
+- ✅ **AI 연동 중심** — Claude Desktop, VS Code, Gemini CLI 등 MCP 클라이언트와 직접 연결
+- ✅ **일관된 호출 방식** — 도구 호출마다 `filename`을 명시하는 stateless 구조
 
 <br>
 
-## Use Cases
+## 사용 사례
 
-- 실전 사용 사례 9개 보기: [`docs/use-cases.md`](docs/use-cases.md)
+- 실전 사용 사례: [`docs/use-cases.md`](docs/use-cases.md)
 - 종합 테스트 리포트: [`tests/hwpx_mcp_report_updated.md`](tests/hwpx_mcp_report_updated.md)
 
 <br>
 
-## Skill-First Workflows
+## 빠른 시작
 
-See the workflow guide and example skills:
-
-- [`docs/skill-first-workflows.md`](docs/skill-first-workflows.md)
-- [`examples/skills/reference-preserving-edit/SKILL.md`](examples/skills/reference-preserving-edit/SKILL.md)
-- [`examples/skills/form-fill/SKILL.md`](examples/skills/form-fill/SKILL.md)
-- [`examples/skills/template-generation/SKILL.md`](examples/skills/template-generation/SKILL.md)
-
-The active FastMCP surface already supports the main reference-preserving workflows without adding new public tools.
-
-- Reference-preserving edit: `copy_document`, read/extract tools, advanced package inspection tools, bounded mutators, `validate_structure`
-- Government/public-form fill: `copy_document`, `batch_replace`, `search_and_replace`, `set_table_cell_text`, read/validate tools
-- Template-based generation: `copy_document` plus replacements, or `create_document` plus paragraph/table builders
-- Cautious edit-review-save: `copy_document`, `plan_edit`, `preview_edit`, bounded mutators, `validate_structure`
-
-Advanced package inspection, validation, and review-pipeline steps require `HWPX_MCP_ADVANCED=1`.
-
-Important surface boundary:
-
-- The active FastMCP server does not expose a public `fill_template` tool.
-- The active FastMCP server does not expose a public `save_as` tool.
-- Mutating tools persist immediately through the shared atomic save path, so cautious workflows should start from `copy_document`.
-- `plan_edit`, `preview_edit`, and `apply_edit` are review/verification pipeline tools, not a general direct-edit replacement for the core HWPX mutators.
-
-Prompt/resource note:
-
-- A legacy prompt/resource implementation exists in the repository, but it is not the authoritative FastMCP product surface.
-- This pass keeps workflow guidance in docs and example skills instead of widening the active server contract.
-
-## Quick Start
-
-### 1. 설치 & 실행
+### 1. 설치 및 실행
 
 [uv](https://docs.astral.sh/uv/getting-started/installation/) 기준:
 
@@ -82,26 +52,26 @@ Prompt/resource note:
 uvx hwpx-mcp-server
 ```
 
-또는 pip 설치:
+또는 `pip` 설치 후 실행:
 
 ```bash
 pip install hwpx-mcp-server
 hwpx-mcp-server
 ```
 
-요구사항:
+요구 사항:
 
 - `Python >= 3.10`
 - `python-hwpx >= 2.6`
 
-현재 검증 기준 upstream 버전: `python-hwpx 2.7.1` (clean venv, released package)
+현재 저장소 기준 검증 버전은 `python-hwpx 2.7.1`입니다.
 
 ### 2. MCP 클라이언트 설정
 
 <details>
 <summary><b>Claude Desktop</b></summary>
 
-`claude_desktop_config.json`:
+`claude_desktop_config.json`
 
 ```json
 {
@@ -119,7 +89,7 @@ hwpx-mcp-server
 <details>
 <summary><b>Gemini CLI</b></summary>
 
-`~/.gemini/settings.json`:
+`~/.gemini/settings.json`
 
 ```json
 {
@@ -135,9 +105,9 @@ hwpx-mcp-server
 </details>
 
 <details>
-<summary><b>VS Code (Copilot Chat)</b></summary>
+<summary><b>VS Code</b></summary>
 
-`.vscode/mcp.json`:
+`.vscode/mcp.json`
 
 ```json
 {
@@ -155,7 +125,7 @@ hwpx-mcp-server
 <details>
 <summary><b>Cursor / Windsurf</b></summary>
 
-각 에디터 MCP 설정 파일에 동일한 블록을 추가:
+각 에디터의 MCP 설정 파일에 같은 블록을 추가하면 됩니다.
 
 ```json
 {
@@ -172,82 +142,81 @@ hwpx-mcp-server
 
 <br>
 
-## Features
+## 주요 기능
 
-기본 모드에서 30개 도구를 제공하며, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서는 총 40개 도구까지 확장됩니다.
+기본 모드에서 주요 HWPX 편집 도구를 제공하며, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서는 점검·검증용 도구가 추가로 활성화됩니다.
 
-### 📖 읽기 & 탐색
+### 📖 읽기 및 탐색
 
 | 도구 | 설명 |
 |---|---|
-| `get_document_info` | 문서 메타데이터/섹션/문단/표 개수 조회 |
+| `get_document_info` | 문서 메타데이터, 섹션, 문단, 표 개수 조회 |
 | `get_document_text` | 문서 전체 텍스트 추출 (`max_chars` 지원) |
-| `get_document_outline` | 제목/개요 구조 추출 |
+| `get_document_outline` | 제목과 개요 구조 추출 |
 | `get_paragraph_text` | 특정 문단 텍스트 조회 |
 | `get_paragraphs_text` | 문단 범위 조회 |
-| `list_available_documents` | 폴더 내 `.hwpx` 파일 목록 조회 |
+| `list_available_documents` | 폴더 안의 `.hwpx` 파일 목록 조회 |
 
-### 🔎 검색 & 치환
+### 🔎 검색 및 치환
 
 | 도구 | 설명 |
 |---|---|
-| `find_text` | 키워드 검색 + 컨텍스트 반환 |
-| `search_and_replace` | 단일 치환 (split-run 보강) |
-| `batch_replace` | 다중 치환 일괄 실행 |
+| `find_text` | 키워드 검색과 주변 문맥 반환 |
+| `search_and_replace` | 단일 텍스트 치환 |
+| `batch_replace` | 여러 치환 작업 일괄 실행 |
 
-### ✏️ 편집
+### ✏️ 문서 편집
 
 | 도구 | 설명 |
 |---|---|
 | `add_heading` | 제목(헤딩) 문단 추가 |
-| `add_paragraph` / `insert_paragraph` / `delete_paragraph` | 문단 추가/삽입/삭제 |
+| `add_paragraph` / `insert_paragraph` / `delete_paragraph` | 문단 추가, 삽입, 삭제 |
 | `add_page_break` | 페이지 나누기 추가 |
-| `add_memo` / `remove_memo` | 메모 추가/제거 |
-| `copy_document` | 문서 안전 복사 |
+| `add_memo` / `remove_memo` | 메모 추가, 제거 |
+| `copy_document` | 안전한 사본 생성 후 작업 시작 |
 
-### 📊 표
+### 📊 표 편집
 
 | 도구 | 설명 |
 |---|---|
-| `add_table` / `get_table_text` | 표 생성/조회 |
+| `add_table` / `get_table_text` | 표 생성, 조회 |
 | `set_table_cell_text` | 셀 텍스트 수정 |
-| `merge_table_cells` / `split_table_cell` | 셀 병합/분할 |
+| `merge_table_cells` / `split_table_cell` | 셀 병합, 분할 |
 | `format_table` | 표 헤더 등 기본 서식 적용 |
 
-### 🎨 스타일
+### 🎨 서식 및 스타일
 
 | 도구 | 설명 |
 |---|---|
-| `format_text` | 텍스트 범위 서식 적용(굵기, 기울임, 밑줄, 색상 등) |
+| `format_text` | 텍스트 범위 서식 적용 |
 | `create_custom_style` | 커스텀 스타일 생성 |
 | `list_styles` | 문서 스타일 목록 조회 |
 
-### 📤 읽기/추출
+스타일 참조 팁: `add_paragraph(..., style=...)`와 `insert_paragraph(..., style=...)`는 `list_styles`의 `id`, `create_custom_style`이 반환하는 `style_id`, 스타일 이름을 모두 받을 수 있습니다.
+
+### 📤 추출
 
 | 도구 | 설명 |
 |---|---|
-| `hwpx_to_markdown` | HWPX payload를 Markdown으로 변환 |
-| `hwpx_to_html` | HWPX payload를 HTML로 변환 |
-| `hwpx_extract_json` | HWPX payload를 구조화 JSON으로 추출 |
+| `hwpx_to_markdown` | HWPX 문서를 Markdown으로 변환 |
+| `hwpx_to_html` | HWPX 문서를 HTML로 변환 |
+| `hwpx_extract_json` | HWPX 문서를 구조화된 JSON으로 추출 |
 
-스타일 참조 팁:
-`add_paragraph(..., style=...)`와 `insert_paragraph(..., style=...)`는 `list_styles`의 `id`, `create_custom_style`이 반환하는 `style_id`, 스타일 이름을 모두 받을 수 있습니다.
-
-### 🔬 고급 (옵션)
+### 🔬 고급 도구
 
 `HWPX_MCP_ADVANCED=1`일 때 활성화:
 
 | 도구 | 설명 |
 |---|---|
 | `package_parts` | OPC 파트 목록 조회 |
-| `package_get_xml` / `package_get_text` | 파트 XML/텍스트 조회 |
+| `package_get_xml` / `package_get_text` | 파트 XML 또는 텍스트 조회 |
 | `object_find_by_tag` / `object_find_by_attr` | XML 요소 검색 |
-| `plan_edit` / `preview_edit` / `apply_edit` | 편집 계획/미리보기/적용 |
-| `validate_structure` / `lint_text_conventions` | 구조 검증/텍스트 린트 |
+| `plan_edit` / `preview_edit` / `apply_edit` | 편집 계획, 미리보기, 적용 |
+| `validate_structure` / `lint_text_conventions` | 구조 검증, 텍스트 규칙 점검 |
 
 <br>
 
-## Configuration
+## 환경 변수
 
 | 변수 | 설명 | 기본값 |
 |---|---|---|
@@ -277,39 +246,7 @@ hwpx-mcp-server
 
 <br>
 
-## Advanced
-
-<details>
-<summary><b>📦 OPC 파트 조회</b></summary>
-
-고급 모드에서 문서 내부 파트를 직접 조회할 수 있습니다.
-
-- `package_parts`
-- `package_get_xml`
-- `package_get_text`
-
-</details>
-
-<details>
-<summary><b>🧭 편집 파이프라인</b></summary>
-
-고급 모드에서 `plan_edit → preview_edit → apply_edit` 흐름으로 변경 계획을 검토하고 적용할 수 있습니다.
-
-</details>
-
-<details>
-<summary><b>🧪 구조/규칙 검사</b></summary>
-
-고급 모드에서 다음 검사 도구를 사용할 수 있습니다.
-
-- `validate_structure`
-- `lint_text_conventions`
-
-</details>
-
-<br>
-
-## Testing
+## 테스트
 
 ```bash
 # 테스트 의존성 설치
@@ -319,169 +256,23 @@ python -m pip install -e ".[test]"
 python -m pytest -q
 ```
 
-Phase 1/2 핵심 회귀 테스트는 실제 HWPX 출력 변경을 검증합니다. 최신 결과는 `python -m pytest -q`로 확인하세요.
+추가 참고:
 
-- 실전 사용 사례: `docs/use-cases.md`
+- 사용 사례: `docs/use-cases.md`
 - 종합 리포트: `tests/hwpx_mcp_report_updated.md`
-- 회귀 테스트: `tests/test_hwpx_report_regressions.py`
+- 스킬 기반 워크플로: `docs/skill-first-workflows.md`
 
 <br>
 
-## Architecture
+## 라이선스
 
-```text
-hwpx-mcp-server
-├── src/hwpx_mcp_server/
-│   ├── server.py            # Stateless MCP 진입점
-│   ├── hwpx_ops.py          # 고급/내부 연산 래퍼
-│   ├── storage.py           # 저장 백엔드 (atomic save)
-│   ├── core/                # 문단/표/검색/서식 핵심 로직
-│   ├── tools.py             # 확장 도구 스키마/정의
-│   └── schema/              # JSON 스키마 빌더/정리기
-├── tests/                   # 단위 + E2E + 회귀 테스트
-└── pyproject.toml
-```
+[MIT](LICENSE)
 
 <br>
 
-## Comparison
-
-| | hwpx-mcp-server | hwp(바이너리) COM 자동화 계열 |
-|---|---|---|
-| 대상 포맷 | `.hwpx` (Open XML) | `.hwp` (바이너리) 중심 |
-| OS | Windows · macOS · Linux | 대체로 Windows 중심 |
-| 한글 프로그램 의존 | 불필요 | 필요한 경우가 많음 |
-| 연동 방식 | MCP + 파이썬 라이브러리 | 데스크톱 앱 자동화 |
-
-<br>
-
-## Layer Ownership
-
-- `python-hwpx` is the upstream engine layer. It owns package parsing, document semantics, exporters, and version-sensitive HWPX behavior.
-- `hwpx-mcp-server` is the downstream MCP product surface. The authoritative public tool inventory is the FastMCP registration in `src/hwpx_mcp_server/server.py`.
-- Skills and workflow docs are orchestration only. They should compose existing MCP tools instead of duplicating Python business logic or inventing new engine semantics.
-- `src/hwpx_mcp_server/legacy_server.py`, `src/hwpx_mcp_server/tools.py`, and `src/hwpx_mcp_server/prompts.py` are legacy/non-authoritative for release-facing tool documentation unless and until they are re-aligned with the active FastMCP surface.
-
-## Upstream Compatibility Notes
-
-- 문서화된 MCP 기능 기준 최소 upstream 버전은 `python-hwpx >= 2.6`입니다.
-- 현재 저장소는 clean venv에서 released `python-hwpx 2.7.1` 기준으로 호환성을 검증했습니다.
-- 로컬 sibling `python-hwpx` editable checkout은 upstream API audit 용도로만 참고하며, dirty 상태에서는 release validation 기준으로 사용하지 않습니다.
-- `format_text`는 실제 run-level `charPrIDRef`를 분리/갱신하며 저장 후 다시 열어도 서식 변경이 유지됩니다.
-- `create_custom_style`는 재사용 가능한 `style_id`를 반환하며, 서식 오버라이드가 있으면 별도의 upstream `charPr`를 생성합니다.
-- 로컬 파일 쓰기는 `storage.py`의 atomic save 경로를 공통 사용합니다.
-
-<br>
-
-## Contributing
-
-기여를 환영합니다.
-
-1. Fork 후 브랜치 생성
-2. 변경 + 테스트 추가/수정
-3. `pytest -q` 통과 확인 후 PR
-
-<br>
-
-## License
-
-[MIT](LICENSE) © 고규현 (Kyuhyun Koh)
-
-<br>
-
-## Author
+## 작성자
 
 **고규현** — 광교고등학교 정보·컴퓨터 교사
 
-- ✉️ [kokyuhyun@hotmail.com](mailto:kokyuhyun@hotmail.com)
-- 🐙 [@airmang](https://github.com/airmang)
-
-<br>
-
-## Transport Modes (Stdio + HTTP)
-
-Existing stdio usage is unchanged:
-
-```bash
-hwpx-mcp-server
-```
-
-Run the same MCP tool set over Streamable HTTP:
-
-```bash
-hwpx-mcp-server --transport streamable-http --host 127.0.0.1 --port 8000
-```
-
-Environment variables are also supported:
-
-- `HWPX_MCP_TRANSPORT` (`stdio` or `streamable-http`)
-- `HWPX_MCP_HOST` (default: `127.0.0.1`)
-- `HWPX_MCP_PORT` (default: `8000`)
-
-Note: HTTP auth is intentionally kept simple for now (dev mode). A production auth hook is left as a TODO in the server entrypoint.
-
-## New Read/Extract Tools
-
-All three tools accept exactly one input source:
-
-- `hwpx_base64`: base64 encoded `.hwpx` bytes
-- `url`: downloadable `https://...` URL
-
-Common options:
-
-- `output`: `full` or `chunks`
-- `chunk_strategy`: `section` or `paragraph`
-- `max_chars_per_chunk`: integer, default via server setting
-
-### 1) `hwpx_to_markdown`
-
-Response:
-
-```json
-{
-  "markdown": "# Title\n\nParagraph...",
-  "chunks": ["..."],
-  "meta": {
-    "source_type": "base64",
-    "section_count": 2,
-    "paragraph_count": 10,
-    "table_count": 1,
-    "figure_caption_count": 1
-  }
-}
-```
-
-### 2) `hwpx_to_html`
-
-Response:
-
-```json
-{
-  "html": "<!doctype html><html>...</html>",
-  "chunks": ["<section>...</section>"],
-  "meta": {
-    "source_type": "url",
-    "image_policy": "omitted"
-  }
-}
-```
-
-### 3) `hwpx_extract_json`
-
-Response:
-
-```json
-{
-  "doc": {
-    "title": "Title",
-    "toc": [{ "level": 1, "text": "Title", "paragraph_index": 0 }],
-    "sections": [{ "index": 0, "title": "Title", "paragraphs": [] }],
-    "tables": [],
-    "figures": []
-  },
-  "chunks": [{ "chunk_index": 0, "strategy": "section", "section": {} }],
-  "meta": {
-    "source_type": "base64"
-  }
-}
-```
+- 이메일: [kokyuhyun@hotmail.com](mailto:kokyuhyun@hotmail.com)
+- GitHub: [@airmang](https://github.com/airmang)
