@@ -246,7 +246,8 @@ For reference-preserving workflows on the current FastMCP surface, see:
 Current workflow boundary:
 
 - No new public MCP tools are required for these flows.
-- There is no active public `fill_template` or `save_as` tool on the FastMCP surface.
+- There is no active public `fill_template` tool on the FastMCP surface.
+- `save_as` is publicly available and returns a post-save `verificationReport` when you need a copied output plus structured verification details.
 - Use `copy_document` first when you need a reviewable or low-risk edit path because mutating tools persist immediately.
 - Use advanced mode for package inspection and validation steps: `package_parts`, `package_get_xml`, `package_get_text`, `plan_edit`, `preview_edit`, `apply_edit`, `validate_structure`.
 
