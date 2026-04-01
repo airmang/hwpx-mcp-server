@@ -362,9 +362,9 @@ class HwpxOps:
                 paragraphs.append(paragraph.text(preserve_breaks=True))
         self._plan_manager.register_document(doc_id, "\n".join(paragraphs))
 
-    def _save_document(self, document: HwpxDocument, target: Path) -> None:
+    def _save_document(self, document: HwpxDocument, target: Path) -> Dict[str, Any]:
         try:
-            self.storage.save_document(document, target)
+            return self.storage.save_document(document, target)
         except PermissionError as exc:
             raise self._new_error(
                 "PERMISSION_DENIED",
@@ -1948,14 +1948,14 @@ class HwpxOps:
     # ------------------------------------------------------------------
     def save(self, path: str) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
-        self._save_document(document, resolved)
-        return {"ok": True}
+        verification_report = self._save_document(document, resolved)
+        return {"ok": True, "verificationReport": verification_report}
 
     def save_as(self, path: str, out: str) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         out_path = self._resolve_output_path(out)
-        self._save_document(document, out_path)
-        return {"outPath": str(out_path)}
+        verification_report = self._save_document(document, out_path)
+        return {"outPath": str(out_path), "verificationReport": verification_report}
 
     def fill_template(
         self,

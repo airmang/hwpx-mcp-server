@@ -544,6 +544,7 @@ class CopyTableBetweenDocumentsOutput(_BaseModel):
 
 class SaveOutput(_BaseModel):
     ok: bool
+    verificationReport: Optional[Dict[str, Any]] = None
 
 
 class SaveAsInput(DocumentLocatorInput):
@@ -552,6 +553,7 @@ class SaveAsInput(DocumentLocatorInput):
 
 class OutPathOutput(_BaseModel):
     outPath: str
+    verificationReport: Optional[Dict[str, Any]] = None
 
 
 class ExportOutput(_BaseModel):
