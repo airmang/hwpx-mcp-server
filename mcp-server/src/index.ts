@@ -123,6 +123,7 @@ Example: get_tool_guide({ workflow: "template" })`,
         output_path: { type: 'string', description: 'Output path (optional, saves to original if omitted)' },
         create_backup: { type: 'boolean', description: 'Create .bak backup before saving (default: true)' },
         verify_integrity: { type: 'boolean', description: 'Verify saved file integrity (default: true)' },
+        include_verification_report: { type: 'boolean', description: 'Include structured post-save verification report in the response (default: true)' },
       },
       required: ['doc_id'],
     },
@@ -2357,8 +2358,11 @@ Call get_tool_guide with: template, table, image, search, read, create`
           const savePath = (args?.output_path as string) || doc.path;
           const createBackup = args?.create_backup !== false; // default: true
           const verifyIntegrity = args?.verify_integrity !== false; // default: true
+          const includeVerificationReport = args?.include_verification_report !== false; // default: true
           let backupPath: string | null = null;
           const tempPath = savePath + '.tmp';
+          const preSaveSnapshot = await buildDocumentPreSaveSnapshot(doc);
+          let verificationReport: any = null;
 
           // Create backup if file exists and backup is enabled
           if (createBackup && fs.existsSync(savePath)) {
@@ -2376,62 +2380,24 @@ Call get_tool_guide with: template, table, image, search, read, create`
             // Phase 1: Write to temp file first (atomic write pattern)
             fs.writeFileSync(tempPath, data);
 
+            try {
+              verificationReport = await buildHwpxVerificationReport(tempPath, preSaveSnapshot);
+            } catch (reportErr) {
+              verificationReport = {
+                ok: false,
+                summary: `Failed to build verification report: ${reportErr}`,
+              };
+            }
+
             // Verify integrity on temp file before moving
-            if (verifyIntegrity) {
-              try {
-                const JSZip = require('jszip');
-                const savedData = fs.readFileSync(tempPath);
-                const zip = await JSZip.loadAsync(savedData);
-
-                // Check essential HWPX structure files
-                const requiredFiles = [
-                  'mimetype',
-                  'Contents/content.hpf',
-                  'Contents/header.xml',
-                  'Contents/section0.xml'
-                ];
-
-                const missingFiles: string[] = [];
-                for (const requiredFile of requiredFiles) {
-                  if (!zip.file(requiredFile)) {
-                    missingFiles.push(requiredFile);
-                  }
-                }
-
-                if (missingFiles.length > 0) {
-                  throw new Error(`Missing required files: ${missingFiles.join(', ')}`);
-                }
-
-                // Verify all section XML files are valid
-                const sectionFiles = Object.keys(zip.files).filter(f => f.match(/^Contents\/section\d+\.xml$/));
-                for (const sectionFile of sectionFiles) {
-                  const file = zip.file(sectionFile);
-                  if (file) {
-                    const xmlContent = await file.async('string');
-                    if (!xmlContent || !xmlContent.includes('<?xml')) {
-                      throw new Error(`Invalid XML in ${sectionFile}`);
-                    }
-                    // Check for truncated XML (incomplete tag at end)
-                    if (xmlContent.match(/<[^>]*$/)) {
-                      throw new Error(`Truncated XML in ${sectionFile}`);
-                    }
-                    // Check for broken opening tags (< followed by < without >)
-                    if (xmlContent.match(/<[^>]*</)) {
-                      throw new Error(`Broken tag structure in ${sectionFile}`);
-                    }
-                  }
-                }
-              } catch (verifyErr) {
-                // Clean up temp file
-                if (fs.existsSync(tempPath)) {
-                  fs.unlinkSync(tempPath);
-                }
-                // Restore from backup if exists
-                if (backupPath && fs.existsSync(backupPath)) {
-                  return error(`Save verification failed, backup preserved: ${verifyErr}`);
-                }
-                return error(`Save verification failed: ${verifyErr}`);
+            if (verifyIntegrity && verificationReport && !verificationReport.ok) {
+              if (fs.existsSync(tempPath)) {
+                fs.unlinkSync(tempPath);
               }
+              if (backupPath && fs.existsSync(backupPath)) {
+                return error(`Save verification failed, backup preserved: ${verificationReport.summary}`);
+              }
+              return error(`Save verification failed: ${verificationReport.summary}`);
             }
 
             // Phase 2: Atomic move - rename temp to final (atomic on same filesystem)
@@ -2443,7 +2409,8 @@ Call get_tool_guide with: template, table, image, search, read, create`
             return success({
               message: `Saved to ${savePath}`,
               backup_created: backupPath ? true : false,
-              integrity_verified: verifyIntegrity
+              integrity_verified: verifyIntegrity,
+              verification_report: includeVerificationReport ? verificationReport : undefined
             });
           } catch (saveErr) {
             // Clean up temp file if exists
@@ -4616,6 +4583,183 @@ function getDoc(docId: string): HwpxDocument | undefined {
   return openDocuments.get(docId);
 }
 
+type VerificationSectionSnapshot = {
+  section: string;
+  xml_length: number;
+  hp_tab_count: number;
+  paragraph_count: number;
+  table_count: number;
+};
+
+async function buildDocumentPreSaveSnapshot(doc: HwpxDocument): Promise<{ structure: any; sections: VerificationSectionSnapshot[] }> {
+  const structure = doc.getStructure();
+  const sections = doc.getSections();
+  const sectionSnapshots: VerificationSectionSnapshot[] = [];
+
+  for (const section of sections) {
+    const xmlContent = await doc.getSectionXml(section.index);
+    if (!xmlContent) continue;
+
+    sectionSnapshots.push({
+      section: `Contents/section${section.index}.xml`,
+      xml_length: xmlContent.length,
+      hp_tab_count: countPattern(xmlContent, /<hp:tab(?:\s|\/|>)/g),
+      paragraph_count: countPattern(xmlContent, /<(?:hp|hs|hc):p(?:\s|>|\/)/g),
+      table_count: countPattern(xmlContent, /<(?:hp|hs|hc):tbl(?:\s|>|\/)/g),
+    });
+  }
+
+  return { structure, sections: sectionSnapshots };
+}
+
+async function buildHwpxVerificationReport(
+  filePath: string,
+  preSaveSnapshot?: { structure: any; sections: VerificationSectionSnapshot[] }
+): Promise<any> {
+  const JSZip = require('jszip');
+  const savedData = fs.readFileSync(filePath);
+  const zip = await JSZip.loadAsync(savedData);
+
+  const requiredFiles = [
+    'mimetype',
+    'Contents/content.hpf',
+    'Contents/header.xml',
+    'Contents/section0.xml'
+  ];
+
+  const missingFiles = requiredFiles.filter((requiredFile) => !zip.file(requiredFile));
+  const sectionFiles = Object.keys(zip.files)
+    .filter((f) => /^Contents\/section\d+\.xml$/.test(f))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  const sectionReports = [] as Array<{
+    section: string;
+    xml_declaration: boolean;
+    truncated_xml: boolean;
+    broken_tag_pattern: boolean;
+    suspicious_pattern_count: number;
+    suspicious_patterns: string[];
+    placeholder_count: number;
+    placeholder_examples: string[];
+    xml_length: number;
+    hp_tab_count: number;
+    paragraph_count: number;
+    table_count: number;
+    counts_diff?: {
+      xml_length: number;
+      hp_tabs: number;
+      paragraphs: number;
+      tables: number;
+    };
+  }>;
+
+  const warnings: string[] = [];
+  const suspiciousPatternRegexes: Array<{ name: string; regex: RegExp }> = [
+    { name: 'unescaped_ampersand', regex: /&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g },
+    // Allow the common valid self-closing form <hp:t/> and whitespace-only runs used for layout.
+    // Only flag the explicit empty open/close form <hp:t></hp:t>.
+    { name: 'empty_hp_t_with_content_gap', regex: /<hp:t\b(?:(?!\/>)\S|\s(?=[^>]))*><\/hp:t>/g },
+    // HWPX legitimately embeds inline hp:* controls such as <hp:tab/> and <hp:fwSpace/> inside <hp:t>.
+    // Only flag non-hp opening tags inside text payloads.
+    { name: 'nested_opening_tag_in_text', regex: /<hp:t\b[^>]*>[^<]*<(?!\/?hp:)[^/!][^>]*>/g },
+    { name: 'double_closing_angle', regex: />>/g },
+    { name: 'double_opening_angle', regex: /<</g },
+  ];
+  const placeholderRegex = /(\{\{[^{}\n]{1,120}\}\}|\[\[[^\]\n]{1,120}\]\]|\[[A-Z0-9_\-. ]{2,120}\]|__(?:[A-Za-z0-9_\-. ]{2,120})__)/g;
+  const preSaveSectionMap = new Map((preSaveSnapshot?.sections || []).map((section) => [section.section, section]));
+
+  for (const sectionFile of sectionFiles) {
+    const file = zip.file(sectionFile);
+    if (!file) continue;
+
+    const xmlContent = await file.async('string');
+    const xmlDeclaration = xmlContent.includes('<?xml');
+    const truncatedXml = /<[^>]*$/.test(xmlContent);
+    const brokenTagPattern = /<[^>]*</.test(xmlContent);
+    const hpTabCount = countPattern(xmlContent, /<hp:tab(?:\s|\/|>)/g);
+    const paragraphCount = countPattern(xmlContent, /<(?:hp|hs|hc):p(?:\s|>|\/)/g);
+    const tableCount = countPattern(xmlContent, /<(?:hp|hs|hc):tbl(?:\s|>|\/)/g);
+    const placeholderMatches = xmlContent.match(placeholderRegex) || [];
+    const suspiciousPatterns = suspiciousPatternRegexes
+      .filter(({ regex }) => regex.test(xmlContent))
+      .map(({ name }) => name);
+
+    if (!xmlDeclaration) warnings.push(`${sectionFile}: missing XML declaration`);
+    if (truncatedXml) warnings.push(`${sectionFile}: truncated XML`);
+    if (brokenTagPattern) warnings.push(`${sectionFile}: broken opening tag pattern`);
+    if (placeholderMatches.length > 0) warnings.push(`${sectionFile}: placeholder-like tokens remain (${placeholderMatches.length})`);
+    if (suspiciousPatterns.length > 0) warnings.push(`${sectionFile}: suspicious XML/text patterns detected (${suspiciousPatterns.join(', ')})`);
+
+    const preSaveSection = preSaveSectionMap.get(sectionFile);
+
+    sectionReports.push({
+      section: sectionFile,
+      xml_declaration: xmlDeclaration,
+      truncated_xml: truncatedXml,
+      broken_tag_pattern: brokenTagPattern,
+      suspicious_pattern_count: suspiciousPatterns.length,
+      suspicious_patterns: suspiciousPatterns,
+      placeholder_count: placeholderMatches.length,
+      placeholder_examples: (Array.from(new Set(placeholderMatches)) as string[]).slice(0, 5),
+      xml_length: xmlContent.length,
+      hp_tab_count: hpTabCount,
+      paragraph_count: paragraphCount,
+      table_count: tableCount,
+      counts_diff: preSaveSection ? {
+        xml_length: xmlContent.length - preSaveSection.xml_length,
+        hp_tabs: hpTabCount - preSaveSection.hp_tab_count,
+        paragraphs: paragraphCount - preSaveSection.paragraph_count,
+        tables: tableCount - preSaveSection.table_count,
+      } : undefined,
+    });
+  }
+
+  const ok = missingFiles.length === 0 && warnings.length === 0;
+  const totalHpTabs = sectionReports.reduce((sum, report) => sum + report.hp_tab_count, 0);
+  const totalParagraphs = sectionReports.reduce((sum, report) => sum + report.paragraph_count, 0);
+  const totalTables = sectionReports.reduce((sum, report) => sum + report.table_count, 0);
+  const totalPlaceholders = sectionReports.reduce((sum, report) => sum + report.placeholder_count, 0);
+  const totalSuspiciousPatterns = sectionReports.reduce((sum, report) => sum + report.suspicious_pattern_count, 0);
+
+  return {
+    ok,
+    summary: ok
+      ? `Verified ${sectionReports.length} section XML file(s); hp:tab=${totalHpTabs}, paragraphs=${totalParagraphs}, tables=${totalTables}`
+      : `Missing files: ${missingFiles.length}, warnings: ${warnings.length}`,
+    file_path: filePath,
+    file_size_bytes: savedData.length,
+    required_files_checked: requiredFiles,
+    missing_files: missingFiles,
+    structure_before_save: preSaveSnapshot?.structure,
+    section_reports: sectionReports,
+    totals: {
+      sections: sectionReports.length,
+      hp_tabs: totalHpTabs,
+      paragraphs: totalParagraphs,
+      tables: totalTables,
+      placeholders: totalPlaceholders,
+      suspicious_patterns: totalSuspiciousPatterns,
+    },
+    diff_summary: buildVerificationDiffSummary(sectionReports),
+    warnings,
+  };
+}
+
+function countPattern(text: string, regex: RegExp): number {
+  return (text.match(regex) || []).length;
+}
+
+function buildVerificationDiffSummary(sectionReports: Array<{ counts_diff?: { xml_length: number; hp_tabs: number; paragraphs: number; tables: number } }>) {
+  return sectionReports.reduce((acc, report) => {
+    if (!report.counts_diff) return acc;
+    acc.xml_length += report.counts_diff.xml_length;
+    acc.hp_tabs += report.counts_diff.hp_tabs;
+    acc.paragraphs += report.counts_diff.paragraphs;
+    acc.tables += report.counts_diff.tables;
+    return acc;
+  }, { xml_length: 0, hp_tabs: 0, paragraphs: 0, tables: 0 });
+}
+
 function success(data: any) {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
 }
@@ -4633,6 +4777,12 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
+export {
+  buildDocumentPreSaveSnapshot,
+  buildHwpxVerificationReport,
+  buildVerificationDiffSummary,
+};
+
 // ============================================================
 // Main
 // ============================================================
@@ -4642,4 +4792,6 @@ async function main() {
   await server.connect(transport);
 }
 
-main().catch(console.error);
+if (!process.env.VITEST) {
+  main().catch(console.error);
+}
