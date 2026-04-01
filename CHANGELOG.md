@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+- Document the active public `save` / `save_as` tools in README and workflow docs.
+- Clarify that `save` / `save_as` return a structured post-save `verificationReport` for handoff and review flows.
+- Remove stale release-readiness notes that still treated public `save_as` as deferred.
+
 ## [2.2.4]
 - README를 기존 레이아웃 스타일에 맞춰 정리하고 문서를 한글 중심으로 재정비했습니다.
 - 패키지 소개와 설치, MCP 설정, 주요 도구, 환경 변수 중심으로 문서 구조를 다듬었습니다.

@@ -80,7 +80,7 @@ Gate for revisiting any public-tool proposal later:
 
 ## 7. Release Alignment Gates
 
-- Do not cut a release while docs still imply deferred public tools such as `fill_template`, `save_as`, structure diff, or layout-drift reporting on the active FastMCP surface.
+- Do not cut a release while docs still imply deferred public tools such as `fill_template`, structure diff, or layout-drift reporting on the active FastMCP surface, or while `save_as` docs lag behind its real response contract.
 - Keep the layer split explicit in release docs:
   - `python-hwpx` = upstream engine
   - `hwpx-mcp-server` = MCP product surface

@@ -14,7 +14,6 @@ Use this checklist before tagging or publishing a release after the scope-pivot 
   - `compare_reference_structure`
   - `layout_drift_report`
   - `fill_template`
-  - `save_as`
 
 ## 2. Documentation Alignment
 
@@ -40,7 +39,7 @@ Use this checklist before tagging or publishing a release after the scope-pivot 
 - Confirm example skills only rely on existing active MCP tools.
 - Confirm limitations are stated honestly:
   - no public `fill_template`
-  - no public `save_as`
+  - `save_as` docs match the active surface and mention `verificationReport` accurately
   - `plan_edit` / `preview_edit` / `apply_edit` are review-pipeline tools, not a general patch engine
 
 ## 5. Upstream Compatibility
