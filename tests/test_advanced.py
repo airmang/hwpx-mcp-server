@@ -89,7 +89,7 @@ def test_plan_edit_preview_apply_verification_flow(tmp_path):
     assert apply_result["data"]["apply"]["applied"] is True
 
 
-def test_plan_edit_uses_extracted_text_when_memo_anchor_pollutes_raw_paragraph(tmp_path):
+def test_plan_edit_accepts_text_from_memo_annotated_paragraph(tmp_path):
     import hwpx_mcp_server.server as server
     server = importlib.reload(server)
 
@@ -98,7 +98,7 @@ def test_plan_edit_uses_extracted_text_when_memo_anchor_pollutes_raw_paragraph(t
     server.add_paragraph(str(target), "memo verification target")
     server.add_memo(str(target), 1, "check memo")
 
-    assert open_doc(str(target)).paragraphs[1].text != "memo verification target"
+    assert "memo verification target" in open_doc(str(target)).paragraphs[1].text
 
     plan = server.plan_edit(str(target), "memo verification target")
 

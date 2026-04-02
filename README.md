@@ -180,9 +180,14 @@ hwpx-mcp-server
 | 도구 | 설명 |
 |---|---|
 | `add_table` / `get_table_text` | 표 생성, 조회 |
+| `get_table_map` | 표가 많은 문서에서 표 위치, 크기, 헤더 문맥을 빠르게 탐색 |
+| `find_cell_by_label` | 한국어 양식/템플릿에서 라벨 셀 기준으로 입력 대상 셀 찾기 |
+| `fill_by_path` | `성명 > right`, `소속 > right`, `합계 > down > right` 같은 경로 구문으로 셀 채우기 |
 | `set_table_cell_text` | 셀 텍스트 수정 |
 | `merge_table_cells` / `split_table_cell` | 셀 병합, 분할 |
 | `format_table` | 표 헤더 등 기본 서식 적용 |
+
+변경 도구는 호출 시 즉시 저장됩니다. 검토용 사본이 필요하면 `copy_document`를 먼저 사용하세요.
 
 ### 🎨 서식 및 스타일
 
@@ -201,15 +206,6 @@ hwpx-mcp-server
 | `hwpx_to_markdown` | HWPX 문서를 Markdown으로 변환 |
 | `hwpx_to_html` | HWPX 문서를 HTML로 변환 |
 | `hwpx_extract_json` | HWPX 문서를 구조화된 JSON으로 추출 |
-
-### 💾 저장 및 결과 확인
-
-| 도구 | 설명 |
-|---|---|
-| `save` | 현재 문서를 저장하고 `verificationReport`를 반환 |
-| `save_as` | 다른 경로로 저장하고 `outPath`, `verificationReport`를 반환 |
-
-`save`/`save_as`의 `verificationReport`에는 저장 후 구조 점검 결과가 포함됩니다. 예를 들어 필수 파일 존재 여부, 섹션 수, placeholder/의심 패턴 점검, 저장 전후 diff 요약 같은 후속 검증 정보를 자동으로 받을 수 있습니다.
 
 ### 🔬 고급 도구
 

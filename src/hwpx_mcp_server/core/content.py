@@ -119,6 +119,23 @@ def get_table_data(doc: HwpxDocument, table_index: int) -> dict:
     return {"rows": rows, "cols": cols, "data": data}
 
 
+def get_table_map_in_doc(doc: HwpxDocument) -> dict:
+    """문서의 표 메타데이터를 LLM 친화적인 JSON 형태로 반환한다."""
+    result = doc.get_table_map()
+    tables = list(result.get("tables", []))
+    return {"tables": tables, "count": len(tables)}
+
+
+def find_cell_by_label_in_doc(doc: HwpxDocument, label_text: str, direction: str = "right") -> dict:
+    """라벨 셀 기준으로 대상 셀을 찾는다."""
+    return doc.find_cell_by_label(label_text, direction=direction)
+
+
+def fill_by_path_in_doc(doc: HwpxDocument, mappings: dict[str, str]) -> dict:
+    """라벨 기반 경로 구문으로 표 셀을 채운다."""
+    return doc.fill_by_path(mappings)
+
+
 def set_cell_text(doc: HwpxDocument, table_index: int, row: int, col: int, text: str) -> None:
     """표의 특정 셀 텍스트를 변경한다."""
     tables = list(_iter_tables(doc))

@@ -20,6 +20,12 @@ PHASE1_TOOLS = {
     "batch_replace",
 }
 
+TABLE_NAVIGATION_TOOLS = {
+    "get_table_map",
+    "find_cell_by_label",
+    "fill_by_path",
+}
+
 ADVANCED_TOOLS = {
     "package_parts",
     "package_get_xml",
@@ -46,6 +52,7 @@ def test_default_toolset_exposes_phase1_and_hides_advanced(server_module) -> Non
     names = set(server_module.mcp._tool_manager._tools.keys())
 
     assert PHASE1_TOOLS.issubset(names)
+    assert TABLE_NAVIGATION_TOOLS.issubset(names)
     assert names.isdisjoint(ADVANCED_TOOLS)
 
 
@@ -87,3 +94,14 @@ def test_default_max_chars_from_env(server_module, tmp_path: Path, monkeypatch: 
 
     assert result["truncated"] is True
     assert len(result["text"]) == 60
+
+
+def test_table_navigation_tools_stay_filename_based(server_module) -> None:
+    forbidden_keys = {"doc_id", "docId", "document", "path", "handleId", "sessionId", "session"}
+
+    for tool_name in TABLE_NAVIGATION_TOOLS:
+        schema = server_module.mcp._tool_manager._tools[tool_name].parameters
+        properties = set(schema.get("properties", {}))
+
+        assert "filename" in properties
+        assert properties.isdisjoint(forbidden_keys)

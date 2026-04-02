@@ -10,7 +10,7 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 
 기존에는 한글 파일을 열어서 일일이 수작업으로 처리해야 했던 일을, 이제 자연어 요청으로 자동화할 수 있습니다.
 
-기본 모드 30개(고급 모드 포함 40개)의 도구로 문서 생성, 검색, 치환, 표 편집, 서식 적용까지 처리할 수 있습니다.
+기본 모드 33개(고급 모드 포함 43개)의 도구로 문서 생성, 검색, 치환, 표 편집, 서식 적용까지 처리할 수 있습니다.
 
 현재 문서화/테스트 기준 upstream 버전 바닥은 `python-hwpx >= 2.6`이며, clean venv에서 released `python-hwpx 2.7.1` 기준으로 검증합니다.
 
@@ -171,7 +171,7 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 | **검색** | 텍스트 검색 | 키워드 위치·빈도 탐색 |
 | **치환** | 단일 치환, 일괄 치환 | 하나씩 또는 여러 개 동시 변경 |
 | **편집** | 문단 추가, 삽입, 삭제, 제목 | 원하는 위치에 내용 추가·제거·이동 |
-| **표** | 생성, 읽기, 셀 수정, 병합, 서식 | 표 조작 전반 |
+| **표** | 생성, 읽기, 셀 수정, 병합, 서식, 라벨 기반 탐색/채우기 | 표 조작과 양식 자동화 전반 |
 | **서식** | 텍스트 서식, 커스텀 스타일 | 굵기, 색상, 크기, 폰트 등 적용 |
 | **기타** | 페이지 나누기, 스타일 목록, 파일 탐색 | 문서 구성 보조 기능 |
 
@@ -247,7 +247,7 @@ Current workflow boundary:
 
 - No new public MCP tools are required for these flows.
 - There is no active public `fill_template` tool on the FastMCP surface.
-- `save_as` is publicly available and returns a post-save `verificationReport` when you need a copied output plus structured verification details.
+- There is no active public `save` / `save_as` tool on the FastMCP surface; mutating tools persist immediately, so use `copy_document` when you need a reviewable output path.
 - Use `copy_document` first when you need a reviewable or low-risk edit path because mutating tools persist immediately.
 - Use advanced mode for package inspection and validation steps: `package_parts`, `package_get_xml`, `package_get_text`, `plan_edit`, `preview_edit`, `apply_edit`, `validate_structure`.
 

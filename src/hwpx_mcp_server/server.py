@@ -29,7 +29,10 @@ from .core.content import (
     collect_full_text,
     copy_document_file,
     delete_paragraph_from_doc,
+    fill_by_path_in_doc,
+    find_cell_by_label_in_doc,
     format_table_in_doc,
+    get_table_map_in_doc,
     get_table_data,
     insert_paragraph_to_doc,
     merge_cells_in_table,
@@ -140,6 +143,7 @@ _OPS = HwpxOps(auto_backup=False)
 
 _OUTPUT_MODES = {"full", "chunks"}
 _CHUNK_STRATEGIES = {"section", "paragraph"}
+_TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
@@ -197,6 +201,28 @@ def _normalize_heading_text(text: str) -> str:
     if stripped.startswith("#"):
         return stripped.lstrip("#").strip()
     return stripped
+
+
+def _normalize_table_label_direction(direction: str | None) -> str:
+    value = (direction or "right").strip().lower()
+    if value not in _TABLE_LABEL_DIRECTIONS:
+        expected = ", ".join(_TABLE_LABEL_DIRECTIONS)
+        raise ValueError(f"direction must be one of: {expected}")
+    return value
+
+
+def _normalize_fill_mappings(mappings: dict[str, str]) -> dict[str, str]:
+    if not isinstance(mappings, dict):
+        raise ValueError("mappings must be an object mapping path strings to text values")
+    if not mappings:
+        raise ValueError("mappings must not be empty")
+
+    normalized: dict[str, str] = {}
+    for path, value in mappings.items():
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError("mappings keys must be non-empty strings")
+        normalized[path] = value if isinstance(value, str) else str(value)
+    return normalized
 
 
 def _looks_like_figure_caption(text: str) -> bool:
@@ -917,6 +943,34 @@ def get_table_text(filename: str, table_index: int = 0) -> dict:
         "cols": result["cols"],
         "data": result["data"],
     }
+
+
+@mcp.tool()
+def get_table_map(filename: str) -> dict:
+    """Discover tables in documents with many tables and return compact table metadata."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    return get_table_map_in_doc(doc)
+
+
+@mcp.tool()
+def find_cell_by_label(filename: str, label_text: str, direction: str = "right") -> dict:
+    """Find label-adjacent target cells in Korean forms or templates. direction: right or down."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    safe_direction = _normalize_table_label_direction(direction)
+    return find_cell_by_label_in_doc(doc, label_text, direction=safe_direction)
+
+
+@mcp.tool()
+def fill_by_path(filename: str, mappings: dict[str, str]) -> dict:
+    """Fill Korean form/template cells using path syntax like `성명 > right`, `소속 > right`, `합계 > down > right`."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    result = fill_by_path_in_doc(doc, _normalize_fill_mappings(mappings))
+    if result.get("applied_count", 0) > 0:
+        save_doc(doc, path)
+    return result
 
 
 @mcp.tool()

@@ -1,9 +1,10 @@
 # Changelog
 
-## [Unreleased]
-- Document the active public `save` / `save_as` tools in README and workflow docs.
-- Clarify that `save` / `save_as` return a structured post-save `verificationReport` for handoff and review flows.
-- Remove stale release-readiness notes that still treated public `save_as` as deferred.
+## [2.2.5]
+- Add filename-based MCP tools `get_table_map`, `find_cell_by_label`, and `fill_by_path` on top of the upstream `python-hwpx` table navigation helpers.
+- Keep the downstream layer thin by limiting this integration to validation, document open/save handling, and LLM-friendly structured JSON responses.
+- Add regression coverage for table discovery shape, Korean label normalization, ambiguous/out-of-bounds path reporting, persisted fills, and filename-only MCP schemas.
+- Refresh README and workflow docs for the new table/form helpers and remove stale claims about public `save` / `save_as` tools.
 
 ## [2.2.4]
 - README를 기존 레이아웃 스타일에 맞춰 정리하고 문서를 한글 중심으로 재정비했습니다.

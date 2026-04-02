@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: hwpx-mcp-server
-Version: 2.2.4
+Version: 2.2.5
 Summary: Model Context Protocol server for local HWPX document automation.
 Author: Kohkyuhyun
 License: MIT License
@@ -221,9 +221,14 @@ hwpx-mcp-server
 | 도구 | 설명 |
 |---|---|
 | `add_table` / `get_table_text` | 표 생성, 조회 |
+| `get_table_map` | 표가 많은 문서에서 표 위치, 크기, 헤더 문맥을 빠르게 탐색 |
+| `find_cell_by_label` | 한국어 양식/템플릿에서 라벨 셀 기준으로 입력 대상 셀 찾기 |
+| `fill_by_path` | `성명 > right`, `소속 > right`, `합계 > down > right` 같은 경로 구문으로 셀 채우기 |
 | `set_table_cell_text` | 셀 텍스트 수정 |
 | `merge_table_cells` / `split_table_cell` | 셀 병합, 분할 |
 | `format_table` | 표 헤더 등 기본 서식 적용 |
+
+변경 도구는 호출 시 즉시 저장됩니다. 검토용 사본이 필요하면 `copy_document`를 먼저 사용하세요.
 
 ### 🎨 서식 및 스타일
 
