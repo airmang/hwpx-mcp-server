@@ -2,6 +2,9 @@
 
 Audit date: 2026-03-08
 
+Later validation note:
+- 2026-04-15 local stack validation also passed with `python-hwpx 2.9.0`; see the shared HWPX stack validation report dated 2026-04-15.
+
 Inspected upstream sources:
 - Active development runtime during audit: editable checkout from sibling repo `../python-hwpx`
 - Clean validation runtime: released `python-hwpx 2.7.1` in an isolated virtualenv
@@ -10,6 +13,7 @@ Inspected upstream sources:
 ## Version Truth
 
 - Verified downstream behavior for this review: released `python-hwpx 2.7.1` in a clean virtualenv
+- Latest separate local validation after this audit: `python-hwpx 2.9.0` in the shared stack validation environment
 - Active shell during code audit imported the sibling editable checkout, which was dirty and not a stable validation baseline
 - Documented downstream floor after this sync: `python-hwpx >= 2.6`
 - Reason for `2.6` floor:

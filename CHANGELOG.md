@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+- Sync downstream docs to the latest local stack validation baseline: `python-hwpx 2.9.0` verified on 2026-04-15, documented minimum support remains `python-hwpx >= 2.6`.
+- Add stack smoke-test workflow and benchmark follow-up docs under `python-hwpx/shared/hwpx` so the shared HWPX stack baseline lives with the upstream engine repo.
+
 ## [2.2.5]
 - Add filename-based MCP tools `get_table_map`, `find_cell_by_label`, and `fill_by_path` on top of the upstream `python-hwpx` table navigation helpers.
 - Keep the downstream layer thin by limiting this integration to validation, document open/save handling, and LLM-friendly structured JSON responses.

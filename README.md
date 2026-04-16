@@ -64,7 +64,8 @@ hwpx-mcp-server
 - `Python >= 3.10`
 - `python-hwpx >= 2.6`
 
-현재 저장소 기준 검증 버전은 `python-hwpx 2.7.1`입니다.
+현재 저장소 기준 검증 버전은 `python-hwpx 2.9.0`입니다 (2026-04-15 검증).
+최소 지원 버전은 `python-hwpx >= 2.6`입니다.
 
 ### 2. MCP 클라이언트 설정
 
@@ -142,6 +143,32 @@ hwpx-mcp-server
 
 <br>
 
+## 안전한 사용 원칙
+
+이 서버의 공개 표면은 **현재 README에 적힌 MCP 도구 집합**이다. 워크플로 문서나 스킬 예시는 이 도구들을 조합하는 사용 패턴이지, 별도의 새 public tool 계약이 아니다.
+
+실전에서는 아래 순서가 가장 안전하다.
+
+1. 먼저 `get_document_info`, `get_document_text`, `find_text` 같은 읽기 도구로 문서를 파악한다.
+2. 수정 전 결과물을 보존해야 하면 `copy_document`를 먼저 호출한다.
+3. 수정 도구는 **호출 즉시 저장**되므로, 검토용 경로가 필요하면 원본 대신 복사본에서 작업한다.
+4. package inspection, edit planning, validation은 `HWPX_MCP_ADVANCED=1`일 때만 쓰고, 기본 흐름과 섞어 쓰지 않는다.
+
+짧게 말하면:
+- **read first**
+- **copy before risky edits**
+- **mutating tools persist immediately**
+- **advanced mode는 점검/검증용으로 분리**
+
+## 도구 동작 빠른 감각
+
+| 구분 | 대표 도구 | 특징 |
+|---|---|---|
+| 파일 기반 읽기 전용 | `get_document_info`, `get_document_text`, `get_paragraph_text`, `get_paragraphs_text`, `find_text`, `get_table_text`, `get_table_map`, `find_cell_by_label`, `list_styles`, `list_available_documents` | 기존 `.hwpx` 파일을 읽거나 탐색만 한다. 저장하지 않는다. |
+| 파일 기반 즉시 저장 | `create_document`, `search_and_replace`, `batch_replace`, `add_heading`, `add_paragraph`, `insert_paragraph`, `delete_paragraph`, `add_table`, `fill_by_path`, `set_table_cell_text`, `add_page_break`, `add_memo`, `remove_memo`, `format_text`, `create_custom_style`, `merge_table_cells`, `split_table_cell`, `format_table`, `copy_document` | 호출 결과가 곧 파일 변경이다. 검토용이면 먼저 복사본에서 작업한다. |
+| payload/url 기반 추출 | `hwpx_to_markdown`, `hwpx_to_html`, `hwpx_extract_json` | 파일명을 직접 수정하지 않는다. HWPX payload 또는 URL을 읽어 변환 결과만 돌려준다. |
+| 고급 점검/검증 | `package_parts`, `package_get_xml`, `package_get_text`, `object_find_by_tag`, `object_find_by_attr`, `plan_edit`, `preview_edit`, `apply_edit`, `validate_structure`, `lint_text_conventions` | `HWPX_MCP_ADVANCED=1`일 때만 활성화한다. package/구조 점검용이다. |
+
 ## 주요 기능
 
 기본 모드에서 주요 HWPX 편집 도구를 제공하며, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서는 점검·검증용 도구가 추가로 활성화됩니다.
@@ -159,6 +186,8 @@ hwpx-mcp-server
 
 ### 🔎 검색 및 치환
 
+`find_text`는 읽기 전용이고, `search_and_replace` / `batch_replace`는 호출 즉시 저장된다.
+
 | 도구 | 설명 |
 |---|---|
 | `find_text` | 키워드 검색과 주변 문맥 반환 |
@@ -166,6 +195,8 @@ hwpx-mcp-server
 | `batch_replace` | 여러 치환 작업 일괄 실행 |
 
 ### ✏️ 문서 편집
+
+이 카테고리의 도구는 `copy_document`를 제외하면 대체로 원본 파일에 즉시 반영된다. 구조 변경 전에는 복사본을 먼저 만드는 편이 안전하다.
 
 | 도구 | 설명 |
 |---|---|
@@ -176,6 +207,8 @@ hwpx-mcp-server
 | `copy_document` | 안전한 사본 생성 후 작업 시작 |
 
 ### 📊 표 편집
+
+`get_table_text`, `get_table_map`, `find_cell_by_label`는 읽기 전용이다. `fill_by_path`, `set_table_cell_text`, `merge_table_cells`, `split_table_cell`, `format_table`은 호출 즉시 저장된다.
 
 | 도구 | 설명 |
 |---|---|
@@ -191,6 +224,8 @@ hwpx-mcp-server
 
 ### 🎨 서식 및 스타일
 
+`list_styles`는 읽기 전용이다. `format_text`, `create_custom_style`은 문서를 직접 갱신한다.
+
 | 도구 | 설명 |
 |---|---|
 | `format_text` | 텍스트 범위 서식 적용 |
@@ -200,6 +235,8 @@ hwpx-mcp-server
 스타일 참조 팁: `add_paragraph(..., style=...)`와 `insert_paragraph(..., style=...)`는 `list_styles`의 `id`, `create_custom_style`이 반환하는 `style_id`, 스타일 이름을 모두 받을 수 있습니다.
 
 ### 📤 추출
+
+이 카테고리는 filename 기반 편집 도구가 아니다. HWPX payload 또는 URL을 읽어 변환 결과를 반환한다.
 
 | 도구 | 설명 |
 |---|---|
