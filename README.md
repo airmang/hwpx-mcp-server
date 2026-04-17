@@ -143,6 +143,34 @@ hwpx-mcp-server
 
 <br>
 
+## 작업별 빠른 경로
+
+처음부터 모든 도구를 외울 필요는 없다. 보통은 아래 세 흐름 중 하나로 시작하면 된다.
+
+### 1. 읽기 전용으로 문서를 파악할 때
+
+1. `get_document_info`
+2. `get_document_outline` 또는 `get_document_text`
+3. `find_text`, `get_table_text`, `get_table_map` 같은 읽기 도구로 필요한 부분만 더 본다.
+
+이 흐름은 원본을 저장하지 않는다.
+
+### 2. 안전하게 수정할 때
+
+1. `copy_document`로 작업용 사본을 만든다.
+2. 읽기 도구로 수정 대상을 다시 확인한다.
+3. `search_and_replace`, `batch_replace`, `set_table_cell_text`, `add_paragraph` 같은 가장 작은 변경 도구만 쓴다.
+4. 필요하면 `save_as`로 별도 산출물을 남긴다.
+5. 수정 후 다시 읽기 도구로 결과를 확인한다.
+
+핵심은 `copy first`, `smallest edit`, `re-read after edits`다.
+
+### 3. 구조 점검과 검증이 목적일 때
+
+1. MCP 설정에서 `HWPX_MCP_ADVANCED=1`
+2. `package_parts`, `package_get_xml`, `package_get_text`로 내부 파트를 본다.
+3. `validate_structure`, `lint_text_conventions`, `plan_edit`, `preview_edit`는 기본 편집 흐름과 섞지 않고 점검/검증 단계에서만 사용한다.
+
 ## 안전한 사용 원칙
 
 이 서버의 공개 표면은 **현재 README에 적힌 MCP 도구 집합**이다. 워크플로 문서나 스킬 예시는 이 도구들을 조합하는 사용 패턴이지, 별도의 새 public tool 계약이 아니다.
@@ -152,12 +180,14 @@ hwpx-mcp-server
 1. 먼저 `get_document_info`, `get_document_text`, `find_text` 같은 읽기 도구로 문서를 파악한다.
 2. 수정 전 결과물을 보존해야 하면 `copy_document`를 먼저 호출한다.
 3. 수정 도구는 **호출 즉시 저장**되므로, 검토용 경로가 필요하면 원본 대신 복사본에서 작업한다.
-4. package inspection, edit planning, validation은 `HWPX_MCP_ADVANCED=1`일 때만 쓰고, 기본 흐름과 섞어 쓰지 않는다.
+4. 결과물을 따로 넘겨야 하면 `save_as`로 분리 저장하고 검수한다.
+5. package inspection, edit planning, validation은 `HWPX_MCP_ADVANCED=1`일 때만 쓰고, 기본 흐름과 섞어 쓰지 않는다.
 
 짧게 말하면:
 - **read first**
 - **copy before risky edits**
 - **mutating tools persist immediately**
+- **explicit handoff uses save_as**
 - **advanced mode는 점검/검증용으로 분리**
 
 ## 도구 동작 빠른 감각
@@ -165,7 +195,8 @@ hwpx-mcp-server
 | 구분 | 대표 도구 | 특징 |
 |---|---|---|
 | 파일 기반 읽기 전용 | `get_document_info`, `get_document_text`, `get_paragraph_text`, `get_paragraphs_text`, `find_text`, `get_table_text`, `get_table_map`, `find_cell_by_label`, `list_styles`, `list_available_documents` | 기존 `.hwpx` 파일을 읽거나 탐색만 한다. 저장하지 않는다. |
-| 파일 기반 즉시 저장 | `create_document`, `search_and_replace`, `batch_replace`, `add_heading`, `add_paragraph`, `insert_paragraph`, `delete_paragraph`, `add_table`, `fill_by_path`, `set_table_cell_text`, `add_page_break`, `add_memo`, `remove_memo`, `format_text`, `create_custom_style`, `merge_table_cells`, `split_table_cell`, `format_table`, `copy_document` | 호출 결과가 곧 파일 변경이다. 검토용이면 먼저 복사본에서 작업한다. |
+| 파일 기반 즉시 저장 편집 | `create_document`, `search_and_replace`, `batch_replace`, `add_heading`, `add_paragraph`, `insert_paragraph`, `delete_paragraph`, `add_table`, `fill_by_path`, `set_table_cell_text`, `add_page_break`, `add_memo`, `remove_memo`, `format_text`, `create_custom_style`, `merge_table_cells`, `split_table_cell`, `format_table` | 호출 결과가 곧 대상 파일 변경이다. 검토용이면 먼저 복사본에서 작업한다. |
+| 복제 / 명시적 저장 | `copy_document`, `save`, `save_as` | 원본 보호, 별도 산출물 저장, handoff 직전 검수용 저장 경계다. |
 | payload/url 기반 추출 | `hwpx_to_markdown`, `hwpx_to_html`, `hwpx_extract_json` | 파일명을 직접 수정하지 않는다. HWPX payload 또는 URL을 읽어 변환 결과만 돌려준다. |
 | 고급 점검/검증 | `package_parts`, `package_get_xml`, `package_get_text`, `object_find_by_tag`, `object_find_by_attr`, `plan_edit`, `preview_edit`, `apply_edit`, `validate_structure`, `lint_text_conventions` | `HWPX_MCP_ADVANCED=1`일 때만 활성화한다. package/구조 점검용이다. |
 
@@ -196,7 +227,7 @@ hwpx-mcp-server
 
 ### ✏️ 문서 편집
 
-이 카테고리의 도구는 `copy_document`를 제외하면 대체로 원본 파일에 즉시 반영된다. 구조 변경 전에는 복사본을 먼저 만드는 편이 안전하다.
+이 카테고리의 도구는 대체로 대상 파일에 즉시 반영된다. 구조 변경 전에는 `copy_document`로 작업용 사본을 만들고, handoff 직전에는 `save_as`로 별도 산출물을 남기는 편이 안전하다.
 
 | 도구 | 설명 |
 |---|---|
@@ -204,7 +235,15 @@ hwpx-mcp-server
 | `add_paragraph` / `insert_paragraph` / `delete_paragraph` | 문단 추가, 삽입, 삭제 |
 | `add_page_break` | 페이지 나누기 추가 |
 | `add_memo` / `remove_memo` | 메모 추가, 제거 |
-| `copy_document` | 안전한 사본 생성 후 작업 시작 |
+
+### 💾 복제 및 저장
+
+이 카테고리는 수정 워크플로의 안전 장치다. 원본 보호와 handoff 시점을 명시적으로 만들 때 쓴다.
+
+| 도구 | 설명 |
+|---|---|
+| `copy_document` | 원본을 건드리기 전에 작업용 사본 생성 |
+| `save` / `save_as` | 명시적 저장, 별도 경로 저장, 검수 경계 만들기 |
 
 ### 📊 표 편집
 
@@ -220,7 +259,7 @@ hwpx-mcp-server
 | `merge_table_cells` / `split_table_cell` | 셀 병합, 분할 |
 | `format_table` | 표 헤더 등 기본 서식 적용 |
 
-변경 도구는 호출 시 즉시 저장됩니다. 검토용 사본이 필요하면 `copy_document`를 먼저 사용하세요.
+변경 도구는 호출 시 즉시 저장됩니다. 검토용 사본이 필요하면 `copy_document`를 먼저 사용하고, 별도 납품본이 필요하면 `save_as`를 사용하세요.
 
 ### 🎨 서식 및 스타일
 
