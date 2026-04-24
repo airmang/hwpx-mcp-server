@@ -1,7 +1,12 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- License relicensed to Apache-2.0 (sole author, full consent).
+- Previous license terms no longer apply to future releases.
 - Sync downstream docs to the latest local stack validation baseline: `python-hwpx 2.9.0` verified on 2026-04-15, documented minimum support remains `python-hwpx >= 2.6`.
+
+### Added
 - Add stack smoke-test workflow and benchmark follow-up docs under `python-hwpx/shared/hwpx` so the shared HWPX stack baseline lives with the upstream engine repo.
 
 ## [2.2.5]

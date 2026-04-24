@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Static metadata used for hardened tool responses."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Text formatting helpers backed by python-hwpx character/style definitions."""
 
 from __future__ import annotations

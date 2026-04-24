@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Planning pipeline and validation helpers."""
 
 from __future__ import annotations

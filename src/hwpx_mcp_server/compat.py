@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """외부 라이브러리 호환성 패치."""
 
 from __future__ import annotations

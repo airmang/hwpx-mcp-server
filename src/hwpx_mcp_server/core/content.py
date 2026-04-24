@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """문단, 표, 메모 CRUD 로직."""
 
 from __future__ import annotations

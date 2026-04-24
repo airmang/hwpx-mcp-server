@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Helpers for constructing sanitized tool schemas."""
 
 from __future__ import annotations

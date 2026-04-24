@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """HWPX MCP 서버를 위한 로깅 보조 모듈."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Thin integration helpers for the upstream ``python-hwpx`` library.
 
 Keep version-sensitive imports and non-obvious upstream calls here so the rest

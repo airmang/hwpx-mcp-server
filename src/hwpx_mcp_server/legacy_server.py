@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """MCP 서버 진입점(표준 입출력/Streamable HTTP transport 지원)."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Transaction helpers for hardened editing pipeline."""
 
 from __future__ import annotations

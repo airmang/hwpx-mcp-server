@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Storage backends for HWPX document operations."""
 
 from __future__ import annotations
