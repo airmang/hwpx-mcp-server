@@ -16,6 +16,15 @@
 
 ---
 
+## 🧩 HWPX Stack (3종)
+
+| 계층 | 레포 | 역할 |
+|---|---|---|
+| 📦 라이브러리 | [`python-hwpx`](https://github.com/airmang/python-hwpx) | 순수 파이썬 HWPX 파싱·편집·생성 코어 |
+| 🔌 MCP 서버 | **[`hwpx-mcp-server`](https://github.com/airmang/hwpx-mcp-server)** | MCP 클라이언트(Claude Desktop, VS Code 등)에서 HWPX 조작 |
+| 🎯 에이전트 스킬 | [`hwpx-skill`](https://github.com/airmang/hwpx-skill) | 에이전트가 HWPX를 바로 쓰게 해주는 공식 온보딩 스킬 |
+
+---
 **hwpx-mcp-server**는 [모델 컨텍스트 프로토콜(MCP)](https://modelcontextprotocol.io) 표준을 따르는 서버로, [python-hwpx](https://github.com/airmang/python-hwpx) 기반에서 HWPX 문서의 열람 · 검색 · 편집 · 추출을 AI 클라이언트에서 직접 수행할 수 있게 합니다.
 
 > **참고** 이 서버는 Open XML 기반 `.hwpx` 포맷을 지원합니다. 바이너리 `.hwp` 포맷은 직접 편집 대상이 아닙니다.
@@ -29,6 +38,23 @@
 - **문서 개요, 표 맵, 패키지 구조를 AI가 직접 조회하고 후속 작업으로 연결**
 - **한글 워드프로세서 없이 서버·CI·로컬 개발 환경에서 같은 흐름 유지**
 - **고급 모드에서 검증, package inspection, edit planning까지 확장**
+
+## Claude Desktop 5분 연결
+
+아래 설정 하나만 넣으면 Claude Desktop에서 `hwpx` MCP 서버를 바로 잡는다.
+
+```json
+{
+  "mcpServers": {
+    "hwpx": {
+      "command": "uvx",
+      "args": ["hwpx-mcp-server"]
+    }
+  }
+}
+```
+
+> Screenshot placeholder: Claude Desktop 설정 화면에서 `hwpx` 서버가 활성화된 장면을 여기에 넣을 예정.
 
 ## 왜 필요한가?
 
