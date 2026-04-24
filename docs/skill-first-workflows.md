@@ -21,11 +21,12 @@ Scope for this pass:
 | Preview plans | `preview_edit` | Shows the plan artifact before confirmation. |
 | Apply plans | `apply_edit` | Applies the review pipeline state, not general direct HWPX mutations. |
 | Template fill | `copy_document` + `batch_replace` / `search_and_replace` / `set_table_cell_text` | No public `fill_template` tool on the active FastMCP surface. |
-| Save/copy flows | `copy_document`, `save`, `save_as`, plus the normal mutating tools | Mutating tools persist immediately through the shared atomic save path; `save`/`save_as` additionally return a post-save `verificationReport`. |
+| Save/copy flows | `copy_document` plus the normal mutating tools | Mutating tools persist immediately through the shared atomic save path. Reviewable handoff는 copied working file을 기준으로 잡는다. |
 
 Important boundary:
 
 - There is no active public `fill_template` tool on the FastMCP surface.
+- There is no active public `save` / `save_as` tool on the FastMCP surface.
 - Cautious workflows should edit a copied working file, then promote that file externally after review.
 
 ## Workflow 1: Reference-Preserving Edit
@@ -127,8 +128,8 @@ Suggested order:
 
 Why this is the safe path:
 
-- The MCP server exposes `save` and `save_as`, both returning a post-save `verificationReport` for explicit handoff checks.
 - Mutations already go through the safer atomic save path, but they still update the target file immediately.
+- There is no separate public `save` / `save_as` handoff step on the current FastMCP surface.
 - Copy-first is therefore the practical review boundary on the current surface.
 
 ## Example Skill Folders
