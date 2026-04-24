@@ -9,7 +9,7 @@
   <p align="center">
     <a href="https://pypi.org/project/hwpx-mcp-server/"><img src="https://img.shields.io/pypi/v/hwpx-mcp-server?style=flat-square&color=blue" alt="PyPI"></a>
     <a href="https://pypi.org/project/hwpx-mcp-server/"><img src="https://img.shields.io/pypi/pyversions/hwpx-mcp-server?style=flat-square" alt="Python"></a>
-    <a href="https://github.com/airmang/hwpx-mcp-server/blob/main/LICENSE"><img src="https://img.shields.io/github/license/airmang/hwpx-mcp-server?style=flat-square" alt="License"></a>
+    <a href="https://github.com/airmang/hwpx-mcp-server/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License"></a>
     <a href="https://github.com/airmang/hwpx-mcp-server/actions"><img src="https://img.shields.io/github/actions/workflow/status/airmang/hwpx-mcp-server/test.yml?style=flat-square&label=tests" alt="Tests"></a>
   </p>
 </p>
@@ -354,9 +354,8 @@ python -m pytest -q
 
 <br>
 
-## 라이선스
-
-[MIT](LICENSE)
+## License
+Apache License 2.0. See LICENSE and NOTICE.
 
 <br>
 

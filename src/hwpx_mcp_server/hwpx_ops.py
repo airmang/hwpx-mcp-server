@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """:mod:`python-hwpx` 위에 구축한 고수준 연산 모음."""
 
 from __future__ import annotations

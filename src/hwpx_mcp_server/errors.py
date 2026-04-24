@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """공통 에러 모델과 MCP 에러 변환 유틸리티."""
 
 from __future__ import annotations

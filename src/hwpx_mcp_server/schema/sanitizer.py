@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Schema sanitizer ensuring draft-07 safe output."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """MCP 서버가 제공하는 도구 정의."""
 
 from __future__ import annotations

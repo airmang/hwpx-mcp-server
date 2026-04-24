@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """HWPX Model Context Protocol 서버 패키지."""
 
 from importlib.metadata import version, PackageNotFoundError

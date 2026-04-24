@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """HWP(.hwp) -> HWPX(.hwpx) 변환 유틸리티."""
 
 from __future__ import annotations

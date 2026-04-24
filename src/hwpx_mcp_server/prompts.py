@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """MCP prompts/list, prompts/get에 노출할 프롬프트 정의."""
 
 from __future__ import annotations

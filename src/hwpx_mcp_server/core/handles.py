@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Helpers for generating stable handles for logical nodes."""
 
 from __future__ import annotations

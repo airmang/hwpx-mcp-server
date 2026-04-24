@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """HWP(바이너리) 파일의 읽기 전용 텍스트 추출 유틸리티."""
 
 from __future__ import annotations
