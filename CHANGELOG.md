@@ -1,13 +1,19 @@
 # Changelog
 
 ## [Unreleased]
-### Changed
-- License relicensed to Apache-2.0 (sole author, full consent).
-- Previous license terms no longer apply to future releases.
-- Sync downstream docs to the latest local stack validation baseline: `python-hwpx 2.9.0` verified on 2026-04-15, documented minimum support remains `python-hwpx >= 2.6`.
-
 ### Added
 - Add stack smoke-test workflow and benchmark follow-up docs under `python-hwpx/shared/hwpx` so the shared HWPX stack baseline lives with the upstream engine repo.
+
+## [2.2.6] - 2026-04-27
+### Changed
+- Require `python-hwpx >= 2.9.1` so downstream consumers pick up the upstream interop fixes for `ET.SubElement` on lxml elements (airmang/python-hwpx#30) and the signed int32 ID generators (airmang/python-hwpx#34, #35).
+- License relicensed to Apache-2.0 (sole author, full consent); previous license terms no longer apply to future releases.
+
+### Removed
+- Drop the `_patch_upstream_id_generators_to_signed_int32` compat shim and its regression tests. The shim existed only to bridge users still pinned to `python-hwpx 2.9.0`; it is superseded by the upstream fix in `python-hwpx 2.9.1`. The `_patch_sub_element_for_lxml_parent` shim is retained because `hwpx/oxml/document.py` still carries stdlib `ET.SubElement` call sites outside the cell-text and run-style paths that 2.9.1 fixed. Thanks to [@seonghoony](https://github.com/seonghoony) for the original shim in #64.
+
+### Fixed
+- Drop the legacy `License :: OSI Approved :: Apache Software License` classifier that coexisted with the PEP 639 `license` expression in `pyproject.toml`, which broke `pip install -e .` and `python -m build` under `setuptools>=77`.
 
 ## [2.2.5]
 - Add filename-based MCP tools `get_table_map`, `find_cell_by_label`, and `fill_by_path` on top of the upstream `python-hwpx` table navigation helpers.
