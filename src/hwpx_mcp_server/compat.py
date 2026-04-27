@@ -35,8 +35,50 @@ def _patch_sub_element_for_lxml_parent() -> None:
     _SUBELEMENT_PATCHED = True
 
 
+_ID_GENERATORS_PATCHED = False
+
+
+def _patch_upstream_id_generators_to_signed_int32() -> None:
+    """Clamp ``hwpx.oxml.document._paragraph_id`` / ``_object_id`` / ``_memo_id``
+    to the signed int32 range.
+
+    Older releases of ``python-hwpx`` mask ``uuid4().int`` with ``0xFFFFFFFF``,
+    which yields values ``>= 2**31`` about half the time. Several downstream
+    HWPX consumers parse the ``id`` attribute as a signed 32-bit integer and
+    misinterpret those values as negative. Once the upstream library masks
+    with ``0x7FFFFFFF`` this patch becomes a no-op; until then it gives
+    hwpx-mcp-server users an in-range guarantee regardless of the installed
+    upstream version.
+    """
+
+    global _ID_GENERATORS_PATCHED
+    if _ID_GENERATORS_PATCHED:
+        return
+
+    try:
+        from hwpx.oxml import document as _hwpx_document
+    except ImportError:
+        return
+
+    from uuid import uuid4
+
+    def _safe_id() -> str:
+        return str(uuid4().int & 0x7FFFFFFF)
+
+    if not hasattr(_hwpx_document, "_paragraph_id"):
+        return
+
+    _hwpx_document._paragraph_id = _safe_id  # type: ignore[attr-defined]
+    if hasattr(_hwpx_document, "_object_id"):
+        _hwpx_document._object_id = _safe_id  # type: ignore[attr-defined]
+    if hasattr(_hwpx_document, "_memo_id"):
+        _hwpx_document._memo_id = _safe_id  # type: ignore[attr-defined]
+    _ID_GENERATORS_PATCHED = True
+
+
 def patch_python_hwpx() -> None:
-    """python-hwpx의 ET 누락/혼합 파서 호환 이슈를 보정합니다."""
+    """python-hwpx의 ET 누락/혼합 파서 호환 이슈와 id 생성 범위를 보정합니다."""
     if not hasattr(builtins, "ET"):
         builtins.ET = _ET
     _patch_sub_element_for_lxml_parent()
+    _patch_upstream_id_generators_to_signed_int32()
