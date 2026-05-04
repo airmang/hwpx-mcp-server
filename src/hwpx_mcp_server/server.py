@@ -44,6 +44,7 @@ from .core.content import (
 from .core.document import create_blank, open_doc, save_doc
 from .core.formatting import create_style_in_doc, format_text_range, list_styles_in_doc
 from .core.search import batch_replace_in_doc, find_in_doc, replace_in_doc
+from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from .hwpx_ops import HwpxOps
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
@@ -1147,6 +1148,46 @@ def copy_document(source_filename: str, destination_filename: str = None) -> dic
         destination = resolve_path(destination_filename)
     dest = copy_document_file(source, destination)
     return {"source": source_filename, "destination": os.path.basename(dest)}
+
+
+@mcp.tool()
+def analyze_form_fill(
+    source_filename: str,
+    input_json: dict = None,
+    input_json_path: str = None,
+    input_docx: str = None,
+    destination_filename: str = None,
+    options: dict = None,
+) -> dict:
+    """HWPX 양식 채움 계획을 분석합니다. 파일 복사/채움 변경은 하지 않습니다."""
+    return analyze_form_fill_workflow(
+        source_filename=source_filename,
+        input_json=input_json,
+        input_json_path=input_json_path,
+        input_docx=input_docx,
+        destination_filename=destination_filename,
+        options=options,
+    )
+
+
+@mcp.tool()
+def apply_form_fill(
+    plan_id: str = None,
+    analysis: dict = None,
+    source_filename: str = None,
+    destination_filename: str = None,
+    canonical_input: dict = None,
+    confirm: bool = True,
+) -> dict:
+    """분석된 HWPX 양식 채움 계획을 복사본에만 적용하고 구조/패키지를 검증합니다."""
+    return apply_form_fill_workflow(
+        plan_id=plan_id,
+        analysis=analysis,
+        source_filename=source_filename,
+        destination_filename=destination_filename,
+        canonical_input=canonical_input,
+        confirm=confirm,
+    )
 
 
 if _advanced_enabled():
