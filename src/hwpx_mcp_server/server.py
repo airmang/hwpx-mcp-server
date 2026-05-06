@@ -49,6 +49,15 @@ from .hwpx_ops import HwpxOps
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
+try:  # python-hwpx >= proposal preset feature
+    from hwpx.presets import (
+        create_proposal_document as build_proposal_document,
+        inspect_proposal_quality as inspect_proposal_document_quality,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    build_proposal_document = None
+    inspect_proposal_document_quality = None
+
 mcp = FastMCP("hwpx-mcp-server")
 
 
@@ -671,6 +680,51 @@ def create_document(filename: str, title: str = None, author: str = None) -> dic
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     create_blank(path)
     return {"filename": filename, "created": True}
+
+
+@mcp.tool()
+def create_proposal_document(
+    filename: str,
+    proposal_spec: dict,
+    style_preset: str = "clean_korean_proposal",
+) -> dict:
+    """자연어에서 추출한 proposal_spec으로 제안서형 HWPX 문서를 생성합니다."""
+    if build_proposal_document is None:
+        raise RuntimeError(
+            "installed python-hwpx does not provide hwpx.presets proposal support"
+        )
+    path = resolve_path(filename)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    doc = build_proposal_document(proposal_spec or {}, preset=style_preset)
+    try:
+        doc.save_to_path(path)
+    finally:
+        doc.close()
+
+    report = (
+        inspect_proposal_document_quality(path)
+        if inspect_proposal_document_quality is not None
+        else None
+    )
+    return {
+        "filename": filename,
+        "created": True,
+        "style_preset": style_preset,
+        "quality": report,
+    }
+
+
+@mcp.tool()
+def inspect_document_quality(filename: str, rubric: str = "proposal") -> dict:
+    """생성된 HWPX 문서를 제안서 품질 루브릭으로 점검합니다."""
+    if rubric != "proposal":
+        raise ValueError("rubric must be 'proposal'")
+    if inspect_proposal_document_quality is None:
+        raise RuntimeError(
+            "installed python-hwpx does not provide proposal quality inspection"
+        )
+    path = resolve_path(filename)
+    return inspect_proposal_document_quality(path)
 
 
 @mcp.tool()
