@@ -256,3 +256,19 @@ Layer ownership:
 - `python-hwpx` stays the upstream engine for HWPX/package behavior.
 - `hwpx-mcp-server` exposes the stable MCP product surface through `src/hwpx_mcp_server/server.py`.
 - Skills and workflow examples orchestrate those tools; they do not replace core editing logic.
+
+## Agent-first proposal document generation
+
+When `python-hwpx` exposes `hwpx.presets`, the MCP server can generate and inspect proposal/planning documents with high-level tools:
+
+- `create_proposal_document(filename, proposal_spec, style_preset="clean_korean_proposal")`
+- `inspect_document_quality(filename, rubric="proposal")`
+
+Recommended flow:
+
+1. Convert the user's natural-language request into `proposal_spec` JSON.
+2. Call `create_proposal_document` to write the HWPX.
+3. Call `inspect_document_quality` to check validation, required sections, tables, asset weight, rubric scores, and the v2 `sample_match` proxy dimensions.
+4. Revise `proposal_spec` if average rubric score is below 4.0, `sample_match.pass` is false, or a required section is missing.
+
+This path intentionally benchmarks DOCX-style document principles without implementing a DOCX converter, GUI, model tuning, renderer, or pixel-diff gate. `visual_review_required=True` means rendered parity is not claimed.
