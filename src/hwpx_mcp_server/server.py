@@ -46,6 +46,12 @@ from .core.formatting import create_style_in_doc, format_text_range, list_styles
 from .core.search import batch_replace_in_doc, find_in_doc, replace_in_doc
 from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from .hwpx_ops import HwpxOps
+from .quality_generation import (
+    analyze_quality_generation_workflow,
+    apply_quality_generation_workflow,
+    create_quality_document_fallback,
+    inspect_quality_fallback,
+)
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
@@ -57,6 +63,30 @@ try:  # python-hwpx >= proposal preset feature
 except Exception:  # pragma: no cover - optional dependency compatibility
     build_proposal_document = None
     inspect_proposal_document_quality = None
+
+try:  # python-hwpx >= document-plan authoring feature
+    from hwpx import (
+        create_document_from_plan as build_document_from_plan,
+        inspect_document_authoring_quality as inspect_authoring_document_quality,
+        inspect_operating_plan_quality as inspect_operating_plan_document_quality,
+        normalize_document_plan as normalize_hwpx_document_plan,
+        validate_document_plan as validate_hwpx_document_plan,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    build_document_from_plan = None
+    inspect_authoring_document_quality = None
+    inspect_operating_plan_document_quality = None
+    normalize_hwpx_document_plan = None
+    validate_hwpx_document_plan = None
+
+try:  # python-hwpx >= template form-fit feature
+    from hwpx import (
+        analyze_template_formfit as analyze_hwpx_template_formfit,
+        apply_template_formfit as apply_hwpx_template_formfit,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    analyze_hwpx_template_formfit = None
+    apply_hwpx_template_formfit = None
 
 mcp = FastMCP("hwpx-mcp-server")
 
@@ -682,6 +712,282 @@ def create_document(filename: str, title: str = None, author: str = None) -> dic
     return {"filename": filename, "created": True}
 
 
+def _quality_profile_argument(
+    quality_profile: str | dict | None,
+    profile: dict | None = None,
+) -> str | dict | None:
+    """Normalize MCP quality-profile arguments for python-hwpx."""
+
+    if profile:
+        merged = dict(profile)
+        if quality_profile:
+            merged.setdefault("name", quality_profile)
+        return merged
+    return quality_profile
+
+
+def _inspect_authoring_quality(
+    source: str | Any,
+    *,
+    document_plan: dict | None,
+    quality_profile: str | dict | None = None,
+    profile: dict | None = None,
+) -> dict:
+    if inspect_authoring_document_quality is None:
+        raise RuntimeError("installed python-hwpx does not provide document-plan authoring")
+    profile_arg = _quality_profile_argument(quality_profile, profile)
+    try:
+        if profile_arg is None:
+            return inspect_authoring_document_quality(source, plan=document_plan)
+        return inspect_authoring_document_quality(
+            source,
+            plan=document_plan,
+            quality_profile=profile_arg,
+        )
+    except TypeError as exc:
+        if profile_arg is not None:
+            raise RuntimeError(
+                "installed python-hwpx does not support document-plan quality profiles"
+            ) from exc
+        raise
+
+
+def _handoff_status(quality: dict) -> str:
+    return "ready" if bool(quality.get("pass")) else "needs_revision"
+
+
+def _next_action(quality: dict) -> str:
+    if bool(quality.get("pass")):
+        return "structural handoff is ready; complete visual review before final submission"
+    return "review quality.gaps and profile repair_hints, then rerun validate/analyze/create"
+
+
+@mcp.tool()
+def validate_document_plan(document_plan: dict) -> dict:
+    """선언형 hwpx.document_plan.v1 생성 계획을 검증합니다. 파일은 쓰지 않습니다."""
+    if validate_hwpx_document_plan is None or normalize_hwpx_document_plan is None:
+        raise RuntimeError("installed python-hwpx does not provide document-plan authoring")
+    report = validate_hwpx_document_plan(document_plan or {})
+    result = report.to_dict()
+    if report.ok:
+        result["can_create"] = True
+        result["normalizedPlan"] = normalize_hwpx_document_plan(document_plan or {}).to_dict()
+        result["next_tool"] = "create_document_from_plan"
+    else:
+        result["can_create"] = False
+        result["next_tool"] = "validate_document_plan"
+        result["next_action"] = (
+            "repair document_plan using repairHints, then rerun validate_document_plan"
+        )
+    return result
+
+
+@mcp.tool()
+def analyze_document_plan(
+    document_plan: dict,
+    destination_filename: str = None,
+    style_preset: str = "standard_korean_business",
+    quality_profile: str = None,
+    profile: dict = None,
+) -> dict:
+    """선언형 document_plan을 파일 쓰기 없이 분석하고 품질 미리보기를 반환합니다."""
+    if (
+        build_document_from_plan is None
+        or validate_hwpx_document_plan is None
+        or normalize_hwpx_document_plan is None
+    ):
+        raise RuntimeError("installed python-hwpx does not provide document-plan authoring")
+    validation = validate_hwpx_document_plan(document_plan or {})
+    validation_payload = validation.to_dict()
+    result = {
+        **validation_payload,
+        "mutated": False,
+        "destination": {
+            "filename": destination_filename,
+            "path": resolve_path(destination_filename) if destination_filename else None,
+            "required_for_create": bool(destination_filename),
+        },
+        "style_preset": style_preset,
+        "quality_profile": _quality_profile_argument(quality_profile, profile),
+    }
+    if not validation.ok:
+        result.update(
+            {
+                "can_create": False,
+                "handoff_status": "needs_revision",
+                "next_tool": "validate_document_plan",
+                "next_action": (
+                    "repair document_plan using repairHints, then rerun analyze_document_plan"
+                ),
+            }
+        )
+        return result
+
+    normalized = normalize_hwpx_document_plan(document_plan or {})
+    quality: dict | None = None
+    doc = build_document_from_plan(document_plan or {}, preset=style_preset)
+    try:
+        quality = _inspect_authoring_quality(
+            doc,
+            document_plan=document_plan or {},
+            quality_profile=quality_profile,
+            profile=profile,
+        )
+    finally:
+        doc.close()
+
+    result.update(
+        {
+            "can_create": True,
+            "normalizedPlan": normalized.to_dict(),
+            "quality_preview": quality,
+            "handoff_status": _handoff_status(quality),
+            "next_tool": "create_document_from_plan",
+            "next_action": _next_action(quality),
+        }
+    )
+    return result
+
+
+@mcp.tool()
+def create_document_from_plan(
+    filename: str,
+    document_plan: dict,
+    style_preset: str = "standard_korean_business",
+    quality_profile: str = None,
+    profile: dict = None,
+) -> dict:
+    """선언형 document_plan으로 HWPX를 생성하고 즉시 저장/검증합니다."""
+    if (
+        build_document_from_plan is None
+        or inspect_authoring_document_quality is None
+        or validate_hwpx_document_plan is None
+    ):
+        raise RuntimeError("installed python-hwpx does not provide document-plan authoring")
+    validation = validate_hwpx_document_plan(document_plan or {})
+    if not validation.ok:
+        return {
+            "filename": filename,
+            "created": False,
+            "error": "document plan failed validation",
+            "plan_validation": validation.to_dict(),
+            "handoff_status": "needs_revision",
+            "next_tool": "validate_document_plan",
+            "next_action": (
+                "repair document_plan using repairHints, then rerun validate_document_plan"
+            ),
+        }
+    path = resolve_path(filename)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    doc = build_document_from_plan(document_plan or {}, preset=style_preset)
+    try:
+        doc.save_to_path(path)
+    finally:
+        doc.close()
+    report = _inspect_authoring_quality(
+        path,
+        document_plan=document_plan or {},
+        quality_profile=quality_profile,
+        profile=profile,
+    )
+    return {
+        "filename": filename,
+        "created": True,
+        "style_preset": style_preset,
+        "quality_profile": _quality_profile_argument(quality_profile, profile),
+        "plan_validation": validation.to_dict(),
+        "handoff_status": _handoff_status(report),
+        "next_action": _next_action(report),
+        "quality": report,
+    }
+
+
+@mcp.tool()
+def inspect_document_authoring_quality(
+    filename: str,
+    document_plan: dict = None,
+    quality_profile: str = None,
+    profile: dict = None,
+) -> dict:
+    """document-plan 기반 생성물의 reopen/package/schema 품질 근거를 조회합니다."""
+    path = resolve_path(filename)
+    return _inspect_authoring_quality(
+        path,
+        document_plan=document_plan,
+        quality_profile=quality_profile,
+        profile=profile,
+    )
+
+
+@mcp.tool()
+def inspect_operating_plan_quality(
+    filename: str,
+    document_plan: dict = None,
+    profile: dict = None,
+) -> dict:
+    """운영 계획서 제출 후보의 file-only 품질 프로필을 반환합니다."""
+    path = resolve_path(filename)
+    if inspect_operating_plan_document_quality is not None:
+        return inspect_operating_plan_document_quality(path, plan=document_plan, profile=profile)
+    report = _inspect_authoring_quality(
+        path,
+        document_plan=document_plan,
+        quality_profile={"name": "operating_plan", **dict(profile or {})},
+    )
+    return report.get("profiles", {}).get("operating_plan", report)
+
+
+def _template_formfit_baseline_arg(baseline: dict | str) -> dict | str:
+    if isinstance(baseline, dict):
+        return baseline
+    text = str(baseline or "").strip()
+    if text.endswith(".json") or Path(text).exists():
+        return resolve_path(text)
+    return text
+
+
+@mcp.tool()
+def analyze_template_formfit(
+    source_filename: str,
+    baseline: dict | str,
+    content: dict,
+    destination_filename: str = None,
+    options: dict = None,
+) -> dict:
+    """P6 baseline 기반 양식 보존 생성 계획을 비파괴 분석합니다."""
+    if analyze_hwpx_template_formfit is None:
+        raise RuntimeError("installed python-hwpx does not provide template form-fit")
+    return analyze_hwpx_template_formfit(
+        resolve_path(source_filename),
+        baseline=_template_formfit_baseline_arg(baseline),
+        content=content or {},
+        destination=resolve_path(destination_filename) if destination_filename else None,
+        options=options,
+    )
+
+
+@mcp.tool()
+def apply_template_formfit(
+    analysis: dict = None,
+    source_filename: str = None,
+    baseline: dict | str = None,
+    content: dict = None,
+    destination_filename: str = None,
+    confirm: bool = True,
+) -> dict:
+    """양식 보존 생성 계획을 복사본 destination에만 적용하고 검증합니다."""
+    if apply_hwpx_template_formfit is None:
+        raise RuntimeError("installed python-hwpx does not provide template form-fit")
+    return apply_hwpx_template_formfit(
+        analysis=analysis,
+        source=resolve_path(source_filename) if source_filename else None,
+        baseline=_template_formfit_baseline_arg(baseline) if baseline is not None else None,
+        content=content,
+        destination=resolve_path(destination_filename) if destination_filename else None,
+        confirm=confirm,
+    )
+
+
 @mcp.tool()
 def create_proposal_document(
     filename: str,
@@ -689,13 +995,13 @@ def create_proposal_document(
     style_preset: str = "clean_korean_proposal",
 ) -> dict:
     """자연어에서 추출한 proposal_spec으로 제안서형 HWPX 문서를 생성합니다."""
-    if build_proposal_document is None:
-        raise RuntimeError(
-            "installed python-hwpx does not provide hwpx.presets proposal support"
-        )
     path = resolve_path(filename)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    doc = build_proposal_document(proposal_spec or {}, preset=style_preset)
+    doc = (
+        build_proposal_document(proposal_spec or {}, preset=style_preset)
+        if build_proposal_document is not None
+        else create_quality_document_fallback(proposal_spec or {})
+    )
     try:
         doc.save_to_path(path)
     finally:
@@ -704,7 +1010,7 @@ def create_proposal_document(
     report = (
         inspect_proposal_document_quality(path)
         if inspect_proposal_document_quality is not None
-        else None
+        else _proposal_quality_fallback(path)
     )
     return {
         "filename": filename,
@@ -719,12 +1025,61 @@ def inspect_document_quality(filename: str, rubric: str = "proposal") -> dict:
     """생성된 HWPX 문서를 제안서 품질 루브릭으로 점검합니다."""
     if rubric != "proposal":
         raise ValueError("rubric must be 'proposal'")
-    if inspect_proposal_document_quality is None:
-        raise RuntimeError(
-            "installed python-hwpx does not provide proposal quality inspection"
-        )
     path = resolve_path(filename)
-    return inspect_proposal_document_quality(path)
+    if inspect_proposal_document_quality is not None:
+        return inspect_proposal_document_quality(path)
+    return _proposal_quality_fallback(path)
+
+
+def _proposal_quality_fallback(path: str) -> dict:
+    """Compatibility report when installed python-hwpx lacks proposal presets."""
+
+    report = inspect_quality_fallback(path)
+    table_checks = dict(report.get("table_checks") or {})
+    table_checks.setdefault("has_budget_table", bool(table_checks.get("has_structured_tables")))
+    report["table_checks"] = table_checks
+    report["report_version"] = "proposal-quality-v2"
+    return report
+
+
+@mcp.tool()
+def analyze_quality_generation(
+    form_filename: str,
+    idea_brief: str | dict,
+    destination_filename: str = None,
+    quality_profile: str = "korean_ai_school_application_v1",
+    options: dict = None,
+) -> dict:
+    """양식+아이디어만으로 고품질 HWPX 생성을 준비하는 비파괴 분석을 수행합니다."""
+    return analyze_quality_generation_workflow(
+        form_filename=form_filename,
+        idea_brief=idea_brief,
+        destination_filename=destination_filename,
+        quality_profile=quality_profile,
+        options=options,
+    )
+
+
+@mcp.tool()
+def apply_quality_generation(
+    plan_id: str = None,
+    analysis: dict = None,
+    form_filename: str = None,
+    destination_filename: str = None,
+    idea_brief: str | dict = None,
+    max_revision_rounds: int = 1,
+    confirm: bool = True,
+) -> dict:
+    """MCP 품질 파이프라인으로 HWPX를 생성하고 검수/개선 루프 결과를 반환합니다."""
+    return apply_quality_generation_workflow(
+        plan_id=plan_id,
+        analysis=analysis,
+        form_filename=form_filename,
+        destination_filename=destination_filename,
+        idea_brief=idea_brief,
+        max_revision_rounds=max_revision_rounds,
+        confirm=confirm,
+    )
 
 
 @mcp.tool()

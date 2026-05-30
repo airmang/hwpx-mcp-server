@@ -21,6 +21,14 @@ import pytest
 # Keep legacy global alias used by existing tests.
 builtins.ET = _ET
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_LOCAL_PYTHON_HWPX_SRC = _REPO_ROOT.parent / "python-hwpx" / "src"
+
+if _LOCAL_PYTHON_HWPX_SRC.exists():
+    local_hwpx_src = str(_LOCAL_PYTHON_HWPX_SRC)
+    if local_hwpx_src not in sys.path:
+        sys.path.insert(0, local_hwpx_src)
+
 
 @pytest.fixture(autouse=True)
 def _clear_path_sandbox_for_inprocess_tests(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -77,7 +85,16 @@ def _env_int(name: str, default: int) -> int:
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return _REPO_ROOT
+
+
+def _pythonpath_with_local_sources(existing: str = "") -> str:
+    paths = [str(_repo_root() / "src")]
+    if _LOCAL_PYTHON_HWPX_SRC.exists():
+        paths.append(str(_LOCAL_PYTHON_HWPX_SRC))
+    if existing:
+        paths.append(existing)
+    return os.pathsep.join(paths)
 
 
 def _default_server_cmd() -> str:
@@ -388,9 +405,7 @@ class StdioMCPClient:
     def _build_env(self) -> dict[str, str]:
         env = os.environ.copy()
         env.update(self.extra_env)
-        src_path = str(_repo_root() / "src")
-        existing = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = src_path if not existing else f"{src_path}{os.pathsep}{existing}"
+        env["PYTHONPATH"] = _pythonpath_with_local_sources(env.get("PYTHONPATH", ""))
         return env
 
     def start(self) -> None:
