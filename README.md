@@ -105,7 +105,7 @@ hwpx-mcp-server
 
 ### 2. MCP 클라이언트 설정
 
-### Codex plugin companion launcher
+#### Codex plugin companion launcher
 
 The `hwpx-skill` repository includes `plugins/hwpx-plugin`, which can launch this MCP server as a companion server. In local development, set `HWPX_MCP_SERVER_REPO=/absolute/path/to/hwpx-mcp-server` and `PYTHON_HWPX_REPO=/absolute/path/to/python-hwpx` when the three repositories are not sibling directories. The plugin launcher uses `uv run --project "$HWPX_MCP_SERVER_REPO" --with-editable "$PYTHON_HWPX_REPO" --with-editable "$HWPX_MCP_SERVER_REPO" hwpx-mcp-server`.
 
