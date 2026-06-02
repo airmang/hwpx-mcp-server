@@ -790,6 +790,61 @@ class HwpxOps:
         text = package.get_text(part_name, encoding=encoding or "utf-8")
         return {"text": text}
 
+    def repair_hwpx(
+        self,
+        source: str,
+        output: str,
+        *,
+        recover: bool = False,
+        overwrite: bool = False,
+        max_entry_size: int = 64 * 1024 * 1024,
+        max_total_size: int = 512 * 1024 * 1024,
+        max_source_size: int = 512 * 1024 * 1024,
+    ) -> Dict[str, Any]:
+        try:
+            from hwpx.tools.package_validator import validate_package
+            from hwpx.tools.repair import repair_from_recovered, repair_repack
+        except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+            raise self._new_error(
+                "REPAIR_UNAVAILABLE",
+                "python-hwpx repair support is not available; install a python-hwpx build with hwpx.tools.repair",
+                hint="Upgrade python-hwpx to a version that includes hwpx.tools.repair and hwpx.tools.recover.",
+            ) from exc
+
+        source_path = self._resolve_path(source)
+        output_path = self.storage.resolve_output_path(output)
+        if recover:
+            result = repair_from_recovered(
+                source_path,
+                output_path,
+                overwrite=overwrite,
+                max_entry_size=max_entry_size,
+                max_total_size=max_total_size,
+                max_source_size=max_source_size,
+            )
+        else:
+            result = repair_repack(
+                source_path,
+                output_path,
+                overwrite=overwrite,
+                max_entry_size=max_entry_size,
+                max_total_size=max_total_size,
+            )
+        validation = validate_package(output_path)
+        return {
+            "outputPath": self._relative_path(output_path),
+            "entries": list(result.entries),
+            "entryCount": len(result.entries),
+            "reordered": result.reordered,
+            "crcOk": result.crc_ok,
+            "recovered": result.recovered,
+            "validatePackage": {
+                "ok": validation.ok,
+                "errors": [str(issue) for issue in validation.errors],
+                "warnings": [str(issue) for issue in validation.warnings],
+            },
+        }
+
 
     # ------------------------------------------------------------------
     # Text extraction

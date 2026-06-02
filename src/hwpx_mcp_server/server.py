@@ -1560,6 +1560,28 @@ def copy_document(source_filename: str, destination_filename: str = None) -> dic
 
 
 @mcp.tool()
+def repair_hwpx(
+    source_filename: str,
+    output_filename: str,
+    recover: bool = False,
+    overwrite: bool = False,
+    max_entry_size: int = 64 * 1024 * 1024,
+    max_total_size: int = 512 * 1024 * 1024,
+    max_source_size: int = 512 * 1024 * 1024,
+) -> dict:
+    """HWPX ZIP 패키지를 repair-repack하거나, recover=true일 때 Local File Header 스캔으로 복구합니다."""
+    return _OPS.repair_hwpx(
+        source=resolve_path(source_filename),
+        output=resolve_path(output_filename),
+        recover=recover,
+        overwrite=overwrite,
+        max_entry_size=max_entry_size,
+        max_total_size=max_total_size,
+        max_source_size=max_source_size,
+    )
+
+
+@mcp.tool()
 def analyze_form_fill(
     source_filename: str,
     input_json: dict = None,

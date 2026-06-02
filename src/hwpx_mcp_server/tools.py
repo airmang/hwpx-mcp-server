@@ -111,6 +111,26 @@ class PackageTextOutput(_BaseModel):
     text: str
 
 
+class RepairHwpxInput(_BaseModel):
+    source: str
+    output: str
+    recover: bool = False
+    overwrite: bool = False
+    max_entry_size: int = Field(64 * 1024 * 1024, alias="maxEntrySize")
+    max_total_size: int = Field(512 * 1024 * 1024, alias="maxTotalSize")
+    max_source_size: int = Field(512 * 1024 * 1024, alias="maxSourceSize")
+
+
+class RepairHwpxOutput(_BaseModel):
+    outputPath: str
+    entries: List[str]
+    entryCount: int
+    reordered: bool
+    crcOk: bool
+    recovered: bool
+    validatePackage: Dict[str, Any]
+
+
 class ReadTextInput(DocumentLocatorInput):
     offset: int = 0
     limit: Optional[int] = None
@@ -648,7 +668,7 @@ class PackageXmlOutput(_BaseModel):
 class GetToolGuideInput(_BaseModel):
     workflow: Optional[str] = Field(
         None,
-        description="Workflow name (read, edit, template, export, table, style). If omitted, returns the full guide.",
+        description="Workflow name (read, repair, edit, template, export, table, style). If omitted, returns the full guide.",
     )
 
 
@@ -664,6 +684,14 @@ _TOOL_GUIDE: Dict[str, str] = {
         "3. `read_paragraphs` — 특정 문단 인덱스로 상세 읽기\n"
         "4. `text_extract_report` — 전체 텍스트 한번에 추출\n"
         "5. `export_text` / `export_html` / `export_markdown` — 형식별 내보내기\n"
+    ),
+    "repair": (
+        "## HWPX repair/recover 워크플로\n"
+        "1. 한컴에서 열리지 않거나 ZIP 오류가 의심되면 원본을 직접 덮어쓰지 말고 `repair_hwpx`로 새 output을 만든다.\n"
+        "2. 일반 패키지 재정렬/CRC self-check는 `recover=false`를 사용한다.\n"
+        "3. central directory 손상처럼 일반 ZIP open이 실패하면 `recover=true`로 Local File Header 복구를 시도한다.\n"
+        "4. 반환값의 `crcOk == true`, `validatePackage.ok == true`, `reordered/recovered`를 evidence로 기록한다.\n"
+        "5. 결과 파일은 가능하면 Hancom Office HWP 또는 viewer로 실제 열람 확인한다.\n"
     ),
     "edit": (
         "## 문서 편집 워크플로\n"
@@ -802,7 +830,7 @@ def build_tool_definitions() -> List[ToolDefinition]:
         ),
         ToolDefinition(
             name="get_tool_guide",
-            description="Return workflow guidance for HWPX MCP tools. Specify a workflow name (read/edit/template/export/table/style) or omit for the full guide.",
+            description="Return workflow guidance for HWPX MCP tools. Specify a workflow name (read/repair/edit/template/export/table/style) or omit for the full guide.",
             input_model=GetToolGuideInput,
             output_model=GetToolGuideOutput,
             func=_get_tool_guide,
@@ -848,6 +876,14 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=PackageTextInput,
             output_model=PackageTextOutput,
             func=_simple("package_get_text"),
+        ),
+        ToolDefinition(
+            name="repair_hwpx",
+            description="Repair an HWPX archive into a new output path. Use recover=true to rebuild from ZIP Local File Headers when the central directory is damaged.",
+            input_model=RepairHwpxInput,
+            output_model=RepairHwpxOutput,
+            func=_simple("repair_hwpx", require_path=False),
+            category="pipeline",
         ),
         ToolDefinition(
             name="read_text",

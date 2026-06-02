@@ -18,6 +18,7 @@ PHASE1_TOOLS = {
     "find_text",
     "search_and_replace",
     "batch_replace",
+    "repair_hwpx",
 }
 
 TABLE_NAVIGATION_TOOLS = {

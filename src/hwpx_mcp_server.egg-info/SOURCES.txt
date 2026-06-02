@@ -12,6 +12,7 @@ src/hwpx_mcp_server/hwpx_ops.py
 src/hwpx_mcp_server/legacy_server.py
 src/hwpx_mcp_server/logging_conf.py
 src/hwpx_mcp_server/prompts.py
+src/hwpx_mcp_server/quality_generation.py
 src/hwpx_mcp_server/server.py
 src/hwpx_mcp_server/storage.py
 src/hwpx_mcp_server/tools.py
@@ -42,6 +43,7 @@ src/hwpx_mcp_server/utils/helpers.py
 tests/test_advanced.py
 tests/test_content.py
 tests/test_contract.py
+tests/test_document_plan_mcp_e2e.py
 tests/test_file_edit_e2e.py
 tests/test_form_fill_mcp_e2e.py
 tests/test_formatting.py
@@ -53,8 +55,11 @@ tests/test_locator_models.py
 tests/test_mcp_end_to_end.py
 tests/test_pipeline.py
 tests/test_proposal_tools.py
+tests/test_quality_generation_pipeline.py
 tests/test_read_export_tools.py
+tests/test_repair_hwpx_tool.py
 tests/test_save_verification_report.py
 tests/test_search.py
 tests/test_streamable_http_transport.py
+tests/test_template_formfit_mcp_e2e.py
 tests/test_tool_schemas.py

@@ -133,6 +133,15 @@ hwpx-mcp-server
 
 ### 2. MCP 클라이언트 설정
 
+#### HWPX plugin companion launcher
+
+The `hwpx-plugins` repository builds per-host bundles whose MCP launcher
+(`plugins/<host>/hwpx-plugin/scripts/hwpx-mcp-server`) can run this server. In local development,
+set `HWPX_MCP_SERVER_REPO=/absolute/path/to/hwpx-mcp-server` and
+`PYTHON_HWPX_REPO=/absolute/path/to/python-hwpx` when the repositories are not under a common
+parent. The launcher otherwise discovers them by walking up from the bundle directory and uses
+`uv run --project "$HWPX_MCP_SERVER_REPO" --with-editable "$PYTHON_HWPX_REPO" --with-editable "$HWPX_MCP_SERVER_REPO" hwpx-mcp-server`.
+
 <details>
 <summary><b>Claude Desktop</b></summary>
 
@@ -209,7 +218,7 @@ hwpx-mcp-server
 
 ## 작업별 빠른 경로
 
-처음부터 모든 도구를 외울 필요는 없다. 보통은 아래 세 흐름 중 하나로 시작하면 된다.
+처음부터 모든 도구를 외울 필요는 없다. 보통은 아래 네 흐름 중 하나로 시작하면 된다.
 
 ### 1. 읽기 전용으로 문서를 파악할 때
 
@@ -235,6 +244,13 @@ hwpx-mcp-server
 2. `package_parts`, `package_get_xml`, `package_get_text`로 내부 파트를 본다.
 3. `validate_structure`, `lint_text_conventions`, `plan_edit`, `preview_edit`는 기본 편집 흐름과 섞지 않고 점검/검증 단계에서만 사용한다.
 
+### 4. 한컴에서 열리지 않는 HWPX를 복구할 때
+
+1. 원본을 직접 덮어쓰지 않고 `repair_hwpx(source_filename, output_filename)`로 복구 복사본을 만든다.
+2. 일반 ZIP open이 실패하거나 central directory 손상이 의심되면 `recover=true`를 지정한다.
+3. 반환값의 `crcOk`, `validatePackage.ok`, `reordered`, `recovered`를 확인한다.
+4. 최종 handoff 전에는 가능하면 Hancom Office HWP 또는 viewer로 실제 열람한다.
+
 ## 안전한 사용 원칙
 
 이 서버의 공개 표면은 **현재 README에 적힌 MCP 도구 집합**이다. 워크플로 문서나 스킬 예시는 이 도구들을 조합하는 사용 패턴이지, 별도의 새 public tool 계약이 아니다.
@@ -259,14 +275,16 @@ hwpx-mcp-server
 | 구분 | 대표 도구 | 특징 |
 |---|---|---|
 | 파일 기반 읽기 전용 | `get_document_info`, `get_document_text`, `get_paragraph_text`, `get_paragraphs_text`, `find_text`, `get_table_text`, `get_table_map`, `find_cell_by_label`, `list_styles`, `list_available_documents` | 기존 `.hwpx` 파일을 읽거나 탐색만 한다. 저장하지 않는다. |
-| 파일 기반 즉시 저장 편집 | `create_document`, `search_and_replace`, `batch_replace`, `add_heading`, `add_paragraph`, `insert_paragraph`, `delete_paragraph`, `add_table`, `fill_by_path`, `set_table_cell_text`, `add_page_break`, `add_memo`, `remove_memo`, `format_text`, `create_custom_style`, `merge_table_cells`, `split_table_cell`, `format_table` | 호출 결과가 곧 대상 파일 변경이다. 검토용이면 먼저 복사본에서 작업한다. |
+| 파일 기반 즉시 저장 생성/편집 | `create_document`, `create_document_from_plan`, `create_proposal_document`, `search_and_replace`, `batch_replace`, `add_heading`, `add_paragraph`, `insert_paragraph`, `delete_paragraph`, `add_table`, `fill_by_path`, `set_table_cell_text`, `add_page_break`, `add_memo`, `remove_memo`, `format_text`, `create_custom_style`, `merge_table_cells`, `split_table_cell`, `format_table` | 호출 결과가 곧 대상 파일 변경이다. 검토용이면 먼저 복사본에서 작업한다. |
+| 선언형 생성 검증 | `validate_document_plan`, `analyze_document_plan`, `inspect_document_authoring_quality`, `inspect_operating_plan_quality`, `inspect_document_quality`, `analyze_template_formfit` | agent가 만든 `hwpx.document_plan.v1`, P6 baseline, 또는 생성 결과를 검증한다. `validate_document_plan`, `analyze_document_plan`, `analyze_template_formfit`은 파일을 쓰지 않는다. |
+| repair/recover | `repair_hwpx` | 원본을 보존하고 새 output에 mimetype-first repair-repack 또는 Local File Header scan 복구를 수행한다. |
 | 복제 / handoff 경계 | `copy_document` | 원본 보호와 reviewable working copy 분리에 쓴다. 현재 FastMCP surface에는 별도 public `save` / `save_as` tool이 없다. |
 | payload/url 기반 추출 | `hwpx_to_markdown`, `hwpx_to_html`, `hwpx_extract_json` | 파일명을 직접 수정하지 않는다. HWPX payload 또는 URL을 읽어 변환 결과만 돌려준다. |
 | 고급 점검/검증 | `package_parts`, `package_get_xml`, `package_get_text`, `object_find_by_tag`, `object_find_by_attr`, `plan_edit`, `preview_edit`, `apply_edit`, `validate_structure`, `lint_text_conventions` | `HWPX_MCP_ADVANCED=1`일 때만 활성화한다. package/구조 점검용이다. |
 
 ## 주요 기능
 
-기본 모드에서 주요 HWPX 편집 도구를 제공하며, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서는 점검·검증용 도구가 추가로 활성화됩니다.
+기본 모드에서 47개 HWPX 도구를 제공하며, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서는 점검·검증용 도구까지 총 57개가 활성화됩니다.
 
 ### 📖 읽기 및 탐색
 
@@ -299,6 +317,72 @@ hwpx-mcp-server
 | `add_paragraph` / `insert_paragraph` / `delete_paragraph` | 문단 추가, 삽입, 삭제 |
 | `add_page_break` | 페이지 나누기 추가 |
 | `add_memo` / `remove_memo` | 메모 추가, 제거 |
+
+### 🧾 선언형 문서 생성
+
+`hwpx.document_plan.v1`은 agent가 OWPML을 직접 만지지 않고 제목, 문단, bullet, 표, 품질 게이트를 선언하는 생성 계약이다.
+
+| 도구 | 설명 |
+|---|---|
+| `validate_document_plan` | plan을 검증하고 정규화 결과를 반환한다. 파일은 생성하지 않는다. |
+| `analyze_document_plan` | 파일을 쓰지 않고 생성 가능 여부, 정규화 plan, 선택한 품질 프로필의 preview를 반환한다. |
+| `create_document_from_plan` | plan을 HWPX로 생성하고 즉시 저장한 뒤 reopen/package/schema 검증과 품질 프로필 결과를 반환한다. |
+| `inspect_document_authoring_quality` | 생성된 HWPX의 document-plan 품질 근거를 다시 조회한다. `quality_profile="operating_plan"`을 지정할 수 있다. |
+| `inspect_operating_plan_quality` | 운영 계획서 제출 후보의 섹션, 일정표, 사업비 근거, 기대 효과, 마감 문구, placeholder 잔여물을 직접 검사한다. |
+| `analyze_template_formfit` | P6 기준선 기반 양식 보존 생성 계획을 비파괴 분석한다. |
+| `apply_template_formfit` | 분석된 계획을 원본과 다른 destination 복사본에만 적용하고 검증한다. |
+| `create_proposal_document` / `inspect_document_quality` | 제안서/기획안 특화 호환 경로 |
+
+`visual_review_required=true`는 구조/파일 기반 검증은 통과했지만 렌더링된
+시각 레이아웃은 아직 증명되지 않았다는 뜻이다. 운영 계획서와 template-formfit
+결과를 최종 제출 가능(submission-ready) 상태로 주장하려면
+`../hwpx-skill/scripts/visual_review.py` 또는 ComputerUse로 열린 문서를 검토해
+`hwpx.visual-review.v1` 증거를 남기고 `current.status="observed_pass"`여야
+한다. HWPX viewer가 없는 환경에서는 fallback 증거를
+`current.status="blocked"`로 기록하고 잔여 위험을 유지한다.
+
+`validate_document_plan` 결과가 `ok=false`이면 `issues[].code`,
+`issues[].path`, `repairHints[]`를 보고 plan을 수정한 뒤 다시 검증한다.
+이때 `can_create=false`이므로 `create_document_from_plan`을 호출하지 않는다.
+table 오류는 `columns[].key`와 `rows[]` key를 맞추고, style warning은 지원
+token으로 바꾸거나 생략한다. 생성 후 package/schema 오류가 있으면
+`quality.validation.*.issues[]`와 `quality.recovery.repair_hints[]`를 확인해
+재저장 또는 재생성한다.
+
+운영 계획서 작성은 다음 순서를 권장한다.
+
+1. `validate_document_plan(document_plan)`으로 schema와 block/table 오류를 먼저 고친다.
+2. `analyze_document_plan(document_plan, quality_profile="operating_plan")`으로 파일 생성 없이 품질 preview를 확인한다.
+3. `handoff_status="ready"`이면 `create_document_from_plan(filename, document_plan, quality_profile="operating_plan")`으로 명시한 경로에만 생성한다.
+4. `handoff_status="needs_revision"`이면 `quality.gaps[]`와 `quality.profiles.operating_plan.repair_hints[]`를 반영해 plan을 보강한다.
+5. 생성 후 `get_document_text`, `get_table_text`로 결과를 다시 읽는다.
+6. `visual_review_required=true`이면 `visual_review.py` 또는 열린 문서 검토로
+   `hwpx.visual-review.v1` 증거를 생성한다. `current.status="observed_pass"`가
+   아니면 `handoff_status="ready"`를 최종 제출 가능(submission-ready)으로
+   설명하지 않는다.
+
+승인된 HWPX 양식을 보존해야 하는 경우에는 `create_document_from_plan`으로 새
+문서를 만들지 말고 P6 baseline 기반 form-fit 경로를 사용한다.
+
+1. `analyze_template_formfit(source_filename, baseline, content, destination_filename)`으로 원본이 변경되지 않는지와 required anchor 해소 여부를 확인한다.
+2. `unresolved_count > 0`이면 `unresolved[].reason`에 따라 content 또는 baseline locator를 보강한다.
+3. `apply_template_formfit(analysis=..., confirm=true)`로 원본과 다른 destination에만 적용한다.
+4. `source.preserved`, `validation.validate_package.ok`, `validation.validate_document.ok`, `residual_markers.blocking == []`를 확인한다.
+5. `visual_review_required=true`이면 `visual_review.py` 또는 열린 문서 검토로
+   `hwpx.visual-review.v1` 증거를 생성한다. `current.status="observed_pass"`가
+   아니면 `handoff_status="ready"`를 최종 제출 가능(submission-ready)으로
+   설명하지 않는다.
+
+### 🧯 패키지 복구
+
+`repair_hwpx`는 원본을 직접 수정하지 않고 새 output 경로에 복구 복사본을 만든다.
+
+| 도구 | 설명 |
+|---|---|
+| `repair_hwpx` | `recover=false`이면 mimetype 첫 엔트리/ZIP_STORED 재패킹과 CRC self-check를 수행한다. `recover=true`이면 central directory 손상 ZIP을 Local File Header scan으로 복구한 뒤 재패킹한다. |
+
+확인할 응답 필드는 `crcOk`, `validatePackage.ok`, `reordered`, `recovered`, `entryCount`다.
+기계 검증 후에도 제출·납품 전에는 가능하면 Hancom Office HWP 또는 viewer에서 실제 열람한다.
 
 ### 💾 복제
 

@@ -10,9 +10,33 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 
 기존에는 한글 파일을 열어서 일일이 수작업으로 처리해야 했던 일을, 이제 자연어 요청으로 자동화할 수 있습니다.
 
-기본 모드 33개(고급 모드 포함 43개)의 도구로 문서 생성, 검색, 치환, 표 편집, 서식 적용까지 처리할 수 있습니다.
+기본 모드 47개(고급 모드 포함 총 57개)의 도구로 문서 생성,
+선언형 document-plan 생성, 운영 계획서 품질 프로필, 검색, 치환, 표 편집,
+서식 적용, HWPX repair/recover까지 처리할 수 있습니다.
 
-현재 문서화/테스트 기준 upstream 버전 바닥은 `python-hwpx >= 2.6`이며, 최신 로컬 검증 기준은 clean venv에서 확인한 `python-hwpx 2.9.0`입니다 (2026-04-15).
+현재 MCP 표면, document-plan, template-formfit, visual-review handoff
+워크플로의 문서화/테스트 기준 upstream 버전 바닥은
+`python-hwpx >= 2.9.1`입니다.
+
+선언형 document-plan 생성은 `validate_document_plan`으로 먼저 검증합니다.
+`ok=false`이면 `issues[].path`와 `repairHints[]`를 따라 JSON plan을 고친 뒤
+다시 검증하고, `can_create=false` 상태에서는 파일 생성을 진행하지 않습니다.
+생성 전에는 `analyze_document_plan(..., quality_profile="operating_plan")`으로
+파일을 쓰지 않고 품질 preview를 확인할 수 있습니다. 생성 후에는
+`inspect_document_authoring_quality`의 package/schema issue와
+`quality.profiles.operating_plan.gaps[]`, `repair_hints[]`를 확인합니다.
+
+승인된 HWPX 양식을 보존해야 할 때는 P6 baseline 기반
+`analyze_template_formfit` → `apply_template_formfit` 흐름을 사용합니다.
+분석 단계는 원본을 변경하지 않으며, 적용 단계는 원본과 다른 destination에
+복사한 뒤에만 반영합니다. `source.preserved`, package/schema validation,
+`residual_markers.blocking`, `visual_review_required`를 handoff 증거로
+확인합니다.
+
+한컴에서 열리지 않거나 ZIP 오류가 의심되는 HWPX는 원본을 덮어쓰지 않고
+`repair_hwpx`로 새 복구 복사본을 만듭니다. central directory 손상처럼 일반
+ZIP open이 실패하면 `recover=true`를 사용하고, `crcOk`,
+`validatePackage.ok`, `reordered`, `recovered`를 증거로 확인합니다.
 
 ---
 
@@ -173,6 +197,7 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 | **편집** | 문단 추가, 삽입, 삭제, 제목 | 원하는 위치에 내용 추가·제거·이동 |
 | **표** | 생성, 읽기, 셀 수정, 병합, 서식, 라벨 기반 탐색/채우기 | 표 조작과 양식 자동화 전반 |
 | **서식** | 텍스트 서식, 커스텀 스타일 | 굵기, 색상, 크기, 폰트 등 적용 |
+| **복구** | repair/recover | 깨진 HWPX를 원본 보존 복사본으로 재패킹/복구 |
 | **기타** | 페이지 나누기, 스타일 목록, 파일 탐색 | 문서 구성 보조 기능 |
 
 ---
@@ -199,7 +224,7 @@ hwpx-mcp-server
 
 업스트림 버전 참고:
 - `Python >= 3.10`
-- `python-hwpx >= 2.6`
+- `python-hwpx >= 2.9.1`
 
 MCP 설정 예시:
 
@@ -272,3 +297,25 @@ Recommended flow:
 4. Revise `proposal_spec` if average rubric score is below 4.0, `sample_match.pass` is false, or a required section is missing.
 
 This path intentionally benchmarks DOCX-style document principles without implementing a DOCX converter, GUI, model tuning, renderer, or pixel-diff gate. `visual_review_required=True` means rendered parity is not claimed.
+
+### Visual review handoff evidence
+
+For operating-plan and template-formfit handoff, file-only quality gates are not
+enough for a submission-ready visual claim when `visual_review_required=True`.
+Record `hwpx.visual-review.v1` evidence after opening or rendering the output.
+
+Observed pass:
+
+```bash
+python3 ../hwpx-skill/scripts/visual_review.py work/output.hwpx --evidence work/output.visual-review.json --viewer auto --status observed_pass --screenshot work/output-page1.png --observation "Front matter, section headings, schedule table, and budget table are visible."
+```
+
+Viewer-missing blocked fallback:
+
+```bash
+python3 ../hwpx-skill/scripts/visual_review.py work/output.hwpx --evidence work/output.visual-review.json --viewer none --status blocked --notes "No HWPX viewer is available on this machine."
+```
+
+`observed_pass` with `--screenshot` evidence is the only status that permits a submission-ready visual claim.
+`needs_review` and `blocked` preserve residual risk and should not be described
+as final visual clearance.
