@@ -98,10 +98,10 @@ hwpx-mcp-server
 요구 사항:
 
 - `Python >= 3.10`
-- `python-hwpx >= 2.6`
+- `python-hwpx >= 2.10.0`
 
-현재 저장소 기준 검증 버전은 `python-hwpx 2.9.0`입니다 (2026-04-15 검증).
-최소 지원 버전은 `python-hwpx >= 2.6`입니다.
+현재 저장소 기준 검증 버전은 `python-hwpx 2.10.0`입니다 (2026-06-02 검증).
+최소 지원 버전은 `python-hwpx >= 2.10.0`입니다.
 
 ### 2. MCP 클라이언트 설정
 

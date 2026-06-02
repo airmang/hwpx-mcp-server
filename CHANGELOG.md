@@ -1,8 +1,14 @@
 # Changelog
 
 ## [Unreleased]
+
+## [2.3.0] - 2026-06-02
 ### Added
 - Add stack smoke-test workflow and benchmark follow-up docs under `python-hwpx/shared/hwpx` so the shared HWPX stack baseline lives with the upstream engine repo.
+
+### Changed
+- Require `python-hwpx >= 2.10.0` so `uvx hwpx-mcp-server` and plugin fallback launchers resolve the S-013 builder core, authoring-quality, validation-severity, and template/form-fill surface shipped by the upstream engine.
+- Refresh README requirements to the `python-hwpx 2.10.0` public stack baseline.
 
 ## [2.2.6] - 2026-04-27
 ### Changed

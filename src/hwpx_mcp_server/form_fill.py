@@ -19,6 +19,7 @@ from typing import Any
 from xml.etree import ElementTree as ET
 
 from hwpx.tools.package_validator import validate_package
+from hwpx.tools.repair import repair_repack
 
 from .core.content import get_table_data, get_table_map_in_doc, set_cell_text
 from .core.document import open_doc, save_doc
@@ -188,6 +189,7 @@ def apply_form_fill_workflow(
             )
 
     save_doc(doc, str(destination))
+    repair_result = _repair_repack_destination(destination)
     reread_doc = open_doc(str(destination))
     touched = _reread_touched(reread_doc, applied)
     validation = _runtime_validation(str(destination))
@@ -213,6 +215,7 @@ def apply_form_fill_workflow(
             "sha256_after_apply": output_hash,
             "changed": copied_hash != output_hash,
         },
+        "repair": repair_result,
         "lineage_id": _lineage_id(source_before_hash, str(destination)),
         "applied": applied,
         "unresolved": [],
@@ -590,6 +593,20 @@ def _runtime_validation(path: str) -> dict[str, Any]:
         "validate_package": _package_report(package_report),
         "validate_document": _document_report(document_report),
     }
+
+
+def _repair_repack_destination(destination: Path) -> dict[str, Any]:
+    repaired = destination.with_name(f".{destination.name}.repair.hwpx")
+    try:
+        result = repair_repack(destination, repaired, overwrite=True)
+        shutil.move(str(repaired), str(destination))
+        return {
+            "reordered": result.reordered,
+            "crc_ok": result.crc_ok,
+            "output_path": str(destination),
+        }
+    finally:
+        repaired.unlink(missing_ok=True)
 
 
 def _package_report(report: Any) -> dict[str, Any]:

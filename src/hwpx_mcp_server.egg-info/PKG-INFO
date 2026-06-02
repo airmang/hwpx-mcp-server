@@ -1,37 +1,21 @@
 Metadata-Version: 2.4
 Name: hwpx-mcp-server
-Version: 2.2.5
+Version: 2.3.0
 Summary: MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents.
 Author: Kohkyuhyun
-License: MIT License
-        
-        Copyright (c) 2025 HWPX MCP Server
-        
-        Permission is hereby granted, free of charge, to any person obtaining a copy
-        of this software and associated documentation files (the "Software"), to deal
-        in the Software without restriction, including without limitation the rights
-        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-        copies of the Software, and to permit persons to whom the Software is
-        furnished to do so, subject to the following conditions:
-        
-        The above copyright notice and this permission notice shall be included in all
-        copies or substantial portions of the Software.
-        
-        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-        SOFTWARE.
-        
+License-Expression: Apache-2.0
 Project-URL: Homepage, https://github.com/airmang/hwpx-mcp-server
 Project-URL: Issues, https://github.com/airmang/hwpx-mcp-server/issues
 Keywords: hwpx,hancom,mcp,model-context-protocol,document-automation,ai-agent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: python-hwpx>=2.6
+License-File: NOTICE
+Requires-Dist: python-hwpx>=2.10.0
 Requires-Dist: pydantic>=2.7
 Requires-Dist: anyio>=4.0
 Requires-Dist: mcp>=1.14.1
@@ -53,13 +37,22 @@ Dynamic: license-file
   <p align="center">
     <a href="https://pypi.org/project/hwpx-mcp-server/"><img src="https://img.shields.io/pypi/v/hwpx-mcp-server?style=flat-square&color=blue" alt="PyPI"></a>
     <a href="https://pypi.org/project/hwpx-mcp-server/"><img src="https://img.shields.io/pypi/pyversions/hwpx-mcp-server?style=flat-square" alt="Python"></a>
-    <a href="https://github.com/airmang/hwpx-mcp-server/blob/main/LICENSE"><img src="https://img.shields.io/github/license/airmang/hwpx-mcp-server?style=flat-square" alt="License"></a>
+    <a href="https://github.com/airmang/hwpx-mcp-server/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License"></a>
     <a href="https://github.com/airmang/hwpx-mcp-server/actions"><img src="https://img.shields.io/github/actions/workflow/status/airmang/hwpx-mcp-server/test.yml?style=flat-square&label=tests" alt="Tests"></a>
   </p>
 </p>
 
 ---
 
+## 🧩 HWPX Stack (3종)
+
+| 계층 | 레포 | 역할 |
+|---|---|---|
+| 📦 라이브러리 | [`python-hwpx`](https://github.com/airmang/python-hwpx) | 순수 파이썬 HWPX 파싱·편집·생성 코어 |
+| 🔌 MCP 서버 | **[`hwpx-mcp-server`](https://github.com/airmang/hwpx-mcp-server)** | MCP 클라이언트(Claude Desktop, VS Code 등)에서 HWPX 조작 |
+| 🎯 에이전트 스킬 | [`hwpx-skill`](https://github.com/airmang/hwpx-skill) | 에이전트가 HWPX를 바로 쓰게 해주는 공식 온보딩 스킬 |
+
+---
 **hwpx-mcp-server**는 [모델 컨텍스트 프로토콜(MCP)](https://modelcontextprotocol.io) 표준을 따르는 서버로, [python-hwpx](https://github.com/airmang/python-hwpx) 기반에서 HWPX 문서의 열람 · 검색 · 편집 · 추출을 AI 클라이언트에서 직접 수행할 수 있게 합니다.
 
 > **참고** 이 서버는 Open XML 기반 `.hwpx` 포맷을 지원합니다. 바이너리 `.hwp` 포맷은 직접 편집 대상이 아닙니다.
@@ -73,6 +66,23 @@ Dynamic: license-file
 - **문서 개요, 표 맵, 패키지 구조를 AI가 직접 조회하고 후속 작업으로 연결**
 - **한글 워드프로세서 없이 서버·CI·로컬 개발 환경에서 같은 흐름 유지**
 - **고급 모드에서 검증, package inspection, edit planning까지 확장**
+
+## Claude Desktop 5분 연결
+
+아래 설정 하나만 넣으면 Claude Desktop에서 `hwpx` MCP 서버를 바로 잡는다.
+
+```json
+{
+  "mcpServers": {
+    "hwpx": {
+      "command": "uvx",
+      "args": ["hwpx-mcp-server"]
+    }
+  }
+}
+```
+
+> Screenshot placeholder: Claude Desktop 설정 화면에서 `hwpx` 서버가 활성화된 장면을 여기에 넣을 예정.
 
 ## 왜 필요한가?
 
@@ -116,10 +126,10 @@ hwpx-mcp-server
 요구 사항:
 
 - `Python >= 3.10`
-- `python-hwpx >= 2.6`
+- `python-hwpx >= 2.10.0`
 
-현재 저장소 기준 검증 버전은 `python-hwpx 2.9.0`입니다 (2026-04-15 검증).
-최소 지원 버전은 `python-hwpx >= 2.6`입니다.
+현재 저장소 기준 검증 버전은 `python-hwpx 2.10.0`입니다 (2026-06-02 검증).
+최소 지원 버전은 `python-hwpx >= 2.10.0`입니다.
 
 ### 2. MCP 클라이언트 설정
 
@@ -398,9 +408,8 @@ python -m pytest -q
 
 <br>
 
-## 라이선스
-
-[MIT](LICENSE)
+## License
+Apache License 2.0. See LICENSE and NOTICE.
 
 <br>
 

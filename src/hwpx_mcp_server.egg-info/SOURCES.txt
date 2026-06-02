@@ -1,9 +1,11 @@
 LICENSE
+NOTICE
 README.md
 pyproject.toml
 src/hwpx_mcp_server/__init__.py
 src/hwpx_mcp_server/compat.py
 src/hwpx_mcp_server/errors.py
+src/hwpx_mcp_server/form_fill.py
 src/hwpx_mcp_server/hwp_converter.py
 src/hwpx_mcp_server/hwp_support.py
 src/hwpx_mcp_server/hwpx_ops.py
@@ -41,6 +43,7 @@ tests/test_advanced.py
 tests/test_content.py
 tests/test_contract.py
 tests/test_file_edit_e2e.py
+tests/test_form_fill_mcp_e2e.py
 tests/test_formatting.py
 tests/test_http_storage.py
 tests/test_hwp_converter.py
@@ -49,6 +52,7 @@ tests/test_hwpx_report_regressions.py
 tests/test_locator_models.py
 tests/test_mcp_end_to_end.py
 tests/test_pipeline.py
+tests/test_proposal_tools.py
 tests/test_read_export_tools.py
 tests/test_save_verification_report.py
 tests/test_search.py
