@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-06-04
+### Fixed
+- Prevent Hancom glyph overlap after replacing text in existing HWPX paragraphs by collapsing cross-run replacements into the first run instead of redistributing text across stale run boundaries.
+- Clear stale `lineSegArray` layout caches in XML fallback table-cell replacement paths so Hancom recalculates line layout after edits.
+
 ## [2.3.0] - 2026-06-02
 ### Added
 - Add stack smoke-test workflow and benchmark follow-up docs under `python-hwpx/shared/hwpx` so the shared HWPX stack baseline lives with the upstream engine repo.

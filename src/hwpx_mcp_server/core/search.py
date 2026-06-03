@@ -7,44 +7,6 @@ from xml.etree import ElementTree as ET
 _HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 
-def _distribute_lengths(total: int, weights: list[int]) -> list[int]:
-    if not weights:
-        return []
-    if total <= 0:
-        return [0 for _ in weights]
-
-    weight_sum = sum(weights)
-    if weight_sum <= 0:
-        base = total // len(weights)
-        remainder = total - (base * len(weights))
-        shares = [base] * len(weights)
-        for index in range(remainder):
-            shares[index] += 1
-        return shares
-
-    shares: list[int] = []
-    remainder = total
-    residuals: list[tuple[int, int]] = []
-    for index, weight in enumerate(weights):
-        raw = total * weight
-        share = raw // weight_sum
-        shares.append(share)
-        remainder -= share
-        residuals.append((raw % weight_sum, index))
-
-    residuals.sort(key=lambda item: (-item[0], item[1]))
-    cursor = 0
-    while remainder > 0 and residuals:
-        _, target = residuals[cursor]
-        shares[target] += 1
-        remainder -= 1
-        cursor = (cursor + 1) % len(residuals)
-
-    if remainder > 0:
-        shares[-1] += remainder
-    return shares
-
-
 def _replace_within_runs(runs: list[Any], find_text: str, replace_text: str) -> int:
     replaced_total = 0
     for run in runs:
@@ -89,9 +51,21 @@ def _xml_run_text(run_element: Any) -> str:
 def _set_xml_run_text(run_element: Any, value: str) -> None:
     text_nodes = list(run_element.findall(f"{_HP_NS}t"))
     primary = text_nodes[0] if text_nodes else _append_xml_text_node(run_element)
+    for child in list(primary):
+        primary.remove(child)
     primary.text = value
     for node in text_nodes[1:]:
+        for child in list(node):
+            node.remove(child)
         node.text = ""
+
+
+def _clear_xml_paragraph_layout_cache(paragraph_element: Any) -> None:
+    for child in list(paragraph_element):
+        tag = getattr(child, "tag", "")
+        local_name = tag.rsplit("}", 1)[-1] if "}" in tag else tag
+        if local_name.lower() == "linesegarray":
+            paragraph_element.remove(child)
 
 
 def _replace_across_runs(runs: list[Any], find_text: str, replace_text: str) -> int:
@@ -105,13 +79,9 @@ def _replace_across_runs(runs: list[Any], find_text: str, replace_text: str) -> 
 
     replaced_count = merged.count(find_text)
     new_merged = merged.replace(find_text, replace_text)
-    weights = [len(text) for text in texts]
-    redistributed = _distribute_lengths(len(new_merged), weights)
-
-    cursor = 0
-    for run, size in zip(runs, redistributed):
-        run.text = new_merged[cursor : cursor + size]
-        cursor += size
+    runs[0].text = new_merged
+    for run in runs[1:]:
+        run.text = ""
 
     return replaced_count
 
@@ -150,13 +120,9 @@ def _replace_across_xml_runs(run_elements: list[Any], find_text: str, replace_te
 
     replaced_count = merged.count(find_text)
     new_merged = merged.replace(find_text, replace_text)
-    weights = [len(text) for text in texts]
-    redistributed = _distribute_lengths(len(new_merged), weights)
-
-    cursor = 0
-    for run_element, size in zip(run_elements, redistributed):
-        _set_xml_run_text(run_element, new_merged[cursor : cursor + size])
-        cursor += size
+    _set_xml_run_text(run_elements[0], new_merged)
+    for run_element in run_elements[1:]:
+        _set_xml_run_text(run_element, "")
 
     return replaced_count
 
@@ -245,7 +211,10 @@ def replace_in_doc(doc: Any, find_text: str, replace_text: str) -> int:
                                 run_elements = list(cell_para_element.findall(f"{_HP_NS}run"))
                                 if not run_elements:
                                     continue
-                                xml_replaced += _replace_in_xml_runs(run_elements, find_text, replace_text)
+                                para_replaced = _replace_in_xml_runs(run_elements, find_text, replace_text)
+                                if para_replaced:
+                                    _clear_xml_paragraph_layout_cache(cell_para_element)
+                                    xml_replaced += para_replaced
                         if xml_replaced:
                             count += xml_replaced
                             section = getattr(para, "section", None)

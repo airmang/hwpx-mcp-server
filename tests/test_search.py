@@ -3,6 +3,7 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
+from hwpx_mcp_server.core.search import _clear_xml_paragraph_layout_cache, _replace_in_xml_runs
 from hwpx_mcp_server.core.document import open_doc, save_doc
 from hwpx_mcp_server.server import (
     batch_replace,
@@ -34,6 +35,14 @@ def _set_split_runs(path: Path, paragraph_index: int, chunks: list[str]) -> None
     for index, chunk in enumerate(chunks):
         paragraph.add_run(chunk, bold=(index == 0), italic=(index == 1))
     save_doc(doc, str(path))
+
+
+def _linesegarray_count(element: ET.Element) -> int:
+    return sum(
+        1
+        for child in element
+        if child.tag.rsplit("}", 1)[-1].lower() == "linesegarray"
+    )
 
 
 def test_search_and_replace_basic(sample_file: Path):
@@ -78,6 +87,10 @@ def test_search_and_replace_in_table(sample_file: Path):
 def test_search_and_replace_cross_run_in_paragraph(sample_file: Path):
     _append_paragraph(sample_file, "")
     _set_split_runs(sample_file, 1, ["20", "26학년도 운영"])
+    doc = open_doc(str(sample_file))
+    paragraph = doc.paragraphs[1]
+    ET.SubElement(paragraph.element, "{http://www.hancom.co.kr/hwpml/2011/paragraph}lineSegArray")
+    save_doc(doc, str(sample_file))
 
     result = search_and_replace(str(sample_file), "2026", "2027")
     find_result = find_text(str(sample_file), "2026")
@@ -88,6 +101,34 @@ def test_search_and_replace_cross_run_in_paragraph(sample_file: Path):
     assert find_result["total_matches"] == 0
     assert paragraph.text.startswith("2027")
     assert len(paragraph.runs) >= 2
+    assert paragraph.runs[0].text == "2027학년도 운영"
+    assert [run.text for run in paragraph.runs[1:]] == [""]
+    assert _linesegarray_count(paragraph.element) == 0
+
+
+def test_xml_cross_run_replacement_collapses_text_and_clears_layout_cache() -> None:
+    hp = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
+    paragraph = ET.Element(f"{hp}p")
+    ET.SubElement(paragraph, f"{hp}lineSegArray")
+    first = ET.SubElement(paragraph, f"{hp}run", {"charPrIDRef": "1"})
+    ET.SubElement(first, f"{hp}t").text = "REQUIRED_DATA_FILES"
+    second = ET.SubElement(paragraph, f"{hp}run", {"charPrIDRef": "2"})
+    ET.SubElement(second, f"{hp}t").text = " = []"
+
+    replaced = _replace_in_xml_runs(
+        [first, second],
+        "REQUIRED_DATA_FILES = []",
+        "REQUIRED_DATA_FILES = ['인천항_물동량.csv', '인천_해양쓰레기.csv']",
+    )
+    if replaced:
+        _clear_xml_paragraph_layout_cache(paragraph)
+
+    assert replaced == 1
+    assert "".join(text for node in first.findall(f"{hp}t") for text in node.itertext()).startswith(
+        "REQUIRED_DATA_FILES = ['인천항_물동량.csv'"
+    )
+    assert "".join(text for node in second.findall(f"{hp}t") for text in node.itertext()) == ""
+    assert _linesegarray_count(paragraph) == 0
 
 
 def test_search_and_replace_cross_run_in_table_cell(sample_file: Path):
