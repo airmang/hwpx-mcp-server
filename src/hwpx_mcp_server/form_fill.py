@@ -34,6 +34,18 @@ _TABLE_DIRECTIONS = {"right", "down"}
 _FORM_FILL_PLANS: dict[str, dict[str, Any]] = {}
 
 
+def _clear_paragraph_layout_cache(paragraph: Any) -> None:
+    element = getattr(paragraph, "element", None)
+    if element is None:
+        return
+    for child in list(element):
+        if child.tag.rsplit("}", 1)[-1].lower() == "linesegarray":
+            element.remove(child)
+    section = getattr(paragraph, "section", None)
+    if section is not None and hasattr(section, "mark_dirty"):
+        section.mark_dirty()
+
+
 def sha256_file(path: str | Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as stream:
@@ -535,6 +547,8 @@ def _replace_placeholder(doc: Any, token: str, value: str) -> list[dict[str, Any
             if token in text:
                 replace_count += text.count(token)
                 run.text = text.replace(token, value)
+        if replace_count:
+            _clear_paragraph_layout_cache(paragraph)
         after_style = _paragraph_style_snapshot(paragraph)
         replacements.append(
             {

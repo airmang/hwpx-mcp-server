@@ -1,9 +1,10 @@
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
 
 import hwpx_mcp_server.server as server_module
-from hwpx_mcp_server.core.document import open_doc
+from hwpx_mcp_server.core.document import open_doc, save_doc
 from hwpx_mcp_server.server import (
     add_heading,
     add_memo,
@@ -26,6 +27,7 @@ from hwpx_mcp_server.server import (
 )
 
 _FORM_ROWS = [["성명:", ""], ["소속", ""], ["합계", "100"]]
+HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 
 def _create_form_document(target: Path) -> None:
@@ -88,6 +90,23 @@ def test_delete_paragraph(tmp_path: Path):
     assert after == before - 1
     texts = [entry["text"] for entry in get_paragraphs_text(str(target))["paragraphs"]]
     assert "삭제 대상" not in texts
+
+
+def test_delete_only_paragraph_clears_layout_cache(tmp_path: Path):
+    target = tmp_path / "test.hwpx"
+    create_document(str(target))
+    doc = open_doc(str(target))
+    paragraph = doc.paragraphs[0]
+    paragraph.runs[0].text = "삭제 대상"
+    ET.SubElement(paragraph.element, f"{HP}lineSegArray")
+    save_doc(doc, str(target))
+
+    result = delete_paragraph(str(target), 0)
+    doc = open_doc(str(target))
+
+    assert result["remaining_paragraphs"] == 1
+    assert doc.paragraphs[0].text == ""
+    assert doc.paragraphs[0].element.find(f"{HP}lineSegArray") is None
 
 
 def test_add_table(tmp_path: Path):

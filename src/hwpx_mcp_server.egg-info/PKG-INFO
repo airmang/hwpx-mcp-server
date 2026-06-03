@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: hwpx-mcp-server
-Version: 2.3.0
+Version: 2.3.2
 Summary: MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents.
 Author: Kohkyuhyun
 License-Expression: Apache-2.0

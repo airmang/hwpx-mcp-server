@@ -29,6 +29,18 @@ def _resolve_style(doc: HwpxDocument, style: str | None) -> str | None:
     return resolve_style_id(doc, style)
 
 
+def _clear_paragraph_layout_cache(paragraph: Any) -> None:
+    element = getattr(paragraph, "element", None)
+    if element is None:
+        return
+    for child in list(element):
+        if child.tag.rsplit("}", 1)[-1].lower() == "linesegarray":
+            element.remove(child)
+    section = getattr(paragraph, "section", None)
+    if section is not None and hasattr(section, "mark_dirty"):
+        section.mark_dirty()
+
+
 # ── 문단 ──────────────────────────────────────────────
 
 def add_heading_to_doc(doc: HwpxDocument, text: str, level: int = 1) -> int:
@@ -84,6 +96,7 @@ def delete_paragraph_from_doc(doc: HwpxDocument, paragraph_index: int) -> int:
         target = paragraphs[paragraph_index]
         for run in target.runs:
             run.text = ""
+        _clear_paragraph_layout_cache(target)
         return total
 
     try:

@@ -4,13 +4,18 @@ import hashlib
 import json
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
 
 import pytest
 
 import hwpx_mcp_server.server as server
+from hwpx_mcp_server.core.document import open_doc, save_doc
 from hwpx.tools.package_validator import validate_package
 from hwpx.tools.validator import validate_document
+
+
+HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 
 def _sha256(path: Path) -> str:
@@ -197,6 +202,9 @@ def test_paragraph_placeholder_fill_preserves_paragraph_style(tmp_path: Path) ->
     destination = tmp_path / "placeholder-filled.hwpx"
     _build_template(source)
     placeholder_index = server.add_paragraph(str(source), "안건: {{agenda_1}}")["paragraph_index"]
+    doc = open_doc(str(source))
+    ET.SubElement(doc.paragraphs[placeholder_index].element, f"{HP}lineSegArray")
+    save_doc(doc, str(source))
     source_hash_before = _sha256(source)
 
     analysis = server.analyze_form_fill(
@@ -225,6 +233,8 @@ def test_paragraph_placeholder_fill_preserves_paragraph_style(tmp_path: Path) ->
     assert result["touched"][0]["kind"] == "placeholder"
     assert result["touched"][0]["paragraph_index"] == placeholder_index
     assert server.get_paragraph_text(str(destination), placeholder_index)["text"] == "안건: AI 활용 수업 설계"
+    filled = open_doc(str(destination))
+    assert filled.paragraphs[placeholder_index].element.find(f"{HP}lineSegArray") is None
 
 
 def test_existing_sample_hwpx_safe_coordinate_fill_smoke(tmp_path: Path) -> None:
