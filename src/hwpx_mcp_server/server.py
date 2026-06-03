@@ -858,6 +858,23 @@ def create_document_from_plan(
     profile: dict = None,
 ) -> dict:
     """선언형 document_plan으로 HWPX를 생성하고 즉시 저장/검증합니다."""
+    return _create_document_from_plan_impl(
+        filename,
+        document_plan,
+        style_preset=style_preset,
+        quality_profile=quality_profile,
+        profile=profile,
+    )
+
+
+def _create_document_from_plan_impl(
+    filename: str,
+    document_plan: dict,
+    *,
+    style_preset: str = "standard_korean_business",
+    quality_profile: str | dict | None = None,
+    profile: dict | None = None,
+) -> dict:
     if (
         build_document_from_plan is None
         or inspect_authoring_document_quality is None
@@ -900,6 +917,22 @@ def create_document_from_plan(
         "next_action": _next_action(report),
         "quality": report,
     }
+
+
+@mcp.tool()
+def create_government_report_document(
+    filename: str,
+    document_plan: dict,
+    profile: dict = None,
+) -> dict:
+    """정부보고서 프리셋으로 document_plan을 생성하고 즉시 저장/검증합니다."""
+    return _create_document_from_plan_impl(
+        filename,
+        document_plan,
+        style_preset="government_report",
+        quality_profile="government_report",
+        profile=profile,
+    )
 
 
 @mcp.tool()
