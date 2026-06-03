@@ -72,7 +72,11 @@ def _comparable_create_payload(payload: dict) -> dict:
 def test_government_report_tool_is_exposed() -> None:
     names = set(server.mcp._tool_manager._tools.keys())
 
-    assert "create_government_report_document" in names
+    assert {
+        "create_government_report_document",
+        "compute_report_value",
+        "parse_government_report_text",
+    }.issubset(names)
 
 
 def test_create_government_report_document_matches_direct_document_plan_call(
@@ -113,3 +117,40 @@ def test_create_government_report_document_returns_repair_hints_for_invalid_plan
     assert result["plan_validation"]["ok"] is False
     assert any(hint["path"] == "blocks[4].rows[0]" for hint in result["plan_validation"]["repairHints"])
     assert not destination.exists()
+
+
+def test_compute_report_value_delegates_to_report_utils() -> None:
+    assert server.compute_report_value("krw_hangul", [123456789]) == {
+        "operation": "krw_hangul",
+        "value": "일억 이천삼백사십오만 육천칠백팔십구원",
+        "warnings": [],
+    }
+    assert server.compute_report_value("commas", [1234567])["value"] == "1,234,567"
+    assert server.compute_report_value("age", ["2000-06-04", {"today": "2026-06-03"}])[
+        "value"
+    ] == 25
+    assert server.compute_report_value("delta", [-2500])["value"] == "△2,500"
+    assert server.compute_report_value("delta_percent", [110, 100])["value"] == "+10.0%"
+    assert server.compute_report_value("ratios", [25, 200])["value"] == 12.5
+    assert server.compute_report_value("date", ["2026. 6. 3."])["value"] == "2026-06-03"
+
+
+def test_compute_report_value_reports_invalid_operation_without_eval() -> None:
+    result = server.compute_report_value("__import__('os').system('echo nope')", [1])
+
+    assert result["operation"].startswith("__import__")
+    assert result["value"] is None
+    assert result["warnings"]
+
+
+def test_parse_government_report_text_returns_validated_document_plan() -> None:
+    result = server.parse_government_report_text(
+        "Ⅰ. 추진 개요\n□ 주요 성과\n○ 세부 과제\n\n구분\t실적\n교원 연수\t128명",
+        title="AI 활용 교육 추진 보고",
+    )
+
+    assert result["document_plan"]["schemaVersion"] == "hwpx.document_plan.v2"
+    assert result["document_plan"]["title"] == "AI 활용 교육 추진 보고"
+    assert result["plan_validation"]["ok"] is True
+    assert result["can_create"] is True
+    assert result["next_tool"] == "create_government_report_document"

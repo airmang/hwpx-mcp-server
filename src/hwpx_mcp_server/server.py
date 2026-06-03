@@ -10,7 +10,7 @@ import html
 import json
 import os
 import re
-from datetime import datetime
+from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -78,6 +78,15 @@ except Exception:  # pragma: no cover - optional dependency compatibility
     inspect_operating_plan_document_quality = None
     normalize_hwpx_document_plan = None
     validate_hwpx_document_plan = None
+
+try:  # python-hwpx >= government-report tools
+    from hwpx.tools import report_utils as hwpx_report_utils
+    from hwpx.tools.report_parser import (
+        parse_government_report_text as parse_hwpx_government_report_text,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    hwpx_report_utils = None
+    parse_hwpx_government_report_text = None
 
 try:  # python-hwpx >= template form-fit feature
     from hwpx import (
@@ -933,6 +942,111 @@ def create_government_report_document(
         quality_profile="government_report",
         profile=profile,
     )
+
+
+def _report_values(values: list | tuple | dict | None) -> tuple[list, dict]:
+    if isinstance(values, dict):
+        args = values.get("args")
+        if args is None:
+            args = values.get("values")
+        if args is None:
+            args = []
+        if not isinstance(args, list | tuple):
+            args = [args]
+        kwargs = {
+            str(key): value
+            for key, value in values.items()
+            if key not in {"args", "values"}
+        }
+        return list(args), kwargs
+    if isinstance(values, list | tuple):
+        args = list(values)
+        if args and isinstance(args[-1], dict):
+            kwargs = dict(args.pop())
+        else:
+            kwargs = {}
+        return args, kwargs
+    if values is None:
+        return [], {}
+    return [values], {}
+
+
+def _optional_int(value: Any, default: int) -> int:
+    if value is None:
+        return default
+    return int(value)
+
+
+@mcp.tool()
+def compute_report_value(operation: str, values: list | dict = None) -> dict:
+    """정부보고서 표/문장에 넣을 계산값을 python-hwpx report_utils로 계산합니다."""
+    if hwpx_report_utils is None:
+        raise RuntimeError("installed python-hwpx does not provide report_utils")
+
+    normalized = str(operation or "").strip().lower().replace("-", "_")
+    args, kwargs = _report_values(values)
+    try:
+        if normalized in {"krw_hangul", "hangul_krw"}:
+            value = hwpx_report_utils.format_krw_hangul(args[0])
+        elif normalized in {"commas", "number_commas"}:
+            value = hwpx_report_utils.format_number_commas(args[0])
+        elif normalized == "age":
+            today_arg = kwargs.get("today")
+            today = date.fromisoformat(today_arg) if today_arg else None
+            value = hwpx_report_utils.calculate_age(args[0], today=today)
+        elif normalized == "delta":
+            value = hwpx_report_utils.format_delta(
+                args[0],
+                negative_prefix=str(kwargs.get("negative_prefix", "△")),
+            )
+        elif normalized == "delta_percent":
+            value = hwpx_report_utils.format_delta_percent(
+                args[0],
+                args[1],
+                digits=_optional_int(kwargs.get("digits"), 1),
+            )
+        elif normalized in {"ratio", "ratios"}:
+            value = hwpx_report_utils.calculate_ratios(
+                args[0],
+                args[1],
+                digits=_optional_int(kwargs.get("digits"), 1),
+            )
+        elif normalized in {"date", "normalize_date", "korean_date"}:
+            value = hwpx_report_utils.normalize_korean_date(args[0])
+        else:
+            return {
+                "operation": operation,
+                "value": None,
+                "warnings": [f"unsupported report value operation: {operation}"],
+            }
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        return {"operation": operation, "value": None, "warnings": [str(exc)]}
+
+    return {"operation": normalized, "value": value, "warnings": []}
+
+
+@mcp.tool()
+def parse_government_report_text(text: str, title: str = "") -> dict:
+    """붙여넣은 정부보고서 텍스트를 document_plan으로 파싱하고 검증합니다."""
+    if parse_hwpx_government_report_text is None or validate_hwpx_document_plan is None:
+        raise RuntimeError("installed python-hwpx does not provide government-report parsing")
+
+    document_plan = parse_hwpx_government_report_text(text or "", title=title or "")
+    validation = validate_hwpx_document_plan(document_plan)
+    result = {
+        "document_plan": document_plan,
+        "plan_validation": validation.to_dict(),
+        "can_create": bool(validation.ok),
+    }
+    if validation.ok:
+        result["next_tool"] = "create_government_report_document"
+        result["next_action"] = (
+            "review document_plan, then call create_government_report_document"
+        )
+    else:
+        result["next_tool"] = "parse_government_report_text"
+        result["next_action"] = "repair source text or document_plan using plan_validation"
+    return result
 
 
 @mcp.tool()
