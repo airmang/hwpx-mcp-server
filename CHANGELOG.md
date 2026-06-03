@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-06-04
+### Fixed
+- Clear stale `lineSegArray` layout caches when placeholder form-fill inserts text into an existing paragraph.
+- Clear layout caches when the single remaining paragraph is emptied by `delete_paragraph`, so Hancom recalculates rendered text instead of reusing stale line layout.
+
 ## [2.3.1] - 2026-06-04
 ### Fixed
 - Prevent Hancom glyph overlap after replacing text in existing HWPX paragraphs by collapsing cross-run replacements into the first run instead of redistributing text across stale run boundaries.
