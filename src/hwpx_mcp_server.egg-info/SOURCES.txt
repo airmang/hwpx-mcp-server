@@ -47,6 +47,7 @@ tests/test_document_plan_mcp_e2e.py
 tests/test_file_edit_e2e.py
 tests/test_form_fill_mcp_e2e.py
 tests/test_formatting.py
+tests/test_government_report_tools.py
 tests/test_http_storage.py
 tests/test_hwp_converter.py
 tests/test_hwpx_ops.py

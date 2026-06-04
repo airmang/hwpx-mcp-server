@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2.3.3] - 2026-06-04
+### Added
+- Expose document-plan validation, analysis, creation, authoring-quality, operating-plan quality, template form-fit, proposal quality, and repair workflows through MCP.
+- Add `create_government_report_document`, `compute_report_value`, and `parse_government_report_text` MCP tools backed by `python-hwpx` government-report/report utility APIs.
+
+### Changed
+- Require `python-hwpx >= 2.10.1` so installed MCP servers have document-plan v2, government-report preset, report calculators/parser, table cleanup, and id-integrity support.
+
 ## [2.3.2] - 2026-06-04
 ### Fixed
 - Clear stale `lineSegArray` layout caches when placeholder form-fill inserts text into an existing paragraph.

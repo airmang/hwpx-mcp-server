@@ -1,4 +1,4 @@
-python-hwpx>=2.10.0
+python-hwpx>=2.10.1
 pydantic>=2.7
 anyio>=4.0
 mcp>=1.14.1

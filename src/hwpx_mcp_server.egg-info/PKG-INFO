@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: hwpx-mcp-server
-Version: 2.3.2
+Version: 2.3.3
 Summary: MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents.
 Author: Kohkyuhyun
 License-Expression: Apache-2.0
@@ -15,7 +15,7 @@ Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
 License-File: NOTICE
-Requires-Dist: python-hwpx>=2.10.0
+Requires-Dist: python-hwpx>=2.10.1
 Requires-Dist: pydantic>=2.7
 Requires-Dist: anyio>=4.0
 Requires-Dist: mcp>=1.14.1
@@ -126,10 +126,10 @@ hwpx-mcp-server
 요구 사항:
 
 - `Python >= 3.10`
-- `python-hwpx >= 2.10.0`
+- `python-hwpx >= 2.10.1`
 
-현재 저장소 기준 검증 버전은 `python-hwpx 2.10.0`입니다 (2026-06-02 검증).
-최소 지원 버전은 `python-hwpx >= 2.10.0`입니다.
+현재 저장소 기준 검증 버전은 `python-hwpx 2.10.1`입니다 (2026-06-04 검증).
+최소 지원 버전은 `python-hwpx >= 2.10.1`입니다.
 
 ### 2. MCP 클라이언트 설정
 
