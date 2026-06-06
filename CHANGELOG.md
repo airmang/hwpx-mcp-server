@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [2.3.4] - 2026-06-06
+### Added
+- Add a shared paragraph location contract covering body paragraphs and table-cell paragraphs, plus anchors that can be passed between search, lookup, memo, and edit tools.
+- Add `get_location_text`, `add_memo_by_anchor`, `replace_in_paragraph`, `replace_by_anchor`, and `mcp_server_health`.
+
+### Changed
+- Search now returns reusable `location` and `anchor` values for body and table-cell matches.
+- `set_table_cell_text` supports `preserve_format` and `split_paragraphs`, preserving existing run `charPrIDRef` while replacing text.
+- `get_table_map` separates `caption_text` from `preceding_paragraph_text` and keeps cell paragraph boundaries in previews.
+- Require `python-hwpx >= 2.10.2` for the table location and table-cell formatting behavior.
+
+### Fixed
+- Clarify sandbox path errors so users know to use a relative path under the sandbox root or an absolute path inside that root.
+
 ## [2.3.3] - 2026-06-04
 ### Added
 - Expose document-plan validation, analysis, creation, authoring-quality, operating-plan quality, template form-fit, proposal quality, and repair workflows through MCP.

@@ -30,6 +30,7 @@ src/hwpx_mcp_server/core/diff.py
 src/hwpx_mcp_server/core/document.py
 src/hwpx_mcp_server/core/formatting.py
 src/hwpx_mcp_server/core/handles.py
+src/hwpx_mcp_server/core/locations.py
 src/hwpx_mcp_server/core/locator.py
 src/hwpx_mcp_server/core/plan.py
 src/hwpx_mcp_server/core/resources.py
