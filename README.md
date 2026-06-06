@@ -247,7 +247,7 @@ parent. The launcher otherwise discovers them by walking up from the bundle dire
 | 구분 | 대표 도구 | 특징 |
 |---|---|---|
 | 파일 기반 읽기 전용 | `get_document_info`, `get_document_text`, `get_paragraph_text`, `get_location_text`, `get_paragraphs_text`, `find_text`, `get_table_text`, `get_table_map`, `find_cell_by_label`, `list_styles`, `list_available_documents` | 기존 `.hwpx` 파일을 읽거나 탐색만 한다. 저장하지 않는다. |
-| 파일 기반 즉시 저장 생성/편집 | `create_document`, `create_document_from_plan`, `create_proposal_document`, `search_and_replace`, `batch_replace`, `replace_in_paragraph`, `add_heading`, `add_paragraph`, `insert_paragraph`, `delete_paragraph`, `add_table`, `fill_by_path`, `set_table_cell_text`, `add_page_break`, `add_memo`, `add_memo_by_anchor`, `remove_memo`, `format_text`, `create_custom_style`, `merge_table_cells`, `split_table_cell`, `format_table` | 호출 결과가 곧 대상 파일 변경이다. 검토용이면 먼저 복사본에서 작업한다. |
+| 파일 기반 즉시 저장 생성/편집 | `create_document`, `create_document_from_plan`, `create_proposal_document`, `search_and_replace`, `batch_replace`, `replace_in_paragraph`, `replace_by_anchor`, `add_heading`, `add_paragraph`, `insert_paragraph`, `delete_paragraph`, `add_table`, `fill_by_path`, `set_table_cell_text`, `add_page_break`, `add_memo`, `add_memo_by_anchor`, `remove_memo`, `format_text`, `create_custom_style`, `merge_table_cells`, `split_table_cell`, `format_table` | 호출 결과가 곧 대상 파일 변경이다. 검토용이면 먼저 복사본에서 작업한다. |
 | 선언형 생성 검증 | `validate_document_plan`, `analyze_document_plan`, `inspect_document_authoring_quality`, `inspect_operating_plan_quality`, `inspect_document_quality`, `analyze_template_formfit` | agent가 만든 `hwpx.document_plan.v1`, P6 baseline, 또는 생성 결과를 검증한다. `validate_document_plan`, `analyze_document_plan`, `analyze_template_formfit`은 파일을 쓰지 않는다. |
 | repair/recover | `repair_hwpx` | 원본을 보존하고 새 output에 mimetype-first repair-repack 또는 Local File Header scan 복구를 수행한다. |
 | 복제 / handoff 경계 | `copy_document` | 원본 보호와 reviewable working copy 분리에 쓴다. 현재 FastMCP surface에는 별도 public `save` / `save_as` tool이 없다. |
@@ -256,7 +256,7 @@ parent. The launcher otherwise discovers them by walking up from the bundle dire
 
 ## 주요 기능
 
-기본 모드에서 51개 HWPX 도구를 제공하며, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서는 점검·검증용 도구까지 총 61개가 활성화됩니다.
+기본 모드에서 52개 HWPX 도구를 제공하며, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서는 점검·검증용 도구까지 총 62개가 활성화됩니다.
 
 ### 위치 계약
 
@@ -283,6 +283,7 @@ parent. The launcher otherwise discovers them by walking up from the bundle dire
 | `find_text` | 키워드 검색과 주변 문맥, 재사용 가능한 `location`/`anchor` 반환 |
 | `search_and_replace` | 단일 텍스트 치환 |
 | `replace_in_paragraph` | 본문/표 셀 문단 하나에서 run 서식을 유지하며 부분 치환 |
+| `replace_by_anchor` | `find_text`가 반환한 anchor의 정확한 위치에서 부분 치환 |
 | `batch_replace` | 여러 치환 작업 일괄 실행 |
 
 ### ✏️ 문서 편집

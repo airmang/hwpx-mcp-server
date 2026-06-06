@@ -1657,6 +1657,57 @@ def remove_memo(
     return result
 
 
+def _anchor_position(anchor: dict[str, Any] | str) -> int | None:
+    if isinstance(anchor, dict):
+        value = anchor.get("position")
+        if value is None:
+            return None
+        return int(value)
+    if isinstance(anchor, str) and "@" in anchor:
+        return int(anchor.rsplit("@", 1)[1])
+    return None
+
+
+def _replace_visible_span_in_runs(
+    runs: list[Any],
+    start: int,
+    end: int,
+    replacement: str,
+) -> int:
+    if start < 0 or end < start:
+        raise ValueError("invalid replacement span")
+
+    boundaries: list[tuple[int, int, Any]] = []
+    cursor = 0
+    for run in runs:
+        text = run.text or ""
+        next_cursor = cursor + len(text)
+        boundaries.append((cursor, next_cursor, run))
+        cursor = next_cursor
+
+    affected = [
+        (run_start, run_end, run)
+        for run_start, run_end, run in boundaries
+        if start < run_end and end > run_start
+    ]
+    if not affected:
+        return 0
+
+    first_start, first_end, first_run = affected[0]
+    last_start, last_end, last_run = affected[-1]
+    first_text = first_run.text or ""
+    last_text = last_run.text or ""
+    prefix = first_text[: max(0, start - first_start)]
+    suffix = last_text[max(0, end - last_start) :]
+
+    first_run.text = prefix + replacement + (suffix if first_run is last_run else "")
+    for _, _, run in affected[1:-1]:
+        run.text = ""
+    if last_run is not first_run:
+        last_run.text = suffix
+    return 1
+
+
 @mcp.tool()
 def replace_in_paragraph(
     filename: str,
@@ -1708,6 +1759,42 @@ def replace_in_paragraph(
     if replaced:
         save_doc(doc, path)
     return {"replaced_count": replaced, "location": resolved.location}
+
+
+@mcp.tool()
+def replace_by_anchor(
+    filename: str,
+    anchor: dict[str, Any] | str,
+    old_text: str,
+    new_text: str,
+) -> dict:
+    """find_text가 반환한 anchor 위치에서 run 서식을 유지하며 텍스트를 치환합니다."""
+    if old_text == "":
+        raise ValueError("old_text는 빈 문자열일 수 없습니다.")
+
+    location = location_from_anchor(anchor)
+    position = _anchor_position(anchor)
+    if position is None:
+        return replace_in_paragraph(filename, old_text, new_text, location=location, count=1)
+
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    resolved = resolve_paragraph_reference(doc, location=location)
+    paragraph = resolved.paragraph
+    before = paragraph.text or ""
+    end = position + len(old_text)
+    if before[position:end] != old_text:
+        raise ValueError("anchor position does not match old_text")
+
+    runs = list(getattr(paragraph, "runs", []))
+    if runs:
+        replaced = _replace_visible_span_in_runs(runs, position, end, new_text)
+    else:
+        paragraph.text = before[:position] + new_text + before[end:]
+        replaced = 1
+
+    save_doc(doc, path)
+    return {"replaced_count": replaced, "location": resolved.location, "position": position}
 
 
 @mcp.tool()

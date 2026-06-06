@@ -16,6 +16,7 @@ from hwpx_mcp_server.server import (
     delete_paragraph,
     fill_by_path,
     find_cell_by_label,
+    find_text,
     get_document_outline,
     get_document_text,
     get_paragraph_text,
@@ -25,6 +26,7 @@ from hwpx_mcp_server.server import (
     insert_paragraph,
     list_available_documents,
     remove_memo,
+    replace_by_anchor,
     replace_in_paragraph,
     set_table_cell_text,
 )
@@ -243,6 +245,25 @@ def test_replace_in_paragraph_uses_location_and_preserves_run_char_pr(tmp_path: 
     assert result["location"] == cell_location
     assert refreshed_run.char_pr_id_ref == "31"
     assert refreshed_run.text == "REQUIRED_DATA_FILES = ['인천항_물동량.csv']"
+
+
+def test_replace_by_anchor_targets_exact_match_position(tmp_path: Path):
+    target = tmp_path / "repeated-code.hwpx"
+    create_document(str(target))
+    add_paragraph(str(target), "TOKEN = 1; TOKEN = 2")
+
+    doc = open_doc(str(target))
+    paragraph = doc.paragraphs[1]
+    paragraph.runs[0].char_pr_id_ref = "41"
+    server_module.save_doc(doc, str(target))
+
+    matches = find_text(str(target), "TOKEN")
+    result = replace_by_anchor(str(target), matches["matches"][1]["anchor"], "TOKEN", "VALUE")
+    refreshed = open_doc(str(target))
+
+    assert result["replaced_count"] == 1
+    assert refreshed.paragraphs[1].text == "TOKEN = 1; VALUE = 2"
+    assert refreshed.paragraphs[1].runs[0].char_pr_id_ref == "41"
 
 
 def test_find_cell_by_label_handles_label_normalization(tmp_path: Path):
