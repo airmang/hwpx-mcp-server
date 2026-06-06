@@ -13,6 +13,7 @@ from xml.etree import ElementTree as ET
 from ..compat import patch_python_hwpx
 from ..upstream import HP_NS as _HP_NS, HwpxDocument
 from .formatting import resolve_style_id
+from .locations import resolve_paragraph_reference
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,16 @@ def _iter_tables(doc: HwpxDocument):
     for paragraph in doc.paragraphs:
         for table in getattr(paragraph, "tables", []):
             yield table
+            yield from _iter_nested_tables(table)
+
+
+def _iter_nested_tables(table: Any):
+    for row in getattr(table, "rows", []) or []:
+        for cell in getattr(row, "cells", []) or []:
+            for paragraph in getattr(cell, "paragraphs", []) or []:
+                for nested in getattr(paragraph, "tables", []) or []:
+                    yield nested
+                    yield from _iter_nested_tables(nested)
 
 
 def _resolve_style(doc: HwpxDocument, style: str | None) -> str | None:
@@ -150,7 +161,16 @@ def fill_by_path_in_doc(doc: HwpxDocument, mappings: dict[str, str]) -> dict:
     return doc.fill_by_path(mappings)
 
 
-def set_cell_text(doc: HwpxDocument, table_index: int, row: int, col: int, text: str) -> None:
+def set_cell_text(
+    doc: HwpxDocument,
+    table_index: int,
+    row: int,
+    col: int,
+    text: str,
+    *,
+    preserve_format: bool = True,
+    split_paragraphs: bool = False,
+) -> None:
     """표의 특정 셀 텍스트를 변경한다."""
     tables = list(_iter_tables(doc))
     if table_index < 0 or table_index >= len(tables):
@@ -160,7 +180,16 @@ def set_cell_text(doc: HwpxDocument, table_index: int, row: int, col: int, text:
         raise ValueError(f"유효하지 않은 row: {row}")
     if col < 0 or col >= len(table.rows[row].cells):
         raise ValueError(f"유효하지 않은 col: {col}")
-    table.rows[row].cells[col].text = text or ""
+    try:
+        table.set_cell_text(
+            row,
+            col,
+            text or "",
+            preserve_format=preserve_format,
+            split_paragraphs=split_paragraphs,
+        )
+    except TypeError:
+        table.rows[row].cells[col].text = text or ""
 
 
 def merge_cells_in_table(
@@ -420,14 +449,31 @@ def _memo_anchor_runs(paragraph: Any, memo_ids: set[str]) -> list[Any]:
     return unique_runs
 
 
-def add_memo_to_doc(doc: HwpxDocument, paragraph_index: int, text: str) -> None:
+def get_paragraph_text_from_doc(
+    doc: HwpxDocument,
+    paragraph_index: int | None = None,
+    location: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """본문 문단 또는 표 셀 문단 텍스트를 조회한다."""
+    resolved = resolve_paragraph_reference(doc, paragraph_index=paragraph_index, location=location)
+    return {"location": resolved.location, "text": resolved.paragraph.text or ""}
+
+
+def add_memo_to_doc(
+    doc: HwpxDocument,
+    paragraph_index: int | None,
+    text: str,
+    location: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """문단에 메모를 추가한다."""
     patch_python_hwpx()
-    paragraphs = doc.paragraphs
-    if paragraph_index < 0 or paragraph_index >= len(paragraphs):
-        raise ValueError(f"유효하지 않은 paragraph_index: {paragraph_index}")
-
-    paragraph = paragraphs[paragraph_index]
+    resolved = resolve_paragraph_reference(
+        doc,
+        paragraph_index=paragraph_index,
+        location=location,
+        create=True,
+    )
+    paragraph = resolved.paragraph
     memo_count_before = len(doc.memos)
     try:
         doc.add_memo_with_anchor(text or "", paragraph=paragraph)
@@ -444,15 +490,18 @@ def add_memo_to_doc(doc: HwpxDocument, paragraph_index: int, text: str) -> None:
             current_memos = doc.memos
         logger.warning("메모 추가 중 혼합 XML 타입 충돌 감지, fallback 경로 사용: %s", exc)
         _add_memo_with_anchor_fallback(paragraph, text or "")
+    return {"memo_added": True, "location": resolved.location}
 
 
-def remove_memo_from_doc(doc: HwpxDocument, paragraph_index: int) -> None:
+def remove_memo_from_doc(
+    doc: HwpxDocument,
+    paragraph_index: int | None,
+    location: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """문단의 메모를 제거한다."""
     patch_python_hwpx()
-    paragraphs = doc.paragraphs
-    if paragraph_index < 0 or paragraph_index >= len(paragraphs):
-        raise ValueError(f"유효하지 않은 paragraph_index: {paragraph_index}")
-    paragraph = paragraphs[paragraph_index]
+    resolved = resolve_paragraph_reference(doc, paragraph_index=paragraph_index, location=location)
+    paragraph = resolved.paragraph
 
     memo_ids: set[str] = set()
     for run in paragraph.runs:
@@ -474,6 +523,7 @@ def remove_memo_from_doc(doc: HwpxDocument, paragraph_index: int) -> None:
         removed_anchor = True
     if removed_anchor and paragraph.section is not None:
         paragraph.section.mark_dirty()
+    return {"memo_removed": True, "location": resolved.location}
 
 
 # ── 페이지 ────────────────────────────────────────────

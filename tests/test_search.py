@@ -6,10 +6,12 @@ import pytest
 from hwpx_mcp_server.core.search import _clear_xml_paragraph_layout_cache, _replace_in_xml_runs
 from hwpx_mcp_server.core.document import open_doc, save_doc
 from hwpx_mcp_server.server import (
+    add_memo_by_anchor,
     batch_replace,
     create_document,
     find_text,
     get_document_text,
+    get_paragraph_text,
     search_and_replace,
 )
 
@@ -197,6 +199,33 @@ def test_find_text(sample_file: Path):
     first = result["matches"][0]
     assert "paragraph_index" in first
     assert "context" in first
+    assert first["location"] == {"kind": "body_paragraph", "paragraph_index": first["paragraph_index"]}
+    assert first["anchor"]["location"] == first["location"]
+
+
+def test_find_text_returns_table_cell_location_and_anchor(sample_file: Path):
+    doc = open_doc(str(sample_file))
+    table = doc.add_table(rows=1, cols=1)
+    table.rows[0].cells[0].text = "표 안 코드 TARGET"
+    save_doc(doc, str(sample_file))
+
+    result = find_text(str(sample_file), "TARGET")
+    match = result["matches"][0]
+    memo_result = add_memo_by_anchor(str(sample_file), match["anchor"], "표 셀 메모")
+    text_result = get_paragraph_text(str(sample_file), location=match["location"])
+
+    assert result["total_matches"] == 1
+    assert match["location"] == {
+        "kind": "table_cell_paragraph",
+        "table_index": 0,
+        "row": 0,
+        "col": 0,
+        "cell_paragraph_index": 0,
+    }
+    assert match["anchor"]["anchor_id"] == "table:0:0:0:0@7"
+    assert memo_result["location"] == match["location"]
+    assert text_result["text"] == "표 안 코드 TARGET"
+    assert len(open_doc(str(sample_file)).memos) == 1
 
 
 def test_search_and_replace_rejects_empty_find(sample_file: Path):

@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Any
 from xml.etree import ElementTree as ET
 
+from .locations import iter_paragraph_locations, location_anchor
+
 _HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 
@@ -144,8 +146,9 @@ def find_in_doc(doc: Any, text_to_find: str, match_case: bool = True, max_result
     matches: list[dict] = []
     needle = text_to_find if match_case else text_to_find.lower()
 
-    for index, para in enumerate(doc.paragraphs):
-        haystack_raw = para.text or ""
+    for resolved in iter_paragraph_locations(doc):
+        location = resolved.location
+        haystack_raw = resolved.paragraph.text or ""
         haystack = haystack_raw if match_case else haystack_raw.lower()
         cursor = 0
         while True:
@@ -154,13 +157,20 @@ def find_in_doc(doc: Any, text_to_find: str, match_case: bool = True, max_result
                 break
             context_start = max(0, pos - 20)
             context_end = min(len(haystack_raw), pos + len(text_to_find) + 20)
-            matches.append(
-                {
-                    "paragraph_index": index,
-                    "position": pos,
-                    "context": haystack_raw[context_start:context_end],
-                }
-            )
+            match = {
+                "location": location,
+                "anchor": location_anchor(location, pos),
+                "position": pos,
+                "context": haystack_raw[context_start:context_end],
+            }
+            if location.get("kind") == "body_paragraph":
+                match["paragraph_index"] = location["paragraph_index"]
+            else:
+                match["table_index"] = location["table_index"]
+                match["row"] = location["row"]
+                match["col"] = location["col"]
+                match["cell_paragraph_index"] = location["cell_paragraph_index"]
+            matches.append(match)
             if len(matches) >= max_results:
                 return {"matches": matches, "total_matches": len(matches)}
             cursor = pos + max(1, len(text_to_find))

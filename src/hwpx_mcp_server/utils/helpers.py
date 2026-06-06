@@ -39,7 +39,10 @@ def resolve_path(filename: str) -> str:
         try:
             resolved.relative_to(sandbox_root)
         except ValueError as exc:
-            raise PermissionError(f"path is outside sandbox root '{sandbox_root}': {filename}") from exc
+            raise PermissionError(
+                "path is outside the configured sandbox root. "
+                f"Use a relative path under '{sandbox_root}' or an absolute path inside that root: {filename}"
+            ) from exc
 
     return str(resolved)
 

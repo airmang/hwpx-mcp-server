@@ -19,3 +19,6 @@ async def test_list_tools_contains_v2_core_tools() -> None:
     assert "create_document" in names
     assert "get_document_text" in names
     assert "search_and_replace" in names
+    assert "replace_in_paragraph" in names
+    assert "add_memo_by_anchor" in names
+    assert "mcp_server_health" in names

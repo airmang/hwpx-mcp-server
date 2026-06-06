@@ -11,6 +11,7 @@ import json
 import os
 import re
 from datetime import date, datetime
+from importlib.metadata import PackageNotFoundError, version
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,7 @@ from .core.content import (
     fill_by_path_in_doc,
     find_cell_by_label_in_doc,
     format_table_in_doc,
+    get_paragraph_text_from_doc,
     get_table_map_in_doc,
     get_table_data,
     insert_paragraph_to_doc,
@@ -43,7 +45,8 @@ from .core.content import (
 )
 from .core.document import create_blank, open_doc, save_doc
 from .core.formatting import create_style_in_doc, format_text_range, list_styles_in_doc
-from .core.search import batch_replace_in_doc, find_in_doc, replace_in_doc
+from .core.locations import location_from_anchor, resolve_paragraph_reference
+from .core.search import _replace_in_runs, batch_replace_in_doc, find_in_doc, replace_in_doc
 from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from .hwpx_ops import HwpxOps
 from .quality_generation import (
@@ -198,6 +201,13 @@ _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
 _FIGURE_CAPTION_RE = re.compile(r"^\s*(?:Figure|Fig\.|그림)\s*\d*", re.IGNORECASE)
+
+
+def _package_version(package: str) -> str:
+    try:
+        return version(package)
+    except PackageNotFoundError:
+        return "unknown"
 
 
 def _env_int(name: str, default: int) -> int:
@@ -1368,15 +1378,24 @@ def hwpx_extract_json(
 
 
 @mcp.tool()
-def get_paragraph_text(filename: str, paragraph_index: int) -> dict:
-    """특정 문단 텍스트를 조회합니다."""
+def get_paragraph_text(
+    filename: str,
+    paragraph_index: int | None = None,
+    location: dict[str, Any] | None = None,
+) -> dict:
+    """본문 문단 또는 표 셀 문단 텍스트를 조회합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
-    try:
-        text = doc.paragraphs[paragraph_index].text or ""
-    except IndexError as exc:
-        raise ValueError(f"유효하지 않은 paragraph_index: {paragraph_index}") from exc
-    return {"paragraph_index": paragraph_index, "text": text}
+    result = get_paragraph_text_from_doc(doc, paragraph_index=paragraph_index, location=location)
+    if result["location"].get("kind") == "body_paragraph":
+        result["paragraph_index"] = result["location"]["paragraph_index"]
+    return result
+
+
+@mcp.tool()
+def get_location_text(filename: str, location: dict[str, Any]) -> dict:
+    """get_table_map/find_text가 반환한 location으로 텍스트를 조회합니다."""
+    return get_paragraph_text(filename, location=location)
 
 
 @mcp.tool()
@@ -1512,6 +1531,31 @@ def get_table_map(filename: str) -> dict:
 
 
 @mcp.tool()
+def mcp_server_health() -> dict:
+    """MCP 서버 transport와 timeout/keepalive 점검 정보를 반환합니다."""
+    transport = os.environ.get("HWPX_MCP_TRANSPORT", "stdio")
+    return {
+        "server": "hwpx-mcp-server",
+        "version": _package_version("hwpx-mcp-server"),
+        "transport": transport,
+        "streamable_http_available": callable(getattr(mcp, "streamable_http_app", None)),
+        "fetch_timeout_seconds": _env_float(
+            "HWPX_MCP_FETCH_TIMEOUT_SECONDS",
+            _DEFAULT_FETCH_TIMEOUT_SECONDS,
+        ),
+        "max_chars": default_max_chars(),
+        "disconnect_diagnostics": {
+            "likely_conditions": [
+                "large document extraction exceeding client/tool timeout",
+                "idle stdio client session termination",
+                "remote URL fetch timeout",
+            ],
+            "keepalive_check": "streamable_http_app constructibility is covered by smoke tests; stdio keepalive is client-controlled.",
+        },
+    }
+
+
+@mcp.tool()
 def find_cell_by_label(filename: str, label_text: str, direction: str = "right") -> dict:
     """양식 문서에서 라벨 기준 인접 셀 후보를 조회합니다. direction: right 또는 down."""
     path = resolve_path(filename)
@@ -1532,13 +1576,36 @@ def fill_by_path(filename: str, mappings: dict[str, str]) -> dict:
 
 
 @mcp.tool()
-def set_table_cell_text(filename: str, table_index: int, row: int, col: int, text: str) -> dict:
-    """표의 특정 셀 텍스트를 변경하고 즉시 저장합니다."""
+def set_table_cell_text(
+    filename: str,
+    table_index: int,
+    row: int,
+    col: int,
+    text: str,
+    preserve_format: bool = True,
+    split_paragraphs: bool = False,
+) -> dict:
+    """표 셀 텍스트를 변경하고 즉시 저장합니다. preserve_format은 기존 charPr를 유지합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
-    set_cell_text(doc, table_index, row, col, text)
+    set_cell_text(
+        doc,
+        table_index,
+        row,
+        col,
+        text,
+        preserve_format=preserve_format,
+        split_paragraphs=split_paragraphs,
+    )
     save_doc(doc, path)
-    return {"table_index": table_index, "row": row, "col": col, "text": text}
+    return {
+        "table_index": table_index,
+        "row": row,
+        "col": col,
+        "text": text,
+        "preserve_format": preserve_format,
+        "split_paragraphs": split_paragraphs,
+    }
 
 
 @mcp.tool()
@@ -1552,23 +1619,95 @@ def add_page_break(filename: str) -> dict:
 
 
 @mcp.tool()
-def add_memo(filename: str, paragraph_index: int, text: str) -> dict:
-    """문단에 메모를 추가하고 즉시 저장합니다."""
+def add_memo(
+    filename: str,
+    paragraph_index: int | None = None,
+    text: str = "",
+    location: dict[str, Any] | None = None,
+) -> dict:
+    """본문 문단 또는 표 셀 문단에 메모를 추가하고 즉시 저장합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
-    add_memo_to_doc(doc, paragraph_index, text)
+    result = add_memo_to_doc(doc, paragraph_index, text, location=location)
     save_doc(doc, path)
-    return {"memo_added": True, "paragraph_index": paragraph_index}
+    if result["location"].get("kind") == "body_paragraph":
+        result["paragraph_index"] = result["location"]["paragraph_index"]
+    return result
 
 
 @mcp.tool()
-def remove_memo(filename: str, paragraph_index: int) -> dict:
-    """문단의 메모를 제거하고 즉시 저장합니다."""
+def add_memo_by_anchor(filename: str, anchor: dict[str, Any] | str, text: str) -> dict:
+    """find_text가 반환한 anchor로 메모 위치를 지정해 메모를 추가합니다."""
+    return add_memo(filename, text=text, location=location_from_anchor(anchor))
+
+
+@mcp.tool()
+def remove_memo(
+    filename: str,
+    paragraph_index: int | None = None,
+    location: dict[str, Any] | None = None,
+) -> dict:
+    """본문 문단 또는 표 셀 문단의 메모를 제거하고 즉시 저장합니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
-    remove_memo_from_doc(doc, paragraph_index)
+    result = remove_memo_from_doc(doc, paragraph_index, location=location)
     save_doc(doc, path)
-    return {"memo_removed": True, "paragraph_index": paragraph_index}
+    if result["location"].get("kind") == "body_paragraph":
+        result["paragraph_index"] = result["location"]["paragraph_index"]
+    return result
+
+
+@mcp.tool()
+def replace_in_paragraph(
+    filename: str,
+    old_text: str,
+    new_text: str,
+    paragraph_index: int | None = None,
+    location: dict[str, Any] | None = None,
+    count: int | None = None,
+) -> dict:
+    """본문/표 셀 문단 하나에서 run 서식을 유지하며 부분 텍스트를 치환합니다."""
+    if old_text == "":
+        raise ValueError("old_text는 빈 문자열일 수 없습니다.")
+    if count is not None and count <= 0:
+        return {"replaced_count": 0, "location": location or {"paragraph_index": paragraph_index}}
+
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    resolved = resolve_paragraph_reference(doc, paragraph_index=paragraph_index, location=location)
+    paragraph = resolved.paragraph
+    runs = list(getattr(paragraph, "runs", []))
+
+    if count is None:
+        replaced = _replace_in_runs(runs, old_text, new_text) if runs else 0
+    else:
+        replaced = 0
+        for run in runs:
+            remaining = count - replaced
+            if remaining <= 0:
+                break
+            if not (run.text or ""):
+                continue
+            if hasattr(run, "replace_text"):
+                replaced += int(run.replace_text(old_text, new_text, count=remaining))
+            else:
+                before = run.text or ""
+                after = before.replace(old_text, new_text, remaining)
+                if after != before:
+                    run.text = after
+                    replaced += before.count(old_text) - after.count(old_text)
+
+    if replaced == 0 and not runs:
+        before = paragraph.text or ""
+        limit = -1 if count is None else count
+        after = before.replace(old_text, new_text, limit)
+        if after != before:
+            paragraph.text = after
+            replaced = before.count(old_text) if count is None else min(before.count(old_text), count)
+
+    if replaced:
+        save_doc(doc, path)
+    return {"replaced_count": replaced, "location": resolved.location}
 
 
 @mcp.tool()

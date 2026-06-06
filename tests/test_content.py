@@ -8,6 +8,7 @@ from hwpx_mcp_server.core.document import open_doc, save_doc
 from hwpx_mcp_server.server import (
     add_heading,
     add_memo,
+    add_memo_by_anchor,
     add_page_break,
     add_paragraph,
     add_table,
@@ -17,14 +18,17 @@ from hwpx_mcp_server.server import (
     find_cell_by_label,
     get_document_outline,
     get_document_text,
+    get_paragraph_text,
     get_paragraphs_text,
     get_table_map,
     get_table_text,
     insert_paragraph,
     list_available_documents,
     remove_memo,
+    replace_in_paragraph,
     set_table_cell_text,
 )
+from hwpx_mcp_server.utils.helpers import resolve_path
 
 _FORM_ROWS = [["성명:", ""], ["소속", ""], ["합계", "100"]]
 HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
@@ -130,6 +134,34 @@ def test_set_table_cell_text(tmp_path: Path):
     assert table["data"][0][0] == "변경값"
 
 
+def test_set_table_cell_text_preserves_char_pr_and_can_split_paragraphs(tmp_path: Path):
+    target = tmp_path / "code.hwpx"
+    create_document(str(target))
+    add_table(str(target), 1, 1, [["old code"]])
+
+    doc = open_doc(str(target))
+    cell = doc.paragraphs[1].tables[0].cell(0, 0)
+    paragraph = cell.paragraphs[0]
+    paragraph.runs[0].char_pr_id_ref = "13"
+    paragraph.add_run(" tail", char_pr_id_ref="21")
+    server_module.save_doc(doc, str(target))
+
+    set_table_cell_text(str(target), 0, 0, 0, "new code")
+    refreshed = open_doc(str(target))
+    refreshed_cell = refreshed.paragraphs[1].tables[0].cell(0, 0)
+    refreshed_paragraph = refreshed_cell.paragraphs[0]
+
+    assert refreshed_paragraph.runs[0].char_pr_id_ref == "13"
+    assert refreshed_paragraph.runs[0].text == "new code"
+    assert refreshed_paragraph.runs[1].char_pr_id_ref == "21"
+    assert refreshed_paragraph.runs[1].text == ""
+
+    set_table_cell_text(str(target), 0, 0, 0, "line one\nline two", split_paragraphs=True)
+    split_cell = open_doc(str(target)).paragraphs[1].tables[0].cell(0, 0)
+    assert [paragraph.text for paragraph in split_cell.paragraphs] == ["line one", "line two"]
+    assert [paragraph.runs[0].char_pr_id_ref for paragraph in split_cell.paragraphs] == ["13", "13"]
+
+
 def test_get_table_map_returns_stable_json_shape(tmp_path: Path):
     target = tmp_path / "form.hwpx"
     _create_form_document(target)
@@ -142,17 +174,75 @@ def test_get_table_map_returns_stable_json_shape(tmp_path: Path):
     assert set(entry) == {
         "table_index",
         "paragraph_index",
+        "location",
         "rows",
         "cols",
+        "caption_text",
+        "preceding_paragraph_text",
         "header_text",
         "first_row_preview",
+        "cells",
         "is_empty",
     }
     assert entry["table_index"] == 0
+    assert entry["location"] == {
+        "kind": "body_paragraph",
+        "paragraph_index": entry["paragraph_index"],
+    }
     assert entry["rows"] == 3
     assert entry["cols"] == 2
     assert entry["first_row_preview"] == ["성명:", ""]
+    assert entry["caption_text"] == ""
+    assert entry["preceding_paragraph_text"] == "기본정보"
     assert entry["header_text"] == "기본정보"
+    assert entry["cells"][0]["paragraphs"][0]["location"] == {
+        "kind": "table_cell_paragraph",
+        "table_index": 0,
+        "row": 0,
+        "col": 0,
+        "cell_paragraph_index": 0,
+    }
+
+
+def test_table_map_location_can_drive_text_lookup_and_memo(tmp_path: Path):
+    target = tmp_path / "form.hwpx"
+    _create_form_document(target)
+
+    cell_location = get_table_map(str(target))["tables"][0]["cells"][0]["paragraphs"][0]["location"]
+    text_result = get_paragraph_text(str(target), location=cell_location)
+    memo_result = add_memo(str(target), text="라벨 확인", location=cell_location)
+
+    assert text_result["text"] == "성명:"
+    assert text_result["location"] == cell_location
+    assert memo_result["memo_added"] is True
+    assert memo_result["location"] == cell_location
+    assert len(open_doc(str(target)).memos) == 1
+
+
+def test_replace_in_paragraph_uses_location_and_preserves_run_char_pr(tmp_path: Path):
+    target = tmp_path / "code-cell.hwpx"
+    create_document(str(target))
+    add_table(str(target), 1, 1, [["REQUIRED_DATA_FILES = []"]])
+
+    cell_location = get_table_map(str(target))["tables"][0]["cells"][0]["paragraphs"][0]["location"]
+    doc = open_doc(str(target))
+    run = doc.paragraphs[1].tables[0].cell(0, 0).paragraphs[0].runs[0]
+    run.char_pr_id_ref = "31"
+    server_module.save_doc(doc, str(target))
+
+    result = replace_in_paragraph(
+        str(target),
+        "[]",
+        "['인천항_물동량.csv']",
+        location=cell_location,
+    )
+    refreshed = open_doc(str(target))
+    refreshed_run = refreshed.paragraphs[1].tables[0].cell(0, 0).paragraphs[0].runs[0]
+
+    assert result["replaced_count"] == 1
+    assert result["location"] == cell_location
+    assert refreshed_run.char_pr_id_ref == "31"
+    assert refreshed_run.text == "REQUIRED_DATA_FILES = ['인천항_물동량.csv']"
 
 
 def test_find_cell_by_label_handles_label_normalization(tmp_path: Path):
@@ -175,6 +265,21 @@ def test_find_cell_by_label_rejects_unsupported_direction(tmp_path: Path):
 
     with pytest.raises(ValueError, match="direction must be one of: right, down"):
         find_cell_by_label(str(target), "성명", direction="left")
+
+
+def test_resolve_path_allows_absolute_paths_inside_sandbox_and_guides_outside(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    sandbox = tmp_path / "workspace"
+    sandbox.mkdir()
+    inside = sandbox / "doc.hwpx"
+    outside = tmp_path / "outside.hwpx"
+    monkeypatch.setenv("HWPX_MCP_SANDBOX_ROOT", str(sandbox))
+
+    assert resolve_path(str(inside)) == str(inside)
+    with pytest.raises(PermissionError, match="Use a relative path under"):
+        resolve_path(str(outside))
 
 
 def test_fill_by_path_applies_multiple_mappings_correctly(tmp_path: Path):
