@@ -5,7 +5,7 @@ from __future__ import annotations
 from starlette.applications import Starlette
 import pytest
 
-from hwpx_mcp_server.server import mcp
+from hwpx_mcp_server.server import mcp, mcp_server_health
 
 
 def test_streamable_http_app_is_constructible() -> None:
@@ -23,3 +23,18 @@ async def test_list_tools_contains_v2_core_tools() -> None:
     assert "replace_by_anchor" in names
     assert "add_memo_by_anchor" in names
     assert "mcp_server_health" in names
+
+
+def test_mcp_server_health_reports_disconnect_and_path_diagnostics(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HWPX_MCP_SANDBOX_ROOT", str(tmp_path))
+    health = mcp_server_health()
+
+    assert health["streamable_http_available"] is True
+    assert health["sandbox"]["root"] == str(tmp_path)
+    assert health["sandbox"]["absolute_paths_inside_root_allowed"] is True
+    assert "absolute paths inside" in health["sandbox"]["path_guidance"]
+    assert "large document extraction exceeding client/tool timeout" in health["disconnect_diagnostics"]["likely_conditions"]
+    assert "stdio keepalive is client-controlled" in health["disconnect_diagnostics"]["keepalive_check"]

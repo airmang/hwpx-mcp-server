@@ -1534,6 +1534,7 @@ def get_table_map(filename: str) -> dict:
 def mcp_server_health() -> dict:
     """MCP 서버 transport와 timeout/keepalive 점검 정보를 반환합니다."""
     transport = os.environ.get("HWPX_MCP_TRANSPORT", "stdio")
+    sandbox_root = os.environ.get("HWPX_MCP_SANDBOX_ROOT")
     return {
         "server": "hwpx-mcp-server",
         "version": _package_version("hwpx-mcp-server"),
@@ -1544,6 +1545,15 @@ def mcp_server_health() -> dict:
             _DEFAULT_FETCH_TIMEOUT_SECONDS,
         ),
         "max_chars": default_max_chars(),
+        "sandbox": {
+            "root": sandbox_root,
+            "absolute_paths_inside_root_allowed": bool(sandbox_root),
+            "path_guidance": (
+                "Use relative paths under HWPX_MCP_SANDBOX_ROOT or absolute paths inside that root."
+                if sandbox_root
+                else "No HWPX_MCP_SANDBOX_ROOT is configured; paths resolve from the current working directory."
+            ),
+        },
         "disconnect_diagnostics": {
             "likely_conditions": [
                 "large document extraction exceeding client/tool timeout",
