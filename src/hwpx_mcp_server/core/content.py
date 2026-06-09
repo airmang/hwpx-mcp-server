@@ -5,12 +5,16 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
+import os
 import shutil
+import tempfile
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 from ..compat import patch_python_hwpx
+from ..storage import build_hwpx_open_safety_report
 from ..upstream import HP_NS as _HP_NS, HwpxDocument
 from .formatting import resolve_style_id
 from .locations import resolve_paragraph_reference
@@ -260,8 +264,34 @@ def copy_document_file(source: str, destination: str = None) -> str:
     if destination is None:
         stem, ext = source.rsplit(".", 1) if "." in source else (source, "hwpx")
         destination = f"{stem}_copy.{ext}"
-    shutil.copy2(source, destination)
-    return destination
+    source_path = Path(source)
+    destination_path = Path(destination)
+    if source_path.suffix.lower() != ".hwpx" and destination_path.suffix.lower() != ".hwpx":
+        shutil.copy2(source_path, destination_path)
+        return str(destination_path)
+
+    _require_open_safe_hwpx(source_path, "source")
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_fd, tmp_name = tempfile.mkstemp(
+        suffix=destination_path.suffix or ".hwpx",
+        dir=str(destination_path.parent),
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        os.close(tmp_fd)
+        shutil.copy2(source_path, tmp_path)
+        _require_open_safe_hwpx(tmp_path, "copied")
+        os.replace(tmp_path, destination_path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+    return str(destination_path)
+
+
+def _require_open_safe_hwpx(path: Path, role: str) -> None:
+    report = build_hwpx_open_safety_report(path)
+    if not report["ok"]:
+        raise ValueError(f"{role} HWPX failed open-safety verification: {report['summary']}")
 
 
 # ── 메모 ──────────────────────────────────────────────

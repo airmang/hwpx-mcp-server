@@ -271,6 +271,7 @@ def test_create_document_from_plan_creates_valid_handoff_file(tmp_path: Path) ->
     assert result["quality"]["validation"]["reopened"] is True
     assert result["quality"]["validation"]["validate_package"]["ok"] is True
     assert result["quality"]["validation"]["validate_document"]["ok"] is True
+    assert result["verification"]["openSafety"]["ok"] is True
     assert result["quality"]["visual_review_required"] is True
     assert validate_package(destination).ok
     assert validate_document(destination).ok
@@ -300,6 +301,7 @@ def test_create_document_from_plan_returns_operating_plan_profile_and_handoff_st
     assert result["quality"]["pass"] is True
     assert result["quality"]["profiles"]["operating_plan"]["pass"] is True
     assert result["quality"]["profiles"]["operating_plan"]["score"] >= 4.0
+    assert result["verification"]["openSafety"]["ok"] is True
     assert validate_package(destination).ok
     assert validate_document(destination).ok
 

@@ -10,6 +10,7 @@ from xml.sax.saxutils import escape
 import pytest
 
 import hwpx_mcp_server.server as server
+import hwpx_mcp_server.form_fill as form_fill_module
 from hwpx_mcp_server.core.document import open_doc, save_doc
 from hwpx.tools.package_validator import validate_package
 from hwpx.tools.validator import validate_document
@@ -104,6 +105,8 @@ def test_analyze_form_fill_is_non_mutating_and_apply_preserves_source(tmp_path: 
     assert result["validation"]["validate_structure"]["ok"] is True
     assert result["validation"]["validate_package"]["ok"] is True
     assert result["validation"]["validate_document"]["ok"] is True
+    assert result["validation"]["openSafety"]["ok"] is True
+    assert result["repair"]["openSafety"]["ok"] is True
     assert validate_package(destination).ok
     assert validate_document(destination).ok
     assert _sha256(source) == source_hash_before
@@ -117,6 +120,66 @@ def test_analyze_form_fill_is_non_mutating_and_apply_preserves_source(tmp_path: 
     ]
     assert all(item["style_preserved"] for item in result["applied"])
     assert {item["text"] for item in result["touched"]} >= {"2026-05-05 10:00", "AI실", "김교사, 이교사"}
+
+
+def test_apply_form_fill_preserves_existing_destination_when_validation_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "meeting-template.hwpx"
+    destination = tmp_path / "meeting-filled.hwpx"
+    _build_template(source)
+    _build_template(destination)
+    destination_hash_before = _sha256(destination)
+
+    analysis = server.analyze_form_fill(
+        str(source),
+        input_json=_structured_input(),
+        destination_filename=str(destination),
+    )
+
+    def blocked_validation(path: str) -> dict:
+        return {
+            "validate_structure": {"ok": True},
+            "validate_package": {"ok": True},
+            "validate_document": {"ok": True},
+            "openSafety": {"ok": False, "summary": f"forced failure for {path}"},
+        }
+
+    monkeypatch.setattr(form_fill_module, "_runtime_validation", blocked_validation)
+
+    result = server.apply_form_fill(analysis=analysis, confirm=True)
+
+    assert result["handoff_status"] == "blocked"
+    assert result["persisted"] is False
+    assert _sha256(destination) == destination_hash_before
+    assert not list(tmp_path.glob(f".{destination.stem}.*"))
+
+
+def test_apply_form_fill_preserves_existing_destination_when_save_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "meeting-template.hwpx"
+    destination = tmp_path / "meeting-filled.hwpx"
+    _build_template(source)
+    _build_template(destination)
+    destination_hash_before = _sha256(destination)
+
+    analysis = server.analyze_form_fill(
+        str(source),
+        input_json=_structured_input(),
+        destination_filename=str(destination),
+    )
+
+    def fail_save(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("forced save failure")
+
+    monkeypatch.setattr(form_fill_module, "_save_form_fill_document", fail_save)
+
+    with pytest.raises(RuntimeError, match="forced save failure"):
+        server.apply_form_fill(analysis=analysis, confirm=True)
+
+    assert _sha256(destination) == destination_hash_before
+    assert not list(tmp_path.glob(f".{destination.stem}.*"))
 
 
 def test_duplicate_label_analysis_blocks_apply_until_explicit_coordinate(tmp_path: Path) -> None:
@@ -266,6 +329,8 @@ def test_existing_sample_hwpx_safe_coordinate_fill_smoke(tmp_path: Path) -> None
     assert _sha256(source) == source_hash_before
     assert source.stat().st_mtime_ns == source_mtime_before
     assert result["validation"]["validate_structure"]["ok"] is True
+    assert result["validation"]["openSafety"]["ok"] is True
+    assert result["repair"]["openSafety"]["ok"] is True
     assert validate_package(destination).ok
     assert validate_document(destination).ok
     assert server.get_table_text(str(destination), 0)["data"][0][1] == "샘플 회귀 검증"

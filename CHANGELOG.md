@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [2.3.5] - 2026-06-09
+### Changed
+- Require `python-hwpx >= 2.10.3` so MCP saves inherit the upstream editor-open safety guard for stale `lineSegArray` layout caches.
+
+### Fixed
+- Add an open-safety save gate for local and HTTP storage. Saves are written to a temporary target, checked for blocking package validation failures and reopenability, and only then replace or upload the document.
+- Add open-safety verification evidence to direct generated-document and repair paths, including document-plan, proposal, quality-generation, form-fill, and `repair_hwpx` outputs.
+- Return `verification.openSafety` evidence from stateless `create_document` so blank-document creation has the same handoff signal as other generated outputs.
+- Block `copy_document` from creating a new HWPX from an unsafe source and preserve an existing destination when validation fails.
+- Return `openSafety` evidence from successful `copy_document` calls so copied HWPX handoffs expose the same editor-open signal as generated outputs.
+- Save generated document-plan/proposal and quality-generation outputs to sibling temporary files first, then replace the requested destination only after open-safety verification passes.
+- Return `verification` and `openSafety` evidence from HWP-to-HWPX conversion outputs.
+- Return `verificationReport.openSafety` evidence from `make_blank` and `fill_template` outputs.
+- Return `verificationReport` plus top-level `openSafety` evidence from stateless edit tools such as text replacement, paragraph/table edits, formatting, and memo operations.
+- Block unsafe HTTP downloads from being promoted into the local cache; remote payloads are first written to a temporary file and open-safety checked.
+- Apply form-fill changes to a sibling temporary HWPX and replace the destination only after structure, package, document, and open-safety validation pass.
+- Include `repair.openSafety` in successful `apply_form_fill` responses so the repair/repack step exposes its own editor-open evidence.
+- Fail closed when an older `python-hwpx` installation lacks the editor-open safety classifier or repair helper, instead of importing the MCP server with weak save validation.
+- Fail closed in quality-generation validation when package validation support is unavailable, so generated HWPX cannot be handed off without package/document/open-safety evidence.
+- Preserve the HTTP storage cache when remote upload fails by replacing the cache only after temporary save, open-safety verification, and upload all succeed.
+- Inherit upstream repair/recover cleanup for stale `lineSegArray` layout caches so `repair_hwpx` can fix that editor-open failure class instead of only rejecting it.
+- Inherit upstream save-time normalization for named paragraph `styleIDRef` values so existing malformed documents can be edited and saved with numeric style references.
+- Preserve the previous target when a save fails open-safety verification.
+- Surface the stricter upstream `openSafety.ok` signal, including hard document-validation failures in addition to package and reopen failures.
+
 ## [2.3.4] - 2026-06-06
 ### Added
 - Add a shared paragraph location contract covering body paragraphs and table-cell paragraphs, plus anchors that can be passed between search, lookup, memo, and edit tools.

@@ -1,4 +1,6 @@
+import zipfile
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -13,6 +15,34 @@ from hwpx_mcp_server.server import (
     list_styles,
     merge_table_cells,
 )
+
+_HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
+
+
+def _inject_stale_lineseg(path: Path) -> None:
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with zipfile.ZipFile(path, "r") as source:
+        with zipfile.ZipFile(tmp_path, "w") as target:
+            for info in source.infolist():
+                data = source.read(info.filename)
+                if info.filename == "Contents/section0.xml":
+                    root = ET.fromstring(data)
+                    paragraph = None
+                    for candidate in root.findall(f".//{{{_HP_NS}}}p"):
+                        text_nodes = candidate.findall(f".//{{{_HP_NS}}}t")
+                        has_visible_text = any((node.text or "") for node in text_nodes)
+                        if has_visible_text and all(
+                            child.tag.rsplit("}", 1)[-1].lower() == "run" for child in candidate
+                        ):
+                            paragraph = candidate
+                            break
+                    assert paragraph is not None
+                    lineseg_array = ET.SubElement(paragraph, f"{{{_HP_NS}}}linesegarray")
+                    ET.SubElement(lineseg_array, f"{{{_HP_NS}}}lineseg", {"textpos": "999"})
+                    data = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+                target.writestr(info, data)
+    path.write_bytes(tmp_path.read_bytes())
+    tmp_path.unlink()
 
 
 def test_format_text_persists_run_level_style_changes(tmp_path: Path):
@@ -170,5 +200,21 @@ def test_copy_document(tmp_path: Path):
     copied_path = tmp_path / copied["destination"]
 
     assert copied_path.exists()
+    assert copied["openSafety"]["ok"] is True
     assert open_doc(str(source)) is not None
     assert open_doc(str(copied_path)) is not None
+
+
+def test_copy_document_rejects_unsafe_hwpx_and_preserves_destination(tmp_path: Path):
+    source = tmp_path / "source.hwpx"
+    destination = tmp_path / "destination.hwpx"
+    create_document(str(source))
+    add_paragraph(str(source), "short")
+    create_document(str(destination))
+    destination_before = destination.read_bytes()
+    _inject_stale_lineseg(source)
+
+    with pytest.raises(ValueError, match="open-safety"):
+        copy_document(str(source), str(destination))
+
+    assert destination.read_bytes() == destination_before

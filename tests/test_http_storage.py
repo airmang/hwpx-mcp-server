@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import Dict, List
+import zipfile
+from xml.etree import ElementTree as ET
 
 import pytest
 
 from hwpx.document import HwpxDocument
 
 from hwpx_mcp_server.storage import HttpDocumentStorage, RemoteDocumentClient
+
+_HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 
 
 class FakeClient(RemoteDocumentClient):
@@ -51,6 +56,32 @@ def sample_payload() -> bytes:
     return sample_path.read_bytes()
 
 
+def _payload_with_stale_lineseg(payload: bytes) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(payload), "r") as source:
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as target:
+            for info in source.infolist():
+                data = source.read(info.filename)
+                if info.filename == "Contents/section0.xml":
+                    root = ET.fromstring(data)
+                    paragraph = None
+                    for candidate in root.findall(f".//{{{_HP_NS}}}p"):
+                        text_nodes = candidate.findall(f".//{{{_HP_NS}}}t")
+                        has_visible_text = any((node.text or "") for node in text_nodes)
+                        if has_visible_text and all(
+                            child.tag.rsplit("}", 1)[-1].lower() == "run"
+                            for child in candidate
+                        ):
+                            paragraph = candidate
+                            break
+                    assert paragraph is not None
+                    lineseg_array = ET.SubElement(paragraph, f"{{{_HP_NS}}}linesegarray")
+                    ET.SubElement(lineseg_array, f"{{{_HP_NS}}}lineseg", {"textpos": "999"})
+                    data = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+                target.writestr(info, data)
+    return buffer.getvalue()
+
+
 def test_http_storage_downloads_and_caches_document(sample_payload: bytes) -> None:
     client = FakeClient({"docs/sample.hwpx": sample_payload})
     storage = HttpDocumentStorage(base_url="https://example.com", client=client)
@@ -64,6 +95,17 @@ def test_http_storage_downloads_and_caches_document(sample_payload: bytes) -> No
     cached_path = storage._cache["docs/sample.hwpx"]
     assert cached_path.exists()
     assert cached_path.read_bytes() == sample_payload
+
+
+def test_http_storage_open_rejects_unsafe_download_without_caching(sample_payload: bytes) -> None:
+    client = FakeClient({"remote.hwpx": _payload_with_stale_lineseg(sample_payload)})
+    storage = HttpDocumentStorage(base_url="https://example.com", client=client)
+
+    with pytest.raises(RuntimeError, match="open-safety"):
+        storage.open_document("remote.hwpx")
+
+    assert "remote.hwpx" not in storage._cache
+    assert list(storage._cache_dir.iterdir()) == []
 
 
 def test_http_storage_save_uploads_changes(sample_payload: bytes) -> None:
@@ -99,3 +141,18 @@ def test_http_storage_save_reports_upload_errors(sample_payload: bytes) -> None:
         storage.save_document(document, resolved)
 
     assert "HTTP storage save failed" in str(excinfo.value)
+
+
+def test_http_storage_upload_failure_preserves_cache(sample_payload: bytes) -> None:
+    client = FakeClient({"remote.hwpx": sample_payload}, upload_error=RuntimeError("boom"))
+    storage = HttpDocumentStorage(base_url="https://example.com", client=client)
+    document, resolved = storage.open_document("remote.hwpx")
+    cached_path = storage._cache["remote.hwpx"]
+    cached_before = cached_path.read_bytes()
+    document.add_paragraph("local change that must not replace cache on upload failure")
+
+    with pytest.raises(RuntimeError, match="HTTP storage save failed"):
+        storage.save_document(document, resolved)
+
+    assert cached_path.read_bytes() == cached_before
+    assert list(cached_path.parent.glob(f"*{cached_path.suffix}")) == [cached_path]

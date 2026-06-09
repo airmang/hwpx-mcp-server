@@ -10,21 +10,37 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import re
 import shutil
+import tempfile
 import uuid
 import zipfile
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from hwpx.tools.package_validator import validate_package
-from hwpx.tools.repair import repair_repack
+try:  # python-hwpx >= 2.10.3
+    from hwpx.tools.package_validator import validate_package
+except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+    validate_package = None
+    _PACKAGE_VALIDATOR_IMPORT_ERROR: Exception | None = exc
+else:
+    _PACKAGE_VALIDATOR_IMPORT_ERROR = None
+
+try:  # python-hwpx >= 2.10.3
+    from hwpx.tools.repair import repair_repack
+except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+    repair_repack = None
+    _REPAIR_REPACK_IMPORT_ERROR: Exception | None = exc
+else:
+    _REPAIR_REPACK_IMPORT_ERROR = None
 
 from .core.content import get_table_data, get_table_map_in_doc, set_cell_text
-from .core.document import open_doc, save_doc
+from .core.document import open_doc
 from .core.formatting import list_styles_in_doc
 from .hwpx_ops import HwpxOps
+from .storage import build_hwpx_open_safety_report
 from .upstream import HP_NS, validate_document_path
 from .utils.helpers import resolve_path
 
@@ -163,78 +179,95 @@ def apply_form_fill_workflow(
     destination.parent.mkdir(parents=True, exist_ok=True)
     source_before_hash = sha256_file(source)
     source_before_mtime = source.stat().st_mtime_ns
-    shutil.copy2(source, destination)
-    copied_hash = sha256_file(destination)
+    tmp_fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{destination.stem}.",
+        suffix=destination.suffix or ".hwpx",
+        dir=str(destination.parent),
+    )
+    tmp_destination = Path(tmp_name)
+    os.close(tmp_fd)
+    try:
+        shutil.copy2(source, tmp_destination)
+        copied_hash = sha256_file(tmp_destination)
 
-    doc = open_doc(str(destination))
-    applied: list[dict[str, Any]] = []
-    for mapping in plan.get("mappings", {}).get("resolved", []):
-        if mapping.get("kind") == "cell":
-            table_index = int(mapping["table_index"])
-            row = int(mapping["row"])
-            col = int(mapping["col"])
-            before_style = _cell_style_snapshot(doc, table_index, row, col)
-            before_text = _cell_text(doc, table_index, row, col)
-            set_cell_text(doc, table_index, row, col, str(mapping.get("value", "")))
-            after_style = _cell_style_snapshot(doc, table_index, row, col)
-            applied.append(
-                {
-                    **mapping,
-                    "before_text": before_text,
-                    "after_text": str(mapping.get("value", "")),
-                    "style_before": before_style,
-                    "style_after": after_style,
-                    "style_preserved": before_style == after_style,
-                }
-            )
-        elif mapping.get("kind") == "placeholder":
-            token = str(mapping["token"])
-            value = str(mapping.get("value", ""))
-            replacements = _replace_placeholder(doc, token, value)
-            applied.append(
-                {
-                    **mapping,
-                    "replaced_count": sum(item["replace_count"] for item in replacements),
-                    "replacements": replacements,
-                    "style_preserved": all(item["style_preserved"] for item in replacements),
-                }
-            )
+        doc = open_doc(str(tmp_destination))
+        applied: list[dict[str, Any]] = []
+        for mapping in plan.get("mappings", {}).get("resolved", []):
+            if mapping.get("kind") == "cell":
+                table_index = int(mapping["table_index"])
+                row = int(mapping["row"])
+                col = int(mapping["col"])
+                before_style = _cell_style_snapshot(doc, table_index, row, col)
+                before_text = _cell_text(doc, table_index, row, col)
+                set_cell_text(doc, table_index, row, col, str(mapping.get("value", "")))
+                after_style = _cell_style_snapshot(doc, table_index, row, col)
+                applied.append(
+                    {
+                        **mapping,
+                        "before_text": before_text,
+                        "after_text": str(mapping.get("value", "")),
+                        "style_before": before_style,
+                        "style_after": after_style,
+                        "style_preserved": before_style == after_style,
+                    }
+                )
+            elif mapping.get("kind") == "placeholder":
+                token = str(mapping["token"])
+                value = str(mapping.get("value", ""))
+                replacements = _replace_placeholder(doc, token, value)
+                applied.append(
+                    {
+                        **mapping,
+                        "replaced_count": sum(item["replace_count"] for item in replacements),
+                        "replacements": replacements,
+                        "style_preserved": all(item["style_preserved"] for item in replacements),
+                    }
+                )
 
-    save_doc(doc, str(destination))
-    repair_result = _repair_repack_destination(destination)
-    reread_doc = open_doc(str(destination))
-    touched = _reread_touched(reread_doc, applied)
-    validation = _runtime_validation(str(destination))
-    source_after_hash = sha256_file(source)
-    source_after_mtime = source.stat().st_mtime_ns
-    output_hash = sha256_file(destination)
-    ok = bool(validation["validate_structure"]["ok"] and validation["validate_package"]["ok"] and validation["validate_document"]["ok"])
+        _save_form_fill_document(doc, tmp_destination)
+        repair_result = _repair_repack_destination(tmp_destination)
+        reread_doc = open_doc(str(tmp_destination))
+        touched = _reread_touched(reread_doc, applied)
+        validation = _runtime_validation(str(tmp_destination))
+        source_after_hash = sha256_file(source)
+        source_after_mtime = source.stat().st_mtime_ns
+        output_hash = sha256_file(tmp_destination)
+        ok = bool(
+            validation["validate_structure"]["ok"]
+            and validation["validate_package"]["ok"]
+            and validation["validate_document"]["ok"]
+            and validation["openSafety"]["ok"]
+        )
+        if ok:
+            os.replace(tmp_destination, destination)
 
-    return {
-        "handoff_status": "ready" if ok else "blocked",
-        "plan_id": plan.get("plan_id"),
-        "source": {
-            "path": str(source),
-            "sha256_before": source_before_hash,
-            "sha256_after": source_after_hash,
-            "mtime_ns_before": source_before_mtime,
-            "mtime_ns_after": source_after_mtime,
-            "preserved": source_before_hash == source_after_hash and source_before_mtime == source_after_mtime,
-        },
-        "destination": {
-            "path": str(destination),
-            "sha256_after_copy": copied_hash,
-            "sha256_after_apply": output_hash,
-            "changed": copied_hash != output_hash,
-        },
-        "repair": repair_result,
-        "lineage_id": _lineage_id(source_before_hash, str(destination)),
-        "applied": applied,
-        "unresolved": [],
-        "touched": touched,
-        "validation": validation,
-        "persisted": True,
-    }
+        return {
+            "handoff_status": "ready" if ok else "blocked",
+            "plan_id": plan.get("plan_id"),
+            "source": {
+                "path": str(source),
+                "sha256_before": source_before_hash,
+                "sha256_after": source_after_hash,
+                "mtime_ns_before": source_before_mtime,
+                "mtime_ns_after": source_after_mtime,
+                "preserved": source_before_hash == source_after_hash and source_before_mtime == source_after_mtime,
+            },
+            "destination": {
+                "path": str(destination),
+                "sha256_after_copy": copied_hash,
+                "sha256_after_apply": output_hash,
+                "changed": copied_hash != output_hash,
+            },
+            "repair": repair_result,
+            "lineage_id": _lineage_id(source_before_hash, str(destination)),
+            "applied": applied,
+            "unresolved": [],
+            "touched": touched,
+            "validation": validation,
+            "persisted": ok,
+        }
+    finally:
+        _cleanup_temporary_destination(tmp_destination)
 
 
 def _load_canonical_input(
@@ -600,16 +633,43 @@ def _reread_touched(doc: Any, applied: list[dict[str, Any]]) -> list[dict[str, A
 def _runtime_validation(path: str) -> dict[str, Any]:
     ops = HwpxOps(auto_backup=False)
     structure = ops.validate_structure(path)
-    package_report = validate_package(path)
+    if validate_package is None:
+        package = _dependency_unavailable_report(
+            "python-hwpx>=2.10.3 is required for HWPX package validation",
+            _PACKAGE_VALIDATOR_IMPORT_ERROR,
+        )
+    else:
+        package = _package_report(validate_package(path))
     document_report = validate_document_path(path)
+    open_safety = build_hwpx_open_safety_report(Path(path))
     return {
         "validate_structure": structure,
-        "validate_package": _package_report(package_report),
+        "validate_package": package,
         "validate_document": _document_report(document_report),
+        "openSafety": open_safety,
     }
 
 
+def _save_form_fill_document(doc: Any, destination: Path) -> None:
+    doc.save_to_path(destination)
+
+
+def _cleanup_temporary_destination(destination: Path) -> None:
+    destination.unlink(missing_ok=True)
+    destination.with_suffix(destination.suffix + ".bak").unlink(missing_ok=True)
+
+
 def _repair_repack_destination(destination: Path) -> dict[str, Any]:
+    if repair_repack is None:
+        detail = (
+            str(_REPAIR_REPACK_IMPORT_ERROR)
+            if _REPAIR_REPACK_IMPORT_ERROR is not None
+            else "hwpx.tools.repair.repair_repack is unavailable"
+        )
+        raise RuntimeError(
+            "python-hwpx>=2.10.3 is required for HWPX repair/open-safety handoff: "
+            + detail
+        )
     repaired = destination.with_name(f".{destination.name}.repair.hwpx")
     try:
         result = repair_repack(destination, repaired, overwrite=True)
@@ -618,6 +678,7 @@ def _repair_repack_destination(destination: Path) -> dict[str, Any]:
             "reordered": result.reordered,
             "crc_ok": result.crc_ok,
             "output_path": str(destination),
+            "openSafety": result.open_safety,
         }
     finally:
         repaired.unlink(missing_ok=True)
@@ -628,6 +689,15 @@ def _package_report(report: Any) -> dict[str, Any]:
         "ok": bool(getattr(report, "ok", False)),
         "checked_parts": list(getattr(report, "checked_parts", ())),
         "issues": [_issue_payload(issue) for issue in getattr(report, "issues", ())],
+    }
+
+
+def _dependency_unavailable_report(message: str, error: Exception | None) -> dict[str, Any]:
+    detail = f"{message}: {error}" if error is not None else message
+    return {
+        "ok": False,
+        "checked_parts": [],
+        "issues": [{"part": None, "message": detail, "level": "error"}],
     }
 
 

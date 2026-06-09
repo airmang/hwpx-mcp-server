@@ -20,8 +20,8 @@ Use this checklist before tagging or publishing a release after the scope-pivot 
 - Confirm `README.md` describes the current FastMCP surface, not the legacy inventory.
 - Confirm `docs/use-cases.md` points to workflow docs and does not imply new public tools.
 - Confirm `docs/upstream-audit.md` still reflects:
-  - `python-hwpx >= 2.6`
-  - validated clean-venv runtime
+  - current release floor `python-hwpx >= 2.10.3`
+  - editor-open safety guard coverage in the validated runtime
   - active FastMCP surface counts
 - Confirm `docs/follow-up-roadmap.md` still defers public-tool growth unless the existing surface is proven insufficient.
 - Confirm any mention of legacy `tools.py`, `legacy_server.py`, or `prompts.py` is marked non-authoritative for release-facing docs.
@@ -45,7 +45,31 @@ Use this checklist before tagging or publishing a release after the scope-pivot 
 ## 5. Upstream Compatibility
 
 - Verify the release in a clean environment that does not import a dirty sibling checkout.
+- Build local wheels and install them into a fresh virtualenv before publishing. For the
+  `python-hwpx 2.10.3` / `hwpx-mcp-server 2.3.5` release candidate, the clean-wheel
+  smoke must prove all of the following:
+  - installed package versions are `python-hwpx 2.10.3` and `hwpx-mcp-server 2.3.5`
+  - `HwpxPackage.save(updates=...)` normalizes named paragraph `styleIDRef` values to numeric ids
+  - stale `lineSegArray` package edits are rejected before bytes/path/stream output is promoted
+  - the ThinkFirst regression file is detected as unsafe and `repair_repack()` produces an open-safe output
+  - MCP `create_blank()` returns an `openSafety.ok` result for the generated HWPX
 - Reconfirm the currently validated upstream release line.
+- Before publishing an MCP server build that raises the `python-hwpx` floor, publish
+  that `python-hwpx` version first, then refresh local uv resolution. For the 2.3.5
+  release line this means:
+
+```bash
+python - <<'PY'
+import json, urllib.request
+for name in ("python-hwpx", "hwpx-mcp-server"):
+    with urllib.request.urlopen(f"https://pypi.org/pypi/{name}/json", timeout=20) as response:
+        print(name, json.load(response)["info"]["version"])
+PY
+uv lock
+```
+
+  `uv lock` is expected to fail before `python-hwpx >= 2.10.3` is visible on PyPI;
+  do not treat a local editable checkout as evidence for the published dependency path.
 - Record any remaining version-sensitive internals in release notes if they still depend on upstream private APIs.
 
 ## 6. Regression Checks

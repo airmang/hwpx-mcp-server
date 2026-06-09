@@ -594,6 +594,8 @@ class ConvertHwpToHwpxOutput(_BaseModel):
     tablesConverted: int
     skippedElements: List[str]
     warnings: List[str]
+    verification: Optional[Dict[str, Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
 
 
 class FillTemplateInput(_BaseModel):
@@ -607,6 +609,7 @@ class FillTemplateInput(_BaseModel):
 class FillTemplateOutput(_BaseModel):
     outPath: str
     replacedCount: int
+    verificationReport: Optional[Dict[str, Any]] = None
 
 
 class MakeBlankInput(_BaseModel):
@@ -690,7 +693,7 @@ _TOOL_GUIDE: Dict[str, str] = {
         "1. 한컴에서 열리지 않거나 ZIP 오류가 의심되면 원본을 직접 덮어쓰지 말고 `repair_hwpx`로 새 output을 만든다.\n"
         "2. 일반 패키지 재정렬/CRC self-check는 `recover=false`를 사용한다.\n"
         "3. central directory 손상처럼 일반 ZIP open이 실패하면 `recover=true`로 Local File Header 복구를 시도한다.\n"
-        "4. 반환값의 `crcOk == true`, `validatePackage.ok == true`, `reordered/recovered`를 evidence로 기록한다.\n"
+        "4. 반환값의 `crcOk == true`, `validatePackage.ok == true`, `openSafety.ok == true`, `reordered/recovered`를 evidence로 기록한다.\n"
         "5. 결과 파일은 가능하면 Hancom Office HWP 또는 viewer로 실제 열람 확인한다.\n"
     ),
     "edit": (

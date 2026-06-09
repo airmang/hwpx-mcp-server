@@ -55,6 +55,8 @@ def test_search_and_replace_basic(sample_file: Path):
 
     assert "2026학년도" in text_result["text"]
     assert result["replaced_count"] == 1
+    assert result["openSafety"]["ok"] is True
+    assert result["verificationReport"]["filePath"] == str(sample_file)
 
 
 def test_batch_replace_order(sample_file: Path):
@@ -71,6 +73,8 @@ def test_batch_replace_order(sample_file: Path):
 
     assert "2026. 3. 1. ~ 2027. 2. 28." in text_result["text"]
     assert result["total_replaced"] == 2
+    assert result["openSafety"]["ok"] is True
+    assert result["verificationReport"]["filePath"] == str(sample_file)
 
 
 def test_search_and_replace_in_table(sample_file: Path):
@@ -187,6 +191,8 @@ def test_create_document(tmp_path: Path):
     result = create_document(str(target))
 
     assert result["created"] is True
+    assert result["openSafety"]["ok"] is True
+    assert result["verification"]["openSafety"]["ok"] is True
     assert open_doc(str(target)) is not None
 
 

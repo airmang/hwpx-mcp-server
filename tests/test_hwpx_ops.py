@@ -293,10 +293,20 @@ def test_save_as_creates_new_file(ops_with_sample, tmp_path):
     result = ops.save_as(str(path), str(out))
     assert Path(result["outPath"]).exists()
     assert Path(result["outPath"]) == out
+    assert result["verificationReport"]["openSafety"]["ok"] is True
 
     source_text = ops.read_text(str(path), limit=5)["textChunk"]
     copied_text = ops.read_text(str(out), limit=5)["textChunk"]
     assert copied_text == source_text
+
+
+def test_make_blank_returns_open_safety_verification(tmp_path):
+    ops = HwpxOps(base_directory=tmp_path, auto_backup=False)
+
+    result = ops.make_blank("blank.hwpx")
+
+    assert Path(result["outPath"]).exists()
+    assert result["verificationReport"]["openSafety"]["ok"] is True
 
 
 def test_fill_template_replaces_multiple_tokens_without_modifying_source(ops_with_sample):
@@ -311,6 +321,7 @@ def test_fill_template_replaces_multiple_tokens_without_modifying_source(ops_wit
 
     assert result["replacedCount"] >= 2
     assert Path(result["outPath"]).exists()
+    assert result["verificationReport"]["openSafety"]["ok"] is True
 
     source_text = ops.read_text(str(path), limit=5)["textChunk"]
     filled_text = ops.read_text(str(out), limit=5)["textChunk"]

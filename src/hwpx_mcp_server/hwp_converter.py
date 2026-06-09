@@ -7,7 +7,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Sequence
+from typing import Any, Iterable, List, Sequence
 
 from hwpx.document import HwpxDocument
 
@@ -36,6 +36,8 @@ class ConversionResult:
     tables_converted: int
     skipped_elements: List[str]
     warnings: List[str]
+    verification: dict[str, Any]
+    open_safety: dict[str, Any]
 
 
 def _local_name(tag: str) -> str:
@@ -206,7 +208,7 @@ def convert_hwp_to_hwpx(hwp_path: str, output_path: str) -> ConversionResult:
             for col_index, text in enumerate(row):
                 table.rows[row_index].cells[col_index].text = text
 
-    save_doc(document, str(target))
+    verification = save_doc(document, str(target))
 
     if skipped_elements:
         warnings.append(
@@ -220,4 +222,6 @@ def convert_hwp_to_hwpx(hwp_path: str, output_path: str) -> ConversionResult:
         tables_converted=len(tables),
         skipped_elements=skipped_elements,
         warnings=warnings,
+        verification=verification,
+        open_safety=verification["openSafety"],
     )

@@ -10,6 +10,7 @@ import html
 import json
 import os
 import re
+import tempfile
 from datetime import date, datetime
 from importlib.metadata import PackageNotFoundError, version
 from io import BytesIO
@@ -55,6 +56,7 @@ from .quality_generation import (
     create_quality_document_fallback,
     inspect_quality_fallback,
 )
+from .storage import build_hwpx_open_safety_report, build_hwpx_verification_report
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
@@ -727,8 +729,54 @@ def create_document(filename: str, title: str = None, author: str = None) -> dic
     del title, author
     path = resolve_path(filename)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    create_blank(path)
-    return {"filename": filename, "created": True}
+    verification = create_blank(path)
+    return {
+        "filename": filename,
+        "created": True,
+        "verification": verification,
+        "openSafety": verification["openSafety"],
+    }
+
+
+def _save_generated_document(doc: Any, path: str) -> dict:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{target.stem}.",
+        suffix=target.suffix or ".hwpx",
+        dir=str(target.parent),
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        os.close(fd)
+        doc.save_to_path(tmp_path)
+        verification = build_hwpx_verification_report(tmp_path)
+        if not verification["openSafety"]["ok"]:
+            raise RuntimeError(
+                "generated HWPX failed open-safety verification: "
+                + verification["openSafety"]["summary"]
+            )
+        os.replace(tmp_path, target)
+        verification["filePath"] = str(target)
+        return verification
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+def _save_doc_verification(doc: Any, path: str) -> dict[str, Any]:
+    verification = save_doc(doc, path)
+    if not isinstance(verification, dict):
+        verification = build_hwpx_verification_report(Path(path))
+    verification["filePath"] = str(Path(path))
+    return verification
+
+
+def _with_save_verification(result: dict[str, Any], verification: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(result)
+    payload["verificationReport"] = verification
+    payload.setdefault("openSafety", verification.get("openSafety"))
+    return payload
 
 
 def _quality_profile_argument(
@@ -917,7 +965,7 @@ def _create_document_from_plan_impl(
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     doc = build_document_from_plan(document_plan or {}, preset=style_preset)
     try:
-        doc.save_to_path(path)
+        verification = _save_generated_document(doc, path)
     finally:
         doc.close()
     report = _inspect_authoring_quality(
@@ -935,6 +983,7 @@ def _create_document_from_plan_impl(
         "handoff_status": _handoff_status(report),
         "next_action": _next_action(report),
         "quality": report,
+        "verification": verification,
     }
 
 
@@ -1160,7 +1209,7 @@ def create_proposal_document(
         else create_quality_document_fallback(proposal_spec or {})
     )
     try:
-        doc.save_to_path(path)
+        verification = _save_generated_document(doc, path)
     finally:
         doc.close()
 
@@ -1174,6 +1223,7 @@ def create_proposal_document(
         "created": True,
         "style_preset": style_preset,
         "quality": report,
+        "verification": verification,
     }
 
 
@@ -1444,8 +1494,11 @@ def search_and_replace(filename: str, find_text: str, replace_text: str) -> dict
     path = resolve_path(filename)
     doc = open_doc(path)
     replaced_count = replace_in_doc(doc, find_text=find_text, replace_text=replace_text)
-    save_doc(doc, path)
-    return {"replaced_count": replaced_count, "find_text": find_text, "replace_text": replace_text}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(
+        {"replaced_count": replaced_count, "find_text": find_text, "replace_text": replace_text},
+        verification,
+    )
 
 
 @mcp.tool()
@@ -1454,8 +1507,8 @@ def batch_replace(filename: str, replacements: list[dict[str, str]]) -> dict:
     path = resolve_path(filename)
     doc = open_doc(path)
     result = batch_replace_in_doc(doc, replacements)
-    save_doc(doc, path)
-    return result
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()
@@ -1464,8 +1517,8 @@ def add_heading(filename: str, text: str, level: int = 1) -> dict:
     path = resolve_path(filename)
     doc = open_doc(path)
     idx = add_heading_to_doc(doc, text, level)
-    save_doc(doc, path)
-    return {"paragraph_index": idx}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification({"paragraph_index": idx}, verification)
 
 
 @mcp.tool()
@@ -1474,8 +1527,8 @@ def add_paragraph(filename: str, text: str, style: str | None = None) -> dict:
     path = resolve_path(filename)
     doc = open_doc(path)
     idx = add_paragraph_to_doc(doc, text, style)
-    save_doc(doc, path)
-    return {"paragraph_index": idx}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification({"paragraph_index": idx}, verification)
 
 
 @mcp.tool()
@@ -1484,8 +1537,8 @@ def insert_paragraph(filename: str, paragraph_index: int, text: str, style: str 
     path = resolve_path(filename)
     doc = open_doc(path)
     idx = insert_paragraph_to_doc(doc, paragraph_index, text, style)
-    save_doc(doc, path)
-    return {"inserted_index": idx}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification({"inserted_index": idx}, verification)
 
 
 @mcp.tool()
@@ -1494,8 +1547,11 @@ def delete_paragraph(filename: str, paragraph_index: int) -> dict:
     path = resolve_path(filename)
     doc = open_doc(path)
     remaining = delete_paragraph_from_doc(doc, paragraph_index)
-    save_doc(doc, path)
-    return {"deleted_index": paragraph_index, "remaining_paragraphs": remaining}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(
+        {"deleted_index": paragraph_index, "remaining_paragraphs": remaining},
+        verification,
+    )
 
 
 @mcp.tool()
@@ -1504,8 +1560,8 @@ def add_table(filename: str, rows: int, cols: int, data: list[list[str]] = None)
     path = resolve_path(filename)
     doc = open_doc(path)
     idx = add_table_to_doc(doc, rows, cols, data)
-    save_doc(doc, path)
-    return {"table_index": idx}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification({"table_index": idx}, verification)
 
 
 @mcp.tool()
@@ -1581,7 +1637,8 @@ def fill_by_path(filename: str, mappings: dict[str, str]) -> dict:
     doc = open_doc(path)
     result = fill_by_path_in_doc(doc, _normalize_fill_mappings(mappings))
     if result.get("applied_count", 0) > 0:
-        save_doc(doc, path)
+        verification = _save_doc_verification(doc, path)
+        return _with_save_verification(result, verification)
     return result
 
 
@@ -1607,15 +1664,18 @@ def set_table_cell_text(
         preserve_format=preserve_format,
         split_paragraphs=split_paragraphs,
     )
-    save_doc(doc, path)
-    return {
-        "table_index": table_index,
-        "row": row,
-        "col": col,
-        "text": text,
-        "preserve_format": preserve_format,
-        "split_paragraphs": split_paragraphs,
-    }
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(
+        {
+            "table_index": table_index,
+            "row": row,
+            "col": col,
+            "text": text,
+            "preserve_format": preserve_format,
+            "split_paragraphs": split_paragraphs,
+        },
+        verification,
+    )
 
 
 @mcp.tool()
@@ -1624,8 +1684,8 @@ def add_page_break(filename: str) -> dict:
     path = resolve_path(filename)
     doc = open_doc(path)
     add_page_break_to_doc(doc)
-    save_doc(doc, path)
-    return {"success": True}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification({"success": True}, verification)
 
 
 @mcp.tool()
@@ -1639,10 +1699,10 @@ def add_memo(
     path = resolve_path(filename)
     doc = open_doc(path)
     result = add_memo_to_doc(doc, paragraph_index, text, location=location)
-    save_doc(doc, path)
+    verification = _save_doc_verification(doc, path)
     if result["location"].get("kind") == "body_paragraph":
         result["paragraph_index"] = result["location"]["paragraph_index"]
-    return result
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()
@@ -1661,10 +1721,10 @@ def remove_memo(
     path = resolve_path(filename)
     doc = open_doc(path)
     result = remove_memo_from_doc(doc, paragraph_index, location=location)
-    save_doc(doc, path)
+    verification = _save_doc_verification(doc, path)
     if result["location"].get("kind") == "body_paragraph":
         result["paragraph_index"] = result["location"]["paragraph_index"]
-    return result
+    return _with_save_verification(result, verification)
 
 
 def _anchor_position(anchor: dict[str, Any] | str) -> int | None:
@@ -1767,7 +1827,11 @@ def replace_in_paragraph(
             replaced = before.count(old_text) if count is None else min(before.count(old_text), count)
 
     if replaced:
-        save_doc(doc, path)
+        verification = _save_doc_verification(doc, path)
+        return _with_save_verification(
+            {"replaced_count": replaced, "location": resolved.location},
+            verification,
+        )
     return {"replaced_count": replaced, "location": resolved.location}
 
 
@@ -1803,8 +1867,11 @@ def replace_by_anchor(
         paragraph.text = before[:position] + new_text + before[end:]
         replaced = 1
 
-    save_doc(doc, path)
-    return {"replaced_count": replaced, "location": resolved.location, "position": position}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(
+        {"replaced_count": replaced, "location": resolved.location, "position": position},
+        verification,
+    )
 
 
 @mcp.tool()
@@ -1855,8 +1922,11 @@ def format_text(
         font_name=font_name,
         color=color,
     )
-    save_doc(doc, path)
-    return {"formatted": True, "paragraph_index": paragraph_index, "range": [start_pos, end_pos]}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(
+        {"formatted": True, "paragraph_index": paragraph_index, "range": [start_pos, end_pos]},
+        verification,
+    )
 
 
 @mcp.tool()
@@ -1881,8 +1951,8 @@ def create_custom_style(
         font_name=font_name,
         color=color,
     )
-    save_doc(doc, path)
-    return result
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()
@@ -1907,8 +1977,11 @@ def merge_table_cells(
     path = resolve_path(filename)
     doc = open_doc(path)
     merge_cells_in_table(doc, table_index, start_row, start_col, end_row, end_col)
-    save_doc(doc, path)
-    return {"merged": True, "range": f"({start_row},{start_col})~({end_row},{end_col})"}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(
+        {"merged": True, "range": f"({start_row},{start_col})~({end_row},{end_col})"},
+        verification,
+    )
 
 
 @mcp.tool()
@@ -1917,8 +1990,8 @@ def split_table_cell(filename: str, table_index: int, row: int, col: int) -> dic
     path = resolve_path(filename)
     doc = open_doc(path)
     span_info = split_cell_in_table(doc, table_index, row, col)
-    save_doc(doc, path)
-    return {"split": True, "original_span": span_info}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification({"split": True, "original_span": span_info}, verification)
 
 
 @mcp.tool()
@@ -1927,8 +2000,8 @@ def format_table(filename: str, table_index: int, has_header_row: bool = None) -
     path = resolve_path(filename)
     doc = open_doc(path)
     format_table_in_doc(doc, table_index, has_header_row=has_header_row)
-    save_doc(doc, path)
-    return {"formatted": True, "table_index": table_index}
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification({"formatted": True, "table_index": table_index}, verification)
 
 
 @mcp.tool()
@@ -1939,7 +2012,12 @@ def copy_document(source_filename: str, destination_filename: str = None) -> dic
     if destination_filename is not None:
         destination = resolve_path(destination_filename)
     dest = copy_document_file(source, destination)
-    return {"source": source_filename, "destination": os.path.basename(dest)}
+    open_safety = build_hwpx_open_safety_report(Path(dest))
+    return {
+        "source": source_filename,
+        "destination": os.path.basename(dest),
+        "openSafety": open_safety,
+    }
 
 
 @mcp.tool()

@@ -4,6 +4,7 @@ Audit date: 2026-03-08
 
 Later validation note:
 - 2026-04-15 local stack validation also passed with `python-hwpx 2.9.0`; see the shared HWPX stack validation report dated 2026-04-15.
+- 2026-06-09 editor-open safety validation requires `python-hwpx >= 2.10.3`; the older `2.6`/`2.9.x` notes below describe the historical audit baseline, not the current release floor.
 
 Inspected upstream sources:
 - Active development runtime during audit: editable checkout from sibling repo `../python-hwpx`

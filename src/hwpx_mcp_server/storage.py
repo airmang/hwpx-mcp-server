@@ -14,7 +14,23 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Protocol, Tuple
 from urllib import error, parse, request
 
-from .upstream import HwpxDocument, open_document
+try:  # python-hwpx >= 2.10.3
+    from hwpx.tools.package_validator import validate_package
+except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+    validate_package = None
+    _PACKAGE_VALIDATOR_IMPORT_ERROR: Exception | None = exc
+else:
+    _PACKAGE_VALIDATOR_IMPORT_ERROR = None
+
+try:  # python-hwpx >= 2.10.3
+    from hwpx.tools.package_validator import is_editor_open_blocking_issue
+except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+    is_editor_open_blocking_issue = None
+    _OPEN_SAFETY_CLASSIFIER_IMPORT_ERROR: Exception | None = exc
+else:
+    _OPEN_SAFETY_CLASSIFIER_IMPORT_ERROR = None
+
+from .upstream import HwpxDocument, open_document, validate_document_path
 
 _REQUIRED_HWPX_FILES = [
     "mimetype",
@@ -99,6 +115,8 @@ class LocalDocumentStorage:
     def ensure_backup(self, path: Path) -> Optional[Path]:
         if not path.exists():
             return None
+        if path.suffix.lower() == ".hwpx":
+            require_hwpx_editor_open_safe(path, role="backup source")
         backup = path.with_suffix(path.suffix + ".bak")
         shutil.copy2(path, backup)
         return backup
@@ -115,6 +133,7 @@ class LocalDocumentStorage:
 
     def open_document(self, path: str) -> Tuple[HwpxDocument, Path]:
         resolved = self.resolve_path(path)
+        require_hwpx_editor_open_safe(resolved, role="local HWPX open")
         document = open_document(resolved)
         return document, resolved
 
@@ -129,9 +148,14 @@ class LocalDocumentStorage:
         try:
             os.close(tmp_fd)
             document.save_to_path(tmp_path)
-            open_document(tmp_path)
             verification_report = build_hwpx_verification_report(tmp_path, pre_save_snapshot)
+            if not verification_report["openSafety"]["ok"]:
+                raise RuntimeError(
+                    "saved HWPX failed open-safety verification: "
+                    + verification_report["openSafety"]["summary"]
+                )
             os.replace(tmp_path, target)
+            verification_report["filePath"] = str(target)
             return verification_report
         except Exception:
             tmp_path.unlink(missing_ok=True)
@@ -146,6 +170,33 @@ class RemoteDocumentClient(Protocol):
 
     def upload(self, path: str, data: bytes) -> None:
         """Persist *data* to *path* on the remote service."""
+
+
+def _report_allows_editor_open(report: Mapping[str, Any]) -> bool:
+    package = report.get("validatePackage", {})
+    reopen = report.get("reopen", {})
+    return bool(
+        isinstance(package, Mapping)
+        and isinstance(reopen, Mapping)
+        and package.get("ok")
+        and reopen.get("ok")
+    )
+
+
+def require_hwpx_editor_open_safe(
+    path: Path,
+    *,
+    role: str,
+) -> Dict[str, Any]:
+    """Fail only on conditions expected to stop an editor from opening HWPX."""
+
+    open_safety = build_hwpx_open_safety_report(path)
+    if not _report_allows_editor_open(open_safety):
+        raise RuntimeError(
+            f"{role} failed open-safety verification: "
+            + open_safety["summary"]
+        )
+    return open_safety
 
 
 @dataclass(slots=True)
@@ -244,7 +295,19 @@ class HttpDocumentStorage:
             raise RuntimeError(f"HTTP storage open failed: {exc}") from exc
 
         local_path = self._cache_path(path)
-        local_path.write_bytes(payload)
+        tmp_fd, tmp_path_str = tempfile.mkstemp(
+            suffix=local_path.suffix or ".hwpx",
+            dir=str(local_path.parent),
+        )
+        tmp_path = Path(tmp_path_str)
+        try:
+            with os.fdopen(tmp_fd, "wb") as tmp_fh:
+                tmp_fh.write(payload)
+            require_hwpx_editor_open_safe(tmp_path, role="HTTP storage open")
+            os.replace(tmp_path, local_path)
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
         self._cache[path] = local_path
 
         document = open_document(local_path)
@@ -258,18 +321,32 @@ class HttpDocumentStorage:
             self._cache[remote_key] = cache_path
 
         pre_save_snapshot = build_hwpx_presave_snapshot(cache_path if cache_path.exists() else None)
+        tmp_fd, tmp_path_str = tempfile.mkstemp(
+            suffix=cache_path.suffix or ".hwpx",
+            dir=str(cache_path.parent),
+        )
+        tmp_path = Path(tmp_path_str)
 
         try:
-            document.save_to_path(cache_path)
-            payload = cache_path.read_bytes()
-            verification_report = build_hwpx_verification_report(cache_path, pre_save_snapshot)
+            os.close(tmp_fd)
+            document.save_to_path(tmp_path)
+            verification_report = build_hwpx_verification_report(tmp_path, pre_save_snapshot)
+            if not verification_report["openSafety"]["ok"]:
+                raise RuntimeError(
+                    "saved HWPX failed open-safety verification: "
+                    + verification_report["openSafety"]["summary"]
+                )
+            payload = tmp_path.read_bytes()
         except Exception as exc:  # pragma: no cover - unexpected save error
+            tmp_path.unlink(missing_ok=True)
             raise RuntimeError(f"HTTP storage save failed: {exc}") from exc
 
         try:
             self._client.upload(remote_key, payload)
         except Exception as exc:  # pragma: no cover - handled in tests for fake clients
+            tmp_path.unlink(missing_ok=True)
             raise RuntimeError(f"HTTP storage save failed: {exc}") from exc
+        os.replace(tmp_path, cache_path)
         return verification_report
 
     def _cache_path(self, path: str) -> Path:
@@ -285,8 +362,116 @@ def build_hwpx_presave_snapshot(path: Path | None) -> Dict[str, Any] | None:
     return _collect_hwpx_snapshot(path)
 
 
+def _issue_messages(report: Any, attr_name: str = "issues") -> List[str]:
+    return [str(issue) for issue in getattr(report, attr_name, ())]
+
+
+def _open_safety_dependency_error() -> str | None:
+    if validate_package is None:
+        detail = (
+            str(_PACKAGE_VALIDATOR_IMPORT_ERROR)
+            if _PACKAGE_VALIDATOR_IMPORT_ERROR is not None
+            else "hwpx.tools.package_validator.validate_package is unavailable"
+        )
+        return f"python-hwpx>=2.10.3 is required for HWPX open-safety validation: {detail}"
+    if is_editor_open_blocking_issue is None:
+        detail = (
+            str(_OPEN_SAFETY_CLASSIFIER_IMPORT_ERROR)
+            if _OPEN_SAFETY_CLASSIFIER_IMPORT_ERROR is not None
+            else "hwpx.tools.package_validator.is_editor_open_blocking_issue is unavailable"
+        )
+        return f"python-hwpx>=2.10.3 is required for HWPX open-safety validation: {detail}"
+    return None
+
+
+def build_hwpx_open_safety_report(path: Path) -> Dict[str, Any]:
+    package_payload: Dict[str, Any]
+    document_payload: Dict[str, Any]
+    reopen_payload: Dict[str, Any]
+
+    dependency_error = _open_safety_dependency_error()
+    if dependency_error is not None:
+        package_payload = {
+            "ok": False,
+            "validatorOk": False,
+            "errors": [dependency_error],
+            "warnings": [],
+            "validatorErrors": [dependency_error],
+        }
+    else:
+        try:
+            assert validate_package is not None
+            assert is_editor_open_blocking_issue is not None
+            package_report = validate_package(path)
+            package_errors = _issue_messages(package_report, "errors")
+            blocking_issues = [
+                issue for issue in package_report.errors if is_editor_open_blocking_issue(issue)
+            ]
+            advisory_issues = [
+                issue for issue in package_report.errors if not is_editor_open_blocking_issue(issue)
+            ]
+            blocking_package_errors = [str(issue) for issue in blocking_issues]
+            compatibility_warnings = [str(issue) for issue in advisory_issues]
+            package_payload = {
+                "ok": not blocking_package_errors,
+                "validatorOk": bool(package_report.ok),
+                "errors": blocking_package_errors,
+                "warnings": [*_issue_messages(package_report, "warnings"), *compatibility_warnings],
+                "validatorErrors": package_errors,
+            }
+        except Exception as exc:  # noqa: BLE001
+            package_payload = {
+                "ok": False,
+                "validatorOk": False,
+                "errors": [str(exc)],
+                "warnings": [],
+                "validatorErrors": [str(exc)],
+            }
+
+    try:
+        document_report = validate_document_path(path)
+        document_payload = {
+            "ok": bool(document_report.ok),
+            "errors": _issue_messages(document_report, "errors"),
+            "warnings": _issue_messages(document_report, "warnings"),
+        }
+    except Exception as exc:  # noqa: BLE001
+        document_payload = {
+            "ok": False,
+            "errors": [str(exc)],
+            "warnings": [],
+        }
+
+    try:
+        reopened = open_document(path)
+        close = getattr(reopened, "close", None)
+        if callable(close):
+            close()
+        reopen_payload = {"ok": True, "error": None}
+    except Exception as exc:  # noqa: BLE001
+        reopen_payload = {"ok": False, "error": str(exc)}
+
+    ok = bool(package_payload["ok"] and document_payload["ok"] and reopen_payload["ok"])
+    failures: List[str] = []
+    if not package_payload["ok"]:
+        failures.append("package validation failed")
+    if not document_payload["ok"]:
+        failures.append("document validation failed")
+    if not reopen_payload["ok"]:
+        failures.append("reopen failed")
+
+    return {
+        "ok": ok,
+        "summary": "open-safety verification passed" if ok else "; ".join(failures),
+        "validatePackage": package_payload,
+        "validateDocument": document_payload,
+        "reopen": reopen_payload,
+    }
+
+
 def build_hwpx_verification_report(path: Path, pre_save_snapshot: Dict[str, Any] | None = None) -> Dict[str, Any]:
     snapshot = _collect_hwpx_snapshot(path)
+    open_safety = build_hwpx_open_safety_report(path)
     totals = snapshot["totals"]
     missing_files = snapshot["missing_files"]
     warnings: List[str] = []
@@ -312,7 +497,12 @@ def build_hwpx_verification_report(path: Path, pre_save_snapshot: Dict[str, Any]
             "tables": totals["tables"] - before["tables"],
         }
 
-    ok = not missing_files and not totals["placeholders"] and not totals["suspiciousPatterns"]
+    ok = (
+        open_safety["ok"]
+        and not missing_files
+        and not totals["placeholders"]
+        and not totals["suspiciousPatterns"]
+    )
     summary = "verification passed"
     if not ok:
         summary = "; ".join(warnings) if warnings else "verification failed"
@@ -324,6 +514,7 @@ def build_hwpx_verification_report(path: Path, pre_save_snapshot: Dict[str, Any]
         "fileSizeBytes": path.stat().st_size,
         "requiredFilesChecked": list(_REQUIRED_HWPX_FILES),
         "missingFiles": missing_files,
+        "openSafety": open_safety,
         "sectionReports": snapshot["section_reports"],
         "totals": {
             "sections": totals["sections"],

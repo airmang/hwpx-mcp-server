@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+
+import hwpx_mcp_server.quality_generation as quality_generation_module
 from hwpx_mcp_server import server
 
 
@@ -81,8 +84,65 @@ def test_apply_quality_generation_creates_validated_output_with_revision_history
     assert result["validation"]["reopened"] is True
     assert result["validation"]["validate_package"]["ok"] is True
     assert result["validation"]["validate_document"]["ok"] is True
+    assert result["validation"]["openSafety"]["ok"] is True
     assert result["revision_history"]
     assert result["quality"]["rubric_average"] >= 4.0
+
+
+def test_apply_quality_generation_preserves_existing_destination_when_open_safety_blocks(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    form = tmp_path / "form.hwpx"
+    destination = tmp_path / "generated.hwpx"
+    server.create_document(str(form))
+    server.create_document(str(destination))
+    original = destination.read_bytes()
+    analysis = server.analyze_quality_generation(
+        form_filename=str(form),
+        idea_brief=_idea(),
+        destination_filename=str(destination),
+    )
+
+    def blocked_validation(_path: str) -> dict:
+        return {
+            "reopened": False,
+            "validate_package": {"ok": False, "errors": []},
+            "validate_document": {"ok": False, "errors": []},
+            "openSafety": {
+                "ok": False,
+                "summary": "forced quality-generation failure",
+            },
+        }
+
+    monkeypatch.setattr(quality_generation_module, "_runtime_validation", blocked_validation)
+
+    with pytest.raises(RuntimeError, match="quality-generation output failed open-safety"):
+        server.apply_quality_generation(analysis=analysis, confirm=True)
+
+    assert destination.read_bytes() == original
+    assert not list(tmp_path.glob(".generated.*.hwpx"))
+
+
+def test_quality_generation_validation_fails_closed_without_package_validator(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "generated.hwpx"
+    server.create_document(str(target))
+    monkeypatch.setattr(quality_generation_module, "validate_package", None, raising=False)
+    monkeypatch.setattr(
+        quality_generation_module,
+        "_PACKAGE_VALIDATOR_IMPORT_ERROR",
+        ImportError("missing package validator"),
+        raising=False,
+    )
+
+    validation = quality_generation_module._runtime_validation(str(target))
+
+    assert validation["validate_package"]["ok"] is False
+    assert "python-hwpx>=2.10.3 is required" in validation["validate_package"]["errors"][0]
+    assert validation["openSafety"]["ok"] is True
 
 
 def test_mcp_inspect_operating_plan_quality_supports_file_only_path(tmp_path) -> None:

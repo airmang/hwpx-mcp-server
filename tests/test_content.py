@@ -1,3 +1,4 @@
+import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -12,6 +13,7 @@ from hwpx_mcp_server.server import (
     add_page_break,
     add_paragraph,
     add_table,
+    copy_document,
     create_document,
     delete_paragraph,
     fill_by_path,
@@ -48,14 +50,31 @@ def _create_ambiguous_form_document(target: Path) -> None:
     add_table(str(target), 1, 2, [["성명", ""]])
 
 
+def _replace_zip_part(path: Path, part_name: str, payload: bytes) -> None:
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with zipfile.ZipFile(path, "r") as source:
+        with zipfile.ZipFile(tmp_path, "w") as target:
+            for info in source.infolist():
+                data = (
+                    payload
+                    if info.filename == part_name
+                    else source.read(info.filename)
+                )
+                target.writestr(info, data)
+    path.write_bytes(tmp_path.read_bytes())
+    tmp_path.unlink()
+
+
 def test_add_paragraph(tmp_path: Path):
     target = tmp_path / "test.hwpx"
     create_document(str(target))
 
-    add_paragraph(str(target), "안녕하세요")
+    result = add_paragraph(str(target), "안녕하세요")
     text_result = get_document_text(str(target))
 
     assert "안녕하세요" in text_result["text"]
+    assert result["openSafety"]["ok"] is True
+    assert result["verificationReport"]["filePath"] == str(target)
 
 
 def test_add_heading(tmp_path: Path):
@@ -303,6 +322,31 @@ def test_resolve_path_allows_absolute_paths_inside_sandbox_and_guides_outside(
         resolve_path(str(outside))
 
 
+def test_copy_document_rejects_unsafe_hwpx_source_and_preserves_destination(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "unsafe-source.hwpx"
+    destination = tmp_path / "safe-destination.hwpx"
+    create_document(str(source))
+    create_document(str(destination))
+    original_destination = destination.read_bytes()
+    stale_section = (
+        "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>"
+        "<hs:sec xmlns:hs='http://www.hancom.co.kr/hwpml/2011/section' "
+        "xmlns:hp='http://www.hancom.co.kr/hwpml/2011/paragraph'>"
+        "<hp:p id='1' paraPrIDRef='0' styleIDRef='0' pageBreak='0' columnBreak='0' merged='0'>"
+        "<hp:run charPrIDRef='0'><hp:t>Short</hp:t></hp:run>"
+        "<hp:linesegarray><hp:lineseg textpos='40'/></hp:linesegarray>"
+        "</hp:p></hs:sec>"
+    ).encode("utf-8")
+    _replace_zip_part(source, "Contents/section0.xml", stale_section)
+
+    with pytest.raises(ValueError, match="source HWPX failed open-safety verification"):
+        copy_document(str(source), str(destination))
+
+    assert destination.read_bytes() == original_destination
+
+
 def test_fill_by_path_applies_multiple_mappings_correctly(tmp_path: Path):
     target = tmp_path / "form.hwpx"
     _create_form_document(target)
@@ -360,10 +404,12 @@ def test_fill_by_path_saves_after_successful_mutation(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(server_module, "save_doc", _tracking_save)
 
-    fill_by_path(str(target), {"성명 > right": "홍길동"})
+    result = fill_by_path(str(target), {"성명 > right": "홍길동"})
 
     assert len(save_calls) == 1
     assert Path(save_calls[0]).resolve() == target.resolve()
+    assert result["openSafety"]["ok"] is True
+    assert result["verificationReport"]["filePath"] == str(target)
     assert get_table_text(str(target), 0)["data"][0][1] == "홍길동"
 
 

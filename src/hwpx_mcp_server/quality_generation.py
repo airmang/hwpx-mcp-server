@@ -11,14 +11,23 @@ quality-sample file.
 from __future__ import annotations
 
 import copy
+import os
 import re
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any, Mapping
 
-from hwpx.tools.package_validator import validate_package
+try:  # python-hwpx >= 2.10.3
+    from hwpx.tools.package_validator import validate_package
+except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+    validate_package = None
+    _PACKAGE_VALIDATOR_IMPORT_ERROR: Exception | None = exc
+else:
+    _PACKAGE_VALIDATOR_IMPORT_ERROR = None
 
 from .core.document import open_doc
+from .storage import build_hwpx_open_safety_report
 from .upstream import new_document, validate_document_path
 from .utils.helpers import resolve_path
 
@@ -444,21 +453,39 @@ def _quality_gates(profile: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _write_and_inspect(destination: str, content_spec: Mapping[str, Any], *, revision_round: int) -> dict[str, Any]:
-    doc = (
-        create_proposal_document(content_spec)
-        if create_proposal_document is not None
-        else _create_quality_document_fallback(content_spec)
+    destination_path = Path(destination)
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{destination_path.stem}.",
+        suffix=destination_path.suffix or ".hwpx",
+        dir=str(destination_path.parent),
     )
+    tmp_path = Path(tmp_name)
+    os.close(fd)
+    doc = None
     try:
-        doc.save_to_path(destination)
+        doc = (
+            create_proposal_document(content_spec)
+            if create_proposal_document is not None
+            else _create_quality_document_fallback(content_spec)
+        )
+        doc.save_to_path(tmp_path)
+        report = (
+            inspect_proposal_quality(str(tmp_path))
+            if inspect_proposal_quality is not None
+            else _inspect_quality_fallback(str(tmp_path))
+        )
+        validation = _runtime_validation(str(tmp_path))
+        if not validation.get("openSafety", {}).get("ok"):
+            raise RuntimeError(
+                "quality-generation output failed open-safety verification: "
+                + str(validation.get("openSafety", {}).get("summary", "unknown failure"))
+            )
+        os.replace(tmp_path, destination_path)
     finally:
-        doc.close()
-    report = (
-        inspect_proposal_quality(destination)
-        if inspect_proposal_quality is not None
-        else _inspect_quality_fallback(destination)
-    )
-    validation = _runtime_validation(destination)
+        tmp_path.unlink(missing_ok=True)
+        if doc is not None:
+            doc.close()
     quality = _quality_result(report, validation)
     return {
         "round": revision_round,
@@ -588,8 +615,16 @@ def _inspect_quality_fallback(path: str) -> dict[str, Any]:
 
 
 def _runtime_validation(path: str) -> dict[str, Any]:
-    package = validate_package(path)
+    if validate_package is None:
+        package_payload = _dependency_unavailable_validation(
+            "python-hwpx>=2.10.3 is required for HWPX package validation",
+            _PACKAGE_VALIDATOR_IMPORT_ERROR,
+        )
+    else:
+        package = validate_package(path)
+        package_payload = {"ok": bool(package.ok), "errors": _report_errors(package)}
     document = validate_document_path(path)
+    open_safety = build_hwpx_open_safety_report(Path(path))
     reopened = False
     try:
         doc = open_doc(path)
@@ -601,9 +636,15 @@ def _runtime_validation(path: str) -> dict[str, Any]:
         reopened = False
     return {
         "reopened": reopened,
-        "validate_package": {"ok": bool(package.ok), "errors": _report_errors(package)},
+        "validate_package": package_payload,
         "validate_document": {"ok": bool(document.ok), "errors": _report_errors(document)},
+        "openSafety": open_safety,
     }
+
+
+def _dependency_unavailable_validation(message: str, error: Exception | None) -> dict[str, Any]:
+    detail = f"{message}: {error}" if error is not None else message
+    return {"ok": False, "errors": [detail]}
 
 
 def _report_errors(report: Any) -> list[Any]:
@@ -626,11 +667,14 @@ def _quality_result(report: Mapping[str, Any], validation: Mapping[str, Any]) ->
         gaps.append("package validation failed")
     if not validation.get("validate_document", {}).get("ok"):
         gaps.append("document validation failed")
+    if not validation.get("openSafety", {}).get("ok"):
+        gaps.append("editor-open safety validation failed")
     passed = bool(
         report.get("pass")
         and validation.get("reopened")
         and validation.get("validate_package", {}).get("ok")
         and validation.get("validate_document", {}).get("ok")
+        and validation.get("openSafety", {}).get("ok")
     )
     return {
         "pass": passed,

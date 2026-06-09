@@ -28,6 +28,7 @@ def test_create_and_inspect_proposal_document(tmp_path, monkeypatch):
     assert result["quality"]["rubric_average"] >= 4.0
     assert result["quality"]["report_version"] == "proposal-quality-v2"
     assert result["quality"]["sample_match"]["pass"] is True
+    assert result["verification"]["openSafety"]["ok"] is True
 
     inspection = server.inspect_document_quality(filename)
     assert inspection["outline"]["required_sections_present"] is True

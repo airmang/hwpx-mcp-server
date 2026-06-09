@@ -802,6 +802,7 @@ class HwpxOps:
         max_source_size: int = 512 * 1024 * 1024,
     ) -> Dict[str, Any]:
         try:
+            from hwpx.tools.package_validator import validate_editor_open_safety
             from hwpx.tools.package_validator import validate_package
             from hwpx.tools.repair import repair_from_recovered, repair_repack
         except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
@@ -831,6 +832,7 @@ class HwpxOps:
                 max_total_size=max_total_size,
             )
         validation = validate_package(output_path)
+        open_safety = validate_editor_open_safety(output_path)
         return {
             "outputPath": self._relative_path(output_path),
             "entries": list(result.entries),
@@ -843,6 +845,7 @@ class HwpxOps:
                 "errors": [str(issue) for issue in validation.errors],
                 "warnings": [str(issue) for issue in validation.warnings],
             },
+            "openSafety": open_safety.to_dict(),
         }
 
 
@@ -2040,10 +2043,11 @@ class HwpxOps:
                 "fill_template called with preserve_style=False, but current backend always preserves run style"
             )
 
-        self._save_document(document, out_path)
+        verification_report = self._save_document(document, out_path)
         return {
             "outPath": str(out_path),
             "replacedCount": replaced_count,
+            "verificationReport": verification_report,
         }
 
     # ------------------------------------------------------------------
@@ -2067,8 +2071,8 @@ class HwpxOps:
     def make_blank(self, out: str) -> Dict[str, Any]:
         document = new_document()
         out_path = self._resolve_output_path(out)
-        self._save_document(document, out_path)
-        return {"outPath": str(out_path)}
+        verification_report = self._save_document(document, out_path)
+        return {"outPath": str(out_path), "verificationReport": verification_report}
 
     def convert_hwp_to_hwpx(self, source: str, output: Optional[str] = None) -> Dict[str, Any]:
         resolved_source = self._resolve_path(source)
@@ -2092,6 +2096,8 @@ class HwpxOps:
             "tablesConverted": result.tables_converted,
             "skippedElements": result.skipped_elements,
             "warnings": result.warnings,
+            "verification": result.verification,
+            "openSafety": result.open_safety,
         }
 
     # ------------------------------------------------------------------

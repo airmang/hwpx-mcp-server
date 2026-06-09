@@ -66,6 +66,19 @@ def _broken_plan() -> dict:
 def _comparable_create_payload(payload: dict) -> dict:
     comparable = dict(payload)
     comparable.pop("filename", None)
+    if "verification" in comparable:
+        verification = comparable["verification"]
+        open_safety = verification["openSafety"]
+        comparable["verification"] = {
+            "ok": verification["ok"],
+            "summary": verification["summary"],
+            "openSafety": {
+                "ok": open_safety["ok"],
+                "validatePackage": open_safety["validatePackage"]["ok"],
+                "validateDocument": open_safety["validateDocument"]["ok"],
+                "reopen": open_safety["reopen"]["ok"],
+            },
+        }
     return comparable
 
 
