@@ -17,6 +17,7 @@ class CommonErrorModel(BaseModel):
     message: str
     details: Optional[Dict[str, Any]] = None
     hint: Optional[str] = None
+    suggestion: Optional[str] = None
 
 
 ERROR_CODE_TO_MCP_CODE: dict[str, int] = {
@@ -31,8 +32,59 @@ ERROR_CODE_TO_MCP_CODE: dict[str, int] = {
 DEFAULT_MCP_ERROR_CODE = -32000
 
 
+DEFAULT_ERROR_SUGGESTIONS: dict[str, str] = {
+    "AMBIGUOUS_TARGET": "검색 조건을 더 구체화하거나 limit=1로 미리보기를 다시 생성하세요.",
+    "BYTE_PATCH_OPEN_SAFETY_FAILED": "반환된 openSafety 진단을 확인하고 일반 저장/복구 경로로 다시 생성하세요.",
+    "BYTE_PATCH_UNAVAILABLE": "설치된 python-hwpx 버전을 확인한 뒤 플러그인을 다시 설치하거나 일반 편집 도구를 사용하세요.",
+    "CONFLICTING_TARGETS": "동일 범위를 겹쳐 수정하지 않도록 edit 목록을 분리해 다시 실행하세요.",
+    "DOCUMENT_LOCATOR_REQUIRED": "path 또는 handleId 중 하나를 지정한 뒤 같은 작업을 다시 호출하세요.",
+    "DOCUMENT_NOT_FOUND": "문서 경로가 샌드박스 루트 안에 존재하는지 확인하고 절대/상대 경로를 다시 전달하세요.",
+    "DOCUMENT_OPEN_FAILED": "파일이 유효한 HWPX인지 확인하고 repair_hwpx로 복구한 뒤 다시 여세요.",
+    "DOCUMENT_SAVE_FAILED": "출력 경로의 쓰기 권한과 남은 디스크 공간을 확인한 뒤 다시 저장하세요.",
+    "EMPTY_MATCH": "찾을 텍스트나 앵커 조건을 실제 문서 내용에 맞게 수정하세요.",
+    "HWP_CONVERSION_FAILED": "원본 HWP가 손상되지 않았는지 확인하고 변환 로그의 원인을 기준으로 다시 시도하세요.",
+    "HWP_TEXT_EXTRACT_FAILED": "HWP 파일을 다른 뷰어에서 열어 유효성을 확인한 뒤 텍스트 추출을 다시 실행하세요.",
+    "IDEMPOTENT_REPLAY": "이미 적용된 planId입니다. 최신 preview/plan을 새로 만든 뒤 apply를 다시 호출하세요.",
+    "MEMO_NOT_FOUND": "list_memos 또는 문서 리소스에서 memoId를 다시 확인한 뒤 호출하세요.",
+    "MISSING_NODE": "대상 섹션, 문단, 표, 셀이 아직 존재하는지 조회한 뒤 새 앵커로 다시 실행하세요.",
+    "PARAGRAPH_INDEX_OUT_OF_RANGE": "list_paragraphs 결과의 paragraphIndex 범위 안에서 다시 선택하세요.",
+    "PERMISSION_DENIED": "샌드박스 루트와 파일 권한을 확인하고 쓰기 가능한 위치를 사용하세요.",
+    "PIPELINE_ERROR": "details.pipelineCode와 hint를 확인한 뒤 preview부터 다시 생성하세요.",
+    "PLAN_RECORD_MISSING": "preview_edit 또는 plan_edit으로 planId를 새로 발급받은 뒤 apply를 다시 호출하세요.",
+    "PREVIEW_REQUIRED": "preview_edit으로 변경 내용을 확인한 뒤 반환된 planId로 apply_edit을 호출하세요.",
+    "READ_ONLY_HWP_DOCUMENT": "HWP 바이너리는 직접 저장할 수 없습니다. 먼저 HWPX로 변환한 뒤 편집하세요.",
+    "RANGE_OUT_OF_BOUNDS": "문단/문자 범위를 최신 문서 기준으로 다시 계산한 뒤 실행하세요.",
+    "REPAIR_UNAVAILABLE": "설치된 python-hwpx에 repair helper가 있는지 확인하고 플러그인을 다시 설치하세요.",
+    "SOURCE_FILE_TYPE_INVALID": "source에는 .hwp 파일을 전달하거나 HWPX 도구에는 .hwpx 경로를 사용하세요.",
+    "STYLE_BORDER_FILL_HEADER_MISSING": "문서 스타일 헤더가 손상되었습니다. repair_hwpx를 실행한 뒤 다시 시도하세요.",
+    "STYLE_CHAR_PROPERTY_ID_MISSING": "문서 문자 스타일 정의를 복구한 뒤 formatting 작업을 다시 실행하세요.",
+    "STYLE_HEADER_MISSING": "문서 style.xml/header 구성이 유효한지 확인하고 repair_hwpx를 먼저 실행하세요.",
+    "STYLE_ID_ALLOCATOR_MISSING": "문서 스타일 ID 할당 정보를 복구하거나 새 문서로 내용을 옮긴 뒤 다시 시도하세요.",
+    "TABLE_CELL_INDEX_OUT_OF_RANGE": "list_tables 결과로 행/열 범위를 확인한 뒤 유효한 셀 좌표를 사용하세요.",
+    "TABLE_CELL_OPERATION_FAILED": "병합 셀 구조와 행/열 좌표를 확인하고 단일 셀 대상으로 다시 실행하세요.",
+    "TABLE_EMPTY": "표에 행과 셀이 있는지 확인하고 비어 있으면 표를 다시 생성하세요.",
+    "TABLE_INDEX_OUT_OF_RANGE": "list_tables 결과의 tableIndex 범위 안에서 다시 선택하세요.",
+    "UNSAFE_WILDCARD": "와일드카드 범위를 줄이거나 정확한 문자열 매칭으로 preview를 다시 생성하세요.",
+}
+
+
 def mcp_code_for_error(error_code: str) -> int:
     return ERROR_CODE_TO_MCP_CODE.get(error_code, DEFAULT_MCP_ERROR_CODE)
+
+
+def suggestion_for_error(
+    error_code: str,
+    *,
+    details: Optional[Dict[str, Any]] = None,
+    hint: Optional[str] = None,
+) -> Optional[str]:
+    if error_code == "PIPELINE_ERROR" and details:
+        pipeline_code = details.get("pipelineCode")
+        if isinstance(pipeline_code, str):
+            mapped = DEFAULT_ERROR_SUGGESTIONS.get(pipeline_code)
+            if mapped:
+                return mapped
+    return DEFAULT_ERROR_SUGGESTIONS.get(error_code) or hint
 
 
 def build_error_payload(
@@ -41,10 +93,13 @@ def build_error_payload(
     message: str,
     details: Optional[Dict[str, Any]] = None,
     hint: Optional[str] = None,
+    suggestion: Optional[str] = None,
 ) -> Dict[str, Any]:
     return CommonErrorModel(
         code=code,
         message=message,
         details=details,
         hint=hint,
+        suggestion=suggestion
+        or suggestion_for_error(code, details=details, hint=hint),
     ).model_dump(exclude_none=True)

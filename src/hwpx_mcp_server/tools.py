@@ -279,7 +279,11 @@ class AddTableInput(DocumentLocatorInput):
     section_index: Optional[int] = Field(None, alias="sectionIndex")
     border_style: Optional[Literal["solid", "none"]] = Field(None, alias="borderStyle")
     border_color: Optional[str] = Field(None, alias="borderColor")
-    border_width: Optional[str | float | int] = Field(None, alias="borderWidth")
+    border_width: Optional[str | float | int] = Field(
+        None,
+        alias="borderWidth",
+        description="Human border width. Prefer strings with units such as '0.1 mm' or '1 pt'; bare numbers are treated by python-hwpx compatibility code.",
+    )
     fill_color: Optional[str] = Field(None, alias="fillColor")
     auto_fit: bool = Field(False, alias="autoFit")
 
@@ -293,7 +297,11 @@ class SetTableBorderFillInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
     border_style: Optional[Literal["solid", "none"]] = Field(None, alias="borderStyle")
     border_color: Optional[str] = Field(None, alias="borderColor")
-    border_width: Optional[str | float | int] = Field(None, alias="borderWidth")
+    border_width: Optional[str | float | int] = Field(
+        None,
+        alias="borderWidth",
+        description="Human border width. Prefer strings with units such as '0.1 mm' or '1 pt'; bare numbers are treated by python-hwpx compatibility code.",
+    )
     fill_color: Optional[str] = Field(None, alias="fillColor")
 
 

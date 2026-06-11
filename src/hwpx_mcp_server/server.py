@@ -207,6 +207,16 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
+_EXPECTED_FASTMCP_TOOL_COUNT = 56
+_EXPECTED_LEGACY_TOOL_COUNT = 51
+_KEY_TOOL_NAMES = (
+    "create_document_from_plan",
+    "create_government_report_document",
+    "repair_hwpx",
+    "replace_by_anchor",
+    "add_memo_by_anchor",
+    "byte_preserving_patch",
+)
 _FIGURE_CAPTION_RE = re.compile(r"^\s*(?:Figure|Fig\.|그림)\s*\d*", re.IGNORECASE)
 
 
@@ -237,6 +247,23 @@ def _env_float(name: str, default: float) -> float:
     except ValueError:
         return default
     return max(0.1, parsed)
+
+
+def _fastmcp_tool_names() -> list[str]:
+    manager = getattr(mcp, "_tool_manager", None)
+    if manager is None:
+        return []
+    tools = getattr(manager, "list_tools", lambda: [])()
+    return sorted(getattr(tool, "name", "") for tool in tools if getattr(tool, "name", ""))
+
+
+def _legacy_tool_names() -> list[str]:
+    try:
+        from .tools import build_tool_definitions
+
+        return sorted(definition.name for definition in build_tool_definitions())
+    except Exception:  # pragma: no cover - reported through health, not hidden
+        return []
 
 
 def _normalize_output_mode(output: str | None) -> str:
@@ -1655,11 +1682,47 @@ def mcp_server_health() -> dict:
     """MCP 서버 transport와 timeout/keepalive 점검 정보를 반환합니다."""
     transport = os.environ.get("HWPX_MCP_TRANSPORT", "stdio")
     sandbox_root = os.environ.get("HWPX_MCP_SANDBOX_ROOT")
+    fastmcp_tool_names = _fastmcp_tool_names()
+    legacy_tool_names = _legacy_tool_names()
+    expected_fastmcp = _env_int("HWPX_EXPECTED_FASTMCP_TOOL_COUNT", _EXPECTED_FASTMCP_TOOL_COUNT)
+    expected_legacy = _env_int("HWPX_EXPECTED_LEGACY_TOOL_COUNT", _EXPECTED_LEGACY_TOOL_COUNT)
+    missing_key_tools = [name for name in _KEY_TOOL_NAMES if name not in fastmcp_tool_names]
+    skew_detected = (
+        len(fastmcp_tool_names) < expected_fastmcp
+        or len(legacy_tool_names) < expected_legacy
+        or bool(missing_key_tools)
+    )
     return {
         "server": "hwpx-mcp-server",
         "version": _package_version("hwpx-mcp-server"),
+        "pythonHwpxVersion": _package_version("python-hwpx"),
+        "skillBundleVersion": os.environ.get("HWPX_SKILL_VERSION", "unknown"),
+        "pluginRoot": os.environ.get("HWPX_PLUGIN_ROOT"),
         "transport": transport,
         "streamable_http_available": callable(getattr(mcp, "streamable_http_app", None)),
+        "toolSurface": {
+            "status": "skewed" if skew_detected else "ok",
+            "expectedFastMcpToolCount": expected_fastmcp,
+            "actualFastMcpToolCount": len(fastmcp_tool_names),
+            "expectedLegacyToolCount": expected_legacy,
+            "actualLegacyToolCount": len(legacy_tool_names),
+            "missingKeyTools": missing_key_tools,
+            "keyTools": list(_KEY_TOOL_NAMES),
+            "diagnosis": (
+                "Installed MCP surface is missing expected tools; reinstall the hwpx plugin, "
+                "remove stale plugin venv/cache, then start a fresh host session."
+                if skew_detected
+                else "Installed MCP surface matches the expected tool count and key tools."
+            ),
+        },
+        "unitPolicy": {
+            "status": "audited",
+            "fontSize": "points",
+            "borderWidth": "human value: number/string accepted; prefer pt or mm suffix when supported",
+            "fileSizeLimits": "bytes",
+            "pageAndTableInternals": "HWP units are internal implementation details; MCP tools should prefer mm/pt/% labels.",
+            "auditReport": "tests/unit_audit_report.md",
+        },
         "fetch_timeout_seconds": _env_float(
             "HWPX_MCP_FETCH_TIMEOUT_SECONDS",
             _DEFAULT_FETCH_TIMEOUT_SECONDS,
@@ -1971,7 +2034,7 @@ def format_text(
     font_name: str = None,
     color: str = None,
 ) -> dict:
-    """지정 범위 텍스트 서식을 변경하고 즉시 저장합니다. color는 hex 형식입니다."""
+    """지정 범위 텍스트 서식을 변경하고 즉시 저장합니다. font_size는 pt, color는 hex 형식입니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     format_text_range(
@@ -2003,7 +2066,7 @@ def create_custom_style(
     font_name: str = None,
     color: str = None,
 ) -> dict:
-    """문서에 커스텀 스타일을 생성하고 즉시 저장합니다."""
+    """문서에 커스텀 스타일을 생성하고 즉시 저장합니다. font_size는 pt, color는 hex 형식입니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     result = create_style_in_doc(

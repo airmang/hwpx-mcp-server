@@ -33,6 +33,14 @@ def test_mcp_server_health_reports_disconnect_and_path_diagnostics(
     health = mcp_server_health()
 
     assert health["streamable_http_available"] is True
+    assert health["pythonHwpxVersion"] != "unknown"
+    assert health["toolSurface"]["status"] == "ok"
+    assert health["toolSurface"]["actualFastMcpToolCount"] >= health["toolSurface"]["expectedFastMcpToolCount"]
+    assert health["toolSurface"]["actualLegacyToolCount"] >= health["toolSurface"]["expectedLegacyToolCount"]
+    assert health["toolSurface"]["missingKeyTools"] == []
+    assert "byte_preserving_patch" in health["toolSurface"]["keyTools"]
+    assert health["unitPolicy"]["fontSize"] == "points"
+    assert health["unitPolicy"]["fileSizeLimits"] == "bytes"
     assert health["sandbox"]["root"] == str(tmp_path)
     assert health["sandbox"]["absolute_paths_inside_root_allowed"] is True
     assert "absolute paths inside" in health["sandbox"]["path_guidance"]
