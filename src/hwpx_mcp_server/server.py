@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 import binascii
+import copy
 import html
 import json
 import os
@@ -268,12 +269,13 @@ def _advanced_enabled() -> bool:
 _OPS = HwpxOps(auto_backup=False)
 
 _OUTPUT_MODES = {"full", "chunks"}
+_VERBOSITY_MODES = {"compact", "full"}
 _CHUNK_STRATEGIES = {"section", "paragraph"}
 _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 83
+_EXPECTED_FASTMCP_TOOL_COUNT = 84
 _EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
@@ -282,6 +284,7 @@ _KEY_TOOL_NAMES = (
     "table_compute",
     "extract_style_profile",
     "list_templates",
+    "get_document_map",
     "repair_hwpx",
     "replace_by_anchor",
     "add_memo_by_anchor",
@@ -291,6 +294,8 @@ _KEY_TOOL_NAMES = (
     "undo_last_edit",
 )
 _FIGURE_CAPTION_RE = re.compile(r"^\s*(?:Figure|Fig\.|그림)\s*\d*", re.IGNORECASE)
+_IDEMPOTENCY_CACHE: dict[str, dict[str, Any]] = {}
+_MAX_IDEMPOTENCY_CACHE_ENTRIES = 512
 
 
 def _package_version(package: str) -> str:
@@ -347,6 +352,14 @@ def _normalize_output_mode(output: str | None) -> str:
     return value
 
 
+def _normalize_verbosity(verbosity: str | None) -> str:
+    value = (verbosity or "compact").strip().lower()
+    if value not in _VERBOSITY_MODES:
+        expected = ", ".join(sorted(_VERBOSITY_MODES))
+        raise ValueError(f"verbosity must be one of: {expected}")
+    return value
+
+
 def _normalize_chunk_strategy(chunk_strategy: str | None) -> str:
     value = (chunk_strategy or "section").strip().lower()
     if value not in _CHUNK_STRATEGIES:
@@ -376,6 +389,104 @@ def _normalize_table_label_direction(direction: str | None) -> str:
         expected = ", ".join(_TABLE_LABEL_DIRECTIONS)
         raise ValueError(f"direction must be one of: {expected}")
     return value
+
+
+def _compact_open_safety(open_safety: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(open_safety, dict):
+        return None
+    compact: dict[str, Any] = {
+        "ok": bool(open_safety.get("ok")),
+        "summary": open_safety.get("summary"),
+    }
+    for key in ("validatePackage", "validateDocument", "reopen"):
+        value = open_safety.get(key)
+        if isinstance(value, dict):
+            compact[key] = {"ok": bool(value.get("ok"))}
+    return compact
+
+
+def _verification_is_successful(verification: dict[str, Any] | None) -> bool:
+    if not isinstance(verification, dict):
+        return False
+    open_safety = verification.get("openSafety")
+    if isinstance(open_safety, dict) and not bool(open_safety.get("ok")):
+        return False
+    return bool(verification.get("ok", True))
+
+
+def _compact_verification_report(verification: dict[str, Any]) -> dict[str, Any]:
+    if not _verification_is_successful(verification):
+        return verification
+    compact: dict[str, Any] = {
+        "ok": bool(verification.get("ok", True)),
+        "summary": verification.get("summary", "verification passed"),
+    }
+    for key in ("filePath", "fileSizeBytes", "warnings"):
+        if key in verification:
+            compact[key] = verification[key]
+    open_safety = _compact_open_safety(verification.get("openSafety"))
+    if open_safety is not None:
+        compact["openSafety"] = open_safety
+    return compact
+
+
+def _apply_write_verbosity(payload: dict[str, Any], verbosity: str | None) -> dict[str, Any]:
+    if _normalize_verbosity(verbosity) == "full":
+        return payload
+    compacted = dict(payload)
+    for key in ("verification", "verificationReport"):
+        verification = compacted.get(key)
+        if isinstance(verification, dict):
+            compacted[key] = _compact_verification_report(verification)
+    open_safety = compacted.get("openSafety")
+    if isinstance(open_safety, dict) and bool(open_safety.get("ok")):
+        compacted["openSafety"] = _compact_open_safety(open_safety)
+    return compacted
+
+
+def _idempotency_scope(tool_name: str, path: str, idempotency_key: str | None) -> str | None:
+    key = (idempotency_key or "").strip()
+    if not key:
+        return None
+    resolved = str(Path(path).resolve())
+    return f"{tool_name}:{resolved}:{key}"
+
+
+def _idempotency_fingerprint(arguments: dict[str, Any]) -> str:
+    return json.dumps(arguments, ensure_ascii=False, sort_keys=True, default=str)
+
+
+def _idempotency_replay(
+    scope: str | None,
+    *,
+    fingerprint: str,
+) -> dict[str, Any] | None:
+    if scope is None:
+        return None
+    cached = _IDEMPOTENCY_CACHE.get(scope)
+    if cached is None:
+        return None
+    if cached.get("fingerprint") != fingerprint:
+        raise ValueError("idempotency_key was reused with different arguments")
+    payload = copy.deepcopy(cached["payload"])
+    payload["idempotentReplay"] = True
+    return payload
+
+
+def _idempotency_store(
+    scope: str | None,
+    *,
+    fingerprint: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    if scope is None:
+        return payload
+    stored = copy.deepcopy(payload)
+    stored["idempotentReplay"] = False
+    _IDEMPOTENCY_CACHE[scope] = {"fingerprint": fingerprint, "payload": stored}
+    while len(_IDEMPOTENCY_CACHE) > _MAX_IDEMPOTENCY_CACHE_ENTRIES:
+        _IDEMPOTENCY_CACHE.pop(next(iter(_IDEMPOTENCY_CACHE)))
+    return copy.deepcopy(stored)
 
 
 def _normalize_fill_mappings(mappings: dict[str, str]) -> dict[str, str]:
@@ -1174,6 +1285,7 @@ def create_document_from_plan(
     style_preset: str = "standard_korean_business",
     quality_profile: str = None,
     profile: dict = None,
+    verbosity: str = "compact",
 ) -> dict:
     """선언형 document_plan으로 HWPX를 생성하고 즉시 저장/검증합니다."""
     return _create_document_from_plan_impl(
@@ -1182,6 +1294,7 @@ def create_document_from_plan(
         style_preset=style_preset,
         quality_profile=quality_profile,
         profile=profile,
+        verbosity=verbosity,
     )
 
 
@@ -1192,6 +1305,7 @@ def _create_document_from_plan_impl(
     style_preset: str = "standard_korean_business",
     quality_profile: str | dict | None = None,
     profile: dict | None = None,
+    verbosity: str | None = "compact",
 ) -> dict:
     if (
         build_document_from_plan is None
@@ -1225,7 +1339,7 @@ def _create_document_from_plan_impl(
         quality_profile=quality_profile,
         profile=profile,
     )
-    return {
+    result = {
         "filename": filename,
         "created": True,
         "style_preset": style_preset,
@@ -1236,6 +1350,7 @@ def _create_document_from_plan_impl(
         "quality": report,
         "verification": verification,
     }
+    return _apply_write_verbosity(result, verbosity)
 
 
 @mcp.tool()
@@ -1243,6 +1358,7 @@ def create_government_report_document(
     filename: str,
     document_plan: dict,
     profile: dict = None,
+    verbosity: str = "compact",
 ) -> dict:
     """정부보고서 프리셋으로 document_plan을 생성하고 즉시 저장/검증합니다."""
     return _create_document_from_plan_impl(
@@ -1251,6 +1367,7 @@ def create_government_report_document(
         style_preset="government_report",
         quality_profile="government_report",
         profile=profile,
+        verbosity=verbosity,
     )
 
 
@@ -1725,6 +1842,7 @@ def create_comparison_table_document(
     new_paragraphs: list[str] = None,
     title: str = "신구대조표",
     include_equal: bool = True,
+    verbosity: str = "compact",
 ) -> dict:
     """두 문서/문단을 좌우 신구대조표 HWPX로 생성하고 검증합니다."""
     if build_hwpx_comparison_table_plan is None or build_document_from_plan is None or validate_hwpx_document_plan is None:
@@ -1756,7 +1874,7 @@ def create_comparison_table_document(
         verification = _save_generated_document(doc, path)
     finally:
         doc.close()
-    return {
+    result = {
         "filename": filename,
         "created": True,
         "document_plan": document_plan,
@@ -1764,6 +1882,7 @@ def create_comparison_table_document(
         "verification": verification,
         "openSafety": verification.get("openSafety"),
     }
+    return _apply_write_verbosity(result, verbosity)
 
 
 @mcp.tool()
@@ -1841,6 +1960,7 @@ def create_proposal_document(
     filename: str,
     proposal_spec: dict,
     style_preset: str = "clean_korean_proposal",
+    verbosity: str = "compact",
 ) -> dict:
     """자연어에서 추출한 proposal_spec으로 제안서형 HWPX 문서를 생성합니다."""
     path = resolve_path(filename)
@@ -1860,13 +1980,14 @@ def create_proposal_document(
         if inspect_proposal_document_quality is not None
         else _proposal_quality_fallback(path)
     )
-    return {
+    result = {
         "filename": filename,
         "created": True,
         "style_preset": style_preset,
         "quality": report,
         "verification": verification,
     }
+    return _apply_write_verbosity(result, verbosity)
 
 
 @mcp.tool()
@@ -1966,6 +2087,93 @@ def get_document_outline(filename: str) -> dict:
         if level > 0 and text:
             outline.append({"level": level, "text": text, "paragraph_index": index})
     return _with_document_state({"outline": outline}, path)
+
+
+@mcp.tool()
+def get_document_map(
+    filename: str,
+    max_preview_chars: int = 80,
+) -> dict:
+    """문서 개요, 표, 양식 필드, 앵커를 한 번에 조회합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    model = _build_read_model(doc)
+    preview_limit = max(0, int(max_preview_chars))
+
+    paragraph_anchors = []
+    for item in model["items"]:
+        if item.get("type") not in {"heading", "paragraph"}:
+            continue
+        text = str(item.get("text") or "")
+        paragraph_index = item.get("paragraph_index")
+        paragraph_anchors.append(
+            {
+                "kind": item.get("type"),
+                "paragraphIndex": paragraph_index,
+                "textPreview": text[:preview_limit],
+                "anchor": {
+                    "kind": "body_paragraph",
+                    "paragraphIndex": paragraph_index,
+                },
+            }
+        )
+
+    table_anchors = [
+        {
+            "kind": "table",
+            "tableIndex": table.get("table_index"),
+            "paragraphIndex": table.get("paragraph_index"),
+            "rows": table.get("rows"),
+            "cols": table.get("cols"),
+            "anchor": {
+                "kind": "table",
+                "tableIndex": table.get("table_index"),
+                "paragraphIndex": table.get("paragraph_index"),
+            },
+        }
+        for table in model["tables"]
+    ]
+
+    try:
+        form_fields = _OPS.list_form_fields(path)
+    except Exception as exc:  # pragma: no cover - diagnostic fallback
+        form_fields = {"fields": [], "error": str(exc)}
+
+    result = {
+        "filename": filename,
+        "info": {
+            "sections": len(doc.sections),
+            "paragraphs": _paragraph_count(doc),
+            "tables": _table_count(doc),
+        },
+        "outline": model["toc"],
+        "sections": [
+            {
+                "index": section.get("index"),
+                "title": section.get("title"),
+                "level": section.get("level"),
+                "paragraphCount": len(section.get("paragraphs") or []),
+                "tableCount": len(section.get("tables") or []),
+                "figureCount": len(section.get("figures") or []),
+            }
+            for section in model["sections"]
+        ],
+        "tables": get_table_map_in_doc(doc),
+        "formFields": form_fields,
+        "anchors": {
+            "paragraphs": paragraph_anchors,
+            "tables": table_anchors,
+            "figures": model["figures"],
+        },
+        "sourceTools": [
+            "get_document_info",
+            "get_document_outline",
+            "get_table_map",
+            "list_form_fields",
+            "hwpx_extract_json",
+        ],
+    }
+    return _with_document_state(result, path)
 
 
 @mcp.tool()
@@ -2271,9 +2479,23 @@ def search_and_replace(
     replace_text: str,
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """문서에서 텍스트를 치환합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("search_and_replace", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "find_text": find_text,
+            "replace_text": replace_text,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
@@ -2281,9 +2503,17 @@ def search_and_replace(
     replaced_count = replace_in_doc(doc, find_text=find_text, replace_text=replace_text)
     result = {"replaced_count": replaced_count, "find_text": find_text, "replace_text": replace_text}
     if dry_run:
-        return _with_dry_run_verification(result, doc, path)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_dry_run_verification(result, doc, path),
+        )
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(result, verification)
+    return _idempotency_store(
+        scope,
+        fingerprint=fingerprint,
+        payload=_with_save_verification(result, verification),
+    )
 
 
 @mcp.tool()
@@ -2292,18 +2522,39 @@ def batch_replace(
     replacements: list[dict[str, str]],
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """여러 치환 규칙을 순서대로 적용합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("batch_replace", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "replacements": replacements,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
     doc = open_doc(path)
     result = batch_replace_in_doc(doc, replacements)
     if dry_run:
-        return _with_dry_run_verification(result, doc, path)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_dry_run_verification(result, doc, path),
+        )
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(result, verification)
+    return _idempotency_store(
+        scope,
+        fingerprint=fingerprint,
+        payload=_with_save_verification(result, verification),
+    )
 
 
 @mcp.tool()
@@ -2312,9 +2563,22 @@ def apply_edits(
     operations: list[dict[str, Any]],
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """여러 편집 operation을 원자적으로 적용합니다. 실패 시 원본 파일은 변경하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("apply_edits", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "operations": operations,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
@@ -2347,9 +2611,17 @@ def apply_edits(
         "operationResults": operation_results,
     }
     if dry_run:
-        return _with_dry_run_verification(result, doc, path)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_dry_run_verification(result, doc, path),
+        )
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(result, verification)
+    return _idempotency_store(
+        scope,
+        fingerprint=fingerprint,
+        payload=_with_save_verification(result, verification),
+    )
 
 
 @mcp.tool()
@@ -2400,18 +2672,40 @@ def add_heading(
     level: int = 1,
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """문서 끝에 제목 문단을 추가합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("add_heading", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "text": text,
+            "level": level,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
     doc = open_doc(path)
     idx = add_heading_to_doc(doc, text, level)
     if dry_run:
-        return _with_dry_run_verification({"paragraph_index": idx}, doc, path)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_dry_run_verification({"paragraph_index": idx}, doc, path),
+        )
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification({"paragraph_index": idx}, verification)
+    return _idempotency_store(
+        scope,
+        fingerprint=fingerprint,
+        payload=_with_save_verification({"paragraph_index": idx}, verification),
+    )
 
 
 @mcp.tool()
@@ -2421,18 +2715,40 @@ def add_paragraph(
     style: str | None = None,
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """문서 끝에 문단을 추가합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("add_paragraph", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "text": text,
+            "style": style,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
     doc = open_doc(path)
     idx = add_paragraph_to_doc(doc, text, style)
     if dry_run:
-        return _with_dry_run_verification({"paragraph_index": idx}, doc, path)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_dry_run_verification({"paragraph_index": idx}, doc, path),
+        )
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification({"paragraph_index": idx}, verification)
+    return _idempotency_store(
+        scope,
+        fingerprint=fingerprint,
+        payload=_with_save_verification({"paragraph_index": idx}, verification),
+    )
 
 
 @mcp.tool()
@@ -2443,18 +2759,41 @@ def insert_paragraph(
     style: str | None = None,
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """지정 위치 앞에 문단을 삽입합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("insert_paragraph", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "paragraph_index": paragraph_index,
+            "text": text,
+            "style": style,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
     doc = open_doc(path)
     idx = insert_paragraph_to_doc(doc, paragraph_index, text, style)
     if dry_run:
-        return _with_dry_run_verification({"inserted_index": idx}, doc, path)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_dry_run_verification({"inserted_index": idx}, doc, path),
+        )
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification({"inserted_index": idx}, verification)
+    return _idempotency_store(
+        scope,
+        fingerprint=fingerprint,
+        payload=_with_save_verification({"inserted_index": idx}, verification),
+    )
 
 
 @mcp.tool()
@@ -2463,9 +2802,22 @@ def delete_paragraph(
     paragraph_index: int,
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """지정 문단을 삭제합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("delete_paragraph", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "paragraph_index": paragraph_index,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
@@ -2473,9 +2825,17 @@ def delete_paragraph(
     remaining = delete_paragraph_from_doc(doc, paragraph_index)
     result = {"deleted_index": paragraph_index, "remaining_paragraphs": remaining}
     if dry_run:
-        return _with_dry_run_verification(result, doc, path)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_dry_run_verification(result, doc, path),
+        )
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(result, verification)
+    return _idempotency_store(
+        scope,
+        fingerprint=fingerprint,
+        payload=_with_save_verification(result, verification),
+    )
 
 
 @mcp.tool()
@@ -2486,18 +2846,41 @@ def add_table(
     data: list[list[str]] = None,
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """문서 끝에 표를 추가합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("add_table", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "rows": rows,
+            "cols": cols,
+            "data": data,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
     doc = open_doc(path)
     idx = add_table_to_doc(doc, rows, cols, data)
     if dry_run:
-        return _with_dry_run_verification({"table_index": idx}, doc, path)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_dry_run_verification({"table_index": idx}, doc, path),
+        )
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification({"table_index": idx}, verification)
+    return _idempotency_store(
+        scope,
+        fingerprint=fingerprint,
+        payload=_with_save_verification({"table_index": idx}, verification),
+    )
 
 
 @mcp.tool()
@@ -2612,9 +2995,22 @@ def fill_by_path(
     mappings: dict[str, str],
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """라벨 경로 문법으로 셀을 채웁니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("fill_by_path", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "mappings": mappings,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
@@ -2622,11 +3018,19 @@ def fill_by_path(
     result = fill_by_path_in_doc(doc, _normalize_fill_mappings(mappings))
     if result.get("applied_count", 0) > 0:
         if dry_run:
-            return _with_dry_run_verification(result, doc, path)
+            return _idempotency_store(
+                scope,
+                fingerprint=fingerprint,
+                payload=_with_dry_run_verification(result, doc, path),
+            )
         verification = _save_doc_verification(doc, path)
-        return _with_save_verification(result, verification)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_save_verification(result, verification),
+        )
     result["dryRun"] = dry_run
-    return result
+    return _idempotency_store(scope, fingerprint=fingerprint, payload=result)
 
 
 @mcp.tool()
@@ -2640,9 +3044,27 @@ def set_table_cell_text(
     split_paragraphs: bool = False,
     dry_run: bool = False,
     expected_revision: str = None,
+    idempotency_key: str = None,
 ) -> dict:
     """표 셀 텍스트를 변경합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
+    scope = _idempotency_scope("set_table_cell_text", path, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": filename,
+            "table_index": table_index,
+            "row": row,
+            "col": col,
+            "text": text,
+            "preserve_format": preserve_format,
+            "split_paragraphs": split_paragraphs,
+            "dry_run": dry_run,
+            "expected_revision": expected_revision,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        return replay
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
@@ -2665,9 +3087,17 @@ def set_table_cell_text(
         "split_paragraphs": split_paragraphs,
     }
     if dry_run:
-        return _with_dry_run_verification(result, doc, path)
+        return _idempotency_store(
+            scope,
+            fingerprint=fingerprint,
+            payload=_with_dry_run_verification(result, doc, path),
+        )
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(result, verification)
+    return _idempotency_store(
+        scope,
+        fingerprint=fingerprint,
+        payload=_with_save_verification(result, verification),
+    )
 
 
 @mcp.tool()
