@@ -489,3 +489,25 @@ def list_styles_in_doc(doc: HwpxDocument) -> list[dict[str, str | None]]:
             }
         )
     return styles
+
+
+def outline_style_levels(doc: HwpxDocument) -> dict[str, int]:
+    """스타일 id → 개요 수준 매핑을 반환한다 ("개요 N"/"Outline N" 문단 스타일)."""
+    levels: dict[str, int] = {}
+    for style in list_styles_in_doc(doc):
+        if (style.get("type") or "").upper() == "CHAR":
+            continue
+        for label in (style.get("name") or "", style.get("eng_name") or ""):
+            for prefix in ("개요 ", "Outline "):
+                if label.startswith(prefix):
+                    try:
+                        level = int(label[len(prefix):].strip())
+                    except ValueError:
+                        continue
+                    style_id = style.get("id")
+                    if style_id is not None:
+                        levels[str(style_id)] = min(6, max(1, level))
+                    break
+            if str(style.get("id")) in levels:
+                break
+    return levels

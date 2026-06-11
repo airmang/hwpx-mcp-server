@@ -46,7 +46,12 @@ from .core.content import (
     split_cell_in_table,
 )
 from .core.document import create_blank, open_doc, save_doc
-from .core.formatting import create_style_in_doc, format_text_range, list_styles_in_doc
+from .core.formatting import (
+    create_style_in_doc,
+    format_text_range,
+    list_styles_in_doc,
+    outline_style_levels,
+)
 from .core.locations import location_from_anchor, resolve_paragraph_reference
 from .core.search import _replace_in_runs, batch_replace_in_doc, find_in_doc, replace_in_doc
 from .core.transactions import (
@@ -742,9 +747,10 @@ def _build_read_model(doc: Any, *, format_detail: bool = False) -> dict[str, Any
         )
 
     table_index = 0
+    style_levels = outline_style_levels(doc)
     for paragraph_index, paragraph in enumerate(doc.paragraphs):
         text = (paragraph.text or "").strip()
-        level = _outline_level(text)
+        level = _paragraph_outline_level(paragraph, text, style_levels)
         paragraph_payload = {"index": paragraph_index, "text": text}
         if format_detail:
             paragraph_payload["format"] = _paragraph_format_detail(paragraph)
@@ -1004,6 +1010,18 @@ def _outline_level(text: str) -> int:
     if stripped[:1].isdigit() and "." in stripped[:4]:
         return 1
     return 1 if len(stripped) < 60 else 0
+
+
+def _paragraph_outline_level(
+    paragraph: Any, text: str, style_levels: dict[str, int]
+) -> int:
+    """개요 문단 스타일이 있으면 그 수준을, 없으면 텍스트 휴리스틱을 쓴다."""
+    if not (text or "").strip():
+        return 0
+    ref = getattr(paragraph, "style_id_ref", None)
+    if ref is not None and str(ref) in style_levels:
+        return style_levels[str(ref)]
+    return _outline_level(text)
 
 
 @mcp.tool()
@@ -2081,11 +2099,18 @@ def get_document_outline(filename: str) -> dict:
     path = resolve_path(filename)
     doc = open_doc(path)
     outline: list[dict] = []
+    style_levels = outline_style_levels(doc)
     for index, para in enumerate(doc.paragraphs):
         text = (para.text or "").strip()
-        level = _outline_level(text)
+        level = _paragraph_outline_level(para, text, style_levels)
         if level > 0 and text:
-            outline.append({"level": level, "text": text, "paragraph_index": index})
+            outline.append(
+                {
+                    "level": level,
+                    "text": _normalize_heading_text(text),
+                    "paragraph_index": index,
+                }
+            )
     return _with_document_state({"outline": outline}, path)
 
 

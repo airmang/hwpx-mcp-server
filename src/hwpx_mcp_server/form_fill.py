@@ -414,13 +414,22 @@ def _slug_key(label: str) -> str:
 
 
 def _document_outline(doc: Any) -> list[dict[str, Any]]:
+    try:
+        from .core.formatting import outline_style_levels
+
+        style_levels = outline_style_levels(doc)
+    except Exception:
+        style_levels = {}
     outline = []
     for index, para in enumerate(getattr(doc, "paragraphs", [])):
         text = (getattr(para, "text", None) or "").strip()
         if not text:
             continue
         level = 1 if len(text) < 80 else 0
-        if text.startswith("#"):
+        style_ref = getattr(para, "style_id_ref", None)
+        if style_ref is not None and str(style_ref) in style_levels:
+            level = style_levels[str(style_ref)]
+        elif text.startswith("#"):
             level = min(6, len(text) - len(text.lstrip("#")))
         if level:
             outline.append({"level": level, "text": text, "paragraph_index": index})

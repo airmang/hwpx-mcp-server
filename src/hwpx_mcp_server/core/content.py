@@ -58,19 +58,67 @@ def _clear_paragraph_layout_cache(paragraph: Any) -> None:
 
 # ── 문단 ──────────────────────────────────────────────
 
+def _outline_style_for_level(doc: HwpxDocument, level: int) -> dict[str, Any] | None:
+    from .formatting import list_styles_in_doc
+
+    for style in list_styles_in_doc(doc):
+        name = str(style.get("name") or "")
+        eng_name = str(style.get("eng_name") or "")
+        if name == f"개요 {level}" or eng_name == f"Outline {level}":
+            return style
+    return None
+
+
 def add_heading_to_doc(doc: HwpxDocument, text: str, level: int = 1) -> int:
-    """문서 끝에 제목(헤딩) 문단을 추가한다. 추가된 paragraph_index를 반환."""
-    safe_level = min(6, max(1, int(level)))
+    """문서 끝에 제목(헤딩) 문단을 추가한다. 추가된 paragraph_index를 반환.
+
+    제목 텍스트는 마크다운 프리픽스 없이 저장하고, 개요 수준은 템플릿 내장
+    "개요 N" 문단 스타일로 표현한다. 구버전이 본문에 남긴 '#' 리터럴 헤딩은
+    읽기 경로(_outline_level)가 계속 인식한다.
+    """
+    safe_level = min(10, max(1, int(level)))
     stripped = (text or "").strip()
-    heading_text = stripped if stripped.startswith("#") else f"{'#' * safe_level} {stripped}"
-    doc.add_paragraph(heading_text)
+    if stripped.startswith("#"):
+        stripped = stripped.lstrip("#").strip()
+
+    from hwpx.authoring import DocumentStylePreset
+
+    tokens = DocumentStylePreset().ensure_tokens(doc)
+    char_ref = tokens.get(f"gov_heading_{safe_level}") or tokens.get("heading")
+
+    outline_style = _outline_style_for_level(doc, safe_level)
+    if outline_style is not None:
+        doc.add_paragraph(
+            stripped,
+            style_id_ref=outline_style.get("id"),
+            para_pr_id_ref=outline_style.get("para_pr_id_ref"),
+            char_pr_id_ref=char_ref,
+            inherit_style=False,
+        )
+    else:
+        doc.add_paragraph(stripped, char_pr_id_ref=char_ref, inherit_style=False)
     return len(doc.paragraphs) - 1
+
+
+def _last_paragraph_is_outline(doc: HwpxDocument) -> bool:
+    paragraphs = doc.paragraphs
+    if not paragraphs:
+        return False
+    ref = getattr(paragraphs[-1], "style_id_ref", None)
+    if ref is None:
+        return False
+    from .formatting import outline_style_levels
+
+    return str(ref) in outline_style_levels(doc)
 
 
 def add_paragraph_to_doc(doc: HwpxDocument, text: str, style: str = None) -> int:
     """문서 끝에 일반 문단을 추가한다. 추가된 paragraph_index를 반환."""
     style_id = _resolve_style(doc, style)
-    doc.add_paragraph(text or "", style_id_ref=style_id)
+    # 직전 문단이 개요(헤딩) 스타일이면 상속을 끊는다 — 헤딩 뒤 본문이
+    # 개요 수준·강조 서식을 물려받는 사고 방지.
+    inherit = not (style_id is None and _last_paragraph_is_outline(doc))
+    doc.add_paragraph(text or "", style_id_ref=style_id, inherit_style=inherit)
     return len(doc.paragraphs) - 1
 
 
