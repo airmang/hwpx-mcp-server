@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from hwpx_mcp_server.core.document import open_doc, save_doc
+
 
 PHASE1_TOOLS = {
     "create_document",
@@ -98,6 +100,57 @@ def test_year_rollover_batch_replace_flow(server_module, tmp_path: Path) -> None
 
     assert result["total_replaced"] == 2
     assert "2026. 3. 1. ~ 2027. 2. 28." in text_result["text"]
+
+
+def test_document_revision_changes_and_stale_write_is_rejected(server_module, tmp_path: Path) -> None:
+    target = tmp_path / "revision.hwpx"
+    server_module.create_document(str(target))
+    first_info = server_module.get_document_info(str(target))
+    first_revision = first_info["document_revision"]
+
+    external_doc = open_doc(str(target))
+    external_doc.add_paragraph("외부 변경")
+    save_doc(external_doc, str(target))
+
+    second_info = server_module.get_document_info(str(target))
+    assert second_info["document_revision"] != first_revision
+
+    stale = server_module.add_paragraph(
+        str(target),
+        "에이전트 변경",
+        expected_revision=first_revision,
+    )
+
+    assert stale["ok"] is False
+    assert stale["reason"] == "document revision mismatch"
+    assert stale["document_revision"] == second_info["document_revision"]
+    assert "Re-read" in stale["suggestion"]
+    assert "에이전트 변경" not in server_module.get_document_text(str(target))["text"]
+
+
+def test_expected_revision_is_backward_compatible_when_omitted(server_module, tmp_path: Path) -> None:
+    target = tmp_path / "revision-omitted.hwpx"
+    server_module.create_document(str(target))
+    before = server_module.get_document_info(str(target))["document_revision"]
+
+    result = server_module.add_paragraph(str(target), "기존 호출")
+
+    assert result["paragraph_index"] >= 0
+    assert result["document_revision"] != before
+    assert "기존 호출" in server_module.get_document_text(str(target))["text"]
+
+
+def test_lock_marker_warning_is_reported_on_read(server_module, tmp_path: Path) -> None:
+    target = tmp_path / "locked.hwpx"
+    server_module.create_document(str(target))
+    lock_marker = target.with_name(f"~${target.name}")
+    lock_marker.write_text("open elsewhere", encoding="utf-8")
+
+    info = server_module.get_document_info(str(target))
+
+    assert info["documentWarnings"]
+    assert info["documentWarnings"][0]["code"] == "possible_document_lock"
+    assert info["documentWarnings"][0]["path"] == str(lock_marker)
 
 
 def test_default_max_chars_from_env(server_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

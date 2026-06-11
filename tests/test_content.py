@@ -278,8 +278,10 @@ def test_get_table_map_returns_stable_json_shape(tmp_path: Path):
 
     result = get_table_map(str(target))
 
-    assert set(result) == {"tables", "count"}
+    assert {"tables", "count", "document_revision", "documentWarnings"}.issubset(result)
     assert result["count"] == 1
+    assert result["document_revision"].startswith("sha256:")
+    assert result["documentWarnings"] == []
     entry = result["tables"][0]
     assert set(entry) == {
         "table_index",
