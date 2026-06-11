@@ -93,6 +93,13 @@ except Exception:  # pragma: no cover - optional dependency compatibility
     normalize_hwpx_document_plan = None
     validate_hwpx_document_plan = None
 
+try:  # python-hwpx >= official-document style lint feature
+    from hwpx import (
+        inspect_official_document_style as inspect_hwpx_official_document_style,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    inspect_hwpx_official_document_style = None
+
 try:  # python-hwpx >= government-report tools
     from hwpx.tools import report_utils as hwpx_report_utils
     from hwpx.tools.report_parser import (
@@ -216,7 +223,7 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 68
+_EXPECTED_FASTMCP_TOOL_COUNT = 69
 _EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
@@ -1284,6 +1291,25 @@ def inspect_operating_plan_quality(
         quality_profile={"name": "operating_plan", **dict(profile or {})},
     )
     return report.get("profiles", {}).get("operating_plan", report)
+
+
+@mcp.tool()
+def inspect_official_document_style(
+    filename: str = None,
+    paragraphs: list[str] = None,
+    document_plan: dict = None,
+) -> dict:
+    """공문서 작성규정 lint를 실행하고 위반별 수정 제안을 반환합니다."""
+    if inspect_hwpx_official_document_style is None:
+        raise RuntimeError("installed python-hwpx does not provide official-document lint")
+    if filename:
+        path = resolve_path(filename)
+        return _with_document_state(inspect_hwpx_official_document_style(path), path)
+    if document_plan is not None:
+        return inspect_hwpx_official_document_style(document_plan or {})
+    if paragraphs is not None:
+        return inspect_hwpx_official_document_style(paragraphs or [])
+    raise ValueError("filename, document_plan, or paragraphs is required")
 
 
 def _template_formfit_baseline_arg(baseline: dict | str) -> dict | str:
