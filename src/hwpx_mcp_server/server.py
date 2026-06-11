@@ -111,6 +111,17 @@ except Exception:  # pragma: no cover - optional dependency compatibility
     build_hwpx_meeting_nameplates = None
     build_hwpx_organization_chart = None
 
+try:  # python-hwpx >= clean-room document diff feature
+    from hwpx import (
+        build_comparison_table_plan as build_hwpx_comparison_table_plan,
+        doc_diff as build_hwpx_doc_diff,
+        inspect_reference_consistency as inspect_hwpx_reference_consistency,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    build_hwpx_comparison_table_plan = None
+    build_hwpx_doc_diff = None
+    inspect_hwpx_reference_consistency = None
+
 try:  # python-hwpx >= government-report tools
     from hwpx.tools import report_utils as hwpx_report_utils
     from hwpx.tools.report_parser import (
@@ -234,7 +245,7 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 72
+_EXPECTED_FASTMCP_TOOL_COUNT = 75
 _EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
@@ -1386,6 +1397,108 @@ def build_organization_chart(
         "document_plan": _single_block_plan(block, title=title),
         "next_tool": "create_document_from_plan",
     }
+
+
+def _diff_sources(
+    *,
+    old_filename: str | None = None,
+    new_filename: str | None = None,
+    old_paragraphs: list[str] | None = None,
+    new_paragraphs: list[str] | None = None,
+) -> tuple[Any, Any]:
+    if old_filename and new_filename:
+        return resolve_path(old_filename), resolve_path(new_filename)
+    if old_paragraphs is not None and new_paragraphs is not None:
+        return old_paragraphs, new_paragraphs
+    raise ValueError("provide old_filename/new_filename or old_paragraphs/new_paragraphs")
+
+
+@mcp.tool()
+def doc_diff(
+    old_filename: str = None,
+    new_filename: str = None,
+    old_paragraphs: list[str] = None,
+    new_paragraphs: list[str] = None,
+) -> dict:
+    """두 문서 또는 문단 목록의 LCS 기반 신구 paragraph diff를 반환합니다."""
+    if build_hwpx_doc_diff is None:
+        raise RuntimeError("installed python-hwpx does not provide doc_diff")
+    old_source, new_source = _diff_sources(
+        old_filename=old_filename,
+        new_filename=new_filename,
+        old_paragraphs=old_paragraphs,
+        new_paragraphs=new_paragraphs,
+    )
+    return build_hwpx_doc_diff(old_source, new_source)
+
+
+@mcp.tool()
+def create_comparison_table_document(
+    filename: str,
+    old_filename: str = None,
+    new_filename: str = None,
+    old_paragraphs: list[str] = None,
+    new_paragraphs: list[str] = None,
+    title: str = "신구대조표",
+    include_equal: bool = True,
+) -> dict:
+    """두 문서/문단을 좌우 신구대조표 HWPX로 생성하고 검증합니다."""
+    if build_hwpx_comparison_table_plan is None or build_document_from_plan is None or validate_hwpx_document_plan is None:
+        raise RuntimeError("installed python-hwpx does not provide comparison table generation")
+    old_source, new_source = _diff_sources(
+        old_filename=old_filename,
+        new_filename=new_filename,
+        old_paragraphs=old_paragraphs,
+        new_paragraphs=new_paragraphs,
+    )
+    document_plan = build_hwpx_comparison_table_plan(
+        old_source,
+        new_source,
+        title=title,
+        include_equal=include_equal,
+    )
+    validation = validate_hwpx_document_plan(document_plan)
+    if not validation.ok:
+        return {
+            "filename": filename,
+            "created": False,
+            "error": "comparison table plan failed validation",
+            "plan_validation": validation.to_dict(),
+        }
+    path = resolve_path(filename)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    doc = build_document_from_plan(document_plan, preset="government_report")
+    try:
+        verification = _save_generated_document(doc, path)
+    finally:
+        doc.close()
+    return {
+        "filename": filename,
+        "created": True,
+        "document_plan": document_plan,
+        "plan_validation": validation.to_dict(),
+        "verification": verification,
+        "openSafety": verification.get("openSafety"),
+    }
+
+
+@mcp.tool()
+def inspect_reference_consistency(
+    filename: str = None,
+    paragraphs: list[str] = None,
+    document_plan: dict = None,
+) -> dict:
+    """붙임 참조와 표/그림 번호 연속성의 의미 수준 정합성을 검사합니다."""
+    if inspect_hwpx_reference_consistency is None:
+        raise RuntimeError("installed python-hwpx does not provide reference consistency lint")
+    if filename:
+        path = resolve_path(filename)
+        return _with_document_state(inspect_hwpx_reference_consistency(path), path)
+    if document_plan is not None:
+        return inspect_hwpx_reference_consistency(document_plan or {})
+    if paragraphs is not None:
+        return inspect_hwpx_reference_consistency(paragraphs or [])
+    raise ValueError("filename, document_plan, or paragraphs is required")
 
 
 def _template_formfit_baseline_arg(baseline: dict | str) -> dict | str:
