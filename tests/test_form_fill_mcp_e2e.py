@@ -19,6 +19,12 @@ from hwpx.tools.validator import validate_document
 HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 
 
+def _append(parent: ET.Element, tag: str, attrs: dict[str, str] | None = None):
+    child = parent.makeelement(tag, attrs or {})
+    parent.append(child)
+    return child
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -35,6 +41,41 @@ def _build_template(path: Path, *, duplicate: bool = False) -> None:
     if duplicate:
         server.add_heading(str(path), "후속 회의", level=2)
         server.add_table(str(path), 1, 2, [["일시", ""]])
+
+
+def _add_click_here_field(
+    path: Path,
+    *,
+    name: str = "일시",
+    prompt: str = "회의 일시",
+    value: str = "입력하세요",
+) -> None:
+    doc = open_doc(str(path))
+    paragraph = doc.add_paragraph("", include_run=False)
+    p = paragraph.element
+    begin_run = _append(p, f"{HP}run", {"charPrIDRef": "0"})
+    ctrl = _append(begin_run, f"{HP}ctrl", {"type": "FORM", "id": f"ctrl-{name}"})
+    field_begin = _append(
+        ctrl,
+        f"{HP}fieldBegin",
+        {
+            "id": f"field-{name}",
+            "fieldid": f"field-{name}",
+            "type": "ClickHere",
+            "name": name,
+            "prompt": prompt,
+        },
+    )
+    parameters = _append(field_begin, f"{HP}parameters", {"count": "2"})
+    _append(parameters, f"{HP}stringParam", {"name": "FieldName"}).text = name
+    _append(parameters, f"{HP}stringParam", {"name": "Instruction"}).text = prompt
+    text_run = _append(p, f"{HP}run", {"charPrIDRef": "0"})
+    _append(text_run, f"{HP}t").text = value
+    end_run = _append(p, f"{HP}run", {"charPrIDRef": "0"})
+    end_ctrl = _append(end_run, f"{HP}ctrl")
+    _append(end_ctrl, f"{HP}fieldEnd", {"beginIDRef": f"field-{name}", "fieldid": f"field-{name}"})
+    paragraph.section.mark_dirty()
+    save_doc(doc, str(path))
 
 
 def _structured_input() -> dict:
@@ -71,7 +112,91 @@ def _write_minimal_docx(path: Path, rows: list[tuple[str, str]]) -> None:
 def test_form_fill_tools_are_exposed() -> None:
     names = set(server.mcp._tool_manager._tools.keys())
 
-    assert {"analyze_form_fill", "apply_form_fill"}.issubset(names)
+    assert {"list_form_fields", "fill_form_field", "analyze_form_fill", "apply_form_fill"}.issubset(names)
+
+
+def test_list_and_fill_native_form_field_returns_open_safety(tmp_path: Path) -> None:
+    source = tmp_path / "native-form.hwpx"
+    server.create_document(str(source))
+    _add_click_here_field(source, name="장소", prompt="회의 장소", value="미정")
+
+    fields = server.list_form_fields(str(source))
+
+    assert fields["fieldCount"] == 1
+    assert fields["fields"][0]["name"] == "장소"
+    assert fields["fields"][0]["prompt"] == "회의 장소"
+    assert fields["fields"][0]["current_value"] == "미정"
+
+    result = server.fill_form_field(str(source), "AI실", name="장소")
+
+    assert result["field"]["current_value"] == "AI실"
+    assert result["style_preserved"] is True
+    assert result["openSafety"]["ok"] is True
+    assert server.list_form_fields(str(source))["fields"][0]["current_value"] == "AI실"
+
+
+def test_analyze_form_fill_prefers_native_form_fields(tmp_path: Path) -> None:
+    source = tmp_path / "native-analysis.hwpx"
+    destination = tmp_path / "native-filled.hwpx"
+    server.create_document(str(source))
+    _add_click_here_field(source, name="일시", prompt="회의 일시", value="입력하세요")
+
+    analysis = server.analyze_form_fill(
+        str(source),
+        input_json={
+            "schemaVersion": "hwpx.formfill.v1",
+            "fields": [{"key": "meeting.date", "label": "일시", "value": "2026-06-11"}],
+        },
+        destination_filename=str(destination),
+    )
+
+    assert analysis["formFields"]["available"] is True
+    assert analysis["resolved_count"] == 1
+    mapping = analysis["mappings"]["resolved"][0]
+    assert mapping["kind"] == "form-field"
+    assert mapping["confidenceGrade"] == "label-exact"
+
+    result = server.apply_form_fill(analysis=analysis, confirm=True)
+
+    assert result["handoff_status"] == "ready"
+    assert result["validation"]["openSafety"]["ok"] is True
+    assert result["touched"][0]["kind"] == "form-field"
+    assert server.list_form_fields(str(destination))["fields"][0]["current_value"] == "2026-06-11"
+
+
+def test_analyze_form_fill_reports_table_label_fallback_without_form_fields(tmp_path: Path) -> None:
+    source = tmp_path / "table-template.hwpx"
+    destination = tmp_path / "table-filled.hwpx"
+    _build_template(source)
+
+    analysis = server.analyze_form_fill(
+        str(source),
+        input_json=_structured_input(),
+        destination_filename=str(destination),
+    )
+
+    assert analysis["formFields"]["available"] is False
+    assert analysis["formFields"]["fallback"] == "table-label"
+    assert {item["confidenceGrade"] for item in analysis["mappings"]["resolved"]} == {"label-exact"}
+
+
+def test_analyze_form_fill_marks_fuzzy_label_confidence(tmp_path: Path) -> None:
+    source = tmp_path / "fuzzy-template.hwpx"
+    server.create_document(str(source))
+    server.add_table(str(source), 1, 2, [["참석자명", ""]])
+
+    analysis = server.analyze_form_fill(
+        str(source),
+        input_json={
+            "schemaVersion": "hwpx.formfill.v1",
+            "fields": [{"key": "attendees", "label": "참석자", "value": "김교사"}],
+        },
+    )
+
+    assert analysis["resolved_count"] == 1
+    mapping = analysis["mappings"]["resolved"][0]
+    assert mapping["method"] == "label-path-fuzzy"
+    assert mapping["confidenceGrade"] == "label-fuzzy"
 
 
 def test_analyze_form_fill_is_non_mutating_and_apply_preserves_source(tmp_path: Path) -> None:

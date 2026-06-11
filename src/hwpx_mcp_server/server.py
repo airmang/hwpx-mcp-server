@@ -215,8 +215,8 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 66
-_EXPECTED_LEGACY_TOOL_COUNT = 61
+_EXPECTED_FASTMCP_TOOL_COUNT = 68
+_EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
     "create_government_report_document",
@@ -2746,6 +2746,32 @@ def repair_hwpx(
         max_entry_size=max_entry_size,
         max_total_size=max_total_size,
         max_source_size=max_source_size,
+    )
+
+
+@mcp.tool()
+def list_form_fields(filename: str) -> dict:
+    """문서의 네이티브 누름틀/FORM 필드 목록과 현재 값을 반환합니다."""
+    return _OPS.list_form_fields(resolve_path(filename))
+
+
+@mcp.tool()
+def fill_form_field(
+    filename: str,
+    value: str,
+    field_index: int = None,
+    field_id: str = None,
+    name: str = None,
+    dry_run: bool = False,
+) -> dict:
+    """네이티브 누름틀/FORM 필드 하나를 채우고 open-safety 검증 증거를 반환합니다."""
+    return _OPS.fill_form_field(
+        resolve_path(filename),
+        value=value,
+        field_index=field_index,
+        field_id=field_id,
+        name=name,
+        dry_run=dry_run,
     )
 
 

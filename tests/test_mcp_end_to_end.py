@@ -35,6 +35,11 @@ FORMAT_EDIT_TOOLS = {
     "set_list_format",
 }
 
+FORM_FIELD_TOOLS = {
+    "list_form_fields",
+    "fill_form_field",
+}
+
 ADVANCED_TOOLS = {
     "package_parts",
     "package_get_xml",
@@ -63,6 +68,7 @@ def test_default_toolset_exposes_phase1_and_hides_advanced(server_module) -> Non
     assert PHASE1_TOOLS.issubset(names)
     assert TABLE_NAVIGATION_TOOLS.issubset(names)
     assert FORMAT_EDIT_TOOLS.issubset(names)
+    assert FORM_FIELD_TOOLS.issubset(names)
     assert names.isdisjoint(ADVANCED_TOOLS)
 
 
@@ -110,6 +116,17 @@ def test_table_navigation_tools_stay_filename_based(server_module) -> None:
     forbidden_keys = {"doc_id", "docId", "document", "path", "handleId", "sessionId", "session"}
 
     for tool_name in TABLE_NAVIGATION_TOOLS:
+        schema = server_module.mcp._tool_manager._tools[tool_name].parameters
+        properties = set(schema.get("properties", {}))
+
+        assert "filename" in properties
+        assert properties.isdisjoint(forbidden_keys)
+
+
+def test_form_field_tools_stay_filename_based(server_module) -> None:
+    forbidden_keys = {"doc_id", "docId", "document", "path", "handleId", "sessionId", "session"}
+
+    for tool_name in FORM_FIELD_TOOLS:
         schema = server_module.mcp._tool_manager._tools[tool_name].parameters
         properties = set(schema.get("properties", {}))
 

@@ -1830,6 +1830,38 @@ class HwpxOps:
         result.update({"ok": True, "filename": path})
         return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
 
+    def list_form_fields(
+        self,
+        path: str,
+    ) -> Dict[str, Any]:
+        document, _resolved = self._open_document(path)
+        fields = document.list_form_fields()
+        return {
+            "fieldCount": len(fields),
+            "fields": fields,
+            "fallback": "table-label" if not fields else None,
+        }
+
+    def fill_form_field(
+        self,
+        path: str,
+        *,
+        value: str,
+        field_index: Optional[int] = None,
+        field_id: Optional[str] = None,
+        name: Optional[str] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        document, resolved = self._open_document(path)
+        result = document.fill_form_field(
+            value,
+            field_index=field_index,
+            field_id=field_id,
+            name=name,
+        )
+        result.update({"ok": True, "filename": path})
+        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
+
     def add_table(
         self,
         path: str,

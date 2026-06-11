@@ -326,6 +326,37 @@ class FormattingEditOutput(_BaseModel):
     backup: Optional[Dict[str, Any]] = None
 
 
+class ListFormFieldsOutput(_BaseModel):
+    fieldCount: int
+    fields: List[Dict[str, Any]]
+    fallback: Optional[str] = None
+
+
+class FillFormFieldInput(DocumentLocatorInput):
+    value: str
+    field_index: Optional[int] = Field(None, alias="fieldIndex")
+    field_id: Optional[str] = Field(None, alias="fieldId")
+    name: Optional[str] = None
+    dry_run: bool = Field(False, alias="dryRun")
+
+
+class FillFormFieldOutput(_BaseModel):
+    ok: bool
+    filename: Optional[str] = None
+    field: Dict[str, Any]
+    before_value: Optional[str] = Field(None, alias="beforeValue")
+    after_value: Optional[str] = Field(None, alias="afterValue")
+    style_before: Optional[List[Any]] = Field(None, alias="styleBefore")
+    style_after: Optional[List[Any]] = Field(None, alias="styleAfter")
+    style_preserved: Optional[bool] = Field(None, alias="stylePreserved")
+    dryRun: bool = False
+    wouldSave: Optional[bool] = None
+    verificationReport: Optional[Dict[str, Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
+    semanticDiff: Optional[Dict[str, Any]] = None
+    backup: Optional[Dict[str, Any]] = None
+
+
 class SetParagraphFormatInput(DocumentLocatorInput):
     paragraph_index: Optional[int] = Field(None, alias="paragraphIndex")
     paragraph_indexes: Optional[Sequence[int]] = Field(None, alias="paragraphIndexes")
@@ -894,7 +925,7 @@ class PackageXmlOutput(_BaseModel):
 class GetToolGuideInput(_BaseModel):
     workflow: Optional[str] = Field(
         None,
-        description="Workflow name (read, repair, edit, template, export, table, style). If omitted, returns the full guide.",
+        description="Workflow name (read, repair, edit, template, export, table, style, form). If omitted, returns the full guide.",
     )
 
 
@@ -935,6 +966,13 @@ _TOOL_GUIDE: Dict[str, str] = {
         "1. `analyze_template_structure`로 템플릿 구조/플레이스홀더 분석\n"
         "2. `fill_template`로 일괄 치환 (source → output 복사 후 치환)\n"
         "3. 결과 파일을 `read_text`로 검증\n"
+    ),
+    "form": (
+        "## 양식 채움 워크플로\n"
+        "1. 먼저 `list_form_fields`로 누름틀/FORM 필드가 있는지 확인한다.\n"
+        "2. 필드가 있으면 `fill_form_field` 또는 `analyze_form_fill`의 form-field 매핑을 우선 사용한다.\n"
+        "3. `analyze_form_fill`의 `confidenceGrade`가 `label-fuzzy` 또는 `position-guess`이면 적용 전 사용자 확인을 받는다.\n"
+        "4. `formFields.available=false`이면 명시된 `fallback=table-label`에 따라 기존 표 라벨 경로를 사용한다.\n"
     ),
     "export": (
         "## 내보내기 워크플로\n"
@@ -1060,10 +1098,24 @@ def build_tool_definitions() -> List[ToolDefinition]:
         ),
         ToolDefinition(
             name="get_tool_guide",
-            description="Return workflow guidance for HWPX MCP tools. Specify a workflow name (read/repair/edit/template/export/table/style) or omit for the full guide.",
+            description="Return workflow guidance for HWPX MCP tools. Specify a workflow name (read/repair/edit/template/export/table/style/form) or omit for the full guide.",
             input_model=GetToolGuideInput,
             output_model=GetToolGuideOutput,
             func=_get_tool_guide,
+        ),
+        ToolDefinition(
+            name="list_form_fields",
+            description="List native HWPX click-here/FORM fields with name, prompt/instruction, and current value.",
+            input_model=DocumentLocatorInput,
+            output_model=ListFormFieldsOutput,
+            func=_simple("list_form_fields"),
+        ),
+        ToolDefinition(
+            name="fill_form_field",
+            description="Fill one native HWPX click-here/FORM field while preserving formatting and returning open-safety evidence.",
+            input_model=FillFormFieldInput,
+            output_model=FillFormFieldOutput,
+            func=_simple("fill_form_field"),
         ),
         ToolDefinition(
             name="close_document_handle",

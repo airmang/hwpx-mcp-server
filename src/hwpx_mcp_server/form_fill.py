@@ -8,6 +8,7 @@ mutation, re-read, and validation evidence.
 from __future__ import annotations
 
 import copy
+from difflib import SequenceMatcher
 import hashlib
 import json
 import os
@@ -48,6 +49,10 @@ _FORM_FILL_SCHEMA_VERSION = "hwpx.formfill.v1"
 _DOCX_W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _TABLE_DIRECTIONS = {"right", "down"}
 _FORM_FILL_PLANS: dict[str, dict[str, Any]] = {}
+_CONFIDENCE_LABEL_EXACT = "label-exact"
+_CONFIDENCE_LABEL_FUZZY = "label-fuzzy"
+_CONFIDENCE_POSITION_GUESS = "position-guess"
+_FUZZY_MATCH_THRESHOLD = 0.72
 
 
 def _clear_paragraph_layout_cache(paragraph: Any) -> None:
@@ -125,6 +130,7 @@ def analyze_form_fill_workflow(
             "styles": styles,
             "styleCount": len(styles),
         },
+        "formFields": mappings.get("formFields", {}),
         "mappings": mappings,
         "unresolved_count": len(mappings["unresolved"]),
         "resolved_count": len(mappings["resolved"]),
@@ -193,7 +199,24 @@ def apply_form_fill_workflow(
         doc = open_doc(str(tmp_destination))
         applied: list[dict[str, Any]] = []
         for mapping in plan.get("mappings", {}).get("resolved", []):
-            if mapping.get("kind") == "cell":
+            if mapping.get("kind") == "form-field":
+                before_fields = _document_form_fields(doc)
+                before_field = _find_form_field_by_mapping(before_fields, mapping)
+                fill_result = doc.fill_form_field(
+                    str(mapping.get("value", "")),
+                    field_index=int(mapping["field_index"]),
+                )
+                applied.append(
+                    {
+                        **mapping,
+                        "before_text": before_field.get("current_value", "") if before_field else "",
+                        "after_text": fill_result["after_value"],
+                        "style_before": fill_result.get("style_before"),
+                        "style_after": fill_result.get("style_after"),
+                        "style_preserved": bool(fill_result.get("style_preserved", False)),
+                    }
+                )
+            elif mapping.get("kind") == "cell":
                 table_index = int(mapping["table_index"])
                 row = int(mapping["row"])
                 col = int(mapping["col"])
@@ -407,14 +430,43 @@ def _document_outline(doc: Any) -> list[dict[str, Any]]:
 def _build_mapping_analysis(doc: Any, canonical_input: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     resolved: list[dict[str, Any]] = []
     unresolved: list[dict[str, Any]] = []
+    form_fields = _document_form_fields(doc)
+    form_field_strategy = {
+        "available": bool(form_fields),
+        "count": len(form_fields),
+        "fields": form_fields,
+        "fallback": None if form_fields else "table-label",
+    }
     for field in _iter_fill_items(canonical_input):
         target = field.get("target") or {}
         kind = target.get("kind", "label-path")
+        if kind == "form-field":
+            mapping = _resolved_explicit_form_field_mapping(field, target, form_fields)
+            if mapping is None:
+                unresolved.append(
+                    {
+                        "kind": "form-field",
+                        "key": field.get("key"),
+                        "label": field.get("label"),
+                        "value": str(field.get("value", "")),
+                        "reason": "form field not found",
+                        "candidate_count": len(form_fields),
+                        "candidates": form_fields,
+                        "next_action": "provide field_index, field_id, or name from list_form_fields",
+                    }
+                )
+            else:
+                resolved.append(mapping)
+            continue
         if kind in {"cell", "coordinate"} or {"table_index", "row", "col"}.issubset(target):
             resolved.append(_resolved_cell_mapping(field, target, method="explicit-coordinate"))
             continue
         if kind == "label-path":
             label, direction = _label_and_direction(field, target)
+            native_mapping = _resolved_form_field_mapping(field, form_fields, label)
+            if native_mapping is not None:
+                resolved.append(native_mapping)
+                continue
             matches = doc.find_cell_by_label(label, direction=direction).get("matches", [])
             if len(matches) == 1:
                 match = matches[0]
@@ -431,9 +483,46 @@ def _build_mapping_analysis(doc: Any, canonical_input: dict[str, Any]) -> dict[s
                         "current_text": cell.get("text", ""),
                         "stylePolicy": field.get("stylePolicy", "preserve-target"),
                         "confidence": "high",
+                        "confidenceGrade": _CONFIDENCE_LABEL_EXACT,
                         "method": "label-path",
                     }
                 )
+            elif not matches:
+                fuzzy_matches = _find_fuzzy_table_label_matches(doc, label, direction)
+                if len(fuzzy_matches) == 1:
+                    match = fuzzy_matches[0]
+                    cell = match["target_cell"]
+                    resolved.append(
+                        {
+                            "kind": "cell",
+                            "key": field.get("key"),
+                            "label": label,
+                            "matched_label": match["label_cell"].get("text", ""),
+                            "match_score": match["score"],
+                            "value": str(field.get("value", "")),
+                            "table_index": match["table_index"],
+                            "row": cell["row"],
+                            "col": cell["col"],
+                            "current_text": cell.get("text", ""),
+                            "stylePolicy": field.get("stylePolicy", "preserve-target"),
+                            "confidence": "medium",
+                            "confidenceGrade": _CONFIDENCE_LABEL_FUZZY,
+                            "method": "label-path-fuzzy",
+                        }
+                    )
+                else:
+                    unresolved.append(
+                        {
+                            "kind": "cell",
+                            "key": field.get("key"),
+                            "label": label,
+                            "value": str(field.get("value", "")),
+                            "reason": "label not found",
+                            "candidates": fuzzy_matches,
+                            "candidate_count": len(fuzzy_matches),
+                            "next_action": "provide explicit table_index/row/col target",
+                        }
+                    )
             else:
                 unresolved.append(
                     {
@@ -460,12 +549,221 @@ def _build_mapping_analysis(doc: Any, canonical_input: dict[str, Any]) -> dict[s
                         "token": str(token),
                         "value": str(field.get("value", "")),
                         "stylePolicy": field.get("stylePolicy", "preserve-placeholder"),
+                        "confidence": "high",
+                        "confidenceGrade": _CONFIDENCE_LABEL_EXACT,
                         "method": "placeholder",
                     }
                 )
             continue
         unresolved.append({"kind": kind, "key": field.get("key"), "reason": f"unsupported target kind: {kind}"})
-    return {"resolved": resolved, "unresolved": unresolved}
+    return {"resolved": resolved, "unresolved": unresolved, "formFields": form_field_strategy}
+
+
+def _document_form_fields(doc: Any) -> list[dict[str, Any]]:
+    list_fields = getattr(doc, "list_form_fields", None)
+    if not callable(list_fields):
+        return []
+    fields = list_fields()
+    if not isinstance(fields, list):
+        return []
+    return [copy.deepcopy(field) for field in fields if isinstance(field, dict)]
+
+
+def _normalize_match_text(value: Any) -> str:
+    normalized = re.sub(r"\s+", " ", str(value or "")).strip().casefold()
+    while normalized.endswith((":", "：")):
+        normalized = normalized[:-1].rstrip()
+    return normalized
+
+
+def _form_field_labels(field: dict[str, Any]) -> list[str]:
+    labels: list[str] = []
+    for key in ("name", "prompt", "instruction", "field_id", "id", "fieldid"):
+        value = str(field.get(key) or "").strip()
+        if value:
+            labels.append(value)
+    for param in field.get("parameters", []) or []:
+        if isinstance(param, dict):
+            value = str(param.get("value") or "").strip()
+            if value:
+                labels.append(value)
+    return labels
+
+
+def _resolved_form_field_mapping(
+    field: dict[str, Any],
+    form_fields: list[dict[str, Any]],
+    label: str,
+) -> dict[str, Any] | None:
+    if not form_fields:
+        return None
+    wanted = _normalize_match_text(field.get("label") or label or field.get("key"))
+    exact = [
+        item
+        for item in form_fields
+        if wanted and wanted in {_normalize_match_text(label_value) for label_value in _form_field_labels(item)}
+    ]
+    if len(exact) == 1:
+        return _form_field_mapping(field, exact[0], label, confidence_grade=_CONFIDENCE_LABEL_EXACT, score=1.0)
+    if len(exact) > 1:
+        return None
+
+    scored: list[tuple[float, dict[str, Any]]] = []
+    for item in form_fields:
+        scores = [
+            SequenceMatcher(None, wanted, _normalize_match_text(candidate)).ratio()
+            for candidate in _form_field_labels(item)
+            if _normalize_match_text(candidate)
+        ]
+        if scores:
+            scored.append((max(scores), item))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    if not scored or scored[0][0] < _FUZZY_MATCH_THRESHOLD:
+        return None
+    if len(scored) > 1 and abs(scored[0][0] - scored[1][0]) < 0.03:
+        return None
+    return _form_field_mapping(
+        field,
+        scored[0][1],
+        label,
+        confidence_grade=_CONFIDENCE_LABEL_FUZZY,
+        score=round(scored[0][0], 3),
+    )
+
+
+def _resolved_explicit_form_field_mapping(
+    field: dict[str, Any],
+    target: dict[str, Any],
+    form_fields: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    if not form_fields:
+        return None
+    field_index = target.get("field_index", target.get("fieldIndex"))
+    if field_index is not None:
+        for item in form_fields:
+            if int(item.get("index", -1)) == int(field_index):
+                return _form_field_mapping(
+                    field,
+                    item,
+                    str(field.get("label") or field.get("key") or ""),
+                    confidence_grade=_CONFIDENCE_POSITION_GUESS,
+                    score=None,
+                    method="form-field-index",
+                )
+        return None
+    selector = target.get("field_id", target.get("fieldId")) or target.get("name")
+    if not selector:
+        return None
+    wanted = _normalize_match_text(selector)
+    matches = [
+        item
+        for item in form_fields
+        if wanted and wanted in {_normalize_match_text(label) for label in _form_field_labels(item)}
+    ]
+    if len(matches) != 1:
+        return None
+    return _form_field_mapping(
+        field,
+        matches[0],
+        str(field.get("label") or field.get("key") or ""),
+        confidence_grade=_CONFIDENCE_LABEL_EXACT,
+        score=1.0,
+        method="form-field-selector",
+    )
+
+
+def _form_field_mapping(
+    field: dict[str, Any],
+    form_field: dict[str, Any],
+    label: str,
+    *,
+    confidence_grade: str,
+    score: float | None,
+    method: str = "form-field",
+) -> dict[str, Any]:
+    mapping = {
+        "kind": "form-field",
+        "key": field.get("key"),
+        "label": label,
+        "value": str(field.get("value", "")),
+        "field_index": int(form_field["index"]),
+        "field_id": form_field.get("field_id", ""),
+        "name": form_field.get("name", ""),
+        "prompt": form_field.get("prompt", ""),
+        "instruction": form_field.get("instruction", ""),
+        "current_text": form_field.get("current_value", ""),
+        "stylePolicy": field.get("stylePolicy", "preserve-target"),
+        "confidence": "high" if confidence_grade == _CONFIDENCE_LABEL_EXACT else "medium",
+        "confidenceGrade": confidence_grade,
+        "method": method,
+    }
+    if score is not None:
+        mapping["match_score"] = score
+    return mapping
+
+
+def _find_form_field_by_mapping(
+    form_fields: list[dict[str, Any]],
+    mapping: dict[str, Any],
+) -> dict[str, Any] | None:
+    field_index = mapping.get("field_index")
+    field_id = str(mapping.get("field_id") or "")
+    name = _normalize_match_text(mapping.get("name"))
+    for field in form_fields:
+        if field_index is not None and int(field.get("index", -1)) == int(field_index):
+            return field
+        if field_id and field_id in {field.get("field_id"), field.get("id"), field.get("fieldid")}:
+            return field
+        if name and name == _normalize_match_text(field.get("name")):
+            return field
+    return None
+
+
+def _table_cell_lookup(table: dict[str, Any], row: int, col: int) -> dict[str, Any] | None:
+    for cell in table.get("cells", []) or []:
+        if int(cell.get("row", -1)) == row and int(cell.get("col", -1)) == col:
+            return cell
+    return None
+
+
+def _find_fuzzy_table_label_matches(doc: Any, label: str, direction: str) -> list[dict[str, Any]]:
+    wanted = _normalize_match_text(label)
+    if not wanted:
+        return []
+    row_delta, col_delta = (0, 1) if direction == "right" else (1, 0)
+    matches: list[dict[str, Any]] = []
+    for table in get_table_map_in_doc(doc).get("tables", []):
+        for cell in table.get("cells", []) or []:
+            cell_text = str(cell.get("text", ""))
+            normalized = _normalize_match_text(cell_text)
+            if not normalized or normalized == wanted:
+                continue
+            score = SequenceMatcher(None, wanted, normalized).ratio()
+            if score < _FUZZY_MATCH_THRESHOLD:
+                continue
+            target = _table_cell_lookup(
+                table,
+                int(cell.get("row", 0)) + row_delta,
+                int(cell.get("col", 0)) + col_delta,
+            )
+            if target is None:
+                continue
+            matches.append(
+                {
+                    "table_index": table["table_index"],
+                    "label_cell": {"row": cell["row"], "col": cell["col"], "text": cell_text},
+                    "target_cell": {
+                        "row": target["row"],
+                        "col": target["col"],
+                        "text": target.get("text", ""),
+                    },
+                    "score": round(score, 3),
+                }
+            )
+    matches.sort(key=lambda item: item["score"], reverse=True)
+    if len(matches) > 1 and abs(matches[0]["score"] - matches[1]["score"]) < 0.03:
+        return matches[:2]
+    return matches[:1]
 
 
 def _iter_fill_items(canonical_input: dict[str, Any]) -> list[dict[str, Any]]:
@@ -600,7 +898,19 @@ def _replace_placeholder(doc: Any, token: str, value: str) -> list[dict[str, Any
 def _reread_touched(doc: Any, applied: list[dict[str, Any]]) -> list[dict[str, Any]]:
     touched = []
     for item in applied:
-        if item.get("kind") == "cell":
+        if item.get("kind") == "form-field":
+            field = _find_form_field_by_mapping(_document_form_fields(doc), item)
+            touched.append(
+                {
+                    "kind": "form-field",
+                    "field_index": item.get("field_index"),
+                    "field_id": item.get("field_id"),
+                    "name": item.get("name"),
+                    "text": field.get("current_value", "") if field else "",
+                    "field": field or {},
+                }
+            )
+        elif item.get("kind") == "cell":
             table_index = int(item["table_index"])
             row = int(item["row"])
             col = int(item["col"])
