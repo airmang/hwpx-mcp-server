@@ -133,6 +133,23 @@ except Exception:  # pragma: no cover - optional dependency compatibility
     build_hwpx_mail_merge = None
     build_hwpx_table_compute = None
 
+try:  # python-hwpx >= style-profile and template registry tools
+    from hwpx import (
+        apply_style_profile_to_plan as apply_hwpx_style_profile_to_plan,
+        compare_style_profiles as compare_hwpx_style_profiles,
+        describe_template as describe_hwpx_template,
+        extract_style_profile as extract_hwpx_style_profile,
+        list_templates as list_hwpx_templates,
+        register_template as register_hwpx_template,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    apply_hwpx_style_profile_to_plan = None
+    compare_hwpx_style_profiles = None
+    describe_hwpx_template = None
+    extract_hwpx_style_profile = None
+    list_hwpx_templates = None
+    register_hwpx_template = None
+
 try:  # python-hwpx >= government-report tools
     from hwpx.tools import report_utils as hwpx_report_utils
     from hwpx.tools.report_parser import (
@@ -256,13 +273,15 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 77
+_EXPECTED_FASTMCP_TOOL_COUNT = 83
 _EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
     "create_government_report_document",
     "mail_merge",
     "table_compute",
+    "extract_style_profile",
+    "list_templates",
     "repair_hwpx",
     "replace_by_anchor",
     "add_memo_by_anchor",
@@ -534,7 +553,54 @@ def _table_to_html(rows: list[list[str]]) -> str:
     return f"<table><thead><tr>{head_html}</tr></thead>{body}</table>"
 
 
-def _build_read_model(doc: Any) -> dict[str, Any]:
+def _run_format_detail(run: Any) -> dict[str, Any]:
+    style = getattr(run, "style", None)
+    child_attrs = getattr(style, "child_attributes", {}) if style is not None else {}
+    return {
+        "text": getattr(run, "text", ""),
+        "charPrIDRef": getattr(run, "char_pr_id_ref", None),
+        "textColor": style.text_color() if style is not None else None,
+        "underlineType": style.underline_type() if style is not None else None,
+        "underlineColor": style.underline_color() if style is not None else None,
+        "bold": "bold" in child_attrs,
+        "italic": "italic" in child_attrs,
+        "strikeout": "strikeout" in child_attrs,
+        "attributes": dict(getattr(style, "attributes", {}) or {}),
+    }
+
+
+def _paragraph_format_detail(paragraph: Any) -> dict[str, Any]:
+    return {
+        "paraPrIDRef": getattr(paragraph, "para_pr_id_ref", None),
+        "styleIDRef": getattr(paragraph, "style_id_ref", None),
+        "charPrIDRef": getattr(paragraph, "char_pr_id_ref", None),
+        "runs": [_run_format_detail(run) for run in getattr(paragraph, "runs", [])],
+    }
+
+
+def _cell_format_detail(cell: Any) -> dict[str, Any]:
+    return {
+        "width": getattr(cell, "width", None),
+        "height": getattr(cell, "height", None),
+        "span": list(getattr(cell, "span", ()) or ()),
+        "address": list(getattr(cell, "address", ()) or ()),
+        "borderFillIDRef": getattr(getattr(cell, "element", None), "get", lambda _name, _default=None: _default)("borderFillIDRef"),
+    }
+
+
+def _table_format_detail(table: Any) -> dict[str, Any]:
+    rows = []
+    for row in getattr(table, "rows", []):
+        cells = [_cell_format_detail(cell) for cell in getattr(row, "cells", [])]
+        rows.append(cells)
+    return {
+        "columnCount": getattr(table, "column_count", None),
+        "rowCount": getattr(table, "row_count", None),
+        "cells": rows,
+    }
+
+
+def _build_read_model(doc: Any, *, format_detail: bool = False) -> dict[str, Any]:
     toc: list[dict[str, Any]] = []
     sections: list[dict[str, Any]] = []
     tables: list[dict[str, Any]] = []
@@ -568,6 +634,9 @@ def _build_read_model(doc: Any) -> dict[str, Any]:
     for paragraph_index, paragraph in enumerate(doc.paragraphs):
         text = (paragraph.text or "").strip()
         level = _outline_level(text)
+        paragraph_payload = {"index": paragraph_index, "text": text}
+        if format_detail:
+            paragraph_payload["format"] = _paragraph_format_detail(paragraph)
 
         if level > 0 and text:
             _flush_current_section()
@@ -581,19 +650,18 @@ def _build_read_model(doc: Any) -> dict[str, Any]:
             }
             heading_text = _normalize_heading_text(text)
             toc.append({"level": level, "text": heading_text, "paragraph_index": paragraph_index})
-            items.append(
-                {
-                    "type": "heading",
-                    "level": level,
-                    "text": heading_text,
-                    "paragraph_index": paragraph_index,
-                }
-            )
+            item = {"type": "heading", "level": level, "text": heading_text, "paragraph_index": paragraph_index}
+            if format_detail:
+                item["format"] = _paragraph_format_detail(paragraph)
+            items.append(item)
         elif text:
-            items.append({"type": "paragraph", "text": text, "paragraph_index": paragraph_index})
+            item = {"type": "paragraph", "text": text, "paragraph_index": paragraph_index}
+            if format_detail:
+                item["format"] = _paragraph_format_detail(paragraph)
+            items.append(item)
 
         if text:
-            current_section["paragraphs"].append({"index": paragraph_index, "text": text})
+            current_section["paragraphs"].append(paragraph_payload)
             if _looks_like_figure_caption(text):
                 figure = {
                     "figure_index": len(figures),
@@ -612,16 +680,14 @@ def _build_read_model(doc: Any) -> dict[str, Any]:
                 "cols": max((len(row) for row in rows), default=0),
                 "data": rows,
             }
+            if format_detail:
+                table_payload["format"] = _table_format_detail(table)
             tables.append(table_payload)
             current_section["tables"].append(table_payload)
-            items.append(
-                {
-                    "type": "table",
-                    "table_index": table_index,
-                    "paragraph_index": paragraph_index,
-                    "data": rows,
-                }
-            )
+            item = {"type": "table", "table_index": table_index, "paragraph_index": paragraph_index, "data": rows}
+            if format_detail:
+                item["format"] = table_payload["format"]
+            items.append(item)
             table_index += 1
 
     _flush_current_section()
@@ -1371,6 +1437,110 @@ def table_compute(
 
 
 @mcp.tool()
+def extract_style_profile(filename: str) -> dict:
+    """참조 HWPX의 페이지·폰트·표 프로파일을 plan 적용용 JSON으로 추출합니다."""
+    if extract_hwpx_style_profile is None:
+        raise RuntimeError("installed python-hwpx does not provide style profile tools")
+    return extract_hwpx_style_profile(resolve_path(filename))
+
+
+@mcp.tool()
+def apply_style_profile_to_plan(
+    document_plan: dict,
+    style_profile: dict = None,
+    reference_filename: str = None,
+    overwrite: bool = True,
+) -> dict:
+    """style_profile 또는 reference HWPX 서식을 document_plan v2에 적용합니다."""
+    if apply_hwpx_style_profile_to_plan is None:
+        raise RuntimeError("installed python-hwpx does not provide style profile tools")
+    profile = style_profile
+    if profile is None:
+        if not reference_filename:
+            raise ValueError("provide style_profile or reference_filename")
+        if extract_hwpx_style_profile is None:
+            raise RuntimeError("installed python-hwpx does not provide style profile extraction")
+        profile = extract_hwpx_style_profile(resolve_path(reference_filename))
+    return {
+        "document_plan": apply_hwpx_style_profile_to_plan(
+            document_plan or {},
+            profile,
+            overwrite=overwrite,
+        ),
+        "style_profile": profile,
+        "next_tool": "create_document_from_plan",
+    }
+
+
+@mcp.tool()
+def compare_style_profiles(
+    reference_filename: str = None,
+    candidate_filename: str = None,
+    reference_profile: dict = None,
+    candidate_profile: dict = None,
+    margin_tolerance_mm: float = 1.0,
+    table_weight_tolerance: float = 0.10,
+) -> dict:
+    """참조/후보 HWPX 또는 style_profile의 페이지·표 프로파일 유사성을 비교합니다."""
+    if compare_hwpx_style_profiles is None:
+        raise RuntimeError("installed python-hwpx does not provide style profile comparison")
+    reference = reference_profile or (resolve_path(reference_filename) if reference_filename else None)
+    candidate = candidate_profile or (resolve_path(candidate_filename) if candidate_filename else None)
+    if reference is None or candidate is None:
+        raise ValueError("provide reference/candidate filenames or profiles")
+    return compare_hwpx_style_profiles(
+        reference,
+        candidate,
+        margin_tolerance_mm=margin_tolerance_mm,
+        table_weight_tolerance=table_weight_tolerance,
+    )
+
+
+@mcp.tool()
+def register_template(
+    name: str,
+    source_filename: str,
+    registry_path: str = None,
+    description: str = "",
+    tags: list[str] = None,
+) -> dict:
+    """사용자 템플릿을 등록하고 style profile과 placeholder contract를 저장합니다."""
+    if register_hwpx_template is None:
+        raise RuntimeError("installed python-hwpx does not provide template registry tools")
+    return register_hwpx_template(
+        name,
+        resolve_path(source_filename),
+        registry_path=resolve_path(registry_path) if registry_path else None,
+        description=description,
+        tags=tags or [],
+    )
+
+
+@mcp.tool()
+def list_templates(registry_path: str = None) -> dict:
+    """등록된 템플릿 목록을 반환합니다."""
+    if list_hwpx_templates is None:
+        raise RuntimeError("installed python-hwpx does not provide template registry tools")
+    return list_hwpx_templates(registry_path=resolve_path(registry_path) if registry_path else None)
+
+
+@mcp.tool()
+def describe_template(
+    name: str,
+    registry_path: str = None,
+    values: dict = None,
+) -> dict:
+    """등록 템플릿 상세와 placeholder 미충전 리포트를 반환합니다."""
+    if describe_hwpx_template is None:
+        raise RuntimeError("installed python-hwpx does not provide template registry tools")
+    return describe_hwpx_template(
+        name,
+        registry_path=resolve_path(registry_path) if registry_path else None,
+        values=values or {},
+    )
+
+
+@mcp.tool()
 def parse_government_report_text(text: str, title: str = "") -> dict:
     """붙여넣은 정부보고서 텍스트를 document_plan으로 파싱하고 검증합니다."""
     if parse_hwpx_government_report_text is None or validate_hwpx_document_plan is None:
@@ -1887,6 +2057,7 @@ def hwpx_extract_json(
     output: str = "full",
     chunk_strategy: str = "section",
     max_chars_per_chunk: int | None = None,
+    format_detail: bool = False,
 ) -> dict:
     """HWPX payload 또는 URL에서 구조화된 JSON을 추출합니다."""
     mode = _normalize_output_mode(output)
@@ -1894,7 +2065,7 @@ def hwpx_extract_json(
     chunk_size = _resolve_chunk_size(max_chars_per_chunk)
 
     doc, source_meta = _open_hwpx_from_payload(hwpx_base64, url)
-    model = _build_read_model(doc)
+    model = _build_read_model(doc, format_detail=bool(format_detail))
     doc_payload = {
         "title": model["title"],
         "toc": model["toc"],
@@ -1906,6 +2077,8 @@ def hwpx_extract_json(
         "doc": doc_payload,
         "meta": _build_conversion_meta(model, source_meta),
     }
+    if format_detail:
+        result["meta"]["format_detail"] = True
     if mode == "chunks":
         result["chunks"] = _json_chunks(
             model,
