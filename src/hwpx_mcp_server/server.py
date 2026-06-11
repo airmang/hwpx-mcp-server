@@ -122,6 +122,17 @@ except Exception:  # pragma: no cover - optional dependency compatibility
     build_hwpx_doc_diff = None
     inspect_hwpx_reference_consistency = None
 
+try:  # python-hwpx >= mail-merge and table-compute productivity tools
+    from hwpx import (
+        inspect_mail_merge_placeholders as inspect_hwpx_mail_merge_placeholders,
+        mail_merge as build_hwpx_mail_merge,
+        table_compute as build_hwpx_table_compute,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    inspect_hwpx_mail_merge_placeholders = None
+    build_hwpx_mail_merge = None
+    build_hwpx_table_compute = None
+
 try:  # python-hwpx >= government-report tools
     from hwpx.tools import report_utils as hwpx_report_utils
     from hwpx.tools.report_parser import (
@@ -245,11 +256,13 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 75
+_EXPECTED_FASTMCP_TOOL_COUNT = 77
 _EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
     "create_government_report_document",
+    "mail_merge",
+    "table_compute",
     "repair_hwpx",
     "replace_by_anchor",
     "add_memo_by_anchor",
@@ -1254,6 +1267,107 @@ def compute_report_value(operation: str, values: list | dict = None) -> dict:
         return {"operation": operation, "value": None, "warnings": [str(exc)]}
 
     return {"operation": normalized, "value": value, "warnings": []}
+
+
+@mcp.tool()
+def inspect_mail_merge_placeholders(filename: str) -> dict:
+    """메일머지 템플릿의 placeholder key를 확인합니다."""
+    if inspect_hwpx_mail_merge_placeholders is None:
+        raise RuntimeError("installed python-hwpx does not provide mail merge tools")
+    return inspect_hwpx_mail_merge_placeholders(resolve_path(filename))
+
+
+def _mail_merge_data_source(data_rows: list | dict | None, data_filename: str | None) -> Any:
+    if data_rows is not None:
+        return data_rows
+    if data_filename:
+        return resolve_path(data_filename)
+    raise ValueError("provide data_rows or data_filename")
+
+
+def _mail_merge_open_safety_summary(report: dict) -> dict:
+    row_reports = list(report.get("rows") or [])
+    checked = 0
+    failures: list[dict[str, Any]] = []
+    for row in row_reports:
+        open_safety = row.get("openSafety")
+        if not isinstance(open_safety, dict):
+            continue
+        checked += 1
+        if not bool(open_safety.get("ok")):
+            failures.append(
+                {
+                    "rowIndex": row.get("rowIndex"),
+                    "filename": row.get("filename"),
+                    "summary": open_safety.get("summary"),
+                }
+            )
+    return {
+        "ok": checked == int(report.get("createdCount", 0)) and not failures,
+        "checkedCount": checked,
+        "failureCount": len(failures),
+        "failures": failures,
+    }
+
+
+@mcp.tool()
+def mail_merge(
+    template_filename: str,
+    data_rows: list | dict = None,
+    data_filename: str = None,
+    output_dir: str = None,
+    filename_pattern: str = "{index:03d}.hwpx",
+    zip_filename: str = None,
+    strict: bool = False,
+    split_newlines: bool = True,
+) -> dict:
+    """템플릿 HWPX와 CSV/JSON/rows 데이터로 N부를 생성하고 zip/openSafety evidence를 반환합니다."""
+    if build_hwpx_mail_merge is None:
+        raise RuntimeError("installed python-hwpx does not provide mail merge tools")
+    data_source = _mail_merge_data_source(data_rows, data_filename)
+    report = build_hwpx_mail_merge(
+        resolve_path(template_filename),
+        data_source,
+        output_dir=resolve_path(output_dir) if output_dir else None,
+        filename_pattern=filename_pattern,
+        zip_path=resolve_path(zip_filename) if zip_filename else None,
+        strict=strict,
+        split_newlines=split_newlines,
+    )
+    open_safety = _mail_merge_open_safety_summary(report)
+    report["openSafety"] = open_safety
+    report["verification"] = {
+        "openSafety": open_safety,
+        "createdCount": report.get("createdCount", 0),
+        "rowCount": report.get("rowCount", 0),
+        "rowsWithIssues": report.get("rowsWithIssues", []),
+        "zip": report.get("zip"),
+    }
+    return report
+
+
+@mcp.tool()
+def table_compute(
+    table: dict | list,
+    value_columns: list = None,
+    operations: list = None,
+    append: str = "rows",
+    group_by: str | int = None,
+    label_column: str | int = None,
+    labels: dict = None,
+) -> dict:
+    """일반 표에 합계·평균·소계 행/열을 추가하고 계산 근거를 반환합니다."""
+    if build_hwpx_table_compute is None:
+        raise RuntimeError("installed python-hwpx does not provide table compute tools")
+    return build_hwpx_table_compute(
+        table,
+        value_columns=value_columns,
+        operations=operations,
+        append=append,
+        group_by=group_by,
+        label_column=label_column,
+        labels=labels,
+    )
 
 
 @mcp.tool()
