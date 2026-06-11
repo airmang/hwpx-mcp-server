@@ -622,6 +622,31 @@ class ExportOutput(_BaseModel):
     format: str
 
 
+class RenderPreviewInput(DocumentLocatorInput):
+    output_dir: Optional[str] = Field(None, alias="outputDir")
+    mode: Literal["pages", "long"] = "pages"
+    screenshot: Literal["auto", "require", "off"] = "auto"
+    max_pages: Optional[int] = Field(None, alias="maxPages")
+
+
+class RenderPreviewOutput(_BaseModel):
+    status: str
+    schemaVersion: str
+    generatedAt: str
+    sourcePath: str
+    outputDir: str
+    htmlPath: str
+    manifestPath: str
+    visualReviewPath: str
+    mode: str
+    pageCount: int
+    pages: List[Dict[str, Any]]
+    screenshots: List[Dict[str, Any]]
+    screenshotEngine: Dict[str, Any]
+    warnings: List[str]
+    suggestion: Optional[str] = None
+
+
 class ConvertHwpToHwpxInput(_BaseModel):
     source: str
     output: Optional[str] = None
@@ -1159,6 +1184,13 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=DocumentLocatorInput,
             output_model=ExportOutput,
             func=_simple("export_html"),
+        ),
+        ToolDefinition(
+            name="render_preview",
+            description="Generate layout-aware HTML and headless browser PNG preview artifacts.",
+            input_model=RenderPreviewInput,
+            output_model=RenderPreviewOutput,
+            func=_simple("render_preview"),
         ),
         ToolDefinition(
             name="export_markdown",

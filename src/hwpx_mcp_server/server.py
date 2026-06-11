@@ -207,8 +207,8 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 56
-_EXPECTED_LEGACY_TOOL_COUNT = 51
+_EXPECTED_FASTMCP_TOOL_COUNT = 57
+_EXPECTED_LEGACY_TOOL_COUNT = 52
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
     "create_government_report_document",
@@ -216,6 +216,7 @@ _KEY_TOOL_NAMES = (
     "replace_by_anchor",
     "add_memo_by_anchor",
     "byte_preserving_patch",
+    "render_preview",
 )
 _FIGURE_CAPTION_RE = re.compile(r"^\s*(?:Figure|Fig\.|그림)\s*\d*", re.IGNORECASE)
 
@@ -1445,6 +1446,24 @@ def hwpx_to_html(
         payload["meta"]["chunk_strategy"] = strategy
         payload["meta"]["max_chars_per_chunk"] = chunk_size
     return payload
+
+
+@mcp.tool()
+def render_preview(
+    filename: str,
+    output_dir: str | None = None,
+    mode: str = "pages",
+    screenshot: str = "auto",
+    max_pages: int | None = None,
+) -> dict:
+    """레이아웃 충실 HTML과 headless browser PNG 프리뷰 산출물을 생성합니다."""
+    return _OPS.render_preview(
+        path=filename,
+        output_dir=output_dir,
+        mode=mode,
+        screenshot=screenshot,
+        max_pages=max_pages,
+    )
 
 
 @mcp.tool()

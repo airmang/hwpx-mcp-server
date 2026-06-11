@@ -6,11 +6,14 @@ from __future__ import annotations
 import copy
 import dataclasses
 import hashlib
+import json
 import logging
 import math
 import os
 import re
 import re as _re
+import shutil
+import subprocess
 import tempfile
 from dataclasses import asdict
 from datetime import datetime
@@ -68,6 +71,14 @@ from .upstream import (
     validate_document_path,
 )
 
+try:  # python-hwpx >= layout preview feature
+    from hwpx.tools.layout_preview import render_layout_preview as render_hwpx_layout_preview
+except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+    render_hwpx_layout_preview = None
+    _LAYOUT_PREVIEW_IMPORT_ERROR: Exception | None = exc
+else:
+    _LAYOUT_PREVIEW_IMPORT_ERROR = None
+
 logger = logging.getLogger(__name__)
 
 _CELL_TEXT_ILLEGAL = _re.compile(
@@ -99,6 +110,46 @@ _AUTO_FIT_MAX_COLUMN_WIDTH = _DEFAULT_CELL_WIDTH * 12
 
 
 DEFAULT_PAGING_PARAGRAPH_LIMIT = 200
+_PREVIEW_SCHEMA_VERSION = "hwpx.render-preview.v1"
+_VISUAL_REVIEW_SCHEMA_VERSION = "hwpx.visual-review.v1"
+_CSS_PX_PER_MM = 96 / 25.4
+_CHROME_CANDIDATES = (
+    "chromium",
+    "chromium-browser",
+    "google-chrome",
+    "google-chrome-stable",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+)
+
+
+def _preview_slug(path: Path) -> str:
+    stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", path.stem).strip("-")
+    return stem or "document"
+
+
+def _chrome_executable() -> str | None:
+    env_path = os.environ.get("HWPX_MCP_CHROME_PATH")
+    if env_path and Path(env_path).exists():
+        return env_path
+    for candidate in _CHROME_CANDIDATES:
+        if candidate.startswith("/"):
+            if Path(candidate).exists():
+                return candidate
+            continue
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    return None
+
+
+def _page_viewport(page: Dict[str, Any]) -> tuple[int, int]:
+    width = max(320, math.ceil(float(page.get("widthMm", 210.0)) * _CSS_PX_PER_MM))
+    height = max(320, math.ceil(float(page.get("heightMm", 297.0)) * _CSS_PX_PER_MM))
+    return width, height
+
+
+def _write_json(path: Path, payload: Dict[str, Any]) -> None:
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 class HwpxOperationError(RuntimeError):
@@ -2130,6 +2181,264 @@ class HwpxOps:
         """Export document content as Markdown."""
         document, _ = self._open_document(path)
         return {"content": export_document(document, "markdown"), "format": "markdown"}
+
+    def _preview_output_dir(self, source_path: Path, output_dir: Optional[str]) -> Path:
+        if output_dir:
+            resolved = self.storage.resolve_path(output_dir, must_exist=False)
+        else:
+            resolved = source_path.parent / f"{_preview_slug(source_path)}-preview"
+        resolved.mkdir(parents=True, exist_ok=True)
+        return resolved
+
+    def _capture_preview_pages(
+        self,
+        *,
+        page_html_paths: Sequence[Path],
+        pages: Sequence[Dict[str, Any]],
+        output_dir: Path,
+        max_pages: int | None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        capture_count = len(page_html_paths)
+        if max_pages is not None:
+            capture_count = min(capture_count, max(0, max_pages))
+
+        try:
+            from playwright.sync_api import sync_playwright  # type: ignore
+        except Exception as playwright_exc:
+            playwright_error = str(playwright_exc)
+        else:  # pragma: no cover - local CI normally uses Chrome CLI fallback
+            screenshots: list[dict[str, Any]] = []
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch()
+                try:
+                    for index, html_path in enumerate(page_html_paths[:capture_count]):
+                        page_info = pages[index]
+                        width, height = _page_viewport(page_info)
+                        output_path = output_dir / f"page-{index + 1:03d}.png"
+                        browser_page = browser.new_page(
+                            viewport={"width": width, "height": height},
+                            device_scale_factor=1,
+                        )
+                        browser_page.goto(html_path.as_uri(), wait_until="load")
+                        browser_page.screenshot(path=str(output_path), full_page=True)
+                        browser_page.close()
+                        screenshots.append(
+                            {
+                                "pageIndex": index,
+                                "path": self._relative_path(output_path),
+                                "backend": "playwright-chromium",
+                                "widthPx": width,
+                                "heightPx": height,
+                            }
+                        )
+                finally:
+                    browser.close()
+            return screenshots, {
+                "requested": True,
+                "available": True,
+                "backend": "playwright-chromium",
+                "message": f"Captured {len(screenshots)} preview screenshot(s).",
+            }
+
+        chrome = _chrome_executable()
+        if chrome is None:
+            return [], {
+                "requested": True,
+                "available": False,
+                "backend": None,
+                "message": (
+                    "No screenshot backend available. Install playwright browsers "
+                    "or set HWPX_MCP_CHROME_PATH to a Chrome executable. "
+                    f"Playwright import error: {playwright_error}"
+                ),
+            }
+
+        screenshots = []
+        failures: list[str] = []
+        for index, html_path in enumerate(page_html_paths[:capture_count]):
+            page_info = pages[index]
+            width, height = _page_viewport(page_info)
+            output_path = output_dir / f"page-{index + 1:03d}.png"
+            command = [
+                chrome,
+                "--headless=new",
+                "--disable-gpu",
+                "--hide-scrollbars",
+                "--no-first-run",
+                "--no-default-browser-check",
+                f"--window-size={width},{height}",
+                f"--screenshot={output_path}",
+                html_path.as_uri(),
+            ]
+            try:
+                completed = subprocess.run(
+                    command,
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=60,
+                )
+            except Exception as exc:  # pragma: no cover - environment specific
+                failures.append(f"page {index + 1}: {exc}")
+                continue
+            if completed.returncode != 0 or not output_path.exists():
+                detail = (completed.stderr or completed.stdout or "unknown error").strip()
+                failures.append(f"page {index + 1}: {detail}")
+                continue
+            screenshots.append(
+                {
+                    "pageIndex": index,
+                    "path": self._relative_path(output_path),
+                    "backend": "chrome-headless-cli",
+                    "widthPx": width,
+                    "heightPx": height,
+                }
+            )
+
+        message = f"Captured {len(screenshots)} preview screenshot(s) with Chrome CLI."
+        if failures:
+            message += " Failures: " + " | ".join(failures[:3])
+        return screenshots, {
+            "requested": True,
+            "available": bool(screenshots),
+            "backend": "chrome-headless-cli",
+            "executable": chrome,
+            "message": message,
+        }
+
+    def render_preview(
+        self,
+        path: str,
+        output_dir: Optional[str] = None,
+        mode: str = "pages",
+        screenshot: str = "auto",
+        max_pages: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Generate layout-aware HTML and optional PNG preview artifacts."""
+        if render_hwpx_layout_preview is None:
+            raise self._new_error(
+                "RENDER_PREVIEW_UNAVAILABLE",
+                "Installed python-hwpx does not expose hwpx.tools.layout_preview.",
+                details={"importError": str(_LAYOUT_PREVIEW_IMPORT_ERROR)},
+                hint="Install the matching python-hwpx checkout/release and restart the MCP server.",
+            )
+        if mode not in {"pages", "long"}:
+            raise self._new_error(
+                "RENDER_PREVIEW_INVALID_MODE",
+                "mode must be 'pages' or 'long'",
+                details={"mode": mode},
+            )
+        if screenshot not in {"auto", "require", "off"}:
+            raise self._new_error(
+                "RENDER_PREVIEW_INVALID_SCREENSHOT_MODE",
+                "screenshot must be 'auto', 'require', or 'off'",
+                details={"screenshot": screenshot},
+            )
+
+        source_path = self._resolve_path(path)
+        output_path = self._preview_output_dir(source_path, output_dir)
+        preview = render_hwpx_layout_preview(source_path, mode=mode, title=source_path.name)
+        preview_dict = preview.as_dict()
+
+        html_path = output_path / "preview.html"
+        manifest_path = output_path / "manifest.json"
+        evidence_path = output_path / "visual-review.json"
+        html_path.write_text(preview.html, encoding="utf-8")
+
+        page_html_paths: list[Path] = []
+        page_documents = preview.page_html_documents(title=source_path.name)
+        for index, page_html in enumerate(page_documents):
+            page_html_path = output_path / f"page-{index + 1:03d}.html"
+            page_html_path.write_text(page_html, encoding="utf-8")
+            page_html_paths.append(page_html_path)
+
+        pages = []
+        for index, page in enumerate(preview_dict["pages"]):
+            item = dict(page)
+            if index < len(page_html_paths):
+                item["htmlPath"] = self._relative_path(page_html_paths[index])
+            pages.append(item)
+
+        if screenshot == "off":
+            screenshots: list[dict[str, Any]] = []
+            screenshot_engine = {
+                "requested": False,
+                "available": False,
+                "backend": None,
+                "message": "Screenshot generation was disabled by request.",
+            }
+            status = "html_only"
+        else:
+            screenshots, screenshot_engine = self._capture_preview_pages(
+                page_html_paths=page_html_paths,
+                pages=pages,
+                output_dir=output_path,
+                max_pages=max_pages,
+            )
+            requested_count = len(page_html_paths)
+            if max_pages is not None:
+                requested_count = min(requested_count, max(0, max_pages))
+            if screenshots and len(screenshots) == requested_count:
+                status = "ok"
+            elif screenshots:
+                status = "partial"
+            else:
+                status = "blocked"
+
+        screenshot_by_page = {item["pageIndex"]: item for item in screenshots}
+        for page in pages:
+            screenshot_item = screenshot_by_page.get(page["index"])
+            if screenshot_item is not None:
+                page["screenshotPath"] = screenshot_item["path"]
+
+        generated_at = datetime.utcnow().isoformat() + "Z"
+        suggestion = None
+        if status in {"blocked", "partial"}:
+            suggestion = (
+                "Open preview.html manually or install a headless browser backend "
+                "(Playwright browsers or Chrome via HWPX_MCP_CHROME_PATH) and rerun render_preview."
+            )
+
+        visual_review = {
+            "schemaVersion": _VISUAL_REVIEW_SCHEMA_VERSION,
+            "sourcePath": self._relative_path(source_path),
+            "current": {
+                "status": "observed_pass" if status == "ok" else "blocked",
+                "method": screenshot_engine.get("backend") or "html-preview",
+                "screenshot_path": screenshots[0]["path"] if screenshots else None,
+                "notes": (
+                    "Layout preview screenshots generated. Final Hancom viewer acceptance is still required."
+                    if status == "ok"
+                    else screenshot_engine["message"]
+                ),
+            },
+            "summary": {
+                "resolved_visual_review_required": "observed_pass" if status == "ok" else "blocked",
+                "layout_preview_status": status,
+            },
+        }
+        _write_json(evidence_path, visual_review)
+
+        manifest = {
+            "schemaVersion": _PREVIEW_SCHEMA_VERSION,
+            "status": status,
+            "generatedAt": generated_at,
+            "sourcePath": self._relative_path(source_path),
+            "outputDir": self._relative_path(output_path),
+            "htmlPath": self._relative_path(html_path),
+            "manifestPath": self._relative_path(manifest_path),
+            "visualReviewPath": self._relative_path(evidence_path),
+            "mode": mode,
+            "pageCount": len(pages),
+            "pages": pages,
+            "screenshots": screenshots,
+            "screenshotEngine": screenshot_engine,
+            "warnings": list(preview.warnings),
+            "suggestion": suggestion,
+        }
+        _write_json(manifest_path, manifest)
+        return manifest
 
     def make_blank(self, out: str) -> Dict[str, Any]:
         document = new_document()
