@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-06-12
+### Added
+- Transactional editing: `apply_edits` (atomic multi-op with rollback, `dry_run`, `expected_revision`, `idempotency_key`), `undo_last_edit`, automatic `.bak` rotation, and semantic diff summaries on write responses.
+- `render_preview` layout preview tool (page-approximate HTML/PNG for agent self-checks).
+- Document revision concurrency guard: reads return `document_revision`; writes reject on `expected_revision` mismatch; Hancom file-lock warnings.
+- Native form field (누름틀) workflows: `list_form_fields`, `fill_form_field`, plus match-confidence grades in `analyze_form_fill`.
+- Existing-document format editing tools: `set_paragraph_format`, `set_page_setup`, header/footer/page-number and list/bullet tools (human units).
+- Official document style lint `inspect_official_document_style` and approval-box (결재란) preset support.
+- Advanced generator tools: photo sheet (`image_grid`), meeting nameplates, table-based org chart.
+- `doc_diff` paragraph diff and reference-consistency lint tools.
+- `mail_merge` bulk generation and `table_compute` (sum/avg) tools.
+- Style profile transfer (`extract_style_profile`) and template registry tools.
+- Picture asset workflows (safe insert/replace with manifest validation).
+- Byte-preserving patch tool `byte_preserving_patch` backed by `hwpx.patch`.
+- `get_document_map` single-call document map; compact write responses (`verbosity` compact/full); plugin health diagnostics in `mcp_server_health`; actionable `suggestion` fields on common errors.
+
+### Changed
+- Require `python-hwpx >= 2.11.0` for the fuzz-hardened, parser-hardened authoring surface backing the new tools.
+
+### Fixed
+- `add_heading` no longer stores a literal markdown `#` prefix in document text (it leaked into the Hancom editor view). Headings now use the template's built-in `개요 N` paragraph styles with emphasized run styling; outline readers (`get_document_outline`, structure extraction, form-fill analysis) detect style-based headings first while still recognizing legacy `#` headings, and a paragraph added right after a heading no longer inherits the outline style.
+
 ## [2.3.5] - 2026-06-09
 ### Changed
 - Require `python-hwpx >= 2.10.3` so MCP saves inherit the upstream editor-open safety guard for stale `lineSegArray` layout caches.
