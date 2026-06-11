@@ -9,6 +9,9 @@ from hwpx_mcp_server.hwpx_ops import HH_NS, HP_NS, HwpxOps
 import hwpx_mcp_server.hwpx_ops as ops_module
 from hwpx_mcp_server.tools import build_tool_definitions
 
+PNG_1X1_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/axwAqkAAAAASUVORK5CYII="
+PNG_1X1_ALT_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAFgwJ/l8EydgAAAABJRU5ErkJggg=="
+
 
 @pytest.fixture()
 def ops_with_sample(tmp_path) -> tuple[HwpxOps, Path]:
@@ -27,6 +30,44 @@ def test_open_info_counts(ops_with_sample):
     assert info["sectionCount"] >= 1
     assert info["paragraphCount"] >= 1
     assert info["meta"]["absolutePath"].endswith("sample.hwpx")
+
+
+def test_picture_tool_definitions_call_ops_with_safe_asset_graph(tmp_path):
+    workdir = tmp_path / "workspace"
+    workdir.mkdir()
+    target = workdir / "picture.hwpx"
+    HwpxDocument.new().save_to_path(target)
+    ops = HwpxOps(base_directory=workdir, auto_backup=True)
+    tools = {definition.name: definition for definition in build_tool_definitions()}
+
+    inserted = tools["insert_picture"].call(
+        ops,
+        {
+            "path": target.name,
+            "imageBase64": PNG_1X1_B64,
+            "imageFormat": "png",
+            "width": 11111,
+            "height": 22222,
+        },
+    )
+
+    assert inserted["openSafety"]["ok"] is True
+    assert inserted["idIntegrity"]["ok"] is True
+    assert inserted["picture"]["binaryItemIDRef"] == "BIN0001"
+
+    replaced = tools["replace_picture"].call(
+        ops,
+        {
+            "path": target.name,
+            "imageBase64": PNG_1X1_ALT_B64,
+            "imageFormat": "png",
+        },
+    )
+
+    assert replaced["openSafety"]["ok"] is True
+    assert replaced["idIntegrity"]["ok"] is True
+    assert replaced["replacement"]["old_binaryItemIDRef"] == "BIN0001"
+    assert replaced["replacement"]["new_binaryItemIDRef"] == "BIN0002"
 
 
 def test_read_text_pagination(ops_with_sample):

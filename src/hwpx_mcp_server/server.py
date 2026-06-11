@@ -66,6 +66,8 @@ from .storage import build_hwpx_open_safety_report, build_hwpx_verification_repo
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
+from hwpx.tools.id_integrity import check_id_integrity
+
 try:  # python-hwpx >= proposal preset feature
     from hwpx.presets import (
         create_proposal_document as build_proposal_document,
@@ -213,8 +215,8 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 59
-_EXPECTED_LEGACY_TOOL_COUNT = 54
+_EXPECTED_FASTMCP_TOOL_COUNT = 61
+_EXPECTED_LEGACY_TOOL_COUNT = 56
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
     "create_government_report_document",
@@ -409,6 +411,26 @@ def _open_hwpx_from_payload(hwpx_base64: str | None, url: str | None):
     except Exception as exc:  # pragma: no cover - delegated to parser
         raise ValueError(f"failed to parse hwpx payload: {exc}") from exc
     return doc, source_meta
+
+
+def _decode_image_base64(image_base64: str) -> bytes:
+    try:
+        payload = base64.b64decode((image_base64 or "").strip(), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("invalid image_base64 payload") from exc
+    if not payload:
+        raise ValueError("image_base64 decoded to empty payload")
+    return payload
+
+
+def _id_integrity_payload(doc: Any) -> dict[str, Any]:
+    report = check_id_integrity(doc)
+    return {
+        "ok": report.ok,
+        "dangling": [str(item) for item in report.dangling],
+        "orphanBinData": [str(item) for item in report.orphan_bin_data],
+        "ignored": [str(item) for item in report.ignored],
+    }
 
 
 def _table_rows(table: Any) -> list[list[str]]:
@@ -2053,6 +2075,87 @@ def add_page_break(filename: str, dry_run: bool = False) -> dict:
         return _with_dry_run_verification({"success": True}, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification({"success": True}, verification)
+
+
+@mcp.tool()
+def insert_picture(
+    filename: str,
+    image_base64: str,
+    image_format: str = "png",
+    width: int | None = None,
+    height: int | None = None,
+    width_mm: float | None = None,
+    height_mm: float | None = None,
+    section_index: int | None = None,
+    align: str | None = None,
+    output: str | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """본문에 그림 객체를 삽입하고 BinData/manifest 참조를 함께 저장합니다."""
+    path = resolve_path(filename)
+    target_path = resolve_path(output) if output else path
+    doc = open_doc(path)
+    image_data = _decode_image_base64(image_base64)
+    doc.add_picture(
+        image_data,
+        image_format,
+        width=width,
+        height=height,
+        width_mm=width_mm,
+        height_mm=height_mm,
+        section_index=section_index,
+        align=align,
+    )
+    picture_refs = doc.picture_references()
+    result = {
+        "ok": True,
+        "filename": filename,
+        "outputPath": target_path,
+        "picture": picture_refs[-1] if picture_refs else None,
+        "pictureReferences": picture_refs,
+        "idIntegrity": _id_integrity_payload(doc),
+    }
+    if dry_run:
+        return _with_dry_run_verification(result, doc, target_path)
+    verification = _save_doc_verification(doc, target_path)
+    return _with_save_verification(result, verification)
+
+
+@mcp.tool()
+def replace_picture(
+    filename: str,
+    image_base64: str,
+    image_format: str = "png",
+    picture_index: int = 0,
+    binary_item_id_ref: str | None = None,
+    remove_orphaned: bool = True,
+    output: str | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """그림 객체의 geometry를 유지하고 연결된 이미지 asset만 교체합니다."""
+    path = resolve_path(filename)
+    target_path = resolve_path(output) if output else path
+    doc = open_doc(path)
+    image_data = _decode_image_base64(image_base64)
+    replacement = doc.replace_picture(
+        image_data,
+        image_format,
+        picture_index=picture_index,
+        binary_item_id_ref=binary_item_id_ref,
+        remove_orphaned=remove_orphaned,
+    )
+    result = {
+        "ok": True,
+        "filename": filename,
+        "outputPath": target_path,
+        "replacement": replacement,
+        "pictureReferences": doc.picture_references(),
+        "idIntegrity": _id_integrity_payload(doc),
+    }
+    if dry_run:
+        return _with_dry_run_verification(result, doc, target_path)
+    verification = _save_doc_verification(doc, target_path)
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()

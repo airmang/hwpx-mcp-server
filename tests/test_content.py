@@ -27,8 +27,10 @@ from hwpx_mcp_server.server import (
     get_table_map,
     get_table_text,
     insert_paragraph,
+    insert_picture,
     list_available_documents,
     remove_memo,
+    replace_picture,
     replace_by_anchor,
     replace_in_paragraph,
     set_table_cell_text,
@@ -37,6 +39,9 @@ from hwpx_mcp_server.utils.helpers import resolve_path
 
 _FORM_ROWS = [["성명:", ""], ["소속", ""], ["합계", "100"]]
 HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
+
+PNG_1X1_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/axwAqkAAAAASUVORK5CYII="
+PNG_1X1_ALT_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAFgwJ/l8EydgAAAABJRU5ErkJggg=="
 
 
 def _create_form_document(target: Path) -> None:
@@ -76,6 +81,43 @@ def test_add_paragraph(tmp_path: Path):
     assert "안녕하세요" in text_result["text"]
     assert result["openSafety"]["ok"] is True
     assert result["verificationReport"]["filePath"] == str(target)
+
+
+def test_insert_and_replace_picture_tools_preserve_safe_asset_graph(tmp_path: Path):
+    target = tmp_path / "picture-tools.hwpx"
+    create_document(str(target))
+
+    inserted = insert_picture(
+        str(target),
+        PNG_1X1_B64,
+        image_format="png",
+        width=11111,
+        height=22222,
+    )
+
+    assert inserted["openSafety"]["ok"] is True
+    assert inserted["verificationReport"]["openSafety"]["ok"] is True
+    assert inserted["idIntegrity"]["ok"] is True
+    assert inserted["picture"]["binaryItemIDRef"] == "BIN0001"
+
+    document = open_doc(str(target))
+    assert document.package.has_part("BinData/BIN0001.png")
+    assert any(item.get("id") == "BIN0001" for item in document.package._manifest_items())
+
+    replaced = replace_picture(str(target), PNG_1X1_ALT_B64, image_format="png")
+
+    assert replaced["openSafety"]["ok"] is True
+    assert replaced["verificationReport"]["openSafety"]["ok"] is True
+    assert replaced["idIntegrity"]["ok"] is True
+    assert replaced["replacement"]["geometryPreserved"] is True
+    assert replaced["replacement"]["old_binaryItemIDRef"] == "BIN0001"
+    assert replaced["replacement"]["new_binaryItemIDRef"] == "BIN0002"
+    assert replaced["replacement"]["removedOldImage"] is True
+
+    refreshed = open_doc(str(target))
+    assert not refreshed.package.has_part("BinData/BIN0001.png")
+    assert refreshed.package.has_part("BinData/BIN0002.png")
+    assert refreshed.picture_references()[0]["binaryItemIDRef"] == "BIN0002"
 
 
 def test_byte_preserving_patch_updates_paragraph_with_open_safety(tmp_path: Path):

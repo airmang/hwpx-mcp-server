@@ -455,6 +455,45 @@ class AddControlInput(DocumentLocatorInput):
     dry_run: bool = Field(True, alias="dryRun")
 
 
+class InsertPictureInput(DocumentLocatorInput):
+    image_base64: str = Field(alias="imageBase64")
+    image_format: str = Field("png", alias="imageFormat")
+    width: Optional[int] = None
+    height: Optional[int] = None
+    width_mm: Optional[float] = Field(None, alias="widthMm")
+    height_mm: Optional[float] = Field(None, alias="heightMm")
+    section_index: Optional[int] = Field(None, alias="sectionIndex")
+    align: Optional[str] = None
+    output: Optional[str] = None
+    dry_run: bool = Field(False, alias="dryRun")
+
+
+class ReplacePictureInput(DocumentLocatorInput):
+    image_base64: str = Field(alias="imageBase64")
+    image_format: str = Field("png", alias="imageFormat")
+    picture_index: int = Field(0, alias="pictureIndex")
+    binary_item_id_ref: Optional[str] = Field(None, alias="binaryItemIDRef")
+    remove_orphaned: bool = Field(True, alias="removeOrphaned")
+    output: Optional[str] = None
+    dry_run: bool = Field(False, alias="dryRun")
+
+
+class PictureEditOutput(_BaseModel):
+    ok: bool
+    dryRun: bool = False
+    filename: Optional[str] = None
+    outputPath: Optional[str] = None
+    picture: Optional[Dict[str, Any]] = None
+    replacement: Optional[Dict[str, Any]] = None
+    pictureReferences: Optional[List[Dict[str, Any]]] = None
+    idIntegrity: Optional[Dict[str, Any]] = None
+    wouldSave: Optional[bool] = None
+    verificationReport: Optional[Dict[str, Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
+    semanticDiff: Optional[Dict[str, Any]] = None
+    backup: Optional[Dict[str, Any]] = None
+
+
 class AddMemoInput(DocumentLocatorInput):
     text: str
     section_index: Optional[int] = Field(None, alias="sectionIndex")
@@ -1141,6 +1180,20 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=AddControlInput,
             output_model=ObjectIdOutput,
             func=_simple("add_control"),
+        ),
+        ToolDefinition(
+            name="insert_picture",
+            description="Insert a body picture and update binaryItemIDRef, content.hpf manifest, and BinData consistently.",
+            input_model=InsertPictureInput,
+            output_model=PictureEditOutput,
+            func=_simple("insert_picture"),
+        ),
+        ToolDefinition(
+            name="replace_picture",
+            description="Replace a body picture asset while preserving the existing hp:pic geometry.",
+            input_model=ReplacePictureInput,
+            output_model=PictureEditOutput,
+            func=_simple("replace_picture"),
         ),
         ToolDefinition(
             name="add_memo",

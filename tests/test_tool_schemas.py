@@ -91,3 +91,9 @@ def test_document_handle_tools_are_exposed():
     assert "list_open_documents" in names
     assert "close_document_handle" in names
     assert "copy_table_between_documents" in names
+
+
+def test_picture_tools_are_exposed():
+    names = {definition.name for definition in build_tool_definitions()}
+    assert "insert_picture" in names
+    assert "replace_picture" in names
