@@ -8,8 +8,10 @@ import dataclasses
 import hashlib
 import logging
 import math
+import os
 import re
 import re as _re
+import tempfile
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -44,7 +46,7 @@ from .core.resources import (
     TableResourceEntry,
 )
 from .errors import build_error_payload
-from .storage import DocumentStorage, LocalDocumentStorage
+from .storage import DocumentStorage, LocalDocumentStorage, build_hwpx_verification_report
 from .upstream import (
     AnnotationOptions,
     HH_NS,
@@ -1554,6 +1556,67 @@ class HwpxOps:
         if not dry_run:
             self._save_document(document, resolved)
         return {"updatedCells": updated}
+
+    def byte_preserving_patch(
+        self,
+        path: str,
+        patches: Sequence[Dict[str, Any]],
+        *,
+        output: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        try:
+            from hwpx.patch import paragraph_patch
+        except Exception as exc:  # pragma: no cover - dependency compatibility
+            raise self._new_error(
+                "BYTE_PATCH_UNAVAILABLE",
+                "installed python-hwpx does not provide hwpx.patch.paragraph_patch",
+            ) from exc
+
+        source_path = self._resolve_path(path)
+        target_path = self._resolve_output_path(output) if output else source_path
+        result = paragraph_patch(source_path, patches)
+        payload = result.to_dict()
+        payload["outputPath"] = str(target_path)
+        verification_report = {
+            "ok": bool(payload["openSafety"]["ok"]) and not payload["skipped"],
+            "filePath": str(target_path),
+            "openSafety": payload["openSafety"],
+            "byteIdentical": payload["byteIdentical"],
+            "changedParts": payload["changedParts"],
+            "skipped": payload["skipped"],
+        }
+        if payload["skipped"]:
+            payload["verificationReport"] = verification_report
+            return payload
+
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=f".{target_path.stem}.",
+            suffix=target_path.suffix or ".hwpx",
+            dir=str(target_path.parent),
+        )
+        tmp_path = Path(tmp_name)
+        try:
+            os.close(fd)
+            tmp_path.write_bytes(result.data)
+            verification_report = build_hwpx_verification_report(tmp_path)
+            if not verification_report["openSafety"]["ok"]:
+                raise self._new_error(
+                    "BYTE_PATCH_OPEN_SAFETY_FAILED",
+                    "patched HWPX failed open-safety verification: "
+                    + verification_report["openSafety"]["summary"],
+                )
+            os.replace(tmp_path, target_path)
+        except BaseException:
+            tmp_path.unlink(missing_ok=True)
+            raise
+        verification_report["filePath"] = str(target_path)
+        verification_report["byteIdentical"] = payload["byteIdentical"]
+        verification_report["changedParts"] = payload["changedParts"]
+        verification_report["skipped"] = payload["skipped"]
+        payload["verificationReport"] = verification_report
+        payload["openSafety"] = verification_report["openSafety"]
+        return payload
 
     def split_table_cell(
         self,

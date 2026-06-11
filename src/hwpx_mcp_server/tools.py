@@ -341,6 +341,38 @@ class SetTableCellOutput(_BaseModel):
     ok: bool
 
 
+class ParagraphBytePatch(_BaseModel):
+    section_path: str = Field("Contents/section0.xml", alias="sectionPath")
+    paragraph_index: int = Field(alias="paragraphIndex")
+    text: str
+
+
+class BytePreservingPatchInput(DocumentLocatorInput):
+    patches: Sequence[ParagraphBytePatch]
+    output: Optional[str] = None
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["patches"] = [
+            patch.model_dump(by_alias=True) for patch in self.patches
+        ]
+        if self.output is not None:
+            payload["output"] = self.output
+        return payload
+
+
+class BytePreservingPatchOutput(_BaseModel):
+    ok: bool
+    applied: List[Dict[str, Any]]
+    skipped: List[Dict[str, Any]]
+    changedParts: List[str]
+    byteIdentical: bool
+    zipMethod: str
+    outputPath: str
+    verificationReport: Optional[Dict[str, Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
+
+
 class ReplaceTableRegionInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
     start_row: int = Field(alias="startRow")
@@ -946,6 +978,14 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=AddParagraphInput,
             output_model=AddParagraphOutput,
             func=_simple("add_paragraph"),
+        ),
+        ToolDefinition(
+            name="byte_preserving_patch",
+            description="Patch paragraph text with section XML byte splices and skipped unsupported edits.",
+            input_model=BytePreservingPatchInput,
+            output_model=BytePreservingPatchOutput,
+            func=_simple("byte_preserving_patch"),
+            category="pipeline",
         ),
         ToolDefinition(
             name="insert_paragraphs_bulk",

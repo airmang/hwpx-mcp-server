@@ -102,6 +102,11 @@ except Exception:  # pragma: no cover - optional dependency compatibility
     analyze_hwpx_template_formfit = None
     apply_hwpx_template_formfit = None
 
+try:  # python-hwpx >= byte-preserving patch feature
+    from hwpx.patch import paragraph_patch as hwpx_paragraph_patch
+except Exception:  # pragma: no cover - optional dependency compatibility
+    hwpx_paragraph_patch = None
+
 mcp = FastMCP("hwpx-mcp-server")
 
 
@@ -777,6 +782,31 @@ def _with_save_verification(result: dict[str, Any], verification: dict[str, Any]
     payload["verificationReport"] = verification
     payload.setdefault("openSafety", verification.get("openSafety"))
     return payload
+
+
+def _write_verified_patch_result(target: Path, payload: bytes) -> dict[str, Any]:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{target.stem}.",
+        suffix=target.suffix or ".hwpx",
+        dir=str(target.parent),
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        os.close(fd)
+        tmp_path.write_bytes(payload)
+        verification = build_hwpx_verification_report(tmp_path)
+        if not verification["openSafety"]["ok"]:
+            raise RuntimeError(
+                "patched HWPX failed open-safety verification: "
+                + verification["openSafety"]["summary"]
+            )
+        os.replace(tmp_path, target)
+        verification["filePath"] = str(target)
+        return verification
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def _quality_profile_argument(
@@ -1509,6 +1539,40 @@ def batch_replace(filename: str, replacements: list[dict[str, str]]) -> dict:
     result = batch_replace_in_doc(doc, replacements)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification(result, verification)
+
+
+@mcp.tool()
+def byte_preserving_patch(
+    filename: str,
+    patches: list[dict[str, Any]],
+    output: str | None = None,
+) -> dict:
+    """section XML 바이트 splice 기반 문단 텍스트 패치를 적용합니다."""
+    if hwpx_paragraph_patch is None:
+        raise RuntimeError("installed python-hwpx does not provide hwpx.patch.paragraph_patch")
+    path = Path(resolve_path(filename))
+    target = Path(resolve_path(output)) if output else path
+    result = hwpx_paragraph_patch(path, patches)
+    payload = result.to_dict()
+    payload["outputPath"] = str(target)
+    verification = {
+        "ok": bool(payload["openSafety"]["ok"]) and not payload["skipped"],
+        "filePath": str(target),
+        "openSafety": payload["openSafety"],
+        "byteIdentical": payload["byteIdentical"],
+        "changedParts": payload["changedParts"],
+        "skipped": payload["skipped"],
+    }
+    if payload["skipped"]:
+        payload["verificationReport"] = verification
+        return payload
+    verification = _write_verified_patch_result(target, result.data)
+    verification["byteIdentical"] = payload["byteIdentical"]
+    verification["changedParts"] = payload["changedParts"]
+    verification["skipped"] = payload["skipped"]
+    payload["verificationReport"] = verification
+    payload["openSafety"] = verification["openSafety"]
+    return payload
 
 
 @mcp.tool()

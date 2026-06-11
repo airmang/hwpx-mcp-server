@@ -13,6 +13,7 @@ from hwpx_mcp_server.server import (
     add_page_break,
     add_paragraph,
     add_table,
+    byte_preserving_patch,
     copy_document,
     create_document,
     delete_paragraph,
@@ -75,6 +76,52 @@ def test_add_paragraph(tmp_path: Path):
     assert "안녕하세요" in text_result["text"]
     assert result["openSafety"]["ok"] is True
     assert result["verificationReport"]["filePath"] == str(target)
+
+
+def test_byte_preserving_patch_updates_paragraph_with_open_safety(tmp_path: Path):
+    target = tmp_path / "patch.hwpx"
+    create_document(str(target))
+    added = add_paragraph(str(target), "원문")
+
+    result = byte_preserving_patch(
+        str(target),
+        [
+            {
+                "sectionPath": "Contents/section0.xml",
+                "paragraphIndex": added["paragraph_index"],
+                "text": "패치본문",
+            }
+        ],
+    )
+
+    assert result["skipped"] == []
+    assert result["changedParts"] == ["Contents/section0.xml"]
+    assert result["openSafety"]["ok"] is True
+    assert result["verificationReport"]["openSafety"]["ok"] is True
+    assert result["verificationReport"]["filePath"] == str(target)
+    assert "패치본문" in get_document_text(str(target))["text"]
+
+
+def test_byte_preserving_patch_skips_unsupported_without_mutating(tmp_path: Path):
+    target = tmp_path / "patch-skip.hwpx"
+    create_document(str(target))
+    added = add_paragraph(str(target), "원문")
+    before = target.read_bytes()
+
+    result = byte_preserving_patch(
+        str(target),
+        [
+            {
+                "sectionPath": "Contents/section0.xml",
+                "paragraphIndex": added["paragraph_index"],
+                "text": "첫 줄\n둘째 줄",
+            }
+        ],
+    )
+
+    assert result["skipped"][0]["reason"] == "line break insertion is unsupported"
+    assert target.read_bytes() == before
+    assert result["verificationReport"]["ok"] is False
 
 
 def test_add_heading(tmp_path: Path):
