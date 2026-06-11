@@ -27,6 +27,14 @@ TABLE_NAVIGATION_TOOLS = {
     "fill_by_path",
 }
 
+FORMAT_EDIT_TOOLS = {
+    "set_paragraph_format",
+    "set_page_setup",
+    "set_header_footer",
+    "set_page_number",
+    "set_list_format",
+}
+
 ADVANCED_TOOLS = {
     "package_parts",
     "package_get_xml",
@@ -54,6 +62,7 @@ def test_default_toolset_exposes_phase1_and_hides_advanced(server_module) -> Non
 
     assert PHASE1_TOOLS.issubset(names)
     assert TABLE_NAVIGATION_TOOLS.issubset(names)
+    assert FORMAT_EDIT_TOOLS.issubset(names)
     assert names.isdisjoint(ADVANCED_TOOLS)
 
 

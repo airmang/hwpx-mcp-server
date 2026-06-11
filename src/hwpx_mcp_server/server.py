@@ -215,8 +215,8 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 61
-_EXPECTED_LEGACY_TOOL_COUNT = 56
+_EXPECTED_FASTMCP_TOOL_COUNT = 66
+_EXPECTED_LEGACY_TOOL_COUNT = 61
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
     "create_government_report_document",
@@ -1974,6 +1974,10 @@ def mcp_server_health() -> dict:
         "unitPolicy": {
             "status": "audited",
             "fontSize": "points",
+            "paragraphLineSpacing": "percent",
+            "paragraphIndent": "millimeters",
+            "paragraphSpacing": "points",
+            "pageSizeAndMargins": "millimeters",
             "borderWidth": "human value: number/string accepted; prefer pt or mm suffix when supported",
             "fileSizeLimits": "bytes",
             "pageAndTableInternals": "HWP units are internal implementation details; MCP tools should prefer mm/pt/% labels.",
@@ -2075,6 +2079,205 @@ def add_page_break(filename: str, dry_run: bool = False) -> dict:
         return _with_dry_run_verification({"success": True}, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification({"success": True}, verification)
+
+
+@mcp.tool()
+def set_paragraph_format(
+    filename: str,
+    paragraph_index: int | None = None,
+    paragraph_indexes: list[int] | None = None,
+    alignment: str | None = None,
+    line_spacing_percent: float | None = None,
+    indent_left_mm: float | None = None,
+    indent_right_mm: float | None = None,
+    first_line_indent_mm: float | None = None,
+    spacing_before_pt: float | None = None,
+    spacing_after_pt: float | None = None,
+    outline_level: int | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """기존 문단의 정렬, 줄간격(%), 들여쓰기(mm), 문단 간격(pt), 개요 수준을 변경합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    result = doc.set_paragraph_format(
+        paragraph_index=paragraph_index,
+        paragraph_indexes=paragraph_indexes,
+        alignment=alignment,
+        line_spacing_percent=line_spacing_percent,
+        indent_left_mm=indent_left_mm,
+        indent_right_mm=indent_right_mm,
+        first_line_indent_mm=first_line_indent_mm,
+        spacing_before_pt=spacing_before_pt,
+        spacing_after_pt=spacing_after_pt,
+        outline_level=outline_level,
+    )
+    result["filename"] = filename
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
+
+
+@mcp.tool()
+def set_page_setup(
+    filename: str,
+    paper_size: str | None = None,
+    width_mm: float | None = None,
+    height_mm: float | None = None,
+    orientation: str | None = None,
+    margins_mm: dict[str, float] | None = None,
+    margin_left_mm: float | None = None,
+    margin_right_mm: float | None = None,
+    margin_top_mm: float | None = None,
+    margin_bottom_mm: float | None = None,
+    header_margin_mm: float | None = None,
+    footer_margin_mm: float | None = None,
+    gutter_mm: float | None = None,
+    columns: int | None = None,
+    column_gap_mm: float | None = None,
+    section_index: int | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """용지/방향/여백을 mm 단위로 설정하고 선택적으로 단 구성을 적용합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    result = doc.set_page_setup(
+        paper_size=paper_size,
+        width_mm=width_mm,
+        height_mm=height_mm,
+        orientation=orientation,
+        margins_mm=margins_mm,
+        margin_left_mm=margin_left_mm,
+        margin_right_mm=margin_right_mm,
+        margin_top_mm=margin_top_mm,
+        margin_bottom_mm=margin_bottom_mm,
+        header_margin_mm=header_margin_mm,
+        footer_margin_mm=footer_margin_mm,
+        gutter_mm=gutter_mm,
+        columns=columns,
+        column_gap_mm=column_gap_mm,
+        section_index=section_index,
+    )
+    result["filename"] = filename
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
+
+
+def _header_footer_payload(wrapper: Any, *, kind: str, page_type: str) -> dict[str, Any]:
+    element = getattr(wrapper, "element", None)
+    page_number_count = 0
+    if element is not None and hasattr(element, "iter"):
+        page_number_count = sum(1 for _ in element.iter(f"{HP_NS}pageNum"))
+    return {
+        "kind": kind,
+        "pageType": page_type,
+        "id": getattr(wrapper, "id", None),
+        "text": getattr(wrapper, "text", ""),
+        "pageNumberCount": page_number_count,
+    }
+
+
+@mcp.tool()
+def set_header_footer(
+    filename: str,
+    kind: str,
+    text: str | None = None,
+    content: list[dict[str, Any]] | None = None,
+    section_index: int | None = None,
+    page_type: str = "BOTH",
+    dry_run: bool = False,
+) -> dict:
+    """머리글 또는 바닥글을 텍스트나 rich content spec으로 추가/수정합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    wrapper = doc.set_header_footer(
+        kind=kind,
+        text=text,
+        content=content,
+        section_index=section_index,
+        page_type=page_type,
+    )
+    result = {
+        "filename": filename,
+        "headerFooter": _header_footer_payload(wrapper, kind=kind, page_type=page_type),
+    }
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
+
+
+@mcp.tool()
+def set_page_number(
+    filename: str,
+    target: str = "footer",
+    page_type: str = "BOTH",
+    format: str = "page",
+    align: str = "CENTER",
+    position: str = "BOTTOM_CENTER",
+    prefix: str = "",
+    suffix: str = "",
+    format_type: str | None = None,
+    section_index: int | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """머리글/바닥글에 자동 쪽번호 필드를 추가하거나 수정합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    wrapper = doc.set_page_number(
+        target=target,
+        page_type=page_type,
+        format=format,
+        align=align,
+        position=position,
+        prefix=prefix,
+        suffix=suffix,
+        format_type=format_type,
+        section_index=section_index,
+    )
+    result = {
+        "filename": filename,
+        "target": target,
+        "format": format,
+        "headerFooter": _header_footer_payload(wrapper, kind=target, page_type=page_type),
+    }
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
+
+
+@mcp.tool()
+def set_list_format(
+    filename: str,
+    paragraph_index: int | None = None,
+    paragraph_indexes: list[int] | None = None,
+    kind: str = "bullet",
+    level: int = 1,
+    bullet_char: str | None = None,
+    number_format: str | None = None,
+    start: int | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """기존 문단에 불릿 또는 번호 목록 서식을 적용합니다."""
+    path = resolve_path(filename)
+    doc = open_doc(path)
+    result = doc.set_list_format(
+        paragraph_index=paragraph_index,
+        paragraph_indexes=paragraph_indexes,
+        kind=kind,
+        level=level,
+        bullet_char=bullet_char,
+        number_format=number_format,
+        start=start,
+    )
+    result["filename"] = filename
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()

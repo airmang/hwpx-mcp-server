@@ -484,6 +484,29 @@ class HwpxOps:
             "ignored": [str(item) for item in report.ignored],
         }
 
+    def _with_transaction_verification(
+        self,
+        result: Dict[str, Any],
+        document: HwpxDocument,
+        target: Path,
+        *,
+        dry_run: bool,
+    ) -> Dict[str, Any]:
+        payload = dict(result)
+        payload.setdefault("dryRun", dry_run)
+        if dry_run:
+            payload.update(save_dry_run(document, target))
+            return payload
+
+        verification = self._save_transaction_document(document, target)
+        payload["verificationReport"] = verification
+        payload["openSafety"] = verification.get("openSafety")
+        if "backup" in verification:
+            payload["backup"] = verification["backup"]
+        if "semanticDiff" in verification:
+            payload["semanticDiff"] = verification["semanticDiff"]
+        return payload
+
     def _operation_value(self, operation: Dict[str, Any], *names: str, default: Any = None) -> Any:
         for name in names:
             if name in operation:
@@ -1617,6 +1640,195 @@ class HwpxOps:
             count += 1
         self._save_document(document, resolved)
         return {"added": count}
+
+    def set_paragraph_format(
+        self,
+        path: str,
+        *,
+        paragraph_index: Optional[int] = None,
+        paragraph_indexes: Optional[Sequence[int]] = None,
+        alignment: Optional[str] = None,
+        line_spacing_percent: Optional[float] = None,
+        indent_left_mm: Optional[float] = None,
+        indent_right_mm: Optional[float] = None,
+        first_line_indent_mm: Optional[float] = None,
+        spacing_before_pt: Optional[float] = None,
+        spacing_after_pt: Optional[float] = None,
+        outline_level: Optional[int] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        document, resolved = self._open_document(path)
+        result = document.set_paragraph_format(
+            paragraph_index=paragraph_index,
+            paragraph_indexes=paragraph_indexes,
+            alignment=alignment,
+            line_spacing_percent=line_spacing_percent,
+            indent_left_mm=indent_left_mm,
+            indent_right_mm=indent_right_mm,
+            first_line_indent_mm=first_line_indent_mm,
+            spacing_before_pt=spacing_before_pt,
+            spacing_after_pt=spacing_after_pt,
+            outline_level=outline_level,
+        )
+        result.update({"ok": True, "filename": path})
+        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
+
+    def set_page_setup(
+        self,
+        path: str,
+        *,
+        paper_size: Optional[str] = None,
+        width_mm: Optional[float] = None,
+        height_mm: Optional[float] = None,
+        orientation: Optional[str] = None,
+        margins_mm: Optional[Dict[str, float]] = None,
+        margin_left_mm: Optional[float] = None,
+        margin_right_mm: Optional[float] = None,
+        margin_top_mm: Optional[float] = None,
+        margin_bottom_mm: Optional[float] = None,
+        header_margin_mm: Optional[float] = None,
+        footer_margin_mm: Optional[float] = None,
+        gutter_mm: Optional[float] = None,
+        columns: Optional[int] = None,
+        column_gap_mm: Optional[float] = None,
+        section_index: Optional[int] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        document, resolved = self._open_document(path)
+        result = document.set_page_setup(
+            paper_size=paper_size,
+            width_mm=width_mm,
+            height_mm=height_mm,
+            orientation=orientation,
+            margins_mm=margins_mm,
+            margin_left_mm=margin_left_mm,
+            margin_right_mm=margin_right_mm,
+            margin_top_mm=margin_top_mm,
+            margin_bottom_mm=margin_bottom_mm,
+            header_margin_mm=header_margin_mm,
+            footer_margin_mm=footer_margin_mm,
+            gutter_mm=gutter_mm,
+            columns=columns,
+            column_gap_mm=column_gap_mm,
+            section_index=section_index,
+        )
+        result.update({"ok": True, "filename": path})
+        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
+
+    def _header_footer_payload(
+        self,
+        wrapper: Any,
+        *,
+        kind: str,
+        page_type: str,
+    ) -> Dict[str, Any]:
+        element = getattr(wrapper, "element", None)
+        page_number_count = 0
+        if element is not None and hasattr(element, "iter"):
+            page_number_count = sum(1 for _ in element.iter(f"{HP_NS}pageNum"))
+        return {
+            "kind": kind,
+            "pageType": page_type,
+            "id": getattr(wrapper, "id", None),
+            "text": getattr(wrapper, "text", ""),
+            "pageNumberCount": page_number_count,
+        }
+
+    def set_header_footer(
+        self,
+        path: str,
+        *,
+        kind: str,
+        text: Optional[str] = None,
+        content: Optional[Sequence[Dict[str, Any]]] = None,
+        section_index: Optional[int] = None,
+        page_type: str = "BOTH",
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        document, resolved = self._open_document(path)
+        wrapper = document.set_header_footer(
+            kind=kind,
+            text=text,
+            content=content,
+            section_index=section_index,
+            page_type=page_type,
+        )
+        result = {
+            "ok": True,
+            "filename": path,
+            "headerFooter": self._header_footer_payload(
+                wrapper,
+                kind=kind,
+                page_type=page_type,
+            ),
+        }
+        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
+
+    def set_page_number(
+        self,
+        path: str,
+        *,
+        target: str = "footer",
+        page_type: str = "BOTH",
+        format: str = "page",
+        align: str = "CENTER",
+        position: str = "BOTTOM_CENTER",
+        prefix: str = "",
+        suffix: str = "",
+        format_type: Optional[str] = None,
+        section_index: Optional[int] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        document, resolved = self._open_document(path)
+        wrapper = document.set_page_number(
+            target=target,
+            page_type=page_type,
+            format=format,
+            align=align,
+            position=position,
+            prefix=prefix,
+            suffix=suffix,
+            format_type=format_type,
+            section_index=section_index,
+        )
+        result = {
+            "ok": True,
+            "filename": path,
+            "target": target,
+            "format": format,
+            "headerFooter": self._header_footer_payload(
+                wrapper,
+                kind=target,
+                page_type=page_type,
+            ),
+        }
+        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
+
+    def set_list_format(
+        self,
+        path: str,
+        *,
+        paragraph_index: Optional[int] = None,
+        paragraph_indexes: Optional[Sequence[int]] = None,
+        kind: str = "bullet",
+        level: int = 1,
+        bullet_char: Optional[str] = None,
+        number_format: Optional[str] = None,
+        start: Optional[int] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        document, resolved = self._open_document(path)
+        result = document.set_list_format(
+            paragraph_index=paragraph_index,
+            paragraph_indexes=paragraph_indexes,
+            kind=kind,
+            level=level,
+            bullet_char=bullet_char,
+            number_format=number_format,
+            start=start,
+        )
+        result.update({"ok": True, "filename": path})
+        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
 
     def add_table(
         self,

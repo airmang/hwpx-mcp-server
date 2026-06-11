@@ -393,6 +393,49 @@ def test_public_edit_tools_return_open_safety_evidence(tmp_path: Path) -> None:
     cases.append((memo, replace_doc))
     cases.append((tools.remove_memo(str(replace_doc), 1), replace_doc))
 
+    formatting_doc = tmp_path / "formatting-tools.hwpx"
+    tools.create_document(str(formatting_doc))
+    paragraph_index = tools.add_paragraph(str(formatting_doc), "줄간격 160%")["paragraph_index"]
+    cases.append(
+        (
+            tools.set_paragraph_format(
+                str(formatting_doc),
+                paragraph_index=paragraph_index,
+                alignment="center",
+                line_spacing_percent=160,
+                indent_left_mm=10,
+                spacing_before_pt=6,
+                spacing_after_pt=3,
+            ),
+            formatting_doc,
+        )
+    )
+    cases.append(
+        (
+            tools.set_page_setup(
+                str(formatting_doc),
+                paper_size="A4",
+                orientation="landscape",
+                margin_left_mm=20,
+                margin_right_mm=15,
+            ),
+            formatting_doc,
+        )
+    )
+    cases.append((tools.set_header_footer(str(formatting_doc), kind="header", text="Header"), formatting_doc))
+    cases.append((tools.set_page_number(str(formatting_doc), target="footer", format="page/total"), formatting_doc))
+    cases.append(
+        (
+            tools.set_list_format(
+                str(formatting_doc),
+                paragraph_index=paragraph_index,
+                kind="bullet",
+                bullet_char="※",
+            ),
+            formatting_doc,
+        )
+    )
+
     table_doc = tmp_path / "table-tools.hwpx"
     tools.create_document(str(table_doc))
     cases.append((tools.add_table(str(table_doc), 2, 2, [["A", "B"], ["C", "D"]]), table_doc))

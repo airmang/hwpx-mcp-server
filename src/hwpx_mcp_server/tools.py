@@ -303,6 +303,95 @@ class InsertParagraphsOutput(_BaseModel):
     added: int
 
 
+class FormattingEditOutput(_BaseModel):
+    ok: Optional[bool] = None
+    dryRun: bool = False
+    filename: Optional[str] = None
+    formatted: Optional[int] = None
+    paragraphs: Optional[List[Dict[str, Any]]] = None
+    pageSize: Optional[Dict[str, Any]] = None
+    margins: Optional[Dict[str, Any]] = None
+    columns: Optional[Dict[str, Any]] = None
+    units: Optional[Dict[str, Any]] = None
+    kind: Optional[str] = None
+    level: Optional[int] = None
+    paraPrIDRef: Optional[str] = None
+    target: Optional[str] = None
+    format: Optional[str] = None
+    headerFooter: Optional[Dict[str, Any]] = None
+    wouldSave: Optional[bool] = None
+    verificationReport: Optional[Dict[str, Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
+    semanticDiff: Optional[Dict[str, Any]] = None
+    backup: Optional[Dict[str, Any]] = None
+
+
+class SetParagraphFormatInput(DocumentLocatorInput):
+    paragraph_index: Optional[int] = Field(None, alias="paragraphIndex")
+    paragraph_indexes: Optional[Sequence[int]] = Field(None, alias="paragraphIndexes")
+    alignment: Optional[str] = None
+    line_spacing_percent: Optional[float] = Field(None, alias="lineSpacingPercent")
+    indent_left_mm: Optional[float] = Field(None, alias="indentLeftMm")
+    indent_right_mm: Optional[float] = Field(None, alias="indentRightMm")
+    first_line_indent_mm: Optional[float] = Field(None, alias="firstLineIndentMm")
+    spacing_before_pt: Optional[float] = Field(None, alias="spacingBeforePt")
+    spacing_after_pt: Optional[float] = Field(None, alias="spacingAfterPt")
+    outline_level: Optional[int] = Field(None, alias="outlineLevel")
+    dry_run: bool = Field(False, alias="dryRun")
+
+
+class SetPageSetupInput(DocumentLocatorInput):
+    paper_size: Optional[str] = Field(None, alias="paperSize")
+    width_mm: Optional[float] = Field(None, alias="widthMm")
+    height_mm: Optional[float] = Field(None, alias="heightMm")
+    orientation: Optional[str] = None
+    margins_mm: Optional[Dict[str, float]] = Field(None, alias="marginsMm")
+    margin_left_mm: Optional[float] = Field(None, alias="marginLeftMm")
+    margin_right_mm: Optional[float] = Field(None, alias="marginRightMm")
+    margin_top_mm: Optional[float] = Field(None, alias="marginTopMm")
+    margin_bottom_mm: Optional[float] = Field(None, alias="marginBottomMm")
+    header_margin_mm: Optional[float] = Field(None, alias="headerMarginMm")
+    footer_margin_mm: Optional[float] = Field(None, alias="footerMarginMm")
+    gutter_mm: Optional[float] = Field(None, alias="gutterMm")
+    columns: Optional[int] = None
+    column_gap_mm: Optional[float] = Field(None, alias="columnGapMm")
+    section_index: Optional[int] = Field(None, alias="sectionIndex")
+    dry_run: bool = Field(False, alias="dryRun")
+
+
+class SetHeaderFooterInput(DocumentLocatorInput):
+    kind: str
+    text: Optional[str] = None
+    content: Optional[Sequence[Dict[str, Any]]] = None
+    section_index: Optional[int] = Field(None, alias="sectionIndex")
+    page_type: str = Field("BOTH", alias="pageType")
+    dry_run: bool = Field(False, alias="dryRun")
+
+
+class SetPageNumberInput(DocumentLocatorInput):
+    target: str = "footer"
+    page_type: str = Field("BOTH", alias="pageType")
+    format: str = "page"
+    align: str = "CENTER"
+    position: str = "BOTTOM_CENTER"
+    prefix: str = ""
+    suffix: str = ""
+    format_type: Optional[str] = Field(None, alias="formatType")
+    section_index: Optional[int] = Field(None, alias="sectionIndex")
+    dry_run: bool = Field(False, alias="dryRun")
+
+
+class SetListFormatInput(DocumentLocatorInput):
+    paragraph_index: Optional[int] = Field(None, alias="paragraphIndex")
+    paragraph_indexes: Optional[Sequence[int]] = Field(None, alias="paragraphIndexes")
+    kind: str = "bullet"
+    level: int = 1
+    bullet_char: Optional[str] = Field(None, alias="bulletChar")
+    number_format: Optional[str] = Field(None, alias="numberFormat")
+    start: Optional[int] = None
+    dry_run: bool = Field(False, alias="dryRun")
+
+
 class AddTableInput(DocumentLocatorInput):
     rows: int
     cols: int
@@ -835,9 +924,10 @@ _TOOL_GUIDE: Dict[str, str] = {
         "1. `open_info`로 문서 구조 확인\n"
         "2. `read_paragraphs`로 편집 대상 문단 확인\n"
         "3. `find`로 편집할 텍스트 위치 검색\n"
-        "4. 여러 변경은 `apply_edits`와 `dryRun=true`로 먼저 semanticDiff를 확인\n"
-        "5. 실제 저장은 `apply_edits` 또는 개별 편집 도구의 `dryRun=false`로 수행\n"
-        "6. 저장 후 문제가 있으면 `undo_last_edit`로 직전 `.bak` 백업 복원\n"
+        "4. 문단/페이지/머리글/쪽번호/목록 서식은 `set_paragraph_format`, `set_page_setup`, `set_header_footer`, `set_page_number`, `set_list_format` 사용\n"
+        "5. 여러 변경은 `apply_edits`와 `dryRun=true`로 먼저 semanticDiff를 확인\n"
+        "6. 실제 저장은 `apply_edits` 또는 개별 편집 도구의 `dryRun=false`로 수행\n"
+        "7. 저장 후 문제가 있으면 `undo_last_edit`로 직전 `.bak` 백업 복원\n"
         "⚠️ 항상 편집 전 `read_paragraphs`로 현재 상태를 확인하세요.\n"
     ),
     "template": (
@@ -864,8 +954,10 @@ _TOOL_GUIDE: Dict[str, str] = {
     "style": (
         "## 스타일 워크플로\n"
         "1. `list_styles_and_bullets`로 현재 스타일 목록 확인\n"
-        "2. `apply_style_to_paragraphs`로 문단 스타일 적용\n"
-        "3. `apply_style_to_text_ranges`로 텍스트 범위 스타일 적용\n"
+        "2. `set_paragraph_format`으로 정렬/줄간격/들여쓰기/문단 간격/개요 수준 적용\n"
+        "3. `set_list_format`으로 불릿/번호 목록 적용\n"
+        "4. `apply_style_to_paragraphs`로 문단 스타일 적용\n"
+        "5. `apply_style_to_text_ranges`로 텍스트 범위 스타일 적용\n"
     ),
 }
 
@@ -1110,6 +1202,43 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=InsertParagraphsInput,
             output_model=InsertParagraphsOutput,
             func=_simple("insert_paragraphs_bulk"),
+        ),
+        ToolDefinition(
+            name="set_paragraph_format",
+            description="Apply paragraph alignment, line spacing %, indents in mm, paragraph spacing in pt, and outline level to existing paragraphs.",
+            input_model=SetParagraphFormatInput,
+            output_model=FormattingEditOutput,
+            func=_simple("set_paragraph_format"),
+            category="styles",
+        ),
+        ToolDefinition(
+            name="set_page_setup",
+            description="Set paper size, orientation, margins in mm, and optional columns for an existing document section.",
+            input_model=SetPageSetupInput,
+            output_model=FormattingEditOutput,
+            func=_simple("set_page_setup"),
+        ),
+        ToolDefinition(
+            name="set_header_footer",
+            description="Add or modify header/footer text or rich content on an existing document section.",
+            input_model=SetHeaderFooterInput,
+            output_model=FormattingEditOutput,
+            func=_simple("set_header_footer"),
+        ),
+        ToolDefinition(
+            name="set_page_number",
+            description="Add or modify an automatic page-number field in a header or footer.",
+            input_model=SetPageNumberInput,
+            output_model=FormattingEditOutput,
+            func=_simple("set_page_number"),
+        ),
+        ToolDefinition(
+            name="set_list_format",
+            description="Apply bullet or numbered-list formatting to existing paragraphs.",
+            input_model=SetListFormatInput,
+            output_model=FormattingEditOutput,
+            func=_simple("set_list_format"),
+            category="styles",
         ),
         ToolDefinition(
             name="add_table",
