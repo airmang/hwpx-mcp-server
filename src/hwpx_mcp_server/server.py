@@ -100,6 +100,17 @@ try:  # python-hwpx >= official-document style lint feature
 except Exception:  # pragma: no cover - optional dependency compatibility
     inspect_hwpx_official_document_style = None
 
+try:  # python-hwpx >= govoffice advanced generators
+    from hwpx import (
+        build_image_grid as build_hwpx_image_grid,
+        build_meeting_nameplates as build_hwpx_meeting_nameplates,
+        build_organization_chart as build_hwpx_organization_chart,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    build_hwpx_image_grid = None
+    build_hwpx_meeting_nameplates = None
+    build_hwpx_organization_chart = None
+
 try:  # python-hwpx >= government-report tools
     from hwpx.tools import report_utils as hwpx_report_utils
     from hwpx.tools.report_parser import (
@@ -223,7 +234,7 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 69
+_EXPECTED_FASTMCP_TOOL_COUNT = 72
 _EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
@@ -1310,6 +1321,71 @@ def inspect_official_document_style(
     if paragraphs is not None:
         return inspect_hwpx_official_document_style(paragraphs or [])
     raise ValueError("filename, document_plan, or paragraphs is required")
+
+
+def _single_block_plan(block: dict, *, title: str = "") -> dict:
+    return {
+        "schemaVersion": "hwpx.document_plan.v2",
+        "title": title,
+        "sections": [{"blocks": [block]}],
+    }
+
+
+@mcp.tool()
+def build_image_grid(
+    images: list,
+    columns: int = 2,
+    image_width_mm: float = None,
+    title: str = "사진대지",
+) -> dict:
+    """사진 목록을 plan v2 image_grid block과 생성 가능한 document_plan으로 변환합니다."""
+    if build_hwpx_image_grid is None:
+        raise RuntimeError("installed python-hwpx does not provide image_grid generator")
+    block = build_hwpx_image_grid(
+        images or [],
+        columns=columns,
+        image_width_mm=image_width_mm,
+    )
+    return {
+        "block": block,
+        "document_plan": _single_block_plan(block, title=title),
+        "next_tool": "create_document_from_plan",
+    }
+
+
+@mcp.tool()
+def build_meeting_nameplates(
+    names: list[str],
+    size: str = "150x70",
+    columns: int = 2,
+    title: str = "회의 명패",
+) -> dict:
+    """참석자 명단을 회의 명패 table block과 document_plan으로 변환합니다."""
+    if build_hwpx_meeting_nameplates is None:
+        raise RuntimeError("installed python-hwpx does not provide meeting nameplate generator")
+    block = build_hwpx_meeting_nameplates(names or [], size=size, columns=columns)
+    return {
+        "block": block,
+        "document_plan": _single_block_plan(block, title=title),
+        "next_tool": "create_document_from_plan",
+    }
+
+
+@mcp.tool()
+def build_organization_chart(
+    hierarchy: dict | list,
+    max_depth: int = 3,
+    title: str = "조직도",
+) -> dict:
+    """2~3단 계층 데이터를 표 기반 조직도 block과 document_plan으로 변환합니다."""
+    if build_hwpx_organization_chart is None:
+        raise RuntimeError("installed python-hwpx does not provide organization chart generator")
+    block = build_hwpx_organization_chart(hierarchy or {}, max_depth=max_depth)
+    return {
+        "block": block,
+        "document_plan": _single_block_plan(block, title=title),
+        "next_tool": "create_document_from_plan",
+    }
 
 
 def _template_formfit_baseline_arg(baseline: dict | str) -> dict | str:
