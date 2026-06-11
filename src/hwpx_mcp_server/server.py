@@ -48,6 +48,12 @@ from .core.document import create_blank, open_doc, save_doc
 from .core.formatting import create_style_in_doc, format_text_range, list_styles_in_doc
 from .core.locations import location_from_anchor, resolve_paragraph_reference
 from .core.search import _replace_in_runs, batch_replace_in_doc, find_in_doc, replace_in_doc
+from .core.transactions import (
+    rotate_and_backup,
+    save_dry_run,
+    semantic_diff,
+    undo_last_backup,
+)
 from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from .hwpx_ops import HwpxOps
 from .quality_generation import (
@@ -207,8 +213,8 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 57
-_EXPECTED_LEGACY_TOOL_COUNT = 52
+_EXPECTED_FASTMCP_TOOL_COUNT = 59
+_EXPECTED_LEGACY_TOOL_COUNT = 54
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
     "create_government_report_document",
@@ -217,6 +223,8 @@ _KEY_TOOL_NAMES = (
     "add_memo_by_anchor",
     "byte_preserving_patch",
     "render_preview",
+    "apply_edits",
+    "undo_last_edit",
 )
 _FIGURE_CAPTION_RE = re.compile(r"^\s*(?:Figure|Fig\.|그림)\s*\d*", re.IGNORECASE)
 
@@ -798,22 +806,49 @@ def _save_generated_document(doc: Any, path: str) -> dict:
 
 
 def _save_doc_verification(doc: Any, path: str) -> dict[str, Any]:
+    target = Path(path)
+    backup = rotate_and_backup(target)
     verification = save_doc(doc, path)
     if not isinstance(verification, dict):
-        verification = build_hwpx_verification_report(Path(path))
-    verification["filePath"] = str(Path(path))
+        verification = build_hwpx_verification_report(target)
+    verification["filePath"] = str(target)
+    verification["backup"] = backup.to_dict()
+    if backup.backup_path is not None:
+        try:
+            verification["semanticDiff"] = semantic_diff(backup.backup_path, target)
+        except Exception as exc:  # pragma: no cover - diagnostic fallback
+            verification["semanticDiff"] = {
+                "schemaVersion": "hwpx.semantic-diff.v1",
+                "changed": True,
+                "summary": f"Semantic diff unavailable: {exc}",
+                "items": [],
+                "error": str(exc),
+            }
     return verification
 
 
 def _with_save_verification(result: dict[str, Any], verification: dict[str, Any]) -> dict[str, Any]:
     payload = dict(result)
+    payload.setdefault("dryRun", False)
     payload["verificationReport"] = verification
     payload.setdefault("openSafety", verification.get("openSafety"))
+    if "semanticDiff" in verification:
+        payload.setdefault("semanticDiff", verification["semanticDiff"])
+    if "backup" in verification:
+        payload.setdefault("backup", verification["backup"])
+    return payload
+
+
+def _with_dry_run_verification(result: dict[str, Any], doc: Any, path: str) -> dict[str, Any]:
+    payload = dict(result)
+    dry_run = save_dry_run(doc, path)
+    payload.update(dry_run)
     return payload
 
 
 def _write_verified_patch_result(target: Path, payload: bytes) -> dict[str, Any]:
     target.parent.mkdir(parents=True, exist_ok=True)
+    backup = rotate_and_backup(target)
     fd, tmp_name = tempfile.mkstemp(
         prefix=f".{target.stem}.",
         suffix=target.suffix or ".hwpx",
@@ -831,6 +866,9 @@ def _write_verified_patch_result(target: Path, payload: bytes) -> dict[str, Any]
             )
         os.replace(tmp_path, target)
         verification["filePath"] = str(target)
+        verification["backup"] = backup.to_dict()
+        if backup.backup_path is not None:
+            verification["semanticDiff"] = semantic_diff(backup.backup_path, target)
         return verification
     except BaseException:
         tmp_path.unlink(missing_ok=True)
@@ -1564,27 +1602,184 @@ def find_text(filename: str, text_to_find: str, match_case: bool = True, max_res
     return find_in_doc(doc, text_to_find=text_to_find, match_case=match_case, max_results=max_results)
 
 
+def _operation_value(operation: dict[str, Any], *names: str, default: Any = None) -> Any:
+    for name in names:
+        if name in operation:
+            return operation[name]
+    return default
+
+
+def _apply_edit_operation(doc: Any, operation: dict[str, Any], index: int) -> dict[str, Any]:
+    if not isinstance(operation, dict):
+        raise TypeError(f"operation {index} must be an object")
+    raw_type = _operation_value(operation, "type", "op", "operation")
+    if not isinstance(raw_type, str) or not raw_type.strip():
+        raise ValueError(f"operation {index} must include a type")
+    op_type = raw_type.strip().replace("-", "_")
+
+    if op_type == "replace_text":
+        find = _operation_value(operation, "findText", "find_text", "find")
+        replace = _operation_value(operation, "replaceText", "replace_text", "replace", default="")
+        if find is None:
+            raise ValueError("replace_text requires findText")
+        count = replace_in_doc(doc, find_text=str(find), replace_text=str(replace))
+        return {"type": op_type, "replaced_count": count}
+
+    if op_type == "batch_replace":
+        replacements = _operation_value(operation, "replacements")
+        if not isinstance(replacements, list):
+            raise ValueError("batch_replace requires a replacements list")
+        result = batch_replace_in_doc(doc, replacements)
+        return {"type": op_type, **result}
+
+    if op_type == "add_heading":
+        text = _operation_value(operation, "text", default="")
+        level = int(_operation_value(operation, "level", default=1))
+        paragraph_index = add_heading_to_doc(doc, str(text), level)
+        return {"type": op_type, "paragraph_index": paragraph_index}
+
+    if op_type == "add_paragraph":
+        text = _operation_value(operation, "text", default="")
+        style = _operation_value(operation, "style")
+        paragraph_index = add_paragraph_to_doc(doc, str(text), style)
+        return {"type": op_type, "paragraph_index": paragraph_index}
+
+    if op_type == "insert_paragraph":
+        paragraph_index = _operation_value(operation, "paragraphIndex", "paragraph_index")
+        if paragraph_index is None:
+            raise ValueError("insert_paragraph requires paragraphIndex")
+        text = _operation_value(operation, "text", default="")
+        style = _operation_value(operation, "style")
+        inserted = insert_paragraph_to_doc(doc, int(paragraph_index), str(text), style)
+        return {"type": op_type, "inserted_index": inserted}
+
+    if op_type == "delete_paragraph":
+        paragraph_index = _operation_value(operation, "paragraphIndex", "paragraph_index")
+        if paragraph_index is None:
+            raise ValueError("delete_paragraph requires paragraphIndex")
+        remaining = delete_paragraph_from_doc(doc, int(paragraph_index))
+        return {
+            "type": op_type,
+            "deleted_index": int(paragraph_index),
+            "remaining_paragraphs": remaining,
+        }
+
+    if op_type == "add_table":
+        rows = _operation_value(operation, "rows")
+        cols = _operation_value(operation, "cols", "columns")
+        if rows is None or cols is None:
+            raise ValueError("add_table requires rows and cols")
+        data = _operation_value(operation, "data")
+        table_index = add_table_to_doc(doc, int(rows), int(cols), data)
+        return {"type": op_type, "table_index": table_index}
+
+    if op_type == "set_table_cell_text":
+        table_index = _operation_value(operation, "tableIndex", "table_index", default=0)
+        row = _operation_value(operation, "row")
+        col = _operation_value(operation, "col", "column")
+        text = _operation_value(operation, "text", default="")
+        if row is None or col is None:
+            raise ValueError("set_table_cell_text requires row and col")
+        preserve_format = bool(_operation_value(operation, "preserveFormat", "preserve_format", default=True))
+        split_paragraphs = bool(_operation_value(operation, "splitParagraphs", "split_paragraphs", default=False))
+        set_cell_text(
+            doc,
+            int(table_index),
+            int(row),
+            int(col),
+            str(text),
+            preserve_format=preserve_format,
+            split_paragraphs=split_paragraphs,
+        )
+        return {
+            "type": op_type,
+            "table_index": int(table_index),
+            "row": int(row),
+            "col": int(col),
+        }
+
+    if op_type == "fill_by_path":
+        mappings = _operation_value(operation, "mappings")
+        if not isinstance(mappings, dict):
+            raise ValueError("fill_by_path requires mappings")
+        result = fill_by_path_in_doc(doc, _normalize_fill_mappings(mappings))
+        return {"type": op_type, **result}
+
+    if op_type == "add_page_break":
+        add_page_break_to_doc(doc)
+        return {"type": op_type, "success": True}
+
+    raise ValueError(f"unsupported operation type: {raw_type}")
+
+
 @mcp.tool()
-def search_and_replace(filename: str, find_text: str, replace_text: str) -> dict:
-    """문서에서 텍스트를 치환하고 즉시 저장합니다. 스타일은 보존됩니다."""
+def search_and_replace(filename: str, find_text: str, replace_text: str, dry_run: bool = False) -> dict:
+    """문서에서 텍스트를 치환합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     replaced_count = replace_in_doc(doc, find_text=find_text, replace_text=replace_text)
+    result = {"replaced_count": replaced_count, "find_text": find_text, "replace_text": replace_text}
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(
-        {"replaced_count": replaced_count, "find_text": find_text, "replace_text": replace_text},
-        verification,
-    )
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()
-def batch_replace(filename: str, replacements: list[dict[str, str]]) -> dict:
-    """여러 치환 규칙을 순서대로 적용하고 즉시 저장합니다."""
+def batch_replace(filename: str, replacements: list[dict[str, str]], dry_run: bool = False) -> dict:
+    """여러 치환 규칙을 순서대로 적용합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     result = batch_replace_in_doc(doc, replacements)
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification(result, verification)
+
+
+@mcp.tool()
+def apply_edits(filename: str, operations: list[dict[str, Any]], dry_run: bool = False) -> dict:
+    """여러 편집 operation을 원자적으로 적용합니다. 실패 시 원본 파일은 변경하지 않습니다."""
+    path = resolve_path(filename)
+    if not isinstance(operations, list):
+        raise TypeError("operations must be a list")
+
+    doc = open_doc(path)
+    operation_results: list[dict[str, Any]] = []
+    try:
+        for index, operation in enumerate(operations):
+            result = _apply_edit_operation(doc, operation, index)
+            result["operationIndex"] = index
+            operation_results.append(result)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "rolledBack": True,
+            "dryRun": dry_run,
+            "filename": filename,
+            "failedOperationIndex": len(operation_results),
+            "error": str(exc),
+            "operationsApplied": 0,
+        }
+
+    result = {
+        "ok": True,
+        "rolledBack": False,
+        "filename": filename,
+        "operationsApplied": len(operation_results),
+        "operationResults": operation_results,
+    }
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
+
+
+@mcp.tool()
+def undo_last_edit(filename: str) -> dict:
+    """마지막 저장 전 .bak 백업과 현재 문서를 교체해 직전 편집을 되돌립니다."""
+    path = resolve_path(filename)
+    return undo_last_backup(path)
 
 
 @mcp.tool()
@@ -1622,54 +1817,74 @@ def byte_preserving_patch(
 
 
 @mcp.tool()
-def add_heading(filename: str, text: str, level: int = 1) -> dict:
-    """문서 끝에 제목 문단을 추가하고 즉시 저장합니다. level: 1~6"""
+def add_heading(filename: str, text: str, level: int = 1, dry_run: bool = False) -> dict:
+    """문서 끝에 제목 문단을 추가합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     idx = add_heading_to_doc(doc, text, level)
+    if dry_run:
+        return _with_dry_run_verification({"paragraph_index": idx}, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification({"paragraph_index": idx}, verification)
 
 
 @mcp.tool()
-def add_paragraph(filename: str, text: str, style: str | None = None) -> dict:
-    """문서 끝에 문단을 추가하고 즉시 저장합니다."""
+def add_paragraph(filename: str, text: str, style: str | None = None, dry_run: bool = False) -> dict:
+    """문서 끝에 문단을 추가합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     idx = add_paragraph_to_doc(doc, text, style)
+    if dry_run:
+        return _with_dry_run_verification({"paragraph_index": idx}, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification({"paragraph_index": idx}, verification)
 
 
 @mcp.tool()
-def insert_paragraph(filename: str, paragraph_index: int, text: str, style: str | None = None) -> dict:
-    """지정 위치 앞에 문단을 삽입하고 즉시 저장합니다."""
+def insert_paragraph(
+    filename: str,
+    paragraph_index: int,
+    text: str,
+    style: str | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """지정 위치 앞에 문단을 삽입합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     idx = insert_paragraph_to_doc(doc, paragraph_index, text, style)
+    if dry_run:
+        return _with_dry_run_verification({"inserted_index": idx}, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification({"inserted_index": idx}, verification)
 
 
 @mcp.tool()
-def delete_paragraph(filename: str, paragraph_index: int) -> dict:
-    """지정 문단을 삭제하고 즉시 저장합니다."""
+def delete_paragraph(filename: str, paragraph_index: int, dry_run: bool = False) -> dict:
+    """지정 문단을 삭제합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     remaining = delete_paragraph_from_doc(doc, paragraph_index)
+    result = {"deleted_index": paragraph_index, "remaining_paragraphs": remaining}
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(
-        {"deleted_index": paragraph_index, "remaining_paragraphs": remaining},
-        verification,
-    )
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()
-def add_table(filename: str, rows: int, cols: int, data: list[list[str]] = None) -> dict:
-    """문서 끝에 표를 추가하고 즉시 저장합니다. data가 없으면 빈 표를 생성합니다."""
+def add_table(
+    filename: str,
+    rows: int,
+    cols: int,
+    data: list[list[str]] = None,
+    dry_run: bool = False,
+) -> dict:
+    """문서 끝에 표를 추가합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     idx = add_table_to_doc(doc, rows, cols, data)
+    if dry_run:
+        return _with_dry_run_verification({"table_index": idx}, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification({"table_index": idx}, verification)
 
@@ -1777,14 +1992,17 @@ def find_cell_by_label(filename: str, label_text: str, direction: str = "right")
 
 
 @mcp.tool()
-def fill_by_path(filename: str, mappings: dict[str, str]) -> dict:
-    """라벨 경로 문법으로 셀을 채우고 변경이 있으면 즉시 저장합니다."""
+def fill_by_path(filename: str, mappings: dict[str, str], dry_run: bool = False) -> dict:
+    """라벨 경로 문법으로 셀을 채웁니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     result = fill_by_path_in_doc(doc, _normalize_fill_mappings(mappings))
     if result.get("applied_count", 0) > 0:
+        if dry_run:
+            return _with_dry_run_verification(result, doc, path)
         verification = _save_doc_verification(doc, path)
         return _with_save_verification(result, verification)
+    result["dryRun"] = dry_run
     return result
 
 
@@ -1797,8 +2015,9 @@ def set_table_cell_text(
     text: str,
     preserve_format: bool = True,
     split_paragraphs: bool = False,
+    dry_run: bool = False,
 ) -> dict:
-    """표 셀 텍스트를 변경하고 즉시 저장합니다. preserve_format은 기존 charPr를 유지합니다."""
+    """표 셀 텍스트를 변경합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     set_cell_text(
@@ -1810,26 +2029,28 @@ def set_table_cell_text(
         preserve_format=preserve_format,
         split_paragraphs=split_paragraphs,
     )
+    result = {
+        "table_index": table_index,
+        "row": row,
+        "col": col,
+        "text": text,
+        "preserve_format": preserve_format,
+        "split_paragraphs": split_paragraphs,
+    }
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(
-        {
-            "table_index": table_index,
-            "row": row,
-            "col": col,
-            "text": text,
-            "preserve_format": preserve_format,
-            "split_paragraphs": split_paragraphs,
-        },
-        verification,
-    )
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()
-def add_page_break(filename: str) -> dict:
-    """문서 끝에 페이지 나누기를 추가하고 즉시 저장합니다."""
+def add_page_break(filename: str, dry_run: bool = False) -> dict:
+    """문서 끝에 페이지 나누기를 추가합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     add_page_break_to_doc(doc)
+    if dry_run:
+        return _with_dry_run_verification({"success": True}, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification({"success": True}, verification)
 
@@ -1840,21 +2061,29 @@ def add_memo(
     paragraph_index: int | None = None,
     text: str = "",
     location: dict[str, Any] | None = None,
+    dry_run: bool = False,
 ) -> dict:
-    """본문 문단 또는 표 셀 문단에 메모를 추가하고 즉시 저장합니다."""
+    """본문 문단 또는 표 셀 문단에 메모를 추가합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     result = add_memo_to_doc(doc, paragraph_index, text, location=location)
-    verification = _save_doc_verification(doc, path)
     if result["location"].get("kind") == "body_paragraph":
         result["paragraph_index"] = result["location"]["paragraph_index"]
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
     return _with_save_verification(result, verification)
 
 
 @mcp.tool()
-def add_memo_by_anchor(filename: str, anchor: dict[str, Any] | str, text: str) -> dict:
+def add_memo_by_anchor(
+    filename: str,
+    anchor: dict[str, Any] | str,
+    text: str,
+    dry_run: bool = False,
+) -> dict:
     """find_text가 반환한 anchor로 메모 위치를 지정해 메모를 추가합니다."""
-    return add_memo(filename, text=text, location=location_from_anchor(anchor))
+    return add_memo(filename, text=text, location=location_from_anchor(anchor), dry_run=dry_run)
 
 
 @mcp.tool()
@@ -1862,14 +2091,17 @@ def remove_memo(
     filename: str,
     paragraph_index: int | None = None,
     location: dict[str, Any] | None = None,
+    dry_run: bool = False,
 ) -> dict:
-    """본문 문단 또는 표 셀 문단의 메모를 제거하고 즉시 저장합니다."""
+    """본문 문단 또는 표 셀 문단의 메모를 제거합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     result = remove_memo_from_doc(doc, paragraph_index, location=location)
-    verification = _save_doc_verification(doc, path)
     if result["location"].get("kind") == "body_paragraph":
         result["paragraph_index"] = result["location"]["paragraph_index"]
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
     return _with_save_verification(result, verification)
 
 
@@ -1932,12 +2164,13 @@ def replace_in_paragraph(
     paragraph_index: int | None = None,
     location: dict[str, Any] | None = None,
     count: int | None = None,
+    dry_run: bool = False,
 ) -> dict:
     """본문/표 셀 문단 하나에서 run 서식을 유지하며 부분 텍스트를 치환합니다."""
     if old_text == "":
         raise ValueError("old_text는 빈 문자열일 수 없습니다.")
     if count is not None and count <= 0:
-        return {"replaced_count": 0, "location": location or {"paragraph_index": paragraph_index}}
+        return {"replaced_count": 0, "location": location or {"paragraph_index": paragraph_index}, "dryRun": dry_run}
 
     path = resolve_path(filename)
     doc = open_doc(path)
@@ -1973,12 +2206,12 @@ def replace_in_paragraph(
             replaced = before.count(old_text) if count is None else min(before.count(old_text), count)
 
     if replaced:
+        result = {"replaced_count": replaced, "location": resolved.location}
+        if dry_run:
+            return _with_dry_run_verification(result, doc, path)
         verification = _save_doc_verification(doc, path)
-        return _with_save_verification(
-            {"replaced_count": replaced, "location": resolved.location},
-            verification,
-        )
-    return {"replaced_count": replaced, "location": resolved.location}
+        return _with_save_verification(result, verification)
+    return {"replaced_count": replaced, "location": resolved.location, "dryRun": dry_run}
 
 
 @mcp.tool()
@@ -1987,6 +2220,7 @@ def replace_by_anchor(
     anchor: dict[str, Any] | str,
     old_text: str,
     new_text: str,
+    dry_run: bool = False,
 ) -> dict:
     """find_text가 반환한 anchor 위치에서 run 서식을 유지하며 텍스트를 치환합니다."""
     if old_text == "":
@@ -1995,7 +2229,14 @@ def replace_by_anchor(
     location = location_from_anchor(anchor)
     position = _anchor_position(anchor)
     if position is None:
-        return replace_in_paragraph(filename, old_text, new_text, location=location, count=1)
+        return replace_in_paragraph(
+            filename,
+            old_text,
+            new_text,
+            location=location,
+            count=1,
+            dry_run=dry_run,
+        )
 
     path = resolve_path(filename)
     doc = open_doc(path)
@@ -2013,11 +2254,11 @@ def replace_by_anchor(
         paragraph.text = before[:position] + new_text + before[end:]
         replaced = 1
 
+    result = {"replaced_count": replaced, "location": resolved.location, "position": position}
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(
-        {"replaced_count": replaced, "location": resolved.location, "position": position},
-        verification,
-    )
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()
@@ -2052,8 +2293,9 @@ def format_text(
     font_size: float = None,
     font_name: str = None,
     color: str = None,
+    dry_run: bool = False,
 ) -> dict:
-    """지정 범위 텍스트 서식을 변경하고 즉시 저장합니다. font_size는 pt, color는 hex 형식입니다."""
+    """지정 범위 텍스트 서식을 변경합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     format_text_range(
@@ -2068,11 +2310,11 @@ def format_text(
         font_name=font_name,
         color=color,
     )
+    result = {"formatted": True, "paragraph_index": paragraph_index, "range": [start_pos, end_pos]}
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(
-        {"formatted": True, "paragraph_index": paragraph_index, "range": [start_pos, end_pos]},
-        verification,
-    )
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()
@@ -2084,8 +2326,9 @@ def create_custom_style(
     font_size: float = None,
     font_name: str = None,
     color: str = None,
+    dry_run: bool = False,
 ) -> dict:
-    """문서에 커스텀 스타일을 생성하고 즉시 저장합니다. font_size는 pt, color는 hex 형식입니다."""
+    """문서에 커스텀 스타일을 생성합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     result = create_style_in_doc(
@@ -2097,6 +2340,8 @@ def create_custom_style(
         font_name=font_name,
         color=color,
     )
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification(result, verification)
 
@@ -2118,34 +2363,44 @@ def merge_table_cells(
     start_col: int,
     end_row: int,
     end_col: int,
+    dry_run: bool = False,
 ) -> dict:
-    """표 셀 범위를 병합하고 즉시 저장합니다."""
+    """표 셀 범위를 병합합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     merge_cells_in_table(doc, table_index, start_row, start_col, end_row, end_col)
+    result = {"merged": True, "range": f"({start_row},{start_col})~({end_row},{end_col})"}
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
     verification = _save_doc_verification(doc, path)
-    return _with_save_verification(
-        {"merged": True, "range": f"({start_row},{start_col})~({end_row},{end_col})"},
-        verification,
-    )
+    return _with_save_verification(result, verification)
 
 
 @mcp.tool()
-def split_table_cell(filename: str, table_index: int, row: int, col: int) -> dict:
-    """병합된 셀을 분할하고 즉시 저장합니다."""
+def split_table_cell(filename: str, table_index: int, row: int, col: int, dry_run: bool = False) -> dict:
+    """병합된 셀을 분할합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     span_info = split_cell_in_table(doc, table_index, row, col)
+    if dry_run:
+        return _with_dry_run_verification({"split": True, "original_span": span_info}, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification({"split": True, "original_span": span_info}, verification)
 
 
 @mcp.tool()
-def format_table(filename: str, table_index: int, has_header_row: bool = None) -> dict:
-    """표 서식을 적용하고 즉시 저장합니다."""
+def format_table(
+    filename: str,
+    table_index: int,
+    has_header_row: bool = None,
+    dry_run: bool = False,
+) -> dict:
+    """표 서식을 적용합니다. dry_run=True이면 원본을 저장하지 않습니다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     format_table_in_doc(doc, table_index, has_header_row=has_header_row)
+    if dry_run:
+        return _with_dry_run_verification({"formatted": True, "table_index": table_index}, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification({"formatted": True, "table_index": table_index}, verification)
 

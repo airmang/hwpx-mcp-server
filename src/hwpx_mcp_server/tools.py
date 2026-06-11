@@ -245,6 +245,36 @@ class ReplaceRunsOutput(_BaseModel):
     replacedCount: int
 
 
+class ApplyEditsInput(DocumentLocatorInput):
+    operations: Sequence[Dict[str, Any]]
+    dry_run: bool = Field(False, alias="dryRun")
+
+
+class ApplyEditsOutput(_BaseModel):
+    ok: bool
+    rolledBack: bool
+    dryRun: bool = False
+    filename: Optional[str] = None
+    operationsApplied: int
+    operationResults: Optional[List[Dict[str, Any]]] = None
+    failedOperationIndex: Optional[int] = None
+    error: Optional[str] = None
+    wouldSave: Optional[bool] = None
+    verificationReport: Optional[Dict[str, Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
+    semanticDiff: Optional[Dict[str, Any]] = None
+    backup: Optional[Dict[str, Any]] = None
+
+
+class UndoLastEditOutput(_BaseModel):
+    restored: bool
+    filename: str
+    backupPath: str
+    verificationReport: Optional[Dict[str, Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
+    semanticDiff: Optional[Dict[str, Any]] = None
+
+
 class RunStyleModel(_BaseModel):
     bold: Optional[bool] = False
     italic: Optional[bool] = False
@@ -766,8 +796,9 @@ _TOOL_GUIDE: Dict[str, str] = {
         "1. `open_info`로 문서 구조 확인\n"
         "2. `read_paragraphs`로 편집 대상 문단 확인\n"
         "3. `find`로 편집할 텍스트 위치 검색\n"
-        "4. `replace_text` / `insert_paragraph` / `delete_paragraph` 등으로 편집\n"
-        "5. `save`로 저장 (atomic save — 임시파일→검증→이동 방식)\n"
+        "4. 여러 변경은 `apply_edits`와 `dryRun=true`로 먼저 semanticDiff를 확인\n"
+        "5. 실제 저장은 `apply_edits` 또는 개별 편집 도구의 `dryRun=false`로 수행\n"
+        "6. 저장 후 문제가 있으면 `undo_last_edit`로 직전 `.bak` 백업 복원\n"
         "⚠️ 항상 편집 전 `read_paragraphs`로 현재 상태를 확인하세요.\n"
     ),
     "template": (
@@ -1004,6 +1035,20 @@ def build_tool_definitions() -> List[ToolDefinition]:
             output_model=ReplaceRunsOutput,
             func=_simple("replace_text_in_runs"),
             category="styles",
+        ),
+        ToolDefinition(
+            name="apply_edits",
+            description="Atomically apply an ordered list of edit operations. Use dryRun=true to preview without saving.",
+            input_model=ApplyEditsInput,
+            output_model=ApplyEditsOutput,
+            func=_simple("apply_edits"),
+        ),
+        ToolDefinition(
+            name="undo_last_edit",
+            description="Restore the last .bak backup for a local HWPX document and swap the current file into .bak.",
+            input_model=DocumentLocatorInput,
+            output_model=UndoLastEditOutput,
+            func=_simple("undo_last_edit"),
         ),
         ToolDefinition(
             name="add_paragraph",

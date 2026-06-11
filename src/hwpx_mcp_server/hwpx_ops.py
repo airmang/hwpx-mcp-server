@@ -48,8 +48,19 @@ from .core.resources import (
     ParagraphResourceEntry,
     TableResourceEntry,
 )
+from .core.content import (
+    add_heading_to_doc,
+    add_page_break_to_doc,
+    add_paragraph_to_doc,
+    add_table_to_doc,
+    delete_paragraph_from_doc,
+    insert_paragraph_to_doc,
+    set_cell_text,
+)
 from .errors import build_error_payload
 from .storage import DocumentStorage, LocalDocumentStorage, build_hwpx_verification_report
+from .core.search import batch_replace_in_doc, replace_in_doc
+from .core.transactions import rotate_and_backup, save_dry_run, semantic_diff, undo_last_backup
 from .upstream import (
     AnnotationOptions,
     HH_NS,
@@ -431,6 +442,188 @@ class HwpxOps:
                 f"failed to save '{target}': {exc}",
                 details={"path": str(target)},
             ) from exc
+
+    def _save_transaction_document(self, document: HwpxDocument, target: Path) -> Dict[str, Any]:
+        backup = rotate_and_backup(target)
+        verification = self._save_document(document, target)
+        if not isinstance(verification, dict):
+            verification = build_hwpx_verification_report(target)
+        verification["filePath"] = str(target)
+        verification["backup"] = backup.to_dict()
+        if backup.backup_path is not None:
+            try:
+                verification["semanticDiff"] = semantic_diff(backup.backup_path, target)
+            except Exception as exc:  # pragma: no cover - diagnostic fallback
+                verification["semanticDiff"] = {
+                    "schemaVersion": "hwpx.semantic-diff.v1",
+                    "changed": True,
+                    "summary": f"Semantic diff unavailable: {exc}",
+                    "items": [],
+                    "error": str(exc),
+                }
+        return verification
+
+    def _operation_value(self, operation: Dict[str, Any], *names: str, default: Any = None) -> Any:
+        for name in names:
+            if name in operation:
+                return operation[name]
+        return default
+
+    def _apply_transaction_operation(
+        self,
+        document: HwpxDocument,
+        operation: Dict[str, Any],
+        index: int,
+    ) -> Dict[str, Any]:
+        if not isinstance(operation, dict):
+            raise TypeError(f"operation {index} must be an object")
+        raw_type = self._operation_value(operation, "type", "op", "operation")
+        if not isinstance(raw_type, str) or not raw_type.strip():
+            raise ValueError(f"operation {index} must include a type")
+        op_type = raw_type.strip().replace("-", "_")
+
+        if op_type == "replace_text":
+            find = self._operation_value(operation, "findText", "find_text", "find")
+            replace = self._operation_value(operation, "replaceText", "replace_text", "replace", default="")
+            if find is None:
+                raise ValueError("replace_text requires findText")
+            count = replace_in_doc(document, find_text=str(find), replace_text=str(replace))
+            return {"type": op_type, "replaced_count": count}
+
+        if op_type == "batch_replace":
+            replacements = self._operation_value(operation, "replacements")
+            if not isinstance(replacements, list):
+                raise ValueError("batch_replace requires a replacements list")
+            result = batch_replace_in_doc(document, replacements)
+            return {"type": op_type, **result}
+
+        if op_type == "add_heading":
+            text = self._operation_value(operation, "text", default="")
+            level = int(self._operation_value(operation, "level", default=1))
+            paragraph_index = add_heading_to_doc(document, str(text), level)
+            return {"type": op_type, "paragraph_index": paragraph_index}
+
+        if op_type == "add_paragraph":
+            text = self._operation_value(operation, "text", default="")
+            style = self._operation_value(operation, "style")
+            paragraph_index = add_paragraph_to_doc(document, str(text), style)
+            return {"type": op_type, "paragraph_index": paragraph_index}
+
+        if op_type == "insert_paragraph":
+            paragraph_index = self._operation_value(operation, "paragraphIndex", "paragraph_index")
+            if paragraph_index is None:
+                raise ValueError("insert_paragraph requires paragraphIndex")
+            text = self._operation_value(operation, "text", default="")
+            style = self._operation_value(operation, "style")
+            inserted = insert_paragraph_to_doc(document, int(paragraph_index), str(text), style)
+            return {"type": op_type, "inserted_index": inserted}
+
+        if op_type == "delete_paragraph":
+            paragraph_index = self._operation_value(operation, "paragraphIndex", "paragraph_index")
+            if paragraph_index is None:
+                raise ValueError("delete_paragraph requires paragraphIndex")
+            remaining = delete_paragraph_from_doc(document, int(paragraph_index))
+            return {
+                "type": op_type,
+                "deleted_index": int(paragraph_index),
+                "remaining_paragraphs": remaining,
+            }
+
+        if op_type == "add_table":
+            rows = self._operation_value(operation, "rows")
+            cols = self._operation_value(operation, "cols", "columns")
+            if rows is None or cols is None:
+                raise ValueError("add_table requires rows and cols")
+            data = self._operation_value(operation, "data")
+            table_index = add_table_to_doc(document, int(rows), int(cols), data)
+            return {"type": op_type, "table_index": table_index}
+
+        if op_type == "set_table_cell_text":
+            table_index = self._operation_value(operation, "tableIndex", "table_index", default=0)
+            row = self._operation_value(operation, "row")
+            col = self._operation_value(operation, "col", "column")
+            text = self._operation_value(operation, "text", default="")
+            if row is None or col is None:
+                raise ValueError("set_table_cell_text requires row and col")
+            preserve_format = bool(self._operation_value(operation, "preserveFormat", "preserve_format", default=True))
+            split_paragraphs = bool(self._operation_value(operation, "splitParagraphs", "split_paragraphs", default=False))
+            set_cell_text(
+                document,
+                int(table_index),
+                int(row),
+                int(col),
+                str(text),
+                preserve_format=preserve_format,
+                split_paragraphs=split_paragraphs,
+            )
+            return {
+                "type": op_type,
+                "table_index": int(table_index),
+                "row": int(row),
+                "col": int(col),
+            }
+
+        if op_type == "fill_by_path":
+            mappings = self._operation_value(operation, "mappings")
+            if not isinstance(mappings, dict):
+                raise ValueError("fill_by_path requires mappings")
+            result = document.fill_by_path(mappings)
+            return {"type": op_type, **result}
+
+        if op_type == "add_page_break":
+            add_page_break_to_doc(document)
+            return {"type": op_type, "success": True}
+
+        raise ValueError(f"unsupported operation type: {raw_type}")
+
+    def apply_edits(
+        self,
+        path: str,
+        operations: Sequence[Dict[str, Any]],
+        *,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        document, resolved = self._open_document(path)
+        operation_results: List[Dict[str, Any]] = []
+        try:
+            for index, operation in enumerate(operations):
+                result = self._apply_transaction_operation(document, operation, index)
+                result["operationIndex"] = index
+                operation_results.append(result)
+        except Exception as exc:
+            return {
+                "ok": False,
+                "rolledBack": True,
+                "dryRun": dry_run,
+                "filename": path,
+                "failedOperationIndex": len(operation_results),
+                "error": str(exc),
+                "operationsApplied": 0,
+            }
+
+        result: Dict[str, Any] = {
+            "ok": True,
+            "rolledBack": False,
+            "dryRun": dry_run,
+            "filename": path,
+            "operationsApplied": len(operation_results),
+            "operationResults": operation_results,
+        }
+        if dry_run:
+            result.update(save_dry_run(document, resolved))
+            return result
+        verification = self._save_transaction_document(document, resolved)
+        result["verificationReport"] = verification
+        result["openSafety"] = verification.get("openSafety")
+        if "backup" in verification:
+            result["backup"] = verification["backup"]
+        if "semanticDiff" in verification:
+            result["semanticDiff"] = verification["semanticDiff"]
+        return result
+
+    def undo_last_edit(self, path: str) -> Dict[str, Any]:
+        resolved = self._resolve_path(path)
+        return undo_last_backup(resolved)
 
     def _iter_paragraphs(self, document: HwpxDocument) -> List[HwpxOxmlParagraph]:
         return list(document.paragraphs)
