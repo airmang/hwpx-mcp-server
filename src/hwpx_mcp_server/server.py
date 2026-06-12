@@ -1015,12 +1015,16 @@ def _outline_level(text: str) -> int:
 def _paragraph_outline_level(
     paragraph: Any, text: str, style_levels: dict[str, int]
 ) -> int:
-    """개요 문단 스타일이 있으면 그 수준을, 없으면 텍스트 휴리스틱을 쓴다."""
+    """개요 문단 스타일을 우선하고, 구버전 '#' 헤딩만 fallback으로 인식한다."""
     if not (text or "").strip():
         return 0
     ref = getattr(paragraph, "style_id_ref", None)
     if ref is not None and str(ref) in style_levels:
         return style_levels[str(ref)]
+    if text.strip().startswith("#"):
+        return _outline_level(text)
+    if style_levels:
+        return 0
     return _outline_level(text)
 
 

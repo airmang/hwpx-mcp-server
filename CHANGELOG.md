@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-06-12
+### Changed
+- Require `python-hwpx >= 2.11.1` so document-plan generated headings receive real `개요 N`/`Outline N` paragraph styles and visible title/heading hierarchy.
+
+### Fixed
+- `create_document_from_plan` outputs now round-trip through `get_document_outline` as structured headings instead of plain emphasized paragraphs.
+- `get_document_outline` no longer promotes plain short or numbered paragraphs when a document has outline styles; legacy markdown `#` heading fallback remains available for older generated files.
+
 ## [2.4.0] - 2026-06-12
 ### Added
 - Transactional editing: `apply_edits` (atomic multi-op with rollback, `dry_run`, `expected_revision`, `idempotency_key`), `undo_last_edit`, automatic `.bak` rotation, and semantic diff summaries on write responses.

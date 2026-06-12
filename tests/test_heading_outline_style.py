@@ -57,6 +57,16 @@ def test_outline_detects_style_based_heading(tmp_path):
     outline = server.get_document_outline(target)["outline"]
     matches = [o for o in outline if o["text"] == "스타일 기반 제목"]
     assert matches and matches[0]["level"] == 2
+    assert all(o["text"] != "본문 문단은 개요로 잡히면 안 되는 충분히 긴 텍스트로 채운다. " * 3 for o in outline)
+
+
+def test_outline_does_not_promote_plain_short_paragraphs(tmp_path):
+    target = str(tmp_path / "doc.hwpx")
+    server.create_document(target)
+    server.add_paragraph(target, "짧은 문단")
+    server.add_paragraph(target, "1. 번호처럼 보이지만 스타일 없는 문단")
+
+    assert server.get_document_outline(target)["outline"] == []
 
 
 def test_outline_still_detects_legacy_hash_heading(tmp_path):

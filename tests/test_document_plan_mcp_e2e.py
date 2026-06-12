@@ -285,6 +285,12 @@ def test_create_document_from_plan_creates_valid_handoff_file(tmp_path: Path) ->
     assert budget_table[0] == ["Item", "Amount", "Note"]
     assert budget_table[1][0] == "AI devices"
 
+    outline = server.get_document_outline(str(destination))["outline"]
+    levels_by_text = {item["text"]: item["level"] for item in outline}
+    assert levels_by_text["Executive Summary"] == 1
+    assert levels_by_text["Budget"] == 2
+    assert set(levels_by_text) == {"Executive Summary", "Budget"}
+
 
 def test_create_document_from_plan_returns_operating_plan_profile_and_handoff_status(tmp_path: Path) -> None:
     destination = tmp_path / "operating-plan.hwpx"
