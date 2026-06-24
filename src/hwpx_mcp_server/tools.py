@@ -262,6 +262,7 @@ class ApplyEditsOutput(_BaseModel):
     wouldSave: Optional[bool] = None
     verificationReport: Optional[Dict[str, Any]] = None
     openSafety: Optional[Dict[str, Any]] = None
+    visualComplete: Optional[Dict[str, Any]] = None
     semanticDiff: Optional[Dict[str, Any]] = None
     backup: Optional[Dict[str, Any]] = None
 
@@ -272,6 +273,7 @@ class UndoLastEditOutput(_BaseModel):
     backupPath: str
     verificationReport: Optional[Dict[str, Any]] = None
     openSafety: Optional[Dict[str, Any]] = None
+    visualComplete: Optional[Dict[str, Any]] = None
     semanticDiff: Optional[Dict[str, Any]] = None
 
 
@@ -322,6 +324,7 @@ class FormattingEditOutput(_BaseModel):
     wouldSave: Optional[bool] = None
     verificationReport: Optional[Dict[str, Any]] = None
     openSafety: Optional[Dict[str, Any]] = None
+    visualComplete: Optional[Dict[str, Any]] = None
     semanticDiff: Optional[Dict[str, Any]] = None
     backup: Optional[Dict[str, Any]] = None
 
@@ -353,6 +356,7 @@ class FillFormFieldOutput(_BaseModel):
     wouldSave: Optional[bool] = None
     verificationReport: Optional[Dict[str, Any]] = None
     openSafety: Optional[Dict[str, Any]] = None
+    visualComplete: Optional[Dict[str, Any]] = None
     semanticDiff: Optional[Dict[str, Any]] = None
     backup: Optional[Dict[str, Any]] = None
 
@@ -529,6 +533,7 @@ class BytePreservingPatchOutput(_BaseModel):
     outputPath: str
     verificationReport: Optional[Dict[str, Any]] = None
     openSafety: Optional[Dict[str, Any]] = None
+    visualComplete: Optional[Dict[str, Any]] = None
 
 
 class ReplaceTableRegionInput(DocumentLocatorInput):
@@ -610,6 +615,7 @@ class PictureEditOutput(_BaseModel):
     wouldSave: Optional[bool] = None
     verificationReport: Optional[Dict[str, Any]] = None
     openSafety: Optional[Dict[str, Any]] = None
+    visualComplete: Optional[Dict[str, Any]] = None
     semanticDiff: Optional[Dict[str, Any]] = None
     backup: Optional[Dict[str, Any]] = None
 

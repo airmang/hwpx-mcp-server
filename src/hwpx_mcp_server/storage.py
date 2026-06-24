@@ -30,6 +30,7 @@ except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
 else:
     _OPEN_SAFETY_CLASSIFIER_IMPORT_ERROR = None
 
+from . import quality as quality_contract
 from .upstream import HwpxDocument, open_document, validate_document_path
 
 _REQUIRED_HWPX_FILES = [
@@ -137,7 +138,12 @@ class LocalDocumentStorage:
         document = open_document(resolved)
         return document, resolved
 
-    def save_document(self, document: HwpxDocument, target: Path) -> Dict[str, Any]:
+    def save_document(
+        self, document: HwpxDocument, target: Path, *, quality: Any = None
+    ) -> Dict[str, Any]:
+        # Phase F: every write funnels through the one SavePipeline gate, and the
+        # capability handshake fails closed before any bytes are produced.
+        quality_contract.assert_write_capability()
         self.maybe_backup(target)
         pre_save_snapshot = build_hwpx_presave_snapshot(target)
         # Atomic save: write to a sibling temp file, verify it, then replace.
@@ -147,7 +153,9 @@ class LocalDocumentStorage:
         tmp_path = Path(tmp_path_str)
         try:
             os.close(tmp_fd)
-            document.save_to_path(tmp_path)
+            report = quality_contract.save_through_pipeline(
+                document, tmp_path, quality=quality
+            )
             verification_report = build_hwpx_verification_report(tmp_path, pre_save_snapshot)
             if not verification_report["openSafety"]["ok"]:
                 raise RuntimeError(
@@ -156,6 +164,7 @@ class LocalDocumentStorage:
                 )
             os.replace(tmp_path, target)
             verification_report["filePath"] = str(target)
+            verification_report["visualComplete"] = quality_contract.visual_complete_block(report)
             return verification_report
         except Exception:
             tmp_path.unlink(missing_ok=True)
@@ -313,7 +322,10 @@ class HttpDocumentStorage:
         document = open_document(local_path)
         return document, Path(path)
 
-    def save_document(self, document: HwpxDocument, target: Path) -> Dict[str, Any]:
+    def save_document(
+        self, document: HwpxDocument, target: Path, *, quality: Any = None
+    ) -> Dict[str, Any]:
+        quality_contract.assert_write_capability()
         remote_key = str(target)
         cache_path = self._cache.get(remote_key)
         if cache_path is None:
@@ -329,14 +341,18 @@ class HttpDocumentStorage:
 
         try:
             os.close(tmp_fd)
-            document.save_to_path(tmp_path)
+            report = quality_contract.save_through_pipeline(document, tmp_path, quality=quality)
             verification_report = build_hwpx_verification_report(tmp_path, pre_save_snapshot)
             if not verification_report["openSafety"]["ok"]:
                 raise RuntimeError(
                     "saved HWPX failed open-safety verification: "
                     + verification_report["openSafety"]["summary"]
                 )
+            verification_report["visualComplete"] = quality_contract.visual_complete_block(report)
             payload = tmp_path.read_bytes()
+        except quality_contract.QualityGateError:
+            tmp_path.unlink(missing_ok=True)
+            raise
         except Exception as exc:  # pragma: no cover - unexpected save error
             tmp_path.unlink(missing_ok=True)
             raise RuntimeError(f"HTTP storage save failed: {exc}") from exc

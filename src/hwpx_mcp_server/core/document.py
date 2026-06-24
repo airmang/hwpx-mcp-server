@@ -22,10 +22,10 @@ def open_doc(path: str) -> HwpxDocument:
     return open_document(path)
 
 
-def save_doc(doc: HwpxDocument, path: str) -> dict[str, Any]:
+def save_doc(doc: HwpxDocument, path: str, *, quality: Any = None) -> dict[str, Any]:
     storage = _local_storage()
     target = storage.resolve_output_path(path)
-    return storage.save_document(doc, target)
+    return storage.save_document(doc, target, quality=quality)
 
 
 def create_blank(path: str, title=None, author=None) -> dict[str, Any]:

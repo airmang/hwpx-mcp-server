@@ -37,6 +37,7 @@ except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
 else:
     _REPAIR_REPACK_IMPORT_ERROR = None
 
+from . import quality as quality_contract
 from .core.content import get_table_data, get_table_map_in_doc, set_cell_text
 from .core.document import open_doc
 from .core.formatting import list_styles_in_doc
@@ -247,7 +248,7 @@ def apply_form_fill_workflow(
                     }
                 )
 
-        _save_form_fill_document(doc, tmp_destination)
+        save_report = _save_form_fill_document(doc, tmp_destination)
         repair_result = _repair_repack_destination(tmp_destination)
         reread_doc = open_doc(str(tmp_destination))
         touched = _reread_touched(reread_doc, applied)
@@ -288,6 +289,7 @@ def apply_form_fill_workflow(
             "touched": touched,
             "validation": validation,
             "persisted": ok,
+            "visualComplete": quality_contract.visual_complete_block(save_report),
         }
     finally:
         _cleanup_temporary_destination(tmp_destination)
@@ -969,8 +971,11 @@ def _runtime_validation(path: str) -> dict[str, Any]:
     }
 
 
-def _save_form_fill_document(doc: Any, destination: Path) -> None:
-    doc.save_to_path(destination)
+def _save_form_fill_document(doc: Any, destination: Path, *, quality: Any = None) -> Any:
+    # Phase F: form fill funnels through the one SavePipeline gate too, and
+    # returns the VisualCompleteReport so the response can carry the block.
+    quality_contract.assert_write_capability()
+    return quality_contract.save_through_pipeline(doc, destination, quality=quality)
 
 
 def _cleanup_temporary_destination(destination: Path) -> None:

@@ -35,6 +35,12 @@ DEFAULT_MCP_ERROR_CODE = -32000
 DEFAULT_ERROR_SUGGESTIONS: dict[str, str] = {
     "AMBIGUOUS_TARGET": "검색 조건을 더 구체화하거나 limit=1로 미리보기를 다시 생성하세요.",
     "BYTE_PATCH_OPEN_SAFETY_FAILED": "반환된 openSafety 진단을 확인하고 일반 저장/복구 경로로 다시 생성하세요.",
+    "CAPABILITY_SKEW": "core/mcp/plugin 버전 불일치로 쓰기가 차단되었습니다. python-hwpx>=2.12.0으로 갱신하고 플러그인을 다시 설치한 뒤 호스트를 재시작하세요.",
+    "FIELD_OVERFLOW": "값이 칸에 넘칩니다. fitPolicy(mode=wrap_then_shrink/shrink/truncate_with_report) 또는 overflow=warn으로 다시 채우거나 값을 줄이세요. details.visualComplete.suggestedRetry 참고.",
+    "STALE_LINESEG_DETECTED": "오래된 lineseg 레이아웃 캐시가 남았습니다. 해당 문단을 다시 편집해 캐시를 무효화한 뒤 저장하세요.",
+    "VISUAL_COMPLETE_FAILED": "한컴 렌더에서 겹침/넘침 등 시각 결함이 감지되었습니다. details.visualComplete를 확인하고 수정 후 다시 저장하세요.",
+    "REQUIRED_FIELD_MISSING": "필수 폼 필드가 비어 있습니다. 값을 채운 뒤 다시 저장하세요.",
+    "TABLE_STRUCTURE_INVALID": "표 구조가 한컴 필수 요소를 누락했습니다. repair_hwpx로 복구하거나 표를 다시 생성하세요.",
     "BYTE_PATCH_UNAVAILABLE": "설치된 python-hwpx 버전을 확인한 뒤 플러그인을 다시 설치하거나 일반 편집 도구를 사용하세요.",
     "CONFLICTING_TARGETS": "동일 범위를 겹쳐 수정하지 않도록 edit 목록을 분리해 다시 실행하세요.",
     "DOCUMENT_LOCATOR_REQUIRED": "path 또는 handleId 중 하나를 지정한 뒤 같은 작업을 다시 호출하세요.",

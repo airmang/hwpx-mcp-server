@@ -62,6 +62,7 @@ from .core.transactions import (
 )
 from .document_state import document_state_payload, revision_mismatch_response
 from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
+from . import quality as quality_contract
 from .hwpx_ops import HwpxOps
 from .quality_generation import (
     analyze_quality_generation_workflow,
@@ -188,12 +189,15 @@ def _error_data(
     tool_name: str | None = None,
     arguments: dict | None = None,
     code: int = -32000,
+    extra_data: dict | None = None,
 ) -> mcp_types.ErrorData:
     data: dict[str, object] = {}
     if tool_name is not None:
         data["tool"] = tool_name
     if arguments is not None:
         data["arguments"] = arguments
+    if extra_data:
+        data.update(extra_data)
     return mcp_types.ErrorData(code=code, message=message, data=data)
 
 
@@ -215,13 +219,38 @@ def _first_text_content(content: object) -> str | None:
     return None
 
 
+def _gate_or_plain_error(text: str, tool_name: str, arguments: dict) -> mcp_types.ErrorData:
+    """Rebuild a structured gate/skew error from the stash, else a plain error."""
+
+    gate = quality_contract.take_last_gate_error()
+    if isinstance(gate, quality_contract.CapabilitySkewError):
+        return _error_data(
+            f"CAPABILITY_SKEW: {text}", tool_name=tool_name, arguments=arguments,
+            extra_data={"errorCode": gate.code, "capability": gate.state},
+        )
+    if isinstance(gate, quality_contract.QualityGateError):
+        return _error_data(
+            f"{gate.code}: {text}", tool_name=tool_name, arguments=arguments,
+            extra_data={
+                "errorCode": gate.code,
+                "visualComplete": gate.block,
+                "suggestedRetry": gate.block.get("suggestedRetry"),
+            },
+        )
+    return _error_data(text, tool_name=tool_name, arguments=arguments)
+
+
 async def _strict_call_tool_handler(req: mcp_types.CallToolRequest):
     tool_name = req.params.name
     arguments = req.params.arguments or {}
+    quality_contract.clear_last_gate_error()
     try:
         result = await mcp.call_tool(tool_name, arguments)
     except Exception as exc:
-        return _error_data(str(exc), tool_name=tool_name, arguments=arguments)
+        # FastMCP wraps a tool's exception in ToolError, so the structured gate/
+        # skew error never matches a specific `except` here — recover it from the
+        # stash the exception left on construction (plan §2 Phase F).
+        return _gate_or_plain_error(str(exc), tool_name, arguments)
 
     if isinstance(result, mcp_types.CreateTaskResult):
         return mcp_types.ServerResult(result)
@@ -229,7 +258,7 @@ async def _strict_call_tool_handler(req: mcp_types.CallToolRequest):
     if isinstance(result, mcp_types.CallToolResult):
         if bool(result.isError):
             text = _first_text_content(result.content) or f"Tool '{tool_name}' returned an error"
-            return _error_data(text, tool_name=tool_name, arguments=arguments)
+            return _gate_or_plain_error(text, tool_name, arguments)
         return mcp_types.ServerResult(result)
 
     if isinstance(result, tuple) and len(result) == 2:
@@ -1053,9 +1082,11 @@ def create_document(
     }
 
 
-def _save_generated_document(doc: Any, path: str) -> dict:
+def _save_generated_document(doc: Any, path: str, *, quality: Any = None) -> dict:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
+    # Phase F: generation also funnels through the one SavePipeline gate.
+    quality_contract.assert_write_capability()
     fd, tmp_name = tempfile.mkstemp(
         prefix=f".{target.stem}.",
         suffix=target.suffix or ".hwpx",
@@ -1064,7 +1095,7 @@ def _save_generated_document(doc: Any, path: str) -> dict:
     tmp_path = Path(tmp_name)
     try:
         os.close(fd)
-        doc.save_to_path(tmp_path)
+        report = quality_contract.save_through_pipeline(doc, tmp_path, quality=quality)
         verification = build_hwpx_verification_report(tmp_path)
         if not verification["openSafety"]["ok"]:
             raise RuntimeError(
@@ -1073,16 +1104,17 @@ def _save_generated_document(doc: Any, path: str) -> dict:
             )
         os.replace(tmp_path, target)
         verification["filePath"] = str(target)
+        verification["visualComplete"] = quality_contract.visual_complete_block(report)
         return verification
     except BaseException:
         tmp_path.unlink(missing_ok=True)
         raise
 
 
-def _save_doc_verification(doc: Any, path: str) -> dict[str, Any]:
+def _save_doc_verification(doc: Any, path: str, *, quality: Any = None) -> dict[str, Any]:
     target = Path(path)
     backup = rotate_and_backup(target)
-    verification = save_doc(doc, path)
+    verification = save_doc(doc, path, quality=quality)
     if not isinstance(verification, dict):
         verification = build_hwpx_verification_report(target)
     verification["filePath"] = str(target)
@@ -1116,6 +1148,8 @@ def _with_save_verification(result: dict[str, Any], verification: dict[str, Any]
     payload.setdefault("dryRun", False)
     payload["verificationReport"] = verification
     payload.setdefault("openSafety", verification.get("openSafety"))
+    if "visualComplete" in verification:
+        payload.setdefault("visualComplete", verification["visualComplete"])
     if "semanticDiff" in verification:
         payload.setdefault("semanticDiff", verification["semanticDiff"])
     if "backup" in verification:
@@ -1126,9 +1160,11 @@ def _with_save_verification(result: dict[str, Any], verification: dict[str, Any]
     return payload
 
 
-def _with_dry_run_verification(result: dict[str, Any], doc: Any, path: str) -> dict[str, Any]:
+def _with_dry_run_verification(
+    result: dict[str, Any], doc: Any, path: str, *, quality: Any = None
+) -> dict[str, Any]:
     payload = dict(result)
-    dry_run = save_dry_run(doc, path)
+    dry_run = save_dry_run(doc, path, quality=quality)
     payload.update(dry_run)
     payload.update(document_state_payload(path))
     return payload
@@ -2593,8 +2629,15 @@ def apply_edits(
     dry_run: bool = False,
     expected_revision: str = None,
     idempotency_key: str = None,
+    quality: dict[str, Any] | str | None = None,
 ) -> dict:
-    """여러 편집 operation을 원자적으로 적용합니다. 실패 시 원본 파일은 변경하지 않습니다."""
+    """여러 편집 operation을 원자적으로 적용합니다. 실패 시 원본 파일은 변경하지 않습니다.
+
+    ``quality``는 저장 게이트 정책입니다(생략 시 transparent = 열림안전만). ``"strict"``
+    또는 ``{"mode":"strict","overflowPolicy":"fail","layoutLint":"strict"}`` 처럼 올리면
+    SavePipeline이 FormFit/레이아웃/시각 게이트를 적용하고, 실패 시 저장을 보류하며
+    ``visualComplete`` 블록과 구조화된 오류 코드를 반환합니다.
+    """
     path = resolve_path(filename)
     scope = _idempotency_scope("apply_edits", path, idempotency_key)
     fingerprint = _idempotency_fingerprint(
@@ -2643,9 +2686,9 @@ def apply_edits(
         return _idempotency_store(
             scope,
             fingerprint=fingerprint,
-            payload=_with_dry_run_verification(result, doc, path),
+            payload=_with_dry_run_verification(result, doc, path, quality=quality),
         )
-    verification = _save_doc_verification(doc, path)
+    verification = _save_doc_verification(doc, path, quality=quality)
     return _idempotency_store(
         scope,
         fingerprint=fingerprint,
@@ -2666,9 +2709,15 @@ def byte_preserving_patch(
     patches: list[dict[str, Any]],
     output: str | None = None,
 ) -> dict:
-    """section XML 바이트 splice 기반 문단 텍스트 패치를 적용합니다."""
+    """section XML 바이트 splice 기반 문단 텍스트 패치를 적용합니다.
+
+    바이트 보존 fast path: python-hwpx의 ``patch`` → SavePipeline(open-safety)로 게이트되고
+    capability handshake로 fail-closed 됩니다. 단, 바이트를 보존하므로 전체 재렌더(VisualComplete
+    render) 게이트는 적용되지 않습니다(설계상 카브아웃).
+    """
     if hwpx_paragraph_patch is None:
         raise RuntimeError("installed python-hwpx does not provide hwpx.patch.paragraph_patch")
+    quality_contract.assert_write_capability()  # fail-closed on capability skew
     path = Path(resolve_path(filename))
     target = Path(resolve_path(output)) if output else path
     result = hwpx_paragraph_patch(path, patches)
@@ -2934,6 +2983,38 @@ def get_table_map(filename: str) -> dict:
     return _with_document_state(get_table_map_in_doc(doc), path)
 
 
+def _capability_block(tool_surface_skew: bool, missing_key_tools: list[str]) -> dict:
+    """Core/mcp/plugin capability handshake (plan §2 Phase F).
+
+    Versions + a fingerprint hash + skew. Writes fail closed on a *version* skew
+    (the SavePipeline gate would otherwise be unavailable); a tool-surface skew is
+    surfaced for the doctor but does not itself block writes.
+    """
+
+    state = quality_contract.capability_state()
+    skew = list(state["skew"])
+    if tool_surface_skew:
+        detail = ", ".join(missing_key_tools) or "expected tool count mismatch"
+        skew.append(f"MCP tool surface skew: {detail}")
+    fail_closed = quality_contract.fail_closed_enabled()
+    return {
+        "handshake": "hwpx.capability.v1",
+        "versions": state["versions"],
+        "minPythonHwpx": state["minPythonHwpx"],
+        "savePipelineAvailable": state["savePipelineAvailable"],
+        "hash": state["hash"],
+        "skew": skew,
+        "ok": not skew,
+        "failClosed": fail_closed,
+        "writesBlocked": fail_closed and not state["ok"],
+        "diagnosis": (
+            "Capability handshake OK; every write funnels through the SavePipeline gate."
+            if not skew
+            else "Capability skew: refresh python-hwpx>=2.12.0 and reinstall the hwpx plugin, then restart the host."
+        ),
+    }
+
+
 @mcp.tool()
 def mcp_server_health() -> dict:
     """MCP 서버 transport와 timeout/keepalive 점검 정보를 반환합니다."""
@@ -2972,6 +3053,7 @@ def mcp_server_health() -> dict:
                 else "Installed MCP surface matches the expected tool count and key tools."
             ),
         },
+        "capability": _capability_block(skew_detected, missing_key_tools),
         "unitPolicy": {
             "status": "audited",
             "fontSize": "points",

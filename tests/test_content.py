@@ -489,9 +489,9 @@ def test_fill_by_path_saves_after_successful_mutation(tmp_path: Path, monkeypatc
     save_calls: list[str] = []
     original_save = server_module.save_doc
 
-    def _tracking_save(doc, path: str) -> None:
+    def _tracking_save(doc, path: str, **kwargs) -> None:
         save_calls.append(path)
-        original_save(doc, path)
+        original_save(doc, path, **kwargs)
 
     monkeypatch.setattr(server_module, "save_doc", _tracking_save)
 

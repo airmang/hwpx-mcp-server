@@ -59,6 +59,7 @@ from .core.content import (
     insert_paragraph_to_doc,
     set_cell_text,
 )
+from . import quality as quality_contract
 from .errors import build_error_payload
 from .storage import DocumentStorage, LocalDocumentStorage, build_hwpx_verification_report
 from .core.search import batch_replace_in_doc, replace_in_doc
@@ -430,9 +431,30 @@ class HwpxOps:
                 paragraphs.append(paragraph.text(preserve_breaks=True))
         self._plan_manager.register_document(doc_id, "\n".join(paragraphs))
 
-    def _save_document(self, document: HwpxDocument, target: Path) -> Dict[str, Any]:
+    def _save_document(
+        self, document: HwpxDocument, target: Path, *, quality: Any = None
+    ) -> Dict[str, Any]:
         try:
-            return self.storage.save_document(document, target)
+            return self.storage.save_document(document, target, quality=quality)
+        except quality_contract.CapabilitySkewError as exc:
+            # Fail closed on core/mcp/plugin skew (plan §2 Phase F).
+            raise self._new_error(
+                "CAPABILITY_SKEW",
+                f"capability handshake skew; writes are blocked: {exc}",
+                details={"capability": exc.state, "path": str(target)},
+            ) from exc
+        except quality_contract.QualityGateError as exc:
+            # visual_complete gate failed under an elevated policy → ok=false with
+            # a structured, retry-able error the model can act on.
+            raise self._new_error(
+                exc.code,
+                f"visual_complete gate failed: {exc}",
+                details={
+                    "path": str(target),
+                    "visualComplete": exc.block,
+                    "suggestedRetry": exc.block.get("suggestedRetry"),
+                },
+            ) from exc
         except PermissionError as exc:
             raise self._new_error(
                 "PERMISSION_DENIED",
@@ -446,9 +468,11 @@ class HwpxOps:
                 details={"path": str(target)},
             ) from exc
 
-    def _save_transaction_document(self, document: HwpxDocument, target: Path) -> Dict[str, Any]:
+    def _save_transaction_document(
+        self, document: HwpxDocument, target: Path, *, quality: Any = None
+    ) -> Dict[str, Any]:
         backup = rotate_and_backup(target)
-        verification = self._save_document(document, target)
+        verification = self._save_document(document, target, quality=quality)
         if not isinstance(verification, dict):
             verification = build_hwpx_verification_report(target)
         verification["filePath"] = str(target)
@@ -491,16 +515,19 @@ class HwpxOps:
         target: Path,
         *,
         dry_run: bool,
+        quality: Any = None,
     ) -> Dict[str, Any]:
         payload = dict(result)
         payload.setdefault("dryRun", dry_run)
         if dry_run:
-            payload.update(save_dry_run(document, target))
+            payload.update(save_dry_run(document, target, quality=quality))
             return payload
 
-        verification = self._save_transaction_document(document, target)
+        verification = self._save_transaction_document(document, target, quality=quality)
         payload["verificationReport"] = verification
         payload["openSafety"] = verification.get("openSafety")
+        if "visualComplete" in verification:
+            payload["visualComplete"] = verification["visualComplete"]
         if "backup" in verification:
             payload["backup"] = verification["backup"]
         if "semanticDiff" in verification:
@@ -626,6 +653,7 @@ class HwpxOps:
         operations: Sequence[Dict[str, Any]],
         *,
         dry_run: bool = False,
+        quality: Any = None,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
         operation_results: List[Dict[str, Any]] = []
@@ -654,11 +682,13 @@ class HwpxOps:
             "operationResults": operation_results,
         }
         if dry_run:
-            result.update(save_dry_run(document, resolved))
+            result.update(save_dry_run(document, resolved, quality=quality))
             return result
-        verification = self._save_transaction_document(document, resolved)
+        verification = self._save_transaction_document(document, resolved, quality=quality)
         result["verificationReport"] = verification
         result["openSafety"] = verification.get("openSafety")
+        if "visualComplete" in verification:
+            result["visualComplete"] = verification["visualComplete"]
         if "backup" in verification:
             result["backup"] = verification["backup"]
         if "semanticDiff" in verification:
@@ -2287,6 +2317,8 @@ class HwpxOps:
         verification = self._save_transaction_document(document, target)
         result["verificationReport"] = verification
         result["openSafety"] = verification.get("openSafety")
+        if "visualComplete" in verification:
+            result["visualComplete"] = verification["visualComplete"]
         if "backup" in verification:
             result["backup"] = verification["backup"]
         if "semanticDiff" in verification:
@@ -2329,6 +2361,8 @@ class HwpxOps:
         verification = self._save_transaction_document(document, target)
         result["verificationReport"] = verification
         result["openSafety"] = verification.get("openSafety")
+        if "visualComplete" in verification:
+            result["visualComplete"] = verification["visualComplete"]
         if "backup" in verification:
             result["backup"] = verification["backup"]
         if "semanticDiff" in verification:

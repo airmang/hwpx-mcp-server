@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from .. import quality as quality_contract
 from ..storage import build_hwpx_verification_report, require_hwpx_editor_open_safe
 from ..upstream import HwpxDocument, open_document
 
@@ -327,7 +328,9 @@ def semantic_diff(before_path: str | Path, after_path: str | Path) -> dict[str, 
     }
 
 
-def save_dry_run(document: HwpxDocument, target: str | Path) -> dict[str, Any]:
+def save_dry_run(
+    document: HwpxDocument, target: str | Path, *, quality: Any = None
+) -> dict[str, Any]:
     target_path = Path(target)
     fd, tmp_name = tempfile.mkstemp(
         prefix=f".{target_path.stem}.dry-run.",
@@ -337,7 +340,17 @@ def save_dry_run(document: HwpxDocument, target: str | Path) -> dict[str, Any]:
     tmp_path = Path(tmp_name)
     try:
         os.close(fd)
-        document.save_to_path(tmp_path)
+        try:
+            report = quality_contract.save_through_pipeline(document, tmp_path, quality=quality)
+        except quality_contract.QualityGateError as gate:
+            # A dry run reports the gate verdict instead of committing.
+            return {
+                "dryRun": True,
+                "wouldSave": False,
+                "visualComplete": gate.block,
+                "openSafety": None,
+                "semanticDiff": None,
+            }
         verification = build_hwpx_verification_report(tmp_path)
         if not verification["openSafety"]["ok"]:
             raise RuntimeError(
@@ -347,12 +360,14 @@ def save_dry_run(document: HwpxDocument, target: str | Path) -> dict[str, Any]:
         diff = semantic_diff(target_path, tmp_path) if target_path.exists() else None
         verification["filePath"] = str(target_path)
         verification["dryRunTempDeleted"] = True
+        verification["visualComplete"] = quality_contract.visual_complete_block(report)
         return {
             "dryRun": True,
             "wouldSave": True,
             "verificationReport": verification,
             "openSafety": verification.get("openSafety"),
             "semanticDiff": diff,
+            "visualComplete": verification["visualComplete"],
         }
     finally:
         tmp_path.unlink(missing_ok=True)

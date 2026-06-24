@@ -1,0 +1,292 @@
+# SPDX-License-Identifier: Apache-2.0
+"""MCP quality contract (VisualComplete Phase F).
+
+Every write funnels through the one ``python-hwpx`` SavePipeline gate and reports a
+uniform ``VisualCompleteReport``. This module owns:
+
+* :func:`resolve_policy` — turn a model-facing ``quality`` block into a
+  :class:`~hwpx.quality.QualityPolicy` (default = transparent, i.e. today's
+  open-safety-only behaviour, so the contract is invisible until a caller opts in).
+* :func:`save_through_pipeline` / :func:`visual_complete_block` — run the gate and
+  map the report to an MCP payload (``ok`` / ``visualComplete`` / structured
+  ``errors`` carrying retry-able codes + ``suggestedRetry``).
+* :class:`QualityGateError` — raised when an elevated policy's gate fails so the
+  write is **withheld** (fail-closed) and the model sees the structured error.
+* the **capability handshake** (:func:`capability_state` / :func:`assert_write_capability`)
+  — core/mcp/plugin versions + a hash that **fails closed on skew** (e.g. a
+  ``python-hwpx`` too old to expose the SavePipeline gate).
+"""
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import os
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from typing import Any, Mapping
+
+# FastMCP's call_tool catches a tool's exception and returns an isError result in
+# a copied context, so the structured gate/skew error can't be caught at the
+# dispatch boundary nor handed back via a ContextVar. A plain module global is
+# shared across that boundary (and across threads): the exceptions stash
+# themselves here on construction; the dispatch handler reads it back to rebuild
+# the structured payload (codes + suggestedRetry). Dispatch is serial per request
+# (clear-then-read brackets each call), so this is not a concurrency hazard.
+_LAST_GATE_ERROR: Any = None
+
+
+def take_last_gate_error() -> Any:
+    """Pop the most recent gate/skew error recorded since the last clear."""
+
+    global _LAST_GATE_ERROR
+    err = _LAST_GATE_ERROR
+    _LAST_GATE_ERROR = None
+    return err
+
+
+def clear_last_gate_error() -> None:
+    global _LAST_GATE_ERROR
+    _LAST_GATE_ERROR = None
+
+
+def _record_gate_error(err: Any) -> None:
+    global _LAST_GATE_ERROR
+    _LAST_GATE_ERROR = err
+
+# The minimum python-hwpx that exposes the SavePipeline quality stack (Phase B-E).
+MIN_PYTHON_HWPX = "2.12.0"
+
+_QUALITY_ENV = "HWPX_MCP_QUALITY"  # global default policy (transparent|strict)
+_REQUIRE_CAPABILITY_ENV = "HWPX_MCP_REQUIRE_CAPABILITY"  # set "0" to disable fail-closed
+
+
+# --------------------------------------------------------------------------- #
+# python-hwpx quality stack (imported lazily so this module loads even on a skew).
+# --------------------------------------------------------------------------- #
+def _quality_available() -> bool:
+    return importlib.util.find_spec("hwpx.quality") is not None
+
+
+def package_version(package: str) -> str:
+    try:
+        return _pkg_version(package)
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def _version_lt(value: str, minimum: str) -> bool:
+    """True if *value* is an older version than *minimum* (PEP 440 aware).
+
+    Uses ``packaging.version`` so that ``"2.12"`` == ``"2.12.0"`` and a
+    pre-release (``"2.12.0rc1"`` / ``".dev1"``) sorts BEFORE the final release —
+    otherwise a healthy install (or an rc of the boundary) would falsely skew and
+    fail closed.
+    """
+
+    try:
+        from packaging.version import InvalidVersion, Version
+
+        try:
+            return Version(value) < Version(minimum)
+        except InvalidVersion:
+            pass
+    except Exception:  # pragma: no cover - packaging always present via pip
+        pass
+    # Stdlib fallback: zero-pad to equal length so "2.12" is not < "2.12.0".
+    a = [int("".join(c for c in p if c.isdigit()) or 0) for p in value.split(".")]
+    b = [int("".join(c for c in p if c.isdigit()) or 0) for p in minimum.split(".")]
+    width = max(len(a), len(b))
+    a += [0] * (width - len(a))
+    b += [0] * (width - len(b))
+    return a < b
+
+
+# --------------------------------------------------------------------------- #
+# Quality policy resolution.
+# --------------------------------------------------------------------------- #
+_POLICY_KEY_MAP = {
+    "requireOpenSafety": "require_open_safety",
+    "requireVisualComplete": "require_visual_complete",
+    "requireReferenceIntegrity": "require_reference_integrity",
+    "renderCheck": "render_check",
+    "xsdMode": "xsd_mode",
+    "overflowPolicy": "overflow_policy",
+    "layoutLint": "layout_lint",
+    "allowExpertUnsafe": "allow_expert_unsafe",
+}
+
+
+def resolve_policy(quality: Mapping[str, Any] | str | None) -> Any:
+    """Map a model-facing ``quality`` block to a ``QualityPolicy``.
+
+    ``None`` → the ``HWPX_MCP_QUALITY`` env default → transparent. A string picks a
+    named policy (``transparent`` / ``strict``). A dict elevates from transparent
+    with camelCase overrides (``renderCheck`` / ``overflowPolicy`` / ``layoutLint`` …).
+    """
+
+    from hwpx.quality import QualityPolicy
+
+    if quality is None:
+        quality = os.environ.get(_QUALITY_ENV) or "transparent"
+
+    if isinstance(quality, str):
+        mode = quality.strip().lower()
+        if mode in ("strict", "docx", "full"):
+            return QualityPolicy.strict()
+        return QualityPolicy.transparent()
+
+    if isinstance(quality, Mapping):
+        mode = str(quality.get("mode", "transparent")).lower()
+        base = QualityPolicy.strict() if mode in ("strict", "docx", "full") else QualityPolicy.transparent()
+        changes: dict[str, Any] = {}
+        for key, attr in _POLICY_KEY_MAP.items():
+            if key in quality:
+                changes[attr] = quality[key]
+        return base.with_(**changes) if changes else base
+
+    return QualityPolicy.transparent()
+
+
+# --------------------------------------------------------------------------- #
+# Report → MCP payload.
+# --------------------------------------------------------------------------- #
+def visual_complete_block(report: Any) -> dict[str, Any]:
+    """The model-facing VisualComplete block (codes + suggestedRetry)."""
+
+    errors = [
+        {
+            "code": err.code,
+            "message": err.message,
+            "suggestedRetry": err.suggested_retry,
+        }
+        for err in report.errors
+    ]
+    return {
+        "ok": bool(report.ok),
+        "visualComplete": bool(report.visual_complete),
+        "status": report.visual_complete_status,
+        "renderChecked": bool(report.render_checked),
+        "errors": errors,
+        "errorCodes": [err.code for err in report.errors],
+        "warnings": list(report.warnings),
+        "suggestedRetry": _aggregate_retry(report),
+        "form": report.form.to_dict(),
+        "layout": report.layout.to_dict(),
+    }
+
+
+def _aggregate_retry(report: Any) -> dict[str, Any] | None:
+    for err in report.errors:
+        if err.suggested_retry:
+            return {"code": err.code, **err.suggested_retry}
+    if report.errors:
+        return {"code": report.errors[0].code}
+    return None
+
+
+class QualityGateError(RuntimeError):
+    """An elevated-policy gate failed; the write was withheld (fail-closed)."""
+
+    def __init__(self, report: Any) -> None:
+        block = visual_complete_block(report)
+        self.report = report
+        self.block = block
+        self.code = (block["errorCodes"] or ["VISUAL_COMPLETE_FAILED"])[0]
+        message = "; ".join(e["message"] for e in block["errors"]) or "visual_complete gate failed"
+        _record_gate_error(self)
+        super().__init__(message)
+
+
+def save_through_pipeline(document: Any, output_path: Any, *, quality: Any = None) -> Any:
+    """Save *document* through the SavePipeline; return the ``VisualCompleteReport``.
+
+    Raises :class:`QualityGateError` when the gate fails (so the caller withholds
+    the output — fail-closed). Open-safety serialize failures still raise the
+    library's ``ValueError`` as before.
+    """
+
+    # Accept a ready QualityPolicy, or resolve None/str/dict into one.
+    if quality is None or isinstance(quality, (str, Mapping)):
+        policy = resolve_policy(quality)
+    else:
+        policy = quality
+    report = document.save_report(output_path, quality=policy)
+    if not report.ok:
+        raise QualityGateError(report)
+    return report
+
+
+# --------------------------------------------------------------------------- #
+# Capability handshake (fail-closed on skew).
+# --------------------------------------------------------------------------- #
+def capability_state() -> dict[str, Any]:
+    """Core/mcp/plugin versions + a fingerprint hash + any version skew."""
+
+    core = package_version("python-hwpx")
+    mcp = package_version("hwpx-mcp-server")
+    plugin = os.environ.get("HWPX_SKILL_VERSION", "unknown")
+    has_pipeline = _quality_available()
+
+    skew: list[str] = []
+    if not has_pipeline:
+        skew.append("python-hwpx is missing the hwpx.quality SavePipeline gate")
+    elif _version_lt(core, MIN_PYTHON_HWPX):
+        skew.append(f"python-hwpx {core} < {MIN_PYTHON_HWPX} (no VisualComplete gate)")
+    if mcp == "unknown":
+        skew.append("hwpx-mcp-server version is unresolved")
+
+    fingerprint = hashlib.sha256(
+        "|".join(["core", core, "mcp", mcp, "plugin", plugin, "pipeline", str(has_pipeline)]).encode()
+    ).hexdigest()[:16]
+
+    return {
+        "versions": {"core": core, "mcp": mcp, "plugin": plugin},
+        "minPythonHwpx": MIN_PYTHON_HWPX,
+        "savePipelineAvailable": has_pipeline,
+        "hash": fingerprint,
+        "skew": skew,
+        "ok": not skew,
+    }
+
+
+def fail_closed_enabled() -> bool:
+    return os.environ.get(_REQUIRE_CAPABILITY_ENV, "1") != "0"
+
+
+def assert_write_capability() -> None:
+    """Raise :class:`QualityGateError`-style failure if capability is skewed.
+
+    Fail-closed: a write must not proceed when the installed quality stack can't
+    honour the gate (e.g. a stale python-hwpx). Disable with
+    ``HWPX_MCP_REQUIRE_CAPABILITY=0`` for an expert/debug bypass.
+    """
+
+    if not fail_closed_enabled():
+        return
+    state = capability_state()
+    if not state["ok"]:
+        raise CapabilitySkewError(state)
+
+
+class CapabilitySkewError(RuntimeError):
+    """The core/mcp/plugin capability handshake detected skew; writes fail closed."""
+
+    code = "CAPABILITY_SKEW"
+
+    def __init__(self, state: Mapping[str, Any]) -> None:
+        self.state = dict(state)
+        _record_gate_error(self)
+        super().__init__("; ".join(state.get("skew", [])) or "capability skew detected")
+
+
+__all__ = [
+    "MIN_PYTHON_HWPX",
+    "resolve_policy",
+    "save_through_pipeline",
+    "visual_complete_block",
+    "QualityGateError",
+    "CapabilitySkewError",
+    "capability_state",
+    "assert_write_capability",
+    "fail_closed_enabled",
+    "package_version",
+]

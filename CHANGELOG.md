@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-06-24
+### Added
+- VisualComplete quality contract (no model can bypass the gate): every write funnels through python-hwpx's single `SavePipeline` and the capability handshake, and write responses carry a `visualComplete` block (`ok`/`status`/`errorCodes`/`warnings`/`suggestedRetry`). (`byte_preserving_patch` is a byte-preserving fast path: open-safety + capability gated, render gate N/A by design.)
+- `quality` block on writes (default `transparent`; `strict` or per-field overrides like `overflowPolicy`/`layoutLint`). On a gate failure the save is withheld (`ok=false`) and the model gets a structured, retry-able error (`FIELD_OVERFLOW`, `STALE_LINESEG_DETECTED`, `VISUAL_COMPLETE_FAILED`, …) with `suggestedRetry`. New `HWPX_MCP_QUALITY` global default.
+- Capability handshake in `mcp_server_health` (core/mcp/plugin versions + fingerprint hash) that **fails closed** on skew — writes are blocked when the installed python-hwpx can't honour the gate. Bypass with `HWPX_MCP_REQUIRE_CAPABILITY=0`.
+- README "no raw XML" quality-contract section.
+
+### Changed
+- Require `python-hwpx >= 2.12.0` (the VisualComplete quality stack: `hwpx.quality` SavePipeline, `form_fit`, `layout`, `design`).
+
 ## [2.4.1] - 2026-06-12
 ### Changed
 - Require `python-hwpx >= 2.11.1` so document-plan generated headings receive real `개요 N`/`Outline N` paragraph styles and visible title/heading hierarchy.

@@ -469,7 +469,11 @@ def _write_and_inspect(destination: str, content_spec: Mapping[str, Any], *, rev
             if create_proposal_document is not None
             else _create_quality_document_fallback(content_spec)
         )
-        doc.save_to_path(tmp_path)
+        # Phase F: this user-file commit funnels through the one SavePipeline gate.
+        from . import quality as quality_contract
+
+        quality_contract.assert_write_capability()
+        quality_contract.save_through_pipeline(doc, tmp_path)
         report = (
             inspect_proposal_quality(str(tmp_path))
             if inspect_proposal_quality is not None

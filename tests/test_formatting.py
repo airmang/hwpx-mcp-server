@@ -141,12 +141,14 @@ def test_save_doc_uses_atomic_write_on_failure(tmp_path: Path, monkeypatch: pyte
     doc = open_doc(str(target))
     doc.add_paragraph("updated")
 
-    def flaky_save(path: str | Path) -> None:
-        broken_path = Path(path)
-        broken_path.write_text("not-a-valid-hwpx", encoding="utf-8")
+    def flaky_save(path: str | Path | None = None, *args: object, **kwargs: object):
+        if path is not None:
+            Path(path).write_text("not-a-valid-hwpx", encoding="utf-8")
         raise RuntimeError("forced save failure")
 
-    monkeypatch.setattr(doc, "save_to_path", flaky_save)
+    # Phase F routes saves through the SavePipeline (save_report), so inject the
+    # failure there to exercise the storage's atomic-write-on-failure path.
+    monkeypatch.setattr(doc, "save_report", flaky_save)
 
     with pytest.raises(RuntimeError, match="forced save failure"):
         save_doc(doc, str(target))
