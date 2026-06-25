@@ -75,6 +75,12 @@ from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
 from hwpx.tools.id_integrity import check_id_integrity
+from hwpx.form_fit import seal as seal_ops
+from hwpx.form_fit.wordbox import (
+    OracleUnavailable,
+    extract_image_boxes,
+    render_glyph_boxes,
+)
 
 try:  # python-hwpx >= proposal preset feature
     from hwpx.presets import (
@@ -311,7 +317,7 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 86
+_EXPECTED_FASTMCP_TOOL_COUNT = 88  # +place_seal +check_seal_compliance (M2 P3)
 _EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
@@ -3581,6 +3587,187 @@ def replace_picture(
         return _with_dry_run_verification(result, doc, target_path)
     verification = _save_doc_verification(doc, target_path)
     return _with_save_verification(result, verification)
+
+
+# ------------------------------------------------------------------
+# 직인/관인 placement + compliance (M2 P3 / FR-003) — oracle-bound
+# ------------------------------------------------------------------
+
+
+def _nearest_rect(rects: list, center: tuple[float, float]):
+    cx, cy = center
+    return min(
+        rects,
+        key=lambda r: ((r.x0 + r.x1) / 2 - cx) ** 2 + ((r.y0 + r.y1) / 2 - cy) ** 2,
+    )
+
+
+def _check_seal_compliance_impl(
+    path: str,
+    sender_text: str,
+    *,
+    tol_pt: float,
+    expected_center: tuple[float, float] | None = None,
+) -> dict[str, Any]:
+    """Render *path* via the Hancom oracle and decide the 직인 rule (pass/fail).
+
+    The seal is a picture, so it is located with ``extract_image_boxes`` (not text);
+    the 발신명의 anchor is found in the same render. Degrades to
+    ``renderChecked=False`` when no oracle is reachable — never a silent pass.
+    """
+
+    fd, pdf = tempfile.mkstemp(prefix="seal_verify_", suffix=".pdf")
+    os.close(fd)
+    try:
+        boxes, _sizes, backend = render_glyph_boxes(path, out_pdf=pdf)
+        seal_rects = extract_image_boxes(pdf)
+    except OracleUnavailable as exc:
+        return {
+            "ok": False,
+            "renderChecked": False,
+            "note": "한컴 오라클이 없어 직인 배치를 검증할 수 없습니다.",
+            "reason": str(exc),
+        }
+    finally:
+        try:
+            os.unlink(pdf)
+        except OSError:
+            pass
+
+    if not seal_rects:
+        return {
+            "ok": False,
+            "renderChecked": True,
+            "note": "렌더에 직인 이미지가 없습니다 (isEmbeded 누락 또는 미배치).",
+        }
+    anchor = seal_ops.find_seal_anchor(boxes, sender_text)
+    center = expected_center or (anchor.center if anchor is not None else None)
+    seal_rect = _nearest_rect(seal_rects, center) if center is not None else seal_rects[-1]
+    verdict = seal_ops.check_seal_placement(boxes, seal_rect, sender_text, tol_pt=tol_pt)
+    out: dict[str, Any] = {"ok": verdict.ok, "renderChecked": True, "backend": backend}
+    out.update(verdict.to_dict())
+    return out
+
+
+@mcp.tool()
+def place_seal(
+    filename: str,
+    sender_text: str,
+    image_base64: str,
+    image_format: str = "png",
+    seal_width_mm: float = 25.0,
+    seal_height_mm: float | None = None,
+    anchor_x: float | None = None,
+    anchor_y: float | None = None,
+    anchor_page: int | None = None,
+    verify: bool = True,
+    tol_pt: float = 6.0,
+    output: str | None = None,
+    dry_run: bool = False,
+    expected_revision: str = None,
+) -> dict:
+    """발신명의(issuer line) 끝글자에 직인/관인을 floating으로 찍습니다 (FR-003).
+
+    한컴 렌더 오라클로 발신명의 위치(앵커)를 찾아 직인을 그 위에 스탬프합니다
+    (textWrap=IN_FRONT_OF_TEXT — 겹친 글자를 밀지 않음). 오라클이 없으면 ``anchor_x``/
+    ``anchor_y`` 로 PDF 포인트 앵커를 직접 지정할 수 있고, 둘 다 없으면
+    ``renderChecked=false`` 로 정직하게 degrade 합니다(임의 배치 금지). ``verify=True``
+    이면 저장 후 재렌더로 직인이 발신명의에 규칙대로 찍혔는지 검증합니다.
+    """
+    path = resolve_path(filename)
+    guard = _revision_guard(path, expected_revision)
+    if guard is not None:
+        return guard
+    target_path = resolve_path(output) if output else path
+    image_data = _decode_image_base64(image_base64)
+
+    # 1) locate the 발신명의 anchor — explicit override, else the render oracle.
+    if anchor_x is not None and anchor_y is not None:
+        anchor_center = (float(anchor_x), float(anchor_y))
+        anchor_page_resolved = anchor_page
+        anchor_source = "explicit"
+    else:
+        try:
+            boxes, _sizes, backend = render_glyph_boxes(path)
+        except OracleUnavailable as exc:
+            return {
+                "ok": False,
+                "filename": filename,
+                "renderChecked": False,
+                "note": "한컴 오라클이 없어 발신명의 위치를 찾을 수 없습니다. anchor_x/anchor_y(PDF pt)로 직접 지정하세요.",
+                "reason": str(exc),
+            }
+        anchor = seal_ops.find_seal_anchor(boxes, sender_text)
+        if anchor is None:
+            return {
+                "ok": False,
+                "filename": filename,
+                "renderChecked": True,
+                "note": f"발신명의 '{sender_text}'를 렌더에서 찾지 못했습니다.",
+            }
+        anchor_center = anchor.center
+        anchor_page_resolved = anchor.glyph.page
+        anchor_source = backend
+
+    # 2) stamp the floating seal on the anchor.
+    doc = open_doc(path)
+    placement = seal_ops.place_seal(
+        doc,
+        image_data=image_data,
+        image_format=image_format,
+        sender_text=sender_text,
+        anchor_center_pt=anchor_center,
+        seal_width_mm=seal_width_mm,
+        seal_height_mm=seal_height_mm,
+        page=anchor_page_resolved,
+    )
+    if not placement.placed:
+        return {
+            "ok": False,
+            "filename": filename,
+            "placement": placement.to_dict(),
+            "note": placement.note or "발신명의 문단을 찾지 못했습니다.",
+        }
+
+    result = {
+        "ok": True,
+        "filename": filename,
+        "outputPath": target_path,
+        "anchorSource": anchor_source,
+        "placement": placement.to_dict(),
+        "idIntegrity": _id_integrity_payload(doc),
+    }
+    if dry_run:
+        return _with_dry_run_verification(result, doc, target_path)
+    verification = _save_doc_verification(doc, target_path)
+    result = _with_save_verification(result, verification)
+
+    # 3) optional oracle re-verify against the realized seal center.
+    if verify:
+        expected_center = (
+            (placement.horz_offset + placement.seal_width_hu / 2) / 100.0,
+            (placement.vert_offset + placement.seal_height_hu / 2) / 100.0,
+        )
+        result["sealVerdict"] = _check_seal_compliance_impl(
+            target_path, sender_text, tol_pt=tol_pt, expected_center=expected_center
+        )
+    return result
+
+
+@mcp.tool()
+def check_seal_compliance(
+    filename: str,
+    sender_text: str,
+    tol_pt: float = 6.0,
+) -> dict:
+    """직인이 발신명의 끝글자에 규칙대로 찍혔는지 pass/fail 검사 (FR-003).
+
+    한컴으로 렌더해 직인 이미지의 실제 위치를 발신명의 앵커와 비교합니다(중심 tol 이내 +
+    의도치 않은 글자 가림 없음). 평가자가 그대로 돌릴 수 있는 차별적 검사 — 잘 찍힌 직인은
+    pass, 어긋난 직인은 fail. 오라클이 없으면 ``renderChecked=false`` 로 degrade 합니다.
+    """
+    path = resolve_path(filename)
+    return _check_seal_compliance_impl(path, sender_text, tol_pt=tol_pt)
 
 
 @mcp.tool()
