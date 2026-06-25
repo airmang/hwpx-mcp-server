@@ -301,7 +301,13 @@ async def _serve_stdio(server: Server) -> None:
 
 
 async def _serve_streamable_http(server: Server, *, host: str, port: int) -> None:
-    import uvicorn
+    try:  # HTTP transport is an optional [http] extra
+        import uvicorn
+    except ImportError as exc:  # pragma: no cover - exercised only without the extra
+        raise RuntimeError(
+            "HTTP transport requires the 'uvicorn' package. Install it with: "
+            "pip install 'hwpx-mcp-server[http]' (or pip install uvicorn)."
+        ) from exc
 
     init_options = server.create_initialization_options(NotificationOptions())
     transport = StreamableHTTPServerTransport(mcp_session_id=None)

@@ -4190,7 +4190,14 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     # TODO: add pluggable auth middleware/headers for production HTTP deployments.
-    import uvicorn
+    try:  # HTTP transport is an optional [http] extra
+        import uvicorn
+    except ImportError as exc:  # pragma: no cover - exercised only without the extra
+        raise RuntimeError(
+            "HTTP transport requires the 'uvicorn' package. Install it with: "
+            "pip install 'hwpx-mcp-server[http]' (or pip install uvicorn). "
+            "The default stdio transport needs no extra."
+        ) from exc
 
     app = mcp.streamable_http_app()
     uvicorn.run(

@@ -9,7 +9,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-import olefile
+try:  # legacy HWP5 (OLE2) support is an optional [hwp] extra
+    import olefile
+except ImportError:  # pragma: no cover - exercised only without the extra
+    olefile = None
+
+_OLEFILE_INSTALL_HINT = (
+    "Reading legacy .hwp (HWP5/OLE2) files requires the 'olefile' package. "
+    "Install it with: pip install 'hwpx-mcp-server[hwp]' (or pip install olefile)."
+)
 
 
 @dataclass(slots=True)
@@ -52,6 +60,8 @@ def _decode_section_payload(payload: bytes) -> str:
 
 
 def extract_hwp_text(path: Path) -> HwpTextSnapshot:
+    if olefile is None:
+        raise HwpBinaryError(_OLEFILE_INSTALL_HINT)
     if path.suffix.lower() != ".hwp":
         raise HwpBinaryError(".hwp 파일만 처리할 수 있습니다")
 
