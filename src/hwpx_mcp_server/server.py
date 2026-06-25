@@ -1581,10 +1581,29 @@ def mail_merge(
     zip_filename: str = None,
     strict: bool = False,
     split_newlines: bool = True,
+    fit_mode: str | None = None,
+    max_lines: int = 1,
 ) -> dict:
-    """템플릿 HWPX와 CSV/JSON/rows 데이터로 N부를 생성하고 zip/openSafety evidence를 반환합니다."""
+    """템플릿 HWPX와 CSV/JSON/XLSX(명부)/rows 데이터로 N부를 생성합니다.
+
+    ``fit_mode`` (keep·wrap·shrink·wrap_then_shrink·expand_row·truncate_with_report·
+    fail_on_overflow)를 주면 **fit-aware** 배치가 됩니다: 각 placeholder 슬롯을 템플릿에서
+    한 번 측정(template-once-measure)하고, 슬롯을 넘치거나 필수값이 빠진 레코드를
+    ``needsReview[]``/``skipped[]`` 로 격리합니다(나머지 배치는 안전). zip/openSafety
+    evidence 동봉.
+    """
     if build_hwpx_mail_merge is None:
         raise RuntimeError("installed python-hwpx does not provide mail merge tools")
+    fit_policy = None
+    if fit_mode:
+        from hwpx.form_fit import FitMode, FitPolicy
+
+        valid_modes = set(getattr(FitMode, "__args__", ()))
+        if valid_modes and fit_mode not in valid_modes:
+            raise ValueError(
+                f"unknown fit_mode {fit_mode!r}; expected one of {sorted(valid_modes)}"
+            )
+        fit_policy = FitPolicy(mode=fit_mode, max_lines=max_lines)
     data_source = _mail_merge_data_source(data_rows, data_filename)
     report = build_hwpx_mail_merge(
         resolve_path(template_filename),
@@ -1594,6 +1613,8 @@ def mail_merge(
         zip_path=resolve_path(zip_filename) if zip_filename else None,
         strict=strict,
         split_newlines=split_newlines,
+        fit_policy=fit_policy,
+        max_lines=max_lines,
     )
     open_safety = _mail_merge_open_safety_summary(report)
     report["openSafety"] = open_safety
