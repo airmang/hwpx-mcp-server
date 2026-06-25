@@ -88,6 +88,7 @@ except Exception:  # pragma: no cover - optional dependency compatibility
 try:  # python-hwpx >= document-plan authoring feature
     from hwpx import (
         create_document_from_plan as build_document_from_plan,
+        get_document_plan_schema as get_hwpx_document_plan_schema,
         inspect_document_authoring_quality as inspect_authoring_document_quality,
         inspect_operating_plan_quality as inspect_operating_plan_document_quality,
         normalize_document_plan as normalize_hwpx_document_plan,
@@ -95,6 +96,7 @@ try:  # python-hwpx >= document-plan authoring feature
     )
 except Exception:  # pragma: no cover - optional dependency compatibility
     build_document_from_plan = None
+    get_hwpx_document_plan_schema = None
     inspect_authoring_document_quality = None
     inspect_operating_plan_document_quality = None
     normalize_hwpx_document_plan = None
@@ -309,7 +311,7 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 84
+_EXPECTED_FASTMCP_TOOL_COUNT = 86
 _EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
@@ -1247,6 +1249,18 @@ def _next_action(quality: dict) -> str:
     if bool(quality.get("pass")):
         return "structural handoff is ready; complete visual review before final submission"
     return "review quality.gaps and profile repair_hints, then rerun validate/analyze/create"
+
+
+@mcp.tool()
+def get_document_plan_schema() -> dict:
+    """document_plan(생성 계획)의 JSON Schema를 반환합니다.
+
+    Structured Outputs/외부 검증 계약으로 직접 사용하세요 — 자유형 JSON을 만들고
+    validate_document_plan에서 거부당하는 대신, 이 스키마로 생성을 제약합니다.
+    """
+    if get_hwpx_document_plan_schema is None:
+        raise RuntimeError("installed python-hwpx does not provide document-plan authoring")
+    return get_hwpx_document_plan_schema()
 
 
 @mcp.tool()
