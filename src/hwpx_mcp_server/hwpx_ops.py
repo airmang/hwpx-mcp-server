@@ -127,6 +127,9 @@ _AUTO_FIT_MAX_COLUMN_WIDTH = _DEFAULT_CELL_WIDTH * 12
 DEFAULT_PAGING_PARAGRAPH_LIMIT = 200
 _PREVIEW_SCHEMA_VERSION = "hwpx.render-preview.v1"
 _VISUAL_REVIEW_SCHEMA_VERSION = "hwpx.visual-review.v1"
+# Cap for inline-embedded preview PNGs (per page). Oversized pages keep their
+# on-disk path but skip the base64 payload so a response can't balloon.
+_DEFAULT_MAX_PREVIEW_IMAGE_BYTES = 6 * 1024 * 1024
 _CSS_PX_PER_MM = 96 / 25.4
 _CHROME_CANDIDATES = (
     "chromium",
@@ -2773,6 +2776,33 @@ class HwpxOps:
         resolved.mkdir(parents=True, exist_ok=True)
         return resolved
 
+    def _embed_screenshot_image(
+        self,
+        item: dict[str, Any],
+        png_path: Path,
+        *,
+        embed_images: bool,
+        max_image_bytes: int | None,
+    ) -> None:
+        """Attach a base64 PNG payload to a screenshot item, bounded by a byte cap.
+
+        Keeps the on-disk artifact regardless; only the inline payload is gated so
+        an oversized page degrades to "path only" instead of bloating the response.
+        """
+        if not embed_images:
+            return
+        try:
+            raw = png_path.read_bytes()
+        except OSError as exc:  # pragma: no cover - filesystem edge
+            item["imageOmitted"] = f"read_error: {exc}"
+            return
+        item["bytes"] = len(raw)
+        if max_image_bytes is not None and len(raw) > max_image_bytes:
+            item["imageOmitted"] = "exceeds_max_image_bytes"
+            return
+        item["imageBase64"] = base64.b64encode(raw).decode("ascii")
+        item["imageMime"] = "image/png"
+
     def _capture_preview_pages(
         self,
         *,
@@ -2780,6 +2810,8 @@ class HwpxOps:
         pages: Sequence[Dict[str, Any]],
         output_dir: Path,
         max_pages: int | None,
+        embed_images: bool = False,
+        max_image_bytes: int | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         capture_count = len(page_html_paths)
         if max_pages is not None:
@@ -2805,15 +2837,20 @@ class HwpxOps:
                         browser_page.goto(html_path.as_uri(), wait_until="load")
                         browser_page.screenshot(path=str(output_path), full_page=True)
                         browser_page.close()
-                        screenshots.append(
-                            {
-                                "pageIndex": index,
-                                "path": self._relative_path(output_path),
-                                "backend": "playwright-chromium",
-                                "widthPx": width,
-                                "heightPx": height,
-                            }
+                        item = {
+                            "pageIndex": index,
+                            "path": self._relative_path(output_path),
+                            "backend": "playwright-chromium",
+                            "widthPx": width,
+                            "heightPx": height,
+                        }
+                        self._embed_screenshot_image(
+                            item,
+                            output_path,
+                            embed_images=embed_images,
+                            max_image_bytes=max_image_bytes,
                         )
+                        screenshots.append(item)
                 finally:
                     browser.close()
             return screenshots, {
@@ -2869,15 +2906,20 @@ class HwpxOps:
                 detail = (completed.stderr or completed.stdout or "unknown error").strip()
                 failures.append(f"page {index + 1}: {detail}")
                 continue
-            screenshots.append(
-                {
-                    "pageIndex": index,
-                    "path": self._relative_path(output_path),
-                    "backend": "chrome-headless-cli",
-                    "widthPx": width,
-                    "heightPx": height,
-                }
+            item = {
+                "pageIndex": index,
+                "path": self._relative_path(output_path),
+                "backend": "chrome-headless-cli",
+                "widthPx": width,
+                "heightPx": height,
+            }
+            self._embed_screenshot_image(
+                item,
+                output_path,
+                embed_images=embed_images,
+                max_image_bytes=max_image_bytes,
             )
+            screenshots.append(item)
 
         message = f"Captured {len(screenshots)} preview screenshot(s) with Chrome CLI."
         if failures:
@@ -2897,8 +2939,18 @@ class HwpxOps:
         mode: str = "pages",
         screenshot: str = "auto",
         max_pages: Optional[int] = None,
+        embed_images: bool = False,
+        max_image_bytes: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Generate layout-aware HTML and optional PNG preview artifacts."""
+        """Generate layout-aware HTML and optional PNG preview artifacts.
+
+        When *embed_images* is true, each captured screenshot item also carries
+        an ``imageBase64``/``imageMime`` payload (bounded by *max_image_bytes*,
+        defaulting to ``_DEFAULT_MAX_PREVIEW_IMAGE_BYTES``) so a caller can return
+        the page as an inline image content block.
+        """
+        if embed_images and max_image_bytes is None:
+            max_image_bytes = _DEFAULT_MAX_PREVIEW_IMAGE_BYTES
         if render_hwpx_layout_preview is None:
             raise self._new_error(
                 "RENDER_PREVIEW_UNAVAILABLE",
@@ -2958,6 +3010,8 @@ class HwpxOps:
                 pages=pages,
                 output_dir=output_path,
                 max_pages=max_pages,
+                embed_images=embed_images,
+                max_image_bytes=max_image_bytes,
             )
             requested_count = len(page_html_paths)
             if max_pages is not None:
@@ -3020,7 +3074,13 @@ class HwpxOps:
             "warnings": list(preview.warnings),
             "suggestion": suggestion,
         }
-        _write_json(manifest_path, manifest)
+        # Keep the on-disk manifest lean — never persist inline base64 payloads.
+        disk_manifest = dict(manifest)
+        disk_manifest["screenshots"] = [
+            {key: value for key, value in shot.items() if key != "imageBase64"}
+            for shot in screenshots
+        ]
+        _write_json(manifest_path, disk_manifest)
         return manifest
 
     def make_blank(self, out: str) -> Dict[str, Any]:

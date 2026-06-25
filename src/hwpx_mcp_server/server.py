@@ -2312,14 +2312,45 @@ def render_preview(
     mode: str = "pages",
     screenshot: str = "auto",
     max_pages: int | None = None,
-) -> dict:
-    """레이아웃 충실 HTML과 headless browser PNG 프리뷰 산출물을 생성합니다."""
-    return _OPS.render_preview(
+    embed_images: bool = True,
+    max_image_bytes: int | None = None,
+) -> mcp_types.CallToolResult:
+    """레이아웃 충실 HTML과 headless browser PNG 프리뷰 산출물을 생성합니다.
+
+    embed_images 가 참이면 각 페이지 PNG 를 인라인 이미지 콘텐츠 블록으로 함께
+    반환해 (한컴/ComputerUse 없이) 모델이 레이아웃을 직접 볼 수 있습니다. 구조화
+    매니페스트(JSON)는 structuredContent 로 그대로 유지됩니다.
+    """
+    manifest = _OPS.render_preview(
         path=filename,
         output_dir=output_dir,
         mode=mode,
         screenshot=screenshot,
         max_pages=max_pages,
+        embed_images=embed_images,
+        max_image_bytes=max_image_bytes,
+    )
+
+    images: list[mcp_types.ImageContent] = []
+    for shot in manifest.get("screenshots", []):
+        data = shot.pop("imageBase64", None)
+        mime = shot.pop("imageMime", "image/png")
+        if data:
+            images.append(mcp_types.ImageContent(type="image", data=data, mimeType=mime))
+            shot["imageEmbedded"] = True
+        elif embed_images:
+            shot["imageEmbedded"] = False
+
+    content: list[mcp_types.ContentBlock] = [
+        mcp_types.TextContent(
+            type="text", text=json.dumps(manifest, ensure_ascii=False, indent=2)
+        )
+    ]
+    content.extend(images)
+    return mcp_types.CallToolResult(
+        content=content,
+        structuredContent=manifest,
+        isError=False,
     )
 
 
