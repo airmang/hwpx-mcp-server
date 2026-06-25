@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-06-25
+### Added
+- `place_seal` / `check_seal_compliance` — oracle-bound 직인/관인 tools (M2 P3 / FR-003). `place_seal` renders the form via the Hancom oracle to locate the 발신명의 anchor, stamps a floating seal on it (`textWrap=IN_FRONT_OF_TEXT` — no text reflow), saves through the openSafety gate, and (verify=True) re-renders to attach the compliance verdict. Falls back to an explicit `anchor_x`/`anchor_y`; with no oracle and no anchor it degrades to `renderChecked=false` rather than guessing. `check_seal_compliance` is the standalone pass/fail check (centered seal passes, mis-placed fails).
+- `mail_merge` `fit_mode` (keep/wrap/shrink/wrap_then_shrink/…) + `max_lines` — fit-aware batch (M2 P4 / FR-004): measures each placeholder slot once, isolates slot-overflow / missing-field rows into `needsReview[]` / `skipped[]` (`fitAware` in the report). Excel/CSV/XLSX 명부 reachable via python-hwpx ingestion.
+- `[oracle]` extra (`python-hwpx[visual]` → PyMuPDF) for the seal/form-fill render-oracle path; absent it degrades honestly (`renderChecked=false`), never crashes.
+### Changed
+- Require `python-hwpx >= 2.14.0` (seal placement, `extract_image_boxes`, `mail_merge` fit_policy + xlsx, `isEmbeded` image-render fix).
+- Tool surface 86 → 88 (`place_seal`, `check_seal_compliance`); `mcp_server_health` expected count updated.
+
 ## [2.5.0] - 2026-06-24
 ### Added
 - VisualComplete quality contract (no model can bypass the gate): every write funnels through python-hwpx's single `SavePipeline` and the capability handshake, and write responses carry a `visualComplete` block (`ok`/`status`/`errorCodes`/`warnings`/`suggestedRetry`). (`byte_preserving_patch` is a byte-preserving fast path: open-safety + capability gated, render gate N/A by design.)
