@@ -188,6 +188,22 @@ try:  # python-hwpx >= byte-preserving patch feature
 except Exception:  # pragma: no cover - optional dependency compatibility
     hwpx_paragraph_patch = None
 
+try:  # python-hwpx >= exam typesetting composer (S-056 시험지 조판)
+    from hwpx.exam import (
+        ExamParseError,
+        FormProfileError,
+        compose_exam_into_form,
+        measure_question_splits,
+    )
+    from hwpx.visual.oracle import NullOracle, resolve_oracle
+except Exception:  # pragma: no cover - optional dependency compatibility
+    ExamParseError = None
+    FormProfileError = None
+    compose_exam_into_form = None
+    measure_question_splits = None
+    NullOracle = None
+    resolve_oracle = None
+
 mcp = FastMCP("hwpx-mcp-server")
 
 
@@ -3800,6 +3816,82 @@ def check_seal_compliance(
     """
     path = resolve_path(filename)
     return _check_seal_compliance_impl(path, sender_text, tol_pt=tol_pt)
+
+
+@mcp.tool()
+def verify_question_splits(
+    filename: str,
+    valid_question_numbers: list[str] | None = None,
+    marker_regex: str | None = None,
+) -> dict:
+    """한컴 렌더로 시험지 .hwpx의 문항이 단/쪽 경계에서 잘렸는지(문항-split) 검증합니다 (S-056).
+
+    오라클이 없으면 ``renderChecked=false`` 로 정직하게 degrade 합니다(임의 0 금지).
+    한컴이 본문을 벡터 커브로 export 해 추출 텍스트에 조판 문항이 0개면(학교 원안지
+    양식에서 관측) ``splits=null`` + ``needsReview=true`` 로 보고하고 렌더 이미지 기반
+    시각 검증을 요구합니다. ``valid_question_numbers`` 로 측정 대상 문항을 한정하면 양식
+    chrome(예: "2026." 연도)이 가짜 문항 블록을 열지 않습니다.
+    """
+    if measure_question_splits is None or resolve_oracle is None:
+        return {
+            "ok": False,
+            "filename": filename,
+            "renderChecked": False,
+            "needsReview": True,
+            "note": "이 python-hwpx 빌드에는 hwpx.exam 조판/측정 모듈이 없습니다.",
+        }
+    path = resolve_path(filename)
+    oracle = resolve_oracle()
+    if not oracle.available():
+        return {
+            "ok": True,
+            "filename": filename,
+            "renderChecked": False,
+            "splits": None,
+            "needsReview": True,
+            "note": "한컴 오라클이 없어 문항 split을 측정할 수 없습니다 (renderChecked=false).",
+        }
+    pdf = oracle.render_pdf(path)
+    if not pdf:
+        return {
+            "ok": False,
+            "filename": filename,
+            "renderChecked": False,
+            "splits": None,
+            "needsReview": True,
+            "note": "한컴 렌더가 PDF를 생성하지 못했습니다 (renderChecked=false).",
+        }
+    kwargs: dict[str, Any] = {}
+    if valid_question_numbers is not None:
+        kwargs["valid_ids"] = {str(n) for n in valid_question_numbers}
+    if marker_regex:
+        kwargs["marker_re"] = re.compile(marker_regex)
+    report = measure_question_splits(pdf, **kwargs)
+    if report.n_blocks == 0:
+        return {
+            "ok": True,
+            "filename": filename,
+            "renderChecked": True,
+            "splits": None,
+            "needsReview": True,
+            "nBlocks": 0,
+            "note": (
+                "추출 가능한 텍스트 레이어에서 조판 문항을 찾지 못했습니다(벡터 커브 export 양식"
+                " 추정). 문항-split은 텍스트 게이트로 검증할 수 없습니다 — 렌더 이미지로 시각"
+                " 검증이 필요합니다."
+            ),
+        }
+    return {
+        "ok": True,
+        "filename": filename,
+        "renderChecked": True,
+        "splits": report.n_splits,
+        "kinds": dict(report.kinds),
+        "splitIds": list(report.split_ids),
+        "nBlocks": report.n_blocks,
+        "nGlyphs": report.n_glyphs,
+        "needsReview": report.n_splits > 0,
+    }
 
 
 @mcp.tool()
