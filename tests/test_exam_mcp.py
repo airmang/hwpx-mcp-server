@@ -200,3 +200,19 @@ def test_compose_exam_requires_md_xor(tmp_path):
     # both
     r_both = server.compose_exam(form, out, exam_md="x", exam_md_filename="y.md")
     assert r_both["ok"] is False
+
+
+# --------------------------------------------------------------------------- #
+# surface wiring — the new tools are part of the declared MCP surface
+# --------------------------------------------------------------------------- #
+
+
+def test_exam_tools_registered_and_not_skewed():
+    names = server._fastmcp_tool_names()
+    assert "compose_exam" in names
+    assert "verify_question_splits" in names
+    health = server.mcp_server_health()
+    surface = health["toolSurface"]
+    assert surface["status"] == "ok"  # expected count keeps up with the new tools
+    assert "compose_exam" in surface["keyTools"]
+    assert surface["missingKeyTools"] == []

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-06-26
+### Added
+- `compose_exam` — 시험지 조판(re-typeset) leap tool (S-056 Plan 3). Pours authored exam Markdown into a school form `.hwpx` using the form's existing named styles, attaches keep-together so no 문항 splits across a column/page, preserves 관리박스 + 머리글/꼬리글 losslessly, and leaves `[그림N]`/`[표N]`/`[식N]` as text placeholders (a human inserts images later). `exam_md` (inline) XOR `exam_md_filename` (path). `verify=True` renders via the Hancom oracle and degrades to `renderChecked=false` when absent; `verify=False` composes without a render. Forms that Hancom exports as vector curves report `splits=null` + `needsReview=true` (no silent 0). Malformed md / unprofilable form → `ok=false`, nothing written (fail-loud). Attaches `openSafety` for the output.
+- `verify_question_splits` — standalone honest 문항-split gate (spec 3b): renders via the oracle and runs `measure_question_splits`. No oracle → `renderChecked=false`; curve-export form (0 composed 문항 in the extractable text) → `splits=null` + `needsReview`. `valid_question_numbers` scopes grouping so form chrome (e.g. a "2026." year) can't open a spurious block.
+- `set_paragraph_format` keep-together params `keep_with_next` / `keep_lines` / `page_break_before` (spec 3a) — forwarded to the python-hwpx engine's `<hh:breakSetting>` via a freshly minted paraPr (lossless).
+### Changed
+- Tool surface 88 → 90 (`compose_exam`, `verify_question_splits`); `mcp_server_health` expected count updated and `compose_exam` registered as a key tool.
+- Requires the `hwpx.exam` composer from python-hwpx (S-056). Imported under a guarded fallback, so a python-hwpx build without it leaves the server importable and the exam tools degrade to `ok=false` ("module unavailable"). NOTE: `hwpx.exam` is not yet in a published python-hwpx wheel — local/editable sibling dev only until python-hwpx ships it and this pin is bumped.
+
 ## [2.6.0] - 2026-06-25
 ### Added
 - `place_seal` / `check_seal_compliance` — oracle-bound 직인/관인 tools (M2 P3 / FR-003). `place_seal` renders the form via the Hancom oracle to locate the 발신명의 anchor, stamps a floating seal on it (`textWrap=IN_FRONT_OF_TEXT` — no text reflow), saves through the openSafety gate, and (verify=True) re-renders to attach the compliance verdict. Falls back to an explicit `anchor_x`/`anchor_y`; with no oracle and no anchor it degrades to `renderChecked=false` rather than guessing. `check_seal_compliance` is the standalone pass/fail check (centered seal passes, mis-placed fails).

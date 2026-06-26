@@ -333,7 +333,7 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 88  # +place_seal +check_seal_compliance (M2 P3)
+_EXPECTED_FASTMCP_TOOL_COUNT = 90  # +compose_exam +verify_question_splits (S-056 Plan3)
 _EXPECTED_LEGACY_TOOL_COUNT = 63
 _KEY_TOOL_NAMES = (
     "create_document_from_plan",
@@ -350,6 +350,7 @@ _KEY_TOOL_NAMES = (
     "render_preview",
     "apply_edits",
     "undo_last_edit",
+    "compose_exam",
 )
 _FIGURE_CAPTION_RE = re.compile(r"^\s*(?:Figure|Fig\.|그림)\s*\d*", re.IGNORECASE)
 _IDEMPOTENCY_CACHE: dict[str, dict[str, Any]] = {}

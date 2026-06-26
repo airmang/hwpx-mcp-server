@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "2.6.0"
+version = "2.7.0"
 description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
