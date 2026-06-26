@@ -3819,6 +3819,82 @@ def check_seal_compliance(
 
 
 @mcp.tool()
+def compose_exam(
+    form_filename: str,
+    output: str,
+    exam_md: str | None = None,
+    exam_md_filename: str | None = None,
+    max_rounds: int = 2,
+    verify: bool = True,
+    role_style_names: dict[str, str] | None = None,
+) -> dict:
+    """출제 md를 학교 양식 .hwpx에 그 양식의 기존 스타일로 재조판합니다 (S-056 시험지 조판).
+
+    각 문항이 단/쪽 경계에서 잘리지 않게(keep-together) 하고, 관리박스·머리글/꼬리글은
+    무손실 보존하며, [그림N]/[표N]/[식N]은 텍스트 placeholder로 남깁니다(사람이 그림을
+    나중에 삽입). ``exam_md``(인라인 문자열) 또는 ``exam_md_filename``(경로) 중 정확히
+    하나를 줍니다. ``verify=True``(기본)면 한컴 렌더로 문항-split/overflow/placeholder를
+    검증하고 — 오라클이 없으면 ``renderChecked=false`` 로 정직하게 degrade — ``verify=False``
+    면 렌더 없이 조판만 합니다. 한컴이 본문을 벡터 커브로 export 하는 양식은
+    ``splits=null`` + ``needsReview=true`` 로 정직 보고합니다(렌더 이미지로 시각 검증 필요).
+    잘못된 md/양식은 조용히 틀린 문서를 내지 않고 ``ok=false`` 로 실패합니다.
+    """
+    if compose_exam_into_form is None:
+        return {
+            "ok": False,
+            "filename": form_filename,
+            "renderChecked": False,
+            "needsReview": True,
+            "note": "이 python-hwpx 빌드에는 hwpx.exam 조판 모듈이 없습니다.",
+        }
+    if (exam_md is None) == (exam_md_filename is None):
+        return {
+            "ok": False,
+            "filename": form_filename,
+            "note": "exam_md(인라인) 또는 exam_md_filename(경로) 중 정확히 하나를 지정하세요.",
+        }
+
+    form_path = resolve_path(form_filename)
+    if exam_md_filename is not None:
+        exam_md = Path(resolve_path(exam_md_filename)).read_text(encoding="utf-8")
+    out_path = resolve_path(output)
+    oracle = None if verify else NullOracle()
+    try:
+        result = compose_exam_into_form(
+            form_path,
+            exam_md,
+            out_path,
+            oracle=oracle,
+            max_rounds=max_rounds,
+            role_style_names=role_style_names,
+        )
+    except (ExamParseError, FormProfileError) as exc:
+        return {
+            "ok": False,
+            "filename": form_filename,
+            "renderChecked": False,
+            "needsReview": True,
+            "error": type(exc).__name__,
+            "note": str(exc),
+        }
+
+    payload = {
+        "ok": True,
+        "filename": form_filename,
+        "outputPath": out_path,
+        "renderChecked": result.render_checked,
+        "splits": result.splits,
+        "overflow": result.overflow,
+        "placeholdersOk": result.placeholders_ok,
+        "rounds": result.rounds,
+        "needsReview": result.needs_review,
+        "notes": list(result.notes),
+    }
+    payload["openSafety"] = build_hwpx_open_safety_report(Path(out_path))
+    return payload
+
+
+@mcp.tool()
 def verify_question_splits(
     filename: str,
     valid_question_numbers: list[str] | None = None,

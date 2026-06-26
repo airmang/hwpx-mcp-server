@@ -11,10 +11,36 @@ the default suite needs no Hancom (Constitution V — no silent true).
 """
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
+import pytest
+
+import hwpx
 import hwpx_mcp_server.server as server
 from hwpx.document import HwpxDocument
 from hwpx.exam import SplitReport
 from hwpx.oxml.namespaces import HH
+
+# The exam form fixtures are vendored once in python-hwpx (real school forms,
+# governed by tests/fixtures/exam/NOTICE.md). With the editable sibling checkout
+# the MCP tests reference them directly instead of duplicating sensitive data.
+PYHWPX_EXAM_FIX = Path(hwpx.__file__).resolve().parents[2] / "tests" / "fixtures" / "exam"
+_FIX_AVAILABLE = (PYHWPX_EXAM_FIX / "A_form.hwpx").exists()
+requires_form_fixture = pytest.mark.skipif(
+    not _FIX_AVAILABLE,
+    reason="python-hwpx exam fixtures unavailable (need editable sibling checkout)",
+)
+
+
+def _form_copy(tmp_path) -> str:
+    dest = tmp_path / "form.hwpx"
+    shutil.copy(PYHWPX_EXAM_FIX / "A_form.hwpx", dest)
+    return str(dest)
+
+
+def _sample_md() -> str:
+    return (PYHWPX_EXAM_FIX / "sample_exam.md").read_text(encoding="utf-8")
 
 
 class _FakeOracle:
@@ -120,3 +146,57 @@ def test_verify_question_splits_clean(tmp_path, monkeypatch):
     assert res["renderChecked"] is True
     assert res["splits"] == 0
     assert res["needsReview"] is False
+
+
+# --------------------------------------------------------------------------- #
+# compose_exam (the leap) — verify-off / fail-loud / input XOR, no Hancom needed
+# --------------------------------------------------------------------------- #
+
+
+@requires_form_fixture
+def test_compose_exam_verify_off(tmp_path):
+    form = _form_copy(tmp_path)
+    out = str(tmp_path / "out.hwpx")
+    res = server.compose_exam(form, out, exam_md=_sample_md(), verify=False)
+    assert res["ok"] is True
+    # verify=False -> compose only, honest: no render, never a silent 0.
+    assert res["renderChecked"] is False
+    assert res["needsReview"] is True
+    assert res["splits"] is None
+    assert res["notes"]
+    assert Path(res["outputPath"]).exists()
+    HwpxDocument.open(res["outputPath"])  # output reopens cleanly
+    assert "openSafety" in res
+
+
+@requires_form_fixture
+def test_compose_exam_md_from_file(tmp_path):
+    form = _form_copy(tmp_path)
+    md_file = tmp_path / "exam.md"
+    md_file.write_text(_sample_md(), encoding="utf-8")
+    out = str(tmp_path / "out.hwpx")
+    res = server.compose_exam(form, out, exam_md_filename=str(md_file), verify=False)
+    assert res["ok"] is True
+    assert Path(res["outputPath"]).exists()
+
+
+@requires_form_fixture
+def test_compose_exam_parse_error_is_loud(tmp_path):
+    form = _form_copy(tmp_path)
+    out = str(tmp_path / "out.hwpx")
+    # plain content with no 문항 header -> ExamParseError before anything is written.
+    res = server.compose_exam(form, out, exam_md="문항 헤더 없는 그냥 본문\n", verify=False)
+    assert res["ok"] is False
+    assert res.get("error") == "ExamParseError"
+    assert not Path(out).exists()
+
+
+def test_compose_exam_requires_md_xor(tmp_path):
+    out = str(tmp_path / "out.hwpx")
+    form = str(tmp_path / "form.hwpx")
+    # neither
+    r_none = server.compose_exam(form, out)
+    assert r_none["ok"] is False
+    # both
+    r_both = server.compose_exam(form, out, exam_md="x", exam_md_filename="y.md")
+    assert r_both["ok"] is False
