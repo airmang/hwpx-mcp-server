@@ -1688,6 +1688,9 @@ class HwpxOps:
         spacing_before_pt: Optional[float] = None,
         spacing_after_pt: Optional[float] = None,
         outline_level: Optional[int] = None,
+        keep_with_next: Optional[bool] = None,
+        keep_lines: Optional[bool] = None,
+        page_break_before: Optional[bool] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._open_document(path)
@@ -1702,6 +1705,9 @@ class HwpxOps:
             spacing_before_pt=spacing_before_pt,
             spacing_after_pt=spacing_after_pt,
             outline_level=outline_level,
+            keep_with_next=keep_with_next,
+            keep_lines=keep_lines,
+            page_break_before=page_break_before,
         )
         result.update({"ok": True, "filename": path})
         return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)

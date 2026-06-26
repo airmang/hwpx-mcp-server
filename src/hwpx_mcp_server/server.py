@@ -3315,10 +3315,18 @@ def set_paragraph_format(
     spacing_before_pt: float | None = None,
     spacing_after_pt: float | None = None,
     outline_level: int | None = None,
+    keep_with_next: bool | None = None,
+    keep_lines: bool | None = None,
+    page_break_before: bool | None = None,
     dry_run: bool = False,
     expected_revision: str = None,
 ) -> dict:
-    """기존 문단의 정렬, 줄간격(%), 들여쓰기(mm), 문단 간격(pt), 개요 수준을 변경합니다."""
+    """기존 문단의 정렬, 줄간격(%), 들여쓰기(mm), 문단 간격(pt), 개요 수준을 변경합니다.
+
+    keep_with_next/keep_lines/page_break_before로 문단의 keep-together(다음 문단과
+    붙임·문단 줄바꿈 금지·앞에서 쪽 나눔) 플래그를 설정합니다 — 시험지 조판 등에서
+    한 문항이 단/쪽 경계에서 잘리지 않게 할 때 씁니다.
+    """
     path = resolve_path(filename)
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
@@ -3335,6 +3343,9 @@ def set_paragraph_format(
         spacing_before_pt=spacing_before_pt,
         spacing_after_pt=spacing_after_pt,
         outline_level=outline_level,
+        keep_with_next=keep_with_next,
+        keep_lines=keep_lines,
+        page_break_before=page_break_before,
     )
     result["filename"] = filename
     if dry_run:

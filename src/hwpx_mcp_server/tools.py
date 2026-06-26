@@ -372,6 +372,9 @@ class SetParagraphFormatInput(DocumentLocatorInput):
     spacing_before_pt: Optional[float] = Field(None, alias="spacingBeforePt")
     spacing_after_pt: Optional[float] = Field(None, alias="spacingAfterPt")
     outline_level: Optional[int] = Field(None, alias="outlineLevel")
+    keep_with_next: Optional[bool] = Field(None, alias="keepWithNext")
+    keep_lines: Optional[bool] = Field(None, alias="keepLines")
+    page_break_before: Optional[bool] = Field(None, alias="pageBreakBefore")
     dry_run: bool = Field(False, alias="dryRun")
 
 
