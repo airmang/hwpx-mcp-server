@@ -202,6 +202,37 @@ def test_compose_exam_requires_md_xor(tmp_path):
     assert r_both["ok"] is False
 
 
+def test_compose_exam_xor_error_signals_unverified(tmp_path):
+    # the XOR error path signals verification status like every other error path
+    res = server.compose_exam(str(tmp_path / "form.hwpx"), str(tmp_path / "out.hwpx"))
+    assert res["ok"] is False
+    assert res["renderChecked"] is False
+    assert res["needsReview"] is True
+
+
+def test_compose_exam_missing_md_file_is_loud(tmp_path):
+    out = str(tmp_path / "out.hwpx")
+    res = server.compose_exam(
+        str(tmp_path / "form.hwpx"), out, exam_md_filename=str(tmp_path / "nope.md")
+    )
+    assert res["ok"] is False
+    assert res["renderChecked"] is False
+    assert res["needsReview"] is True
+    assert "error" in res  # honest structured error, not a raw traceback
+    assert not Path(out).exists()
+
+
+def test_verify_question_splits_bad_marker_regex(tmp_path):
+    path = _make_doc(tmp_path)
+    # invalid regex must fail fast with an honest dict, never render or crash
+    res = server.verify_question_splits(path, marker_regex="[invalid(")
+    assert res["ok"] is False
+    assert res["renderChecked"] is False
+    assert res["splits"] is None
+    assert res["needsReview"] is True
+    assert res.get("error") == "InvalidRegex"
+
+
 # --------------------------------------------------------------------------- #
 # surface wiring — the new tools are part of the declared MCP surface
 # --------------------------------------------------------------------------- #

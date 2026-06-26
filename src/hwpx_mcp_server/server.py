@@ -3852,12 +3852,24 @@ def compose_exam(
         return {
             "ok": False,
             "filename": form_filename,
+            "renderChecked": False,
+            "needsReview": True,
             "note": "exam_md(인라인) 또는 exam_md_filename(경로) 중 정확히 하나를 지정하세요.",
         }
 
     form_path = resolve_path(form_filename)
     if exam_md_filename is not None:
-        exam_md = Path(resolve_path(exam_md_filename)).read_text(encoding="utf-8")
+        try:
+            exam_md = Path(resolve_path(exam_md_filename)).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            return {
+                "ok": False,
+                "filename": form_filename,
+                "renderChecked": False,
+                "needsReview": True,
+                "error": type(exc).__name__,
+                "note": f"exam_md_filename을 읽을 수 없습니다: {exc}",
+            }
     out_path = resolve_path(output)
     oracle = None if verify else NullOracle()
     try:
@@ -3917,6 +3929,20 @@ def verify_question_splits(
             "needsReview": True,
             "note": "이 python-hwpx 빌드에는 hwpx.exam 조판/측정 모듈이 없습니다.",
         }
+    marker_re = None
+    if marker_regex:
+        try:
+            marker_re = re.compile(marker_regex)
+        except re.error as exc:
+            return {
+                "ok": False,
+                "filename": filename,
+                "renderChecked": False,
+                "splits": None,
+                "needsReview": True,
+                "error": "InvalidRegex",
+                "note": f"marker_regex가 올바른 정규식이 아닙니다: {exc}",
+            }
     path = resolve_path(filename)
     oracle = resolve_oracle()
     if not oracle.available():
@@ -3941,8 +3967,8 @@ def verify_question_splits(
     kwargs: dict[str, Any] = {}
     if valid_question_numbers is not None:
         kwargs["valid_ids"] = {str(n) for n in valid_question_numbers}
-    if marker_regex:
-        kwargs["marker_re"] = re.compile(marker_regex)
+    if marker_re is not None:
+        kwargs["marker_re"] = marker_re
     report = measure_question_splits(pdf, **kwargs)
     if report.n_blocks == 0:
         return {
