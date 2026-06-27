@@ -16,6 +16,16 @@ from hwpx_mcp_server import server as server_module
 from hwpx_mcp_server.server import apply_edits, create_document, mcp_server_health
 
 
+def _oracle_reachable() -> bool:
+    """True when a real Hancom render oracle is reachable on this box."""
+    try:
+        from hwpx.visual.oracle import resolve_oracle
+
+        return resolve_oracle().available()
+    except Exception:
+        return False
+
+
 def _doc(tmp_path: Path) -> str:
     path = str(tmp_path / "d.hwpx")
     create_document(path)
@@ -166,6 +176,11 @@ def test_version_comparison_is_pep440_aware():
     assert Q._version_lt("2.12.0.dev1", "2.12.0")
 
 
+@pytest.mark.skipif(
+    _oracle_reachable(),
+    reason="premise is a box with NO reachable Hancom oracle; this box has one, so a "
+    "real strict save legitimately reaches the visual gate (runs + passes in no-Hancom CI)",
+)
 def test_real_strict_save_fails_closed_without_oracle(tmp_path: Path):
     # On a box with no Hancom oracle, a real strict save cannot reach
     # visual_complete=true; it fails the gate with VISUAL_COMPLETE_FAILED and an

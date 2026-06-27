@@ -9,7 +9,7 @@
 - `set_paragraph_format` keep-together params `keep_with_next` / `keep_lines` / `page_break_before` (spec 3a) — forwarded to the python-hwpx engine's `<hh:breakSetting>` via a freshly minted paraPr (lossless).
 ### Changed
 - Tool surface 88 → 90 (`compose_exam`, `verify_question_splits`); `mcp_server_health` expected count updated and `compose_exam` registered as a key tool.
-- Requires the `hwpx.exam` composer from python-hwpx (S-056). Imported under a guarded fallback, so a python-hwpx build without it leaves the server importable and the exam tools degrade to `ok=false` ("module unavailable"). NOTE: `hwpx.exam` is not yet in a published python-hwpx wheel — local/editable sibling dev only until python-hwpx ships it and this pin is bumped.
+- Requires `python-hwpx >= 2.15.0` (the `hwpx.exam` 시험지 조판 composer). Imported under a guarded fallback, so an older python-hwpx without `hwpx.exam` leaves the server importable and the exam tools degrade to `ok=false` ("module unavailable").
 
 ## [2.6.0] - 2026-06-25
 ### Added

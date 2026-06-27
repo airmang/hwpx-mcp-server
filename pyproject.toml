@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "python-hwpx>=2.14.0", # VisualComplete: hwpx.quality SavePipeline gate, form_fit, layout, design
+    "python-hwpx>=2.15.0", # hwpx.exam 시험지 조판 composer (compose_exam) + keep-together; VisualComplete/form_fit/seal
 
     "pydantic>=2.7",
     "anyio>=4.0",
