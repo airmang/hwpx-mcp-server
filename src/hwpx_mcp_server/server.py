@@ -1244,19 +1244,27 @@ def _inspect_authoring_quality(
     document_plan: dict | None,
     quality_profile: str | dict | None = None,
     profile: dict | None = None,
+    verify_render: bool = False,
 ) -> dict:
     if inspect_authoring_document_quality is None:
         raise RuntimeError("installed python-hwpx does not provide document-plan authoring")
     profile_arg = _quality_profile_argument(quality_profile, profile)
+    kwargs: dict[str, Any] = {"plan": document_plan}
+    if profile_arg is not None:
+        kwargs["quality_profile"] = profile_arg
+    if verify_render:
+        kwargs["verify_render"] = True
     try:
-        if profile_arg is None:
-            return inspect_authoring_document_quality(source, plan=document_plan)
-        return inspect_authoring_document_quality(
-            source,
-            plan=document_plan,
-            quality_profile=profile_arg,
-        )
+        return inspect_authoring_document_quality(source, **kwargs)
     except TypeError as exc:
+        # An older installed python-hwpx may predate verify_render and/or the
+        # quality_profile kwarg; retry without the unsupported argument(s).
+        if verify_render:
+            kwargs.pop("verify_render", None)
+            try:
+                return inspect_authoring_document_quality(source, **kwargs)
+            except TypeError:
+                pass
         if profile_arg is not None:
             raise RuntimeError(
                 "installed python-hwpx does not support document-plan quality profiles"
@@ -1380,15 +1388,28 @@ def create_document_from_plan(
     style_preset: str = "standard_korean_business",
     quality_profile: str = None,
     profile: dict = None,
+    verify_render: bool = False,
     verbosity: str = "compact",
 ) -> dict:
-    """선언형 document_plan으로 HWPX를 생성하고 즉시 저장/검증합니다."""
+    """선언형 document_plan으로 HWPX를 생성하고 즉시 저장/검증합니다.
+
+    document_plan.metadata.document_type 이 '공문'/'보고서'/'가정통신문'이면 실제
+    한컴-harvest 프로파일로 생성됩니다. 공문은 결문 메타
+    document_plan.gyeolmun = {issuer, productionNumber, enforcementDate,
+    disclosure} 를 지원하고, 공문서 작성규정 구조 hard-gate 결과가
+    quality.gongmun_structure(structure_pass)로 반환됩니다. 맞춤법은
+    quality.korean_proofing_status(정직 'unverified', 거짓 통과 없음)로 보고합니다.
+    출력은 **HWPX 전용**입니다(.odt/.docx/.pdf 등 비-HWPX 미지원; 기안문 ODT는
+    별도 트랙). verify_render=True 이고 Mac 한컴 오라클이 가용하면
+    quality.render_checked/visual_complete 가 실제 렌더 영수증이 됩니다.
+    """
     return _create_document_from_plan_impl(
         filename,
         document_plan,
         style_preset=style_preset,
         quality_profile=quality_profile,
         profile=profile,
+        verify_render=verify_render,
         verbosity=verbosity,
     )
 
@@ -1400,6 +1421,7 @@ def _create_document_from_plan_impl(
     style_preset: str = "standard_korean_business",
     quality_profile: str | dict | None = None,
     profile: dict | None = None,
+    verify_render: bool = False,
     verbosity: str | None = "compact",
 ) -> dict:
     if (
@@ -1408,6 +1430,17 @@ def _create_document_from_plan_impl(
         or validate_hwpx_document_plan is None
     ):
         raise RuntimeError("installed python-hwpx does not provide document-plan authoring")
+    # FR-011: HWPX-only output. Non-HWPX formats (ODT/기안문, docx, pdf) are a
+    # separate track — never silently attempt them.
+    suffix = Path(filename).suffix.lower()
+    if suffix and suffix != ".hwpx":
+        return {
+            "filename": filename,
+            "created": False,
+            "error": f"unsupported output format {suffix!r}; only .hwpx is supported",
+            "handoff_status": "unsupported_format",
+            "next_action": "use a .hwpx filename (ODT 기안문 등 비-HWPX 포맷은 별도 트랙)",
+        }
     validation = validate_hwpx_document_plan(document_plan or {})
     if not validation.ok:
         return {
@@ -1433,6 +1466,7 @@ def _create_document_from_plan_impl(
         document_plan=document_plan or {},
         quality_profile=quality_profile,
         profile=profile,
+        verify_render=verify_render,
     )
     result = {
         "filename": filename,

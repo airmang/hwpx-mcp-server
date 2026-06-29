@@ -1,6 +1,14 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- `create_document_from_plan` — M3 document authoring (S-057). When `document_plan.metadata.document_type` is 공문/보고서/가정통신문 the document is composed from a real Hancom-harvested profile (opens-clean), not the from-scratch builder. 공문 supports a 결문 block `document_plan.gyeolmun = {issuer, productionNumber, enforcementDate, disclosure}`. The response `quality` now carries: `gongmun_structure` (공문서 작성규정 구조 hard-gate — 수신·발신명의·시행·공개구분·끝., anchored by a real 시행문; `structure_pass`), `korean_proofing_status` (honest `unverified` / `llm_proofed_not_oracle_verified`, never a silent pass), and `render_checked`/`visual_complete`.
+- `create_document_from_plan` `verify_render` param — opt into a real Mac Hancom render receipt (`render_checked`/`visual_complete=true`); absent an oracle it degrades to `unverified` (Constitution V).
+### Changed
+- `create_document_from_plan` output is **HWPX-only** — a non-`.hwpx` filename (ODT 기안문, docx, pdf) returns `created=false`, `handoff_status="unsupported_format"` with no silent attempt (FR-011; ODT 기안문 is a separate track).
+- Require `python-hwpx >= 2.16.0` (M3 document_type routing, 결문 IR, 공문 structure hard-gate, render_checked). Co-located editable resolution for local dev.
+### Note
+- 각주(footnote) authoring is honest-deferred (`unverified`): `add_footnote` emits valid round-tripping XML but the footnote does not render in Hancom, so it is **not** exposed as a working tool until a real-footnote XML diff fix lands.
 
 ## [2.7.0] - 2026-06-26
 ### Added

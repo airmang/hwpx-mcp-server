@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "2.7.0"
+version = "2.8.0"
 description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "python-hwpx>=2.15.0", # hwpx.exam 시험지 조판 composer (compose_exam) + keep-together; VisualComplete/form_fit/seal
+    "python-hwpx>=2.16.0", # M3 document-authoring: document_type→profile 라우팅·결문 IR·공문 구조 hard-gate·render_checked; hwpx.exam 시험지 조판; VisualComplete/form_fit/seal
 
     "pydantic>=2.7",
     "anyio>=4.0",
