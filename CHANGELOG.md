@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [2.8.0] - 2026-06-29
 ### Added
 - `create_document_from_plan` — M3 document authoring (S-057). When `document_plan.metadata.document_type` is 공문/보고서/가정통신문 the document is composed from a real Hancom-harvested profile (opens-clean), not the from-scratch builder. 공문 supports a 결문 block `document_plan.gyeolmun = {issuer, productionNumber, enforcementDate, disclosure}`. The response `quality` now carries: `gongmun_structure` (공문서 작성규정 구조 hard-gate — 수신·발신명의·시행·공개구분·끝., anchored by a real 시행문; `structure_pass`), `korean_proofing_status` (honest `unverified` / `llm_proofed_not_oracle_verified`, never a silent pass), and `render_checked`/`visual_complete`.
 - `create_document_from_plan` `verify_render` param — opt into a real Mac Hancom render receipt (`render_checked`/`visual_complete=true`); absent an oracle it degrades to `unverified` (Constitution V).
