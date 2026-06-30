@@ -64,6 +64,35 @@ from .document_state import document_state_payload, revision_mismatch_response
 from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from . import quality as quality_contract
 from .hwpx_ops import HwpxOps
+from hwpx.tools.pii import DEFAULT_POLICY, detect_pii, mask_pii, mask_value
+
+
+def _mask_pii_text(value: str, mask: bool = True) -> str:
+    """Mask machine-set PII (rrn/phone/email/card) in user-facing extract output.
+
+    On by default (safe-by-default per 개인정보 보호법); contextual types stay
+    label-gated low-confidence inside ``mask_pii`` so free text isn't over-masked.
+    """
+    if not mask or not value:
+        return value
+    return mask_pii(value, DEFAULT_POLICY)
+
+
+def _deep_mask_pii(obj: Any, mask: bool = True) -> Any:
+    """Recursively mask PII in string VALUES of a nested JSON-able structure.
+
+    Dict keys are left untouched; only string values are masked (``mask_pii`` only
+    rewrites machine-set PII + label-gated contextual, so normal text is unchanged).
+    """
+    if not mask:
+        return obj
+    if isinstance(obj, str):
+        return mask_pii(obj, DEFAULT_POLICY)
+    if isinstance(obj, list):
+        return [_deep_mask_pii(item, True) for item in obj]
+    if isinstance(obj, dict):
+        return {key: _deep_mask_pii(val, True) for key, val in obj.items()}
+    return obj
 from .quality_generation import (
     analyze_quality_generation_workflow,
     apply_quality_generation_workflow,
@@ -2224,11 +2253,43 @@ def get_document_info(filename: str) -> dict:
 
 
 @mcp.tool()
-def get_document_text(filename: str, max_chars: int | None = None) -> dict:
-    """문서 전체 텍스트를 조회합니다."""
+def get_document_text(filename: str, max_chars: int | None = None, mask: bool = True) -> dict:
+    """문서 전체 텍스트를 조회합니다. (기본: 기계검증 PII 마스킹 ON — `mask=False`로 원본)"""
     path = resolve_path(filename)
     doc = open_doc(path)
-    return _with_document_state(truncate_response(collect_full_text(doc), max_chars=max_chars), path)
+    text = _mask_pii_text(collect_full_text(doc), mask)
+    return _with_document_state(truncate_response(text, max_chars=max_chars), path)
+
+
+@mcp.tool()
+def scan_personal_info(filename: str | None = None, text: str | None = None) -> dict:
+    """문서/텍스트의 개인정보(PII)를 탐지하는 read-only 감사 (원본값 미노출).
+
+    기계검증 세트(주민등록번호·휴대폰·이메일·카드)는 항상 high-confidence, 맥락형(계좌·주소·이름)은
+    라벨 게이트 low-confidence. 반환은 유형별 건수 + **마스킹된 예시만** — 원본 PII는 절대 반환하지 않습니다.
+    마스킹은 따로 하지 않고 이 도구는 탐지/감사만 합니다(마스킹은 fill/merge/extract 도구의 `mask` 기본 ON).
+    """
+    if text is None:
+        if not filename:
+            return {"error": "filename 또는 text 중 하나가 필요합니다."}
+        text = collect_full_text(open_doc(resolve_path(filename)))
+    spans = detect_pii(text or "", DEFAULT_POLICY)
+    by_type: dict[str, dict] = {}
+    for span in spans:
+        kind = span["type"]
+        bucket = by_type.setdefault(
+            kind, {"type": kind, "confidence": span["confidence"], "count": 0, "maskedExamples": []}
+        )
+        bucket["count"] += 1
+        if len(bucket["maskedExamples"]) < 3:
+            bucket["maskedExamples"].append(mask_value(span["value"], kind, DEFAULT_POLICY))
+    return {
+        "report_version": "pii-scan-v1",
+        "total": len(spans),
+        "byType": list(by_type.values()),
+        "machineSet": ["rrn", "phone", "email", "card"],
+        "note": "기계세트=high-confidence 항상 탐지; 맥락형(account/address/name)=라벨게이트 low-confidence. 원본값 미반환(마스킹 예시만).",
+    }
 
 
 @mcp.tool()
@@ -2346,26 +2407,27 @@ def hwpx_to_markdown(
     output: str = "full",
     chunk_strategy: str = "section",
     max_chars_per_chunk: int | None = None,
+    mask: bool = True,
 ) -> dict:
-    """HWPX payload 또는 URL을 Markdown으로 변환합니다."""
+    """HWPX payload 또는 URL을 Markdown으로 변환합니다. (기본: 기계검증 PII 마스킹 ON)"""
     mode = _normalize_output_mode(output)
     strategy = _normalize_chunk_strategy(chunk_strategy)
     chunk_size = _resolve_chunk_size(max_chars_per_chunk)
 
     doc, source_meta = _open_hwpx_from_payload(hwpx_base64, url)
     model = _build_read_model(doc)
-    markdown = _render_markdown(model)
+    markdown = _mask_pii_text(_render_markdown(model), mask)
 
     result: dict[str, Any] = {
         "markdown": markdown,
         "meta": _build_conversion_meta(model, source_meta),
     }
     if mode == "chunks":
-        result["chunks"] = _markdown_chunks(
+        result["chunks"] = _deep_mask_pii(_markdown_chunks(
             model,
             chunk_strategy=strategy,
             max_chars_per_chunk=chunk_size,
-        )
+        ), mask)
         result["meta"]["chunk_strategy"] = strategy
         result["meta"]["max_chars_per_chunk"] = chunk_size
     return result
@@ -2460,21 +2522,22 @@ def hwpx_extract_json(
     chunk_strategy: str = "section",
     max_chars_per_chunk: int | None = None,
     format_detail: bool = False,
+    mask: bool = True,
 ) -> dict:
-    """HWPX payload 또는 URL에서 구조화된 JSON을 추출합니다."""
+    """HWPX payload 또는 URL에서 구조화된 JSON을 추출합니다. (기본: 기계검증 PII 마스킹 ON)"""
     mode = _normalize_output_mode(output)
     strategy = _normalize_chunk_strategy(chunk_strategy)
     chunk_size = _resolve_chunk_size(max_chars_per_chunk)
 
     doc, source_meta = _open_hwpx_from_payload(hwpx_base64, url)
     model = _build_read_model(doc, format_detail=bool(format_detail))
-    doc_payload = {
+    doc_payload = _deep_mask_pii({
         "title": model["title"],
         "toc": model["toc"],
         "sections": model["sections"],
         "tables": model["tables"],
         "figures": model["figures"],
-    }
+    }, mask)
     result: dict[str, Any] = {
         "doc": doc_payload,
         "meta": _build_conversion_meta(model, source_meta),
@@ -2482,11 +2545,11 @@ def hwpx_extract_json(
     if format_detail:
         result["meta"]["format_detail"] = True
     if mode == "chunks":
-        result["chunks"] = _json_chunks(
+        result["chunks"] = _deep_mask_pii(_json_chunks(
             model,
             chunk_strategy=strategy,
             max_chars_per_chunk=chunk_size,
-        )
+        ), mask)
         result["meta"]["chunk_strategy"] = strategy
         result["meta"]["max_chars_per_chunk"] = chunk_size
     return result

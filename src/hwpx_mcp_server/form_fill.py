@@ -21,6 +21,8 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
+from hwpx.tools.pii import DEFAULT_POLICY, mask_pii
+
 try:  # python-hwpx >= 2.10.3
     from hwpx.tools.package_validator import validate_package
 except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
@@ -153,6 +155,7 @@ def apply_form_fill_workflow(
     destination_filename: str | None = None,
     canonical_input: dict[str, Any] | str | None = None,
     confirm: bool = True,
+    mask: bool = True,
 ) -> dict[str, Any]:
     """Apply a resolved form-fill plan to a copied destination and validate it."""
 
@@ -199,7 +202,12 @@ def apply_form_fill_workflow(
 
         doc = open_doc(str(tmp_destination))
         applied: list[dict[str, Any]] = []
-        for mapping in plan.get("mappings", {}).get("resolved", []):
+        for _raw_mapping in plan.get("mappings", {}).get("resolved", []):
+            # PII compliance (S-059): mask the merged-in value (machine set on by
+            # default) so neither the output doc nor the applied[] echo leaks raw PII.
+            mapping = dict(_raw_mapping)
+            if mask and mapping.get("value") is not None:
+                mapping["value"] = mask_pii(str(mapping["value"]), DEFAULT_POLICY)
             if mapping.get("kind") == "form-field":
                 before_fields = _document_form_fields(doc)
                 before_field = _find_form_field_by_mapping(before_fields, mapping)
@@ -207,10 +215,11 @@ def apply_form_fill_workflow(
                     str(mapping.get("value", "")),
                     field_index=int(mapping["field_index"]),
                 )
+                _before_ff = before_field.get("current_value", "") if before_field else ""
                 applied.append(
                     {
                         **mapping,
-                        "before_text": before_field.get("current_value", "") if before_field else "",
+                        "before_text": mask_pii(_before_ff, DEFAULT_POLICY) if mask else _before_ff,
                         "after_text": fill_result["after_value"],
                         "style_before": fill_result.get("style_before"),
                         "style_after": fill_result.get("style_after"),
@@ -223,6 +232,8 @@ def apply_form_fill_workflow(
                 col = int(mapping["col"])
                 before_style = _cell_style_snapshot(doc, table_index, row, col)
                 before_text = _cell_text(doc, table_index, row, col)
+                if mask:
+                    before_text = mask_pii(before_text, DEFAULT_POLICY)
                 set_cell_text(doc, table_index, row, col, str(mapping.get("value", "")))
                 after_style = _cell_style_snapshot(doc, table_index, row, col)
                 applied.append(
