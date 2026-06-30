@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-06-30
+### Added
+- `add_tracked_edit(source_filename, destination_filename, edits, author="AI Agent", date=None, dry_run=False)` — redline 저작 MCP 표면 (M4/S-058). `edits[]` 의 `insert`/`delete`/`replace` 를 python-hwpx `add_tracked_*` 프리미티브로 `paragraph_index` 에 적용하고, `verify_redline` 영수증(changeCount/marksLinked/displayEnabled/opensClean/render_checked, 오라클 없으면 정직 강등)을 응답에 fold합니다. in-place·비-.hwpx 거부(fail-closed), `dry_run` 지원. 사람은 한컴 검토 리본에서 수락/거부합니다.
+### Changed
+- python-hwpx 의존 핀 `>=2.16.0` → `>=2.17.0` (redline 저작 API + 메모 본문 픽스).
+
 ## [2.8.0] - 2026-06-29
 ### Added
 - `create_document_from_plan` — M3 document authoring (S-057). When `document_plan.metadata.document_type` is 공문/보고서/가정통신문 the document is composed from a real Hancom-harvested profile (opens-clean), not the from-scratch builder. 공문 supports a 결문 block `document_plan.gyeolmun = {issuer, productionNumber, enforcementDate, disclosure}`. The response `quality` now carries: `gongmun_structure` (공문서 작성규정 구조 hard-gate — 수신·발신명의·시행·공개구분·끝., anchored by a real 시행문; `structure_pass`), `korean_proofing_status` (honest `unverified` / `llm_proofed_not_oracle_verified`, never a silent pass), and `render_checked`/`visual_complete`.

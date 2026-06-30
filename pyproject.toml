@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "python-hwpx>=2.16.0", # M3 document-authoring: document_type→profile 라우팅·결문 IR·공문 구조 hard-gate·render_checked; hwpx.exam 시험지 조판; VisualComplete/form_fit/seal
+    "python-hwpx>=2.17.0", # M3 document-authoring: document_type→profile 라우팅·결문 IR·공문 구조 hard-gate·render_checked; hwpx.exam 시험지 조판; VisualComplete/form_fit/seal
 
     "pydantic>=2.7",
     "anyio>=4.0",
