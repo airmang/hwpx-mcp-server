@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-07-01
+### Added
+- **개인정보(PII) 마스킹 표면 (M5/S-059)**: `scan_personal_info(filename|text)` — read-only PII 감사(유형별 건수 + 마스킹 예시만, 원본값 미노출). `get_document_text`·`hwpx_to_markdown`·`hwpx_extract_json` 에 `mask` 파라미터(기본 ON) — 추출 텍스트의 기계검증 PII(주민등록번호·휴대폰·이메일·카드) 자동 마스킹. `apply_form_fill` 은 채워지는 값 + `applied[]` echo 를 마스킹. `mail_merge` 는 엔진 기본-on 마스킹을 상속. 기계세트=항상-on high-confidence, 맥락형(계좌·주소·이름)=라벨게이트 low-confidence(과마스킹 방지).
+### Changed
+- python-hwpx 의존 핀 `>=2.17.0` → `>=2.18.0` (PII 마스킹 엔진 `hwpx.tools.pii`).
+
 ## [2.9.0] - 2026-06-30
 ### Added
 - `add_tracked_edit(source_filename, destination_filename, edits, author="AI Agent", date=None, dry_run=False)` — redline 저작 MCP 표면 (M4/S-058). `edits[]` 의 `insert`/`delete`/`replace` 를 python-hwpx `add_tracked_*` 프리미티브로 `paragraph_index` 에 적용하고, `verify_redline` 영수증(changeCount/marksLinked/displayEnabled/opensClean/render_checked, 오라클 없으면 정직 강등)을 응답에 fold합니다. in-place·비-.hwpx 거부(fail-closed), `dry_run` 지원. 사람은 한컴 검토 리본에서 수락/거부합니다.
