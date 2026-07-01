@@ -65,6 +65,7 @@ from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from . import quality as quality_contract
 from .hwpx_ops import HwpxOps
 from hwpx.tools.pii import DEFAULT_POLICY, detect_pii, mask_pii, mask_value
+from hwpx.tools import read_fidelity as _read_fidelity
 
 
 def _mask_pii_text(value: str, mask: bool = True) -> str:
@@ -758,28 +759,44 @@ def _table_to_html(rows: list[list[str]]) -> str:
     return f"<table><thead><tr>{head_html}</tr></thead>{body}</table>"
 
 
-def _run_format_detail(run: Any) -> dict[str, Any]:
+def _run_format_detail(run: Any, fontfaces: dict[str, dict[str, str]] | None = None) -> dict[str, Any]:
+    """Resolved inline formatting for one run.
+
+    Named fields (bold/italic/underline/strikeout/color/fontSize/fontName/
+    super-subscript) come from the canonical :mod:`hwpx.tools.read_fidelity`
+    resolver so this surface and the fidelity harness agree by construction.
+    ``strikeout`` is shape-normalised (the always-present
+    ``<hh:strikeout shape="NONE"/>`` previously read as always-on); ``underline``
+    is the type or ``None`` when off. Legacy keys are preserved for compat.
+    """
     style = getattr(run, "style", None)
-    child_attrs = getattr(style, "child_attributes", {}) if style is not None else {}
+    span = _read_fidelity.run_span(getattr(run, "text", "") or "", style, fontfaces or {})
     return {
-        "text": getattr(run, "text", ""),
+        "text": span.text,
         "charPrIDRef": getattr(run, "char_pr_id_ref", None),
-        "textColor": style.text_color() if style is not None else None,
+        "bold": span.bold,
+        "italic": span.italic,
+        "underline": span.underline,
+        "strikeout": span.strikeout,
+        "color": span.color,
+        "fontSize": span.size_pt,
+        "fontName": span.font,
+        "superscript": span.superscript,
+        "subscript": span.subscript,
+        # legacy back-compat keys
+        "textColor": span.color,
         "underlineType": style.underline_type() if style is not None else None,
         "underlineColor": style.underline_color() if style is not None else None,
-        "bold": "bold" in child_attrs,
-        "italic": "italic" in child_attrs,
-        "strikeout": "strikeout" in child_attrs,
         "attributes": dict(getattr(style, "attributes", {}) or {}),
     }
 
 
-def _paragraph_format_detail(paragraph: Any) -> dict[str, Any]:
+def _paragraph_format_detail(paragraph: Any, fontfaces: dict[str, dict[str, str]] | None = None) -> dict[str, Any]:
     return {
         "paraPrIDRef": getattr(paragraph, "para_pr_id_ref", None),
         "styleIDRef": getattr(paragraph, "style_id_ref", None),
         "charPrIDRef": getattr(paragraph, "char_pr_id_ref", None),
-        "runs": [_run_format_detail(run) for run in getattr(paragraph, "runs", [])],
+        "runs": [_run_format_detail(run, fontfaces) for run in getattr(paragraph, "runs", [])],
     }
 
 
@@ -837,12 +854,13 @@ def _build_read_model(doc: Any, *, format_detail: bool = False) -> dict[str, Any
 
     table_index = 0
     style_levels = outline_style_levels(doc)
+    fontfaces = _read_fidelity.fontface_maps(doc) if format_detail else {}
     for paragraph_index, paragraph in enumerate(doc.paragraphs):
         text = (paragraph.text or "").strip()
         level = _paragraph_outline_level(paragraph, text, style_levels)
         paragraph_payload = {"index": paragraph_index, "text": text}
         if format_detail:
-            paragraph_payload["format"] = _paragraph_format_detail(paragraph)
+            paragraph_payload["format"] = _paragraph_format_detail(paragraph, fontfaces)
 
         if level > 0 and text:
             _flush_current_section()
@@ -858,12 +876,12 @@ def _build_read_model(doc: Any, *, format_detail: bool = False) -> dict[str, Any
             toc.append({"level": level, "text": heading_text, "paragraph_index": paragraph_index})
             item = {"type": "heading", "level": level, "text": heading_text, "paragraph_index": paragraph_index}
             if format_detail:
-                item["format"] = _paragraph_format_detail(paragraph)
+                item["format"] = _paragraph_format_detail(paragraph, fontfaces)
             items.append(item)
         elif text:
             item = {"type": "paragraph", "text": text, "paragraph_index": paragraph_index}
             if format_detail:
-                item["format"] = _paragraph_format_detail(paragraph)
+                item["format"] = _paragraph_format_detail(paragraph, fontfaces)
             items.append(item)
 
         if text:
@@ -897,6 +915,10 @@ def _build_read_model(doc: Any, *, format_detail: bool = False) -> dict[str, Any
             table_index += 1
 
     _flush_current_section()
+    try:
+        notes = [note.to_dict() for note in _read_fidelity.collect_notes(doc)]
+    except Exception:  # pragma: no cover - defensive: never break a read
+        notes = []
     return {
         "title": toc[0]["text"] if toc else None,
         "toc": toc,
@@ -904,7 +926,31 @@ def _build_read_model(doc: Any, *, format_detail: bool = False) -> dict[str, Any
         "tables": tables,
         "figures": figures,
         "items": items,
+        "notes": notes,
     }
+
+
+def _append_notes_markdown(markdown: str, notes: list[dict[str, Any]], mask: bool) -> str:
+    """Append a footnote/endnote definition appendix (reference-style).
+
+    The reading surfaces used to drop note bodies entirely; this preserves them
+    at the installed surface as ``[^fn1]: body`` lines under a rule.
+    """
+    if not notes:
+        return markdown
+    fn_i = en_i = 0
+    lines: list[str] = []
+    for note in notes:
+        if note.get("kind") == "footNote":
+            fn_i += 1
+            marker, label = f"[^fn{fn_i}]", "각주"
+        else:
+            en_i += 1
+            marker, label = f"[^en{en_i}]", "미주"
+        body = _mask_pii_text(note.get("bodyText", "") or "", mask)
+        lines.append(f"{marker}: ({label}) {body}")
+    appendix = "\n".join(lines)
+    return f"{markdown}\n\n---\n\n{appendix}" if markdown else appendix
 
 
 def _render_markdown(model: dict[str, Any]) -> str:
@@ -2417,6 +2463,7 @@ def hwpx_to_markdown(
     doc, source_meta = _open_hwpx_from_payload(hwpx_base64, url)
     model = _build_read_model(doc)
     markdown = _mask_pii_text(_render_markdown(model), mask)
+    markdown = _append_notes_markdown(markdown, model.get("notes", []), mask)
 
     result: dict[str, Any] = {
         "markdown": markdown,
@@ -2537,6 +2584,7 @@ def hwpx_extract_json(
         "sections": model["sections"],
         "tables": model["tables"],
         "figures": model["figures"],
+        "notes": model.get("notes", []),
     }, mask)
     result: dict[str, Any] = {
         "doc": doc_payload,
