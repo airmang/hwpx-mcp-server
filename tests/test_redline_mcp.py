@@ -3,9 +3,32 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+import pytest
+
 import hwpx_mcp_server.server as server
 from hwpx.tools.redline import verify_redline
+from hwpx.visual import oracle as _oracle
 from hwpx_mcp_server.core.document import open_doc
+
+
+@pytest.fixture
+def _force_structural_oracle_degrade(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the honest no-oracle degrade path so redline verification is deterministic.
+
+    On a macOS+Hancom dev box ``resolve_oracle()`` returns a live oracle, so
+    ``verify_redline`` attempts a real (~12s each) Hancom render whose success is
+    nondeterministic. When that render intermittently fails to emit a PDF,
+    ``visual_check`` returns ``render_checked=False`` with a non-empty ``errors``
+    list, ``verify_redline`` reports ``opensClean=False``, and the receipt test
+    flakes (~1 in 5 under load). This test verifies redline *structure*, not
+    rendering, and its assertions already tolerate the degrade (``opensClean``
+    may be ``None``). Force both oracle backends unavailable so the structural
+    degrade path is taken deterministically — matching the suite convention that
+    live-oracle checks are opt-in (HWPX_MAC_ORACLE_SMOKE).
+    """
+
+    monkeypatch.setattr(_oracle.WindowsComOracle, "available", lambda self: False)
+    monkeypatch.setattr(_oracle.MacHancomOracle, "available", lambda self: False)
 
 
 def _sha256(path: Path) -> str:
@@ -30,7 +53,9 @@ def test_add_tracked_edit_tool_is_exposed() -> None:
     assert "add_tracked_edit" in server.mcp._tool_manager._tools
 
 
-def test_add_tracked_edit_writes_structural_redline_receipt(tmp_path: Path) -> None:
+def test_add_tracked_edit_writes_structural_redline_receipt(
+    tmp_path: Path, _force_structural_oracle_degrade: None
+) -> None:
     source = tmp_path / "source.hwpx"
     destination = tmp_path / "redlined.hwpx"
     paragraph_index = _build_redline_source(source)
