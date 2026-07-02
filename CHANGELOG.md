@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-07-02
+### Added
+- **네이티브 자동 차례·상호참조 (M7/S-062)**: `add_toc` — 개요 스타일 제목들로 한컴 네이티브 `TABLEOFCONTENTS` 필드 삽입(`dirty=1` 기본 = 한컴이 처음 여는 순간 항목·스타일·쪽번호 재계산; 방출 쪽번호는 추정치로 정직 표기). `add_cross_reference` — 제목 텍스트로 타깃을 지정하는 쪽 번호 `CROSSREF`(한컴이 자동 재계산). `verify_toc` — 캐시 쪽번호 검증: 구조 verdict + **오라클-free stale 신호**(상호참조↔차례 캐시 모순), `verify_render=True`면 실제 한컴 렌더 대조(`toc_correctness_ratio`), `refresh=True`면 macOS 새로고침 세션 구동, 오라클 없으면 정직 `unverified`, 비-HWPX fail-closed.
+### Changed
+- python-hwpx 의존 핀 `>=2.19.0` → `>=2.20.0` (`hwpx.tools.toc_author`/`toc_fidelity` + Mac 오라클 refresh 레그).
+
 ## [2.11.0] - 2026-07-02
 ### Added
 - **런서식 충실 읽기 표면 (M6/S-060)**: `hwpx_extract_json` 이 `doc.notes[]`(각주/미주 kind·instId·anchorParaIndex·bodyText·bodySpans, PII 마스킹) 를 방출하고, `format_detail=True` 런 상세에 명명 필드 `fontSize`·`fontName`·`superscript`·`subscript` 추가. `hwpx_to_markdown` 은 각주/미주 정의 부록(`[^fn1]: 본문`) 을 덧붙인다 — 이전엔 모든 읽기 표면이 각주 본문을 드롭했다. 정본 `hwpx.tools.read_fidelity` 재사용으로 표면=하니스 일치.
