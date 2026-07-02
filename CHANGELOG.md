@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-07-02
+### Added
+- **런서식 충실 읽기 표면 (M6/S-060)**: `hwpx_extract_json` 이 `doc.notes[]`(각주/미주 kind·instId·anchorParaIndex·bodyText·bodySpans, PII 마스킹) 를 방출하고, `format_detail=True` 런 상세에 명명 필드 `fontSize`·`fontName`·`superscript`·`subscript` 추가. `hwpx_to_markdown` 은 각주/미주 정의 부록(`[^fn1]: 본문`) 을 덧붙인다 — 이전엔 모든 읽기 표면이 각주 본문을 드롭했다. 정본 `hwpx.tools.read_fidelity` 재사용으로 표면=하니스 일치.
+### Fixed
+- **strikeout 상시-true 버그**: `_run_format_detail` 이 항상 존재하는 `<hh:strikeout shape="NONE"/>` 의 멤버십만 검사해 모든 런에 취소선을 보고하던 문제 — shape 속성으로 정규화. `underline` type `NONE`→`null` 정규화.
+- 기본 테스트 스위트가 라이브 한컴 렌더를 간헐 유발하던 flake(`test_add_tracked_edit_writes_structural_redline_receipt`) — 해당 테스트를 no-oracle degrade 경로로 고정(라이브 렌더는 `HWPX_MAC_ORACLE_SMOKE` opt-in).
+### Changed
+- python-hwpx 의존 핀 `>=2.18.0` → `>=2.19.0` (read-fidelity 하니스).
+
 ## [2.10.0] - 2026-07-01
 ### Added
 - **개인정보(PII) 마스킹 표면 (M5/S-059)**: `scan_personal_info(filename|text)` — read-only PII 감사(유형별 건수 + 마스킹 예시만, 원본값 미노출). `get_document_text`·`hwpx_to_markdown`·`hwpx_extract_json` 에 `mask` 파라미터(기본 ON) — 추출 텍스트의 기계검증 PII(주민등록번호·휴대폰·이메일·카드) 자동 마스킹. `apply_form_fill` 은 채워지는 값 + `applied[]` echo 를 마스킹. `mail_merge` 는 엔진 기본-on 마스킹을 상속. 기계세트=항상-on high-confidence, 맥락형(계좌·주소·이름)=라벨게이트 low-confidence(과마스킹 방지).
