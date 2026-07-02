@@ -3535,6 +3535,157 @@ def add_tracked_edit(
     }
 
 
+# ── M7: 네이티브 자동 차례 / 상호참조 (S-062) ─────────────────────────
+def _toc_format_guard(filename: str, path: str) -> dict | None:
+    if str(path).lower().endswith((".hwpx", ".hwpxml")):
+        return None
+    return {
+        "ok": False,
+        "error": "native TOC/cross-reference tools support HWPX only",
+        "filename": filename,
+        "path": path,
+        "errors": [{"code": "unsupported_format", "message": "HWPX(.hwpx)만 지원합니다"}],
+    }
+
+
+@mcp.tool()
+def add_toc(
+    filename: str,
+    level: int = 2,
+    leader: int = 3,
+    hyperlink: bool = False,
+    at_index: int = 0,
+    dry_run: bool = False,
+) -> dict:
+    """개요 스타일 제목들로 한컴 네이티브 차례(TABLEOFCONTENTS 필드)를 삽입합니다.
+
+    고정 텍스트 목차가 아니라 한컴이 인식·재계산하는 필드입니다. dirty=1로
+    방출되므로 한컴이 처음 여는 순간 항목·스타일·쪽번호를 스스로 재계산합니다
+    (방출 시점의 쪽번호는 추정치 — 응답의 cachedPagesAreEstimates 참조).
+    본문 문단은 본문(스타일 1) 등 비수집 스타일이어야 항목으로 끌려가지
+    않습니다(바탕글=스타일 0은 수집 대상)."""
+    from hwpx.tools.toc_author import add_native_toc
+
+    path = resolve_path(filename)
+    guard = _toc_format_guard(filename, path)
+    if guard is not None:
+        return guard
+    doc = open_doc(path)
+    try:
+        summary = add_native_toc(
+            doc, at_index=at_index, level=level, leader=leader, hyperlink=hyperlink
+        )
+    except ValueError as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "hint": "개요 1~10 스타일의 제목 문단이 필요합니다 (add_heading 사용)",
+            "errors": [{"code": "no_outline_headings", "message": str(exc)}],
+        }
+    if dry_run:
+        return _with_dry_run_verification({"ok": True, "dryRun": True, **summary}, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification({"ok": True, **summary}, verification)
+
+
+@mcp.tool()
+def add_cross_reference(
+    filename: str,
+    paragraph_index: int,
+    target_heading_text: str,
+    cached_page: int = 1,
+    dry_run: bool = False,
+) -> dict:
+    """지정 문단 끝에 특정 제목의 '쪽 번호' 상호참조(CROSSREF 필드)를 추가합니다.
+
+    캐시 쪽번호는 추정치여도 됩니다 — 한컴이 문서를 열거나 편집/저장할 때
+    자동으로 재계산합니다(실측 의미론)."""
+    from hwpx.tools.toc_author import add_page_crossref
+
+    path = resolve_path(filename)
+    guard = _toc_format_guard(filename, path)
+    if guard is not None:
+        return guard
+    doc = open_doc(path)
+    paragraphs = [p for s in doc.sections for p in s.paragraphs]
+    if not (0 <= paragraph_index < len(paragraphs)):
+        return {
+            "ok": False,
+            "error": f"paragraph_index {paragraph_index} out of range (total {len(paragraphs)})",
+            "errors": [{"code": "paragraph_index_out_of_range", "message": str(paragraph_index)}],
+        }
+    needle = target_heading_text.strip()
+    target = next((p for p in paragraphs if (p.text or "").strip() == needle), None)
+    if target is None:
+        target = next((p for p in paragraphs if needle and needle in (p.text or "")), None)
+    if target is None:
+        return {
+            "ok": False,
+            "error": f"target heading not found: {target_heading_text!r}",
+            "errors": [{"code": "target_not_found", "message": target_heading_text}],
+        }
+    result = add_page_crossref(doc, paragraphs[paragraph_index], target, cached_page=cached_page)
+    if dry_run:
+        return _with_dry_run_verification({"ok": True, "dryRun": True, **result}, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification({"ok": True, **result}, verification)
+
+
+@mcp.tool()
+def verify_toc(
+    filename: str,
+    refresh: bool = False,
+    verify_render: bool = False,
+) -> dict:
+    """네이티브 차례/상호참조의 캐시 쪽번호를 검증합니다.
+
+    verify_render=True면 실제 한컴 렌더로 캐시 vs 실제 페이지를 대조해
+    toc_correctness_ratio를 산출합니다(오라클 없으면 정직하게 unverified).
+    refresh=True면 검증 전에 한컴을 열어 dirty 필드를 재계산·저장합니다
+    (macOS GUI 오라클 필요; dirty 재생성 직후 같은 세션 렌더는 이 한컴
+    빌드가 크래시하므로 refresh와 render는 별도 세션으로 수행됩니다)."""
+    from hwpx.tools.toc_fidelity import structural_report, toc_verify
+
+    path = resolve_path(filename)
+    guard = _toc_format_guard(filename, path)
+    if guard is not None:
+        return guard
+
+    oracle = None
+    refreshed = None
+    if refresh or verify_render:
+        try:
+            from hwpx.visual.oracle import resolve_oracle
+
+            oracle = resolve_oracle()
+        except Exception:  # pragma: no cover - oracle stack unavailable
+            oracle = None
+    if refresh:
+        refresher = getattr(oracle, "refresh_document", None)
+        refreshed = bool(refresher and refresher(path))
+
+    if verify_render and oracle is not None and oracle.available():
+        report = toc_verify(path, oracle=oracle)
+    else:
+        structural = structural_report(path)
+        report = {
+            "structural": structural,
+            "render_checked": False,
+            "toc_correctness_ratio": None,
+            "stale_entries": [],
+            "crossref_correctness_ratio": None,
+            "verdict": (
+                "stale_detected_structurally"
+                if not structural["internally_consistent"]
+                else "unverified"
+            ),
+        }
+    if refreshed is not None:
+        report["refreshed"] = refreshed
+    report["ok"] = report["verdict"] in ("verified", "unverified")
+    return report
+
+
 @mcp.tool()
 def add_heading(
     filename: str,
