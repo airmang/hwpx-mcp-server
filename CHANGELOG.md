@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-07-03
+### Added
+- **Column-width fit (M10 follow-on)**: `apply_table_ops` gains two ops — `set_column_widths` (explicit logical column widths, merge-aware) and `autofit_columns` (rebalance widths to content: widen content-heavy columns, narrow light ones, table total preserved) so long text is not cramped in a narrow column. Both are byte-preserving (cellSz only). Backed by `hwpx.table_patch` (python-hwpx ≥ 2.22.0).
+### Changed
+- `python-hwpx>=2.22.0` (column-width fit).
+
 ## [2.13.0] - 2026-07-03
 ### Added
 - **Byte-preserving structural form-fill (M10/S-064)**: `apply_table_ops` — fill cells + edit table structure (`fill_cell`, `delete_column`, `delete_row`, `delete_table`, `insert_row_by_clone`) in one transactional tool that PRESERVES the original table formatting and every untouched byte (never rebuild — the 2026-07-03 failure mode). `delete_column` redistributes freed width and cascades a delete of any row it empties; `insert_row_by_clone` clones a `rowSpan==1` reference row (formatting kept); every structure edit is grid-validated and refuses on an invalid result (fail-closed). `renderCheck='required'|'auto'` gates on / attaches a real-Hancom render verdict. `verify_form_fill` — render before/after in real Hancom → `renderChecked` + overflow/overlap(글자겹침)/pageCount, honest degrade, `require=true` fail-closed. Backed by `hwpx.table_patch` (python-hwpx ≥ 2.21.0); tools return `TABLE_OPS_UNAVAILABLE` on version skew.
