@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "2.12.0"
+version = "2.13.0"
 description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "python-hwpx>=2.20.0", # M7 native TOC (hwpx.tools.toc_author/toc_fidelity) + M6 read-fidelity + M5 PII
+    "python-hwpx>=2.21.0", # M10 byte-preserving structural form-fill (hwpx.table_patch) + M7 TOC + M6 read + M5 PII
 
     "pydantic>=2.7",
     "anyio>=4.0",
@@ -34,7 +34,7 @@ hwp = ["olefile>=0.47"]
 http = ["uvicorn>=0.30"]
 # 직인 날인/검증의 한컴 렌더 오라클 경로(렌더→fitz word/image bbox). macOS+Hancom 필요;
 # 없으면 place_seal/check_seal_compliance가 renderChecked=false로 정직하게 degrade한다.
-oracle = ["python-hwpx[visual]>=2.12.0"]
+oracle = ["python-hwpx[visual]>=2.21.0"]
 test = ["pytest>=8.0", "olefile>=0.47", "uvicorn>=0.30"]
 
 [project.urls]

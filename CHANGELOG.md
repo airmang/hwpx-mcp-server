@@ -2,8 +2,11 @@
 
 ## [Unreleased]
 
-## [2.12.0] - 2026-07-02
+## [2.13.0] - 2026-07-03
 ### Added
+- **Byte-preserving structural form-fill (M10/S-064)**: `apply_table_ops` — fill cells + edit table structure (`fill_cell`, `delete_column`, `delete_row`, `delete_table`, `insert_row_by_clone`) in one transactional tool that PRESERVES the original table formatting and every untouched byte (never rebuild — the 2026-07-03 failure mode). `delete_column` redistributes freed width and cascades a delete of any row it empties; `insert_row_by_clone` clones a `rowSpan==1` reference row (formatting kept); every structure edit is grid-validated and refuses on an invalid result (fail-closed). `renderCheck='required'|'auto'` gates on / attaches a real-Hancom render verdict. `verify_form_fill` — render before/after in real Hancom → `renderChecked` + overflow/overlap(글자겹침)/pageCount, honest degrade, `require=true` fail-closed. Backed by `hwpx.table_patch` (python-hwpx ≥ 2.21.0); tools return `TABLE_OPS_UNAVAILABLE` on version skew.
+### Changed
+- `python-hwpx>=2.21.0` (M10 `hwpx.table_patch`).
 - **네이티브 자동 차례·상호참조 (M7/S-062)**: `add_toc` — 개요 스타일 제목들로 한컴 네이티브 `TABLEOFCONTENTS` 필드 삽입(`dirty=1` 기본 = 한컴이 처음 여는 순간 항목·스타일·쪽번호 재계산; 방출 쪽번호는 추정치로 정직 표기). `add_cross_reference` — 제목 텍스트로 타깃을 지정하는 쪽 번호 `CROSSREF`(한컴이 자동 재계산). `verify_toc` — 캐시 쪽번호 검증: 구조 verdict + **오라클-free stale 신호**(상호참조↔차례 캐시 모순), `verify_render=True`면 실제 한컴 렌더 대조(`toc_correctness_ratio`), `refresh=True`면 macOS 새로고침 세션 구동, 오라클 없으면 정직 `unverified`, 비-HWPX fail-closed.
 ### Changed
 - python-hwpx 의존 핀 `>=2.19.0` → `>=2.20.0` (`hwpx.tools.toc_author`/`toc_fidelity` + Mac 오라클 refresh 레그).
