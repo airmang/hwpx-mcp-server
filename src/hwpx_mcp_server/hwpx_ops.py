@@ -2166,6 +2166,110 @@ class HwpxOps:
         payload["openSafety"] = verification_report["openSafety"]
         return payload
 
+    def _write_patched(self, target_path, data: bytes, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Atomic temp-write + open-safety gate for a byte-preserving result
+        (shared by byte_preserving_patch / apply_table_ops)."""
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=f".{target_path.stem}.", suffix=target_path.suffix or ".hwpx", dir=str(target_path.parent)
+        )
+        tmp_path = Path(tmp_name)
+        try:
+            os.close(fd)
+            tmp_path.write_bytes(data)
+            report = build_hwpx_verification_report(tmp_path)
+            if not report["openSafety"]["ok"]:
+                raise self._new_error(
+                    "FORM_FILL_OPEN_SAFETY_FAILED",
+                    "form-fill output failed open-safety verification: " + report["openSafety"]["summary"],
+                )
+            os.replace(tmp_path, target_path)
+        except BaseException:
+            tmp_path.unlink(missing_ok=True)
+            raise
+        report["filePath"] = str(target_path)
+        report["byteIdentical"] = payload["byteIdentical"]
+        report["changedParts"] = payload["changedParts"]
+        report["skipped"] = payload["skipped"]
+        payload["verificationReport"] = report
+        payload["openSafety"] = report["openSafety"]
+        return payload
+
+    def apply_table_ops(
+        self,
+        path: str,
+        ops: Sequence[Dict[str, Any]],
+        *,
+        output: Optional[str] = None,
+        render_check: str = "off",
+    ) -> Dict[str, Any]:
+        """Byte-preserving structural form-fill: apply cell fills + table structure
+        ops (delete_column/row/table, insert_row_by_clone) preserving every
+        untouched byte. Optional real-Hancom render gate."""
+        try:
+            from hwpx.table_patch import apply_table_ops as _apply
+        except Exception as exc:  # pragma: no cover - dependency compatibility
+            raise self._new_error(
+                "TABLE_OPS_UNAVAILABLE",
+                "installed python-hwpx does not provide hwpx.table_patch.apply_table_ops",
+            ) from exc
+
+        source_path = self._resolve_path(path)
+        target_path = self._resolve_output_path(output) if output else source_path
+        result = _apply(source_path, list(ops))
+        payload = result.to_dict()
+        payload["outputPath"] = str(target_path)
+        if not result.byte_identical:
+            payload = self._write_patched(target_path, result.data, payload)
+
+        if render_check and render_check != "off":
+            try:
+                from hwpx.table_patch import verify_fill
+                report = verify_fill(source_path, result.data, require=(render_check == "required"))
+                payload["renderVerdict"] = {
+                    "renderChecked": report.render_checked,
+                    "ok": report.ok,
+                    "overflowDetected": report.overflow_detected,
+                    "overlapDetected": report.overlap_detected,
+                    "pageCountChanged": report.page_count_changed,
+                    "warnings": list(report.warnings),
+                    "errors": list(report.errors),
+                }
+            except Exception as exc:
+                if render_check == "required":
+                    raise self._new_error("RENDER_CHECK_REQUIRED_FAILED", str(exc)) from exc
+                payload["renderVerdict"] = {"renderChecked": False, "note": str(exc)}
+        return payload
+
+    def verify_form_fill(
+        self,
+        path: str,
+        before_path: str,
+        *,
+        require: bool = False,
+    ) -> Dict[str, Any]:
+        """Render before/after in REAL Hancom and judge overflow/overlap/layout.
+        Honest degrade (renderChecked=false) with no oracle unless require=true."""
+        try:
+            from hwpx.table_patch import verify_fill
+        except Exception as exc:  # pragma: no cover - dependency compatibility
+            raise self._new_error(
+                "VERIFY_UNAVAILABLE",
+                "installed python-hwpx does not provide hwpx.table_patch.verify_fill",
+            ) from exc
+        after = self._resolve_path(path)
+        before = self._resolve_path(before_path)
+        report = verify_fill(before, after, require=require)
+        return {
+            "renderChecked": report.render_checked,
+            "ok": report.ok,
+            "overflowDetected": report.overflow_detected,
+            "overlapDetected": report.overlap_detected,
+            "pageCountChanged": report.page_count_changed,
+            "warnings": list(report.warnings),
+            "errors": list(report.errors),
+        }
+
     def split_table_cell(
         self,
         path: str,

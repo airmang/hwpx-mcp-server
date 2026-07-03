@@ -539,6 +539,54 @@ class BytePreservingPatchOutput(_BaseModel):
     visualComplete: Optional[Dict[str, Any]] = None
 
 
+class ApplyTableOpsInput(DocumentLocatorInput):
+    ops: List[Dict[str, Any]]
+    output: Optional[str] = None
+    render_check: str = Field("off", alias="renderCheck")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["ops"] = [dict(op) for op in self.ops]
+        if self.output is not None:
+            payload["output"] = self.output
+        payload["render_check"] = self.render_check
+        return payload
+
+
+class ApplyTableOpsOutput(_BaseModel):
+    ok: bool
+    applied: List[Dict[str, Any]]
+    skipped: List[Dict[str, Any]]
+    changedParts: List[str]
+    byteIdentical: bool
+    zipMethod: str
+    outputPath: str
+    verificationReport: Optional[Dict[str, Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
+    renderVerdict: Optional[Dict[str, Any]] = None
+
+
+class VerifyFormFillInput(DocumentLocatorInput):
+    before_path: str = Field(alias="beforePath")
+    require: bool = False
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["before_path"] = self.before_path
+        payload["require"] = self.require
+        return payload
+
+
+class VerifyFormFillOutput(_BaseModel):
+    renderChecked: bool
+    ok: bool
+    overflowDetected: Optional[bool] = None
+    overlapDetected: Optional[bool] = None
+    pageCountChanged: Optional[Any] = None
+    warnings: List[str]
+    errors: List[str]
+
+
 class ReplaceTableRegionInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
     start_row: int = Field(alias="startRow")
@@ -1255,6 +1303,38 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=BytePreservingPatchInput,
             output_model=BytePreservingPatchOutput,
             func=_simple("byte_preserving_patch"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="apply_table_ops",
+            description=(
+                "Byte-preserving structural form-fill: apply a list of ops "
+                "(fill_cell / delete_column / delete_row / delete_table / "
+                "insert_row_by_clone) to a form, PRESERVING the original table "
+                "formatting and every untouched byte (never rebuild). ops: "
+                "[{op, tableIndex, row?, col?, cols?, ref_row?, count?, text?}]. "
+                "delete_table shifts later indices — sequence deletes in reverse "
+                "order. Structure edits are grid-validated (fail-closed). Set "
+                "renderCheck='required' to gate on a real Hancom render, 'auto' to "
+                "attach a render verdict when Hancom is reachable."
+            ),
+            input_model=ApplyTableOpsInput,
+            output_model=ApplyTableOpsOutput,
+            func=_simple("apply_table_ops"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="verify_form_fill",
+            description=(
+                "Render before/after in REAL Hancom and judge the fill: "
+                "renderChecked + overflowDetected + overlapDetected (글자겹침) + "
+                "pageCountChanged. Honest degrade (renderChecked=false) when no "
+                "Hancom is reachable; set require=true to fail closed. Never treat "
+                "open-safety or an HTML preview as Hancom acceptance."
+            ),
+            input_model=VerifyFormFillInput,
+            output_model=VerifyFormFillOutput,
+            func=_simple("verify_form_fill"),
             category="pipeline",
         ),
         ToolDefinition(
