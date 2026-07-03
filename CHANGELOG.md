@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-07-03
+### Added
+- **Font shrink-to-fit (M10 follow-on)**: `apply_table_ops` `fill_cell` op now accepts `max_lines` — the cell font is shrunk (down to a floor) so its text fits within that many lines, backed by `hwpx.table_patch` font materialisation (python-hwpx ≥ 2.23.0). Complements `autofit_columns` (width) for the "long text" case.
+### Changed
+- `python-hwpx>=2.23.0`.
+- README trimmed 599→184 lines (the exhaustive tool catalog moved to themed highlights + links to `docs/use-cases.md` / `docs/skill-first-workflows.md`).
+
 ## [2.14.0] - 2026-07-03
 ### Added
 - **Column-width fit (M10 follow-on)**: `apply_table_ops` gains two ops — `set_column_widths` (explicit logical column widths, merge-aware) and `autofit_columns` (rebalance widths to content: widen content-heavy columns, narrow light ones, table total preserved) so long text is not cramped in a narrow column. Both are byte-preserving (cellSz only). Backed by `hwpx.table_patch` (python-hwpx ≥ 2.22.0).
