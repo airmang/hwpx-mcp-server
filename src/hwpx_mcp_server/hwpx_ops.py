@@ -2204,8 +2204,10 @@ class HwpxOps:
         render_check: str = "off",
     ) -> Dict[str, Any]:
         """Byte-preserving structural form-fill: apply cell fills + table structure
-        ops (delete_column/row/table, insert_row_by_clone) preserving every
-        untouched byte. Optional real-Hancom render gate."""
+        ops (delete_column/row/table, insert_row_by_clone, insert_block_by_clone)
+        preserving every untouched byte. Cells/tables may be addressed by
+        tableAnchor/cellAnchor (unique-or-skip) as well as index. Optional
+        real-Hancom render gate."""
         try:
             from hwpx.table_patch import apply_table_ops as _apply
         except Exception as exc:  # pragma: no cover - dependency compatibility
