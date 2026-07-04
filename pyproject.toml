@@ -32,6 +32,8 @@ dependencies = [
 hwp = ["olefile>=0.47"]
 # HTTP/streamable transport. The default stdio transport needs no extra.
 http = ["uvicorn>=0.30"]
+# General non-HWPX document ingest through Microsoft's MarkItDown. Lazy-imported.
+ingest = ["markitdown[all]>=0.1.6"]
 # 직인 날인/검증의 한컴 렌더 오라클 경로(렌더→fitz word/image bbox). macOS+Hancom 필요;
 # 없으면 place_seal/check_seal_compliance가 renderChecked=false로 정직하게 degrade한다.
 oracle = ["python-hwpx[visual]>=2.23.0"]

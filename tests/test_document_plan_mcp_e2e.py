@@ -184,6 +184,7 @@ def test_document_plan_tools_are_exposed() -> None:
 
     assert {
         "analyze_document_plan",
+        "markdown_to_document_plan",
         "validate_document_plan",
         "create_document_from_plan",
         "inspect_document_authoring_quality",

@@ -138,6 +138,15 @@ except Exception:  # pragma: no cover - optional dependency compatibility
     normalize_hwpx_document_plan = None
     validate_hwpx_document_plan = None
 
+try:  # python-hwpx >= MarkItDown-style ingest gateway
+    from hwpx.ingest import (
+        DocumentIngestError,
+        DocumentIngestor,
+    )
+except Exception:  # pragma: no cover - optional dependency compatibility
+    DocumentIngestError = None
+    DocumentIngestor = None
+
 try:  # python-hwpx >= official-document style lint feature
     from hwpx import (
         inspect_official_document_style as inspect_hwpx_official_document_style,
@@ -1063,6 +1072,11 @@ def _markdown_chunks(model: dict[str, Any], *, chunk_strategy: str, max_chars_pe
     return _chunk_paragraphs(paragraphs, max_chars_per_chunk)
 
 
+def _ingest_markdown_chunks(markdown: str, *, max_chars_per_chunk: int) -> list[str]:
+    paragraphs = [part for part in re.split(r"\n{2,}", markdown or "") if part.strip()]
+    return _chunk_paragraphs(paragraphs, max_chars_per_chunk)
+
+
 def _html_chunks(model: dict[str, Any], *, chunk_strategy: str, max_chars_per_chunk: int) -> list[str]:
     if chunk_strategy == "section":
         chunks = [_section_html(section) for section in model["sections"]]
@@ -1117,6 +1131,63 @@ def _build_conversion_meta(model: dict[str, Any], source_meta: dict[str, Any]) -
         "table_count": len(model["tables"]),
         "figure_caption_count": len(model["figures"]),
     }
+
+
+def _ingest_local_document(filename: str):
+    if DocumentIngestor is None:
+        raise RuntimeError("installed python-hwpx does not provide document ingest")
+    from .ingest_adapters import MarkItDownAdapter, MissingMarkItDownDependency
+
+    path = resolve_path(filename)
+    ingestor = DocumentIngestor.default()
+    ingestor.register_converter(MarkItDownAdapter(), priority=100.0)
+    try:
+        return path, ingestor.convert(path)
+    except DocumentIngestError as exc:
+        for attempt in getattr(exc, "attempts", []) or []:
+            if getattr(attempt, "error_type", None) == "MissingMarkItDownDependency":
+                raise MissingMarkItDownDependency(str(attempt.message), attempts=exc.attempts) from exc
+        raise
+
+
+def _document_ingest_error_payload(exc: Exception, filename: str) -> dict[str, Any]:
+    if DocumentIngestError is not None and isinstance(exc, DocumentIngestError):
+        payload = exc.as_dict()
+    else:
+        payload = {"error": type(exc).__name__, "message": str(exc), "attempts": []}
+    payload.update({"ok": False, "filename": filename})
+    return payload
+
+
+def _document_ingest_meta(result: Any) -> dict[str, Any]:
+    source_info = getattr(result, "source_info", None)
+    meta = {
+        "source_format": getattr(result, "source_format", None),
+        "engine": getattr(result, "engine", None),
+        "engine_version": getattr(result, "engine_version", None),
+        "lossiness": getattr(result, "lossiness", None),
+    }
+    if source_info is not None:
+        meta["source_info"] = {
+            "mimetype": getattr(source_info, "mimetype", None),
+            "extension": getattr(source_info, "extension", None),
+            "charset": getattr(source_info, "charset", None),
+            "filename": getattr(source_info, "filename", None),
+            "local_path": getattr(source_info, "local_path", None),
+            "url": getattr(source_info, "url", None),
+        }
+    metadata = getattr(result, "metadata", None)
+    if isinstance(metadata, dict):
+        meta.update(metadata)
+    return {key: value for key, value in meta.items() if value is not None}
+
+
+def _attempts_payload(result: Any) -> list[dict[str, Any]]:
+    attempts = getattr(result, "attempts", []) or []
+    return [
+        attempt.as_dict() if hasattr(attempt, "as_dict") else dict(attempt)
+        for attempt in attempts
+    ]
 
 
 def _paragraph_count(doc) -> int:
@@ -1391,6 +1462,44 @@ def validate_document_plan(document_plan: dict) -> dict:
         result["next_tool"] = "validate_document_plan"
         result["next_action"] = (
             "repair document_plan using repairHints, then rerun validate_document_plan"
+        )
+    return result
+
+
+@mcp.tool()
+def markdown_to_document_plan(
+    markdown: str,
+    title: str = None,
+    metadata: dict = None,
+    style_preset: str = "standard_korean_business",
+) -> dict:
+    """Markdown을 검증 가능한 hwpx.document_plan.v1 초안으로 변환합니다. 파일은 쓰지 않습니다."""
+    if validate_hwpx_document_plan is None or normalize_hwpx_document_plan is None:
+        raise RuntimeError("installed python-hwpx does not provide document-plan authoring")
+    from .markdown_plan import markdown_to_document_plan as _build_markdown_document_plan
+
+    converted = _build_markdown_document_plan(
+        markdown or "",
+        title=title,
+        metadata=metadata or {},
+        style_preset=style_preset,
+    )
+    plan = converted.plan
+    report = validate_hwpx_document_plan(plan)
+    validation = report.to_dict()
+    result: dict[str, Any] = {
+        "ok": report.ok,
+        "can_create": report.ok,
+        "document_plan": plan,
+        "validation": validation,
+        "warnings": list(converted.warnings),
+        "next_tool": "create_document_from_plan" if report.ok else "markdown_to_document_plan",
+    }
+    if report.ok:
+        result["normalizedPlan"] = normalize_hwpx_document_plan(plan).to_dict()
+    else:
+        result["next_action"] = (
+            "repair Markdown or document_plan using validation.repairHints, then rerun markdown_to_document_plan"
         )
     return result
 
@@ -2481,6 +2590,43 @@ def hwpx_to_markdown(
 
 
 @mcp.tool()
+def document_to_markdown(
+    filename: str,
+    output: str = "full",
+    chunk_strategy: str = "section",
+    max_chars_per_chunk: int | None = None,
+    mask: bool = True,
+) -> dict:
+    """로컬 문서를 Markdown으로 변환합니다. 현재 HWPX는 python-hwpx ingest 엔진으로 처리합니다."""
+    mode = _normalize_output_mode(output)
+    strategy = _normalize_chunk_strategy(chunk_strategy)
+    chunk_size = _resolve_chunk_size(max_chars_per_chunk)
+
+    try:
+        path, ingest_result = _ingest_local_document(filename)
+    except Exception as exc:
+        return _document_ingest_error_payload(exc, filename)
+
+    markdown = _mask_pii_text(ingest_result.markdown, mask)
+    payload: dict[str, Any] = {
+        "ok": True,
+        "filename": str(path),
+        "markdown": markdown,
+        "meta": _document_ingest_meta(ingest_result),
+        "warnings": list(getattr(ingest_result, "warnings", []) or []),
+        "attempts": _attempts_payload(ingest_result),
+    }
+    if mode == "chunks":
+        payload["chunks"] = _deep_mask_pii(
+            _ingest_markdown_chunks(markdown, max_chars_per_chunk=chunk_size),
+            mask,
+        )
+        payload["meta"]["chunk_strategy"] = strategy
+        payload["meta"]["max_chars_per_chunk"] = chunk_size
+    return payload
+
+
+@mcp.tool()
 def hwpx_to_html(
     hwpx_base64: str | None = None,
     url: str | None = None,
@@ -2601,6 +2747,55 @@ def hwpx_extract_json(
         result["meta"]["chunk_strategy"] = strategy
         result["meta"]["max_chars_per_chunk"] = chunk_size
     return result
+
+
+@mcp.tool()
+def document_extract_json(
+    filename: str,
+    output: str = "full",
+    chunk_strategy: str = "section",
+    max_chars_per_chunk: int | None = None,
+    format_detail: bool = False,
+    mask: bool = True,
+) -> dict:
+    """로컬 문서에서 Markdown과 구조화된 JSON을 함께 추출합니다. 현재 HWPX ingest를 우선 사용합니다."""
+    del format_detail
+    mode = _normalize_output_mode(output)
+    strategy = _normalize_chunk_strategy(chunk_strategy)
+    chunk_size = _resolve_chunk_size(max_chars_per_chunk)
+
+    try:
+        path, ingest_result = _ingest_local_document(filename)
+    except Exception as exc:
+        return _document_ingest_error_payload(exc, filename)
+
+    markdown = _mask_pii_text(ingest_result.markdown, mask)
+    doc_payload = _deep_mask_pii(
+        {
+            "title": getattr(ingest_result, "title", None),
+            "markdown": markdown,
+            "sections": getattr(ingest_result, "sections", []) or [],
+            "tables": getattr(ingest_result, "tables", []) or [],
+            "metadata": getattr(ingest_result, "metadata", {}) or {},
+        },
+        mask,
+    )
+    payload: dict[str, Any] = {
+        "ok": True,
+        "filename": str(path),
+        "doc": doc_payload,
+        "meta": _document_ingest_meta(ingest_result),
+        "warnings": list(getattr(ingest_result, "warnings", []) or []),
+        "attempts": _attempts_payload(ingest_result),
+    }
+    if mode == "chunks":
+        payload["chunks"] = _deep_mask_pii(
+            _ingest_markdown_chunks(markdown, max_chars_per_chunk=chunk_size),
+            mask,
+        )
+        payload["meta"]["chunk_strategy"] = strategy
+        payload["meta"]["max_chars_per_chunk"] = chunk_size
+    return payload
 
 
 @mcp.tool()
