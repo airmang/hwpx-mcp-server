@@ -55,6 +55,12 @@ pip install hwpx-mcp-server
 hwpx-mcp-server
 ```
 
+비-HWPX 문서(PDF/DOCX/XLSX/HTML/TXT)를 `document_to_markdown` 경로로 읽으려면 MarkItDown adapter extra를 함께 설치합니다.
+
+```bash
+pip install "hwpx-mcp-server[ingest]"
+```
+
 요구 사항: `Python >= 3.10` · `python-hwpx >= 2.23.0`
 
 ### MCP 클라이언트 설정
@@ -111,6 +117,7 @@ hwpx-mcp-server
 기본 모드에서 다수의 HWPX 도구를 제공하며, 고급 모드(`HWPX_MCP_ADVANCED=1`)에서 점검·검증용 도구가 추가됩니다. 아래는 테마별 대표 하이라이트입니다. **전체 도구 목록·시그니처는 [`docs/use-cases.md`](docs/use-cases.md)와 [`docs/skill-first-workflows.md`](docs/skill-first-workflows.md)를 참고하세요.**
 
 - **📖 읽기·탐색** — `get_document_info`, `get_document_text`, `get_document_outline`, `find_text`, `get_table_text`, `get_table_map`, `find_cell_by_label`, `list_styles`. `get_document_map`은 아웃라인·표 지도·누름틀·앵커를 한 호출로 반환(왕복 최소화). (저장하지 않음)
+- **📥 로컬 문서 ingest** — `document_to_markdown`, `document_extract_json`, `markdown_to_document_plan`이 로컬 문서를 Markdown/JSON/document plan으로 변환합니다. HWPX는 `python-hwpx` 엔진을 우선 사용하고, 비-HWPX는 `[ingest]` extra 설치 시 MarkItDown adapter로 처리합니다.
 - **🔎 검색·치환** — `search_and_replace`, `batch_replace`, `replace_in_paragraph`, `replace_by_anchor`. (`find_text` 외 즉시 저장)
 - **✏️ 편집·트랜잭션** — `add_heading`, `add_paragraph`/`insert_paragraph`/`delete_paragraph`, `add_page_break`, `add_memo` 계열. `apply_edits`는 연산 목록 원자 적용(중간 실패 시 전체 롤백·`dry_run`·`expected_revision` 동시성 가드·`idempotency_key`), `undo_last_edit`는 `.bak` 복원, `byte_preserving_patch`는 미수정 영역 바이트 보존, `add_tracked_edit`는 변경 추적(redline).
 - **📊 표·양식채움** — `add_table`, `set_table_cell_text`, `merge_table_cells`/`split_table_cell`, `format_table`, `table_compute`(합계·평균·소계), `fill_by_path`(`성명 > right` 경로 구문). **바이트 보존 구조적 양식채움**: 셀 바이트 채움(빈/다중 문단)·행/열/표 삭제·복제 삽입·열 너비 자동맞춤·폰트 축소맞춤을 양식 서식을 재구성하지 않고 그대로 보존하며 수행하고 실제 한컴으로 검증(`verify_fill`). `analyze_template_formfit`/`apply_template_formfit`은 승인된 양식을 원본과 다른 destination에만 반영.
