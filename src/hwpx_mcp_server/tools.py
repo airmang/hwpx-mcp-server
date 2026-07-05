@@ -587,6 +587,30 @@ class VerifyFormFillOutput(_BaseModel):
     errors: List[str]
 
 
+class ScoreFormFillInput(DocumentLocatorInput):
+    gold_path: str = Field(alias="goldPath")
+    blank_path: str = Field(alias="blankPath")
+    run_render: bool = Field(True, alias="runRender")
+    expected_pages: Optional[int] = Field(None, alias="expectedPages")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["gold_path"] = self.gold_path
+        payload["blank_path"] = self.blank_path
+        payload["run_render"] = self.run_render
+        payload["expected_pages"] = self.expected_pages
+        return payload
+
+
+class ScoreFormFillOutput(_BaseModel):
+    total: float
+    renderChecked: bool = Field(alias="render_checked")
+    axes: List[Dict[str, Any]]
+    lowestAxis: str = Field(alias="lowest_axis")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class ReplaceTableRegionInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
     start_row: int = Field(alias="startRow")
@@ -1349,6 +1373,30 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=VerifyFormFillInput,
             output_model=VerifyFormFillOutput,
             func=_simple("verify_form_fill"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="score_form_fill",
+            description=(
+                "Score a filled 평가계획 form against a gold reference on 5 axes -> "
+                "weighted 0-100 total + per-axis GAP REPORT (the fitness function of "
+                "the form-fill quality loop). path = produced fill, goldPath = an "
+                "accepted submission of the same form family, blankPath = the empty "
+                "province form. Axes: A render_cleanliness(30, REAL-Hancom render: "
+                "text crossing a cell border = overflow; no oracle -> unverified, "
+                "never a silent pass) · B format_fidelity(25, byte preservation vs "
+                "blank — regeneration scores ~0; gold itself scores LOW here by "
+                "design) · C structure_conformance(20, vs gold skeleton: delete/keep "
+                "policy + 성취기준/루브릭 block counts) · D content_completeness(15) · "
+                "E compliance(10, gold-calibrated lint; manual rules -> needs_review). "
+                "Each axis reports status (measured/unverified/needs_review) and "
+                "findings with locations; lowestAxis names the weakest axis to fix "
+                "next. Set runRender=false for a fast structural-only pass (A -> "
+                "unverified). expectedPages penalises page-count overflow when set."
+            ),
+            input_model=ScoreFormFillInput,
+            output_model=ScoreFormFillOutput,
+            func=_simple("score_form_fill"),
             category="pipeline",
         ),
         ToolDefinition(

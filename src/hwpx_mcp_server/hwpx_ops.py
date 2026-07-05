@@ -2272,6 +2272,41 @@ class HwpxOps:
             "errors": list(report.errors),
         }
 
+    def score_form_fill(
+        self,
+        path: str,
+        gold_path: str,
+        blank_path: str,
+        *,
+        run_render: bool = True,
+        expected_pages: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Score a filled evaluation-plan form against a gold reference on 5 axes
+        (A render cleanliness / B byte fidelity vs blank / C structure vs gold /
+        D content completeness / E compliance) -> weighted 0-100 + per-axis gap
+        report. The fitness function of the form-fill quality loop.
+
+        ``path`` = produced fill, ``goldPath`` = accepted reference of the same
+        form family, ``blankPath`` = the empty province form. A requires a real
+        Hancom render (renderCheck); with no oracle A is ``unverified`` (never a
+        silent pass). Set runRender=false for a fast structural-only pass."""
+        try:
+            from hwpx.formfill_quality import score_form_fill as _score
+        except Exception as exc:  # pragma: no cover - dependency compatibility
+            raise self._new_error(
+                "SCORE_UNAVAILABLE",
+                "installed python-hwpx does not provide hwpx.formfill_quality.score_form_fill",
+            ) from exc
+        produced = self._resolve_path(path)
+        gold = self._resolve_path(gold_path)
+        blank = self._resolve_path(blank_path)
+        card = _score(
+            produced, gold, blank,
+            run_render=run_render,
+            expected_pages=expected_pages,
+        )
+        return card.to_dict()
+
     def split_table_cell(
         self,
         path: str,

@@ -1,0 +1,29 @@
+.git
+.github
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+build
+dist
+.coverage
+htmlcov
+.DS_Store
+.env
+.env.*
+*.log
+work
+tmp
+.temp
+.cache
+
+# Local/editor artifacts
+.vscode
+.idea
+
+# Large or local test artifacts
+*.hwpx.bak
