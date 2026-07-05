@@ -611,6 +611,41 @@ class ScoreFormFillOutput(_BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class ApplyEvalplanFillInput(DocumentLocatorInput):
+    review_md: str = Field(alias="reviewMd")
+    output: Optional[str] = None
+    render_check: str = Field("off", alias="renderCheck")
+    score_gold_path: Optional[str] = Field(None, alias="scoreGoldPath")
+    expected_pages: Optional[int] = Field(None, alias="expectedPages")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["review_md"] = self.review_md
+        if self.output is not None:
+            payload["output"] = self.output
+        payload["render_check"] = self.render_check
+        payload["score_gold_path"] = self.score_gold_path
+        payload["expected_pages"] = self.expected_pages
+        return payload
+
+
+class ApplyEvalplanFillOutput(_BaseModel):
+    ok: bool
+    outputPath: str
+    byteIdentical: bool
+    transcript: List[str]
+    expectedSkeleton: Optional[Dict[str, Any]] = None
+    contentReport: Dict[str, Any]
+    rubricNeedsReview: int
+    needsReviewNotes: List[str]
+    changedParts: Optional[List[str]] = None
+    skipped: Optional[List[Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
+    verificationReport: Optional[Dict[str, Any]] = None
+    renderVerdict: Optional[Dict[str, Any]] = None
+    scorecard: Optional[Dict[str, Any]] = None
+
+
 class ReplaceTableRegionInput(DocumentLocatorInput):
     table_index: int = Field(alias="tableIndex")
     start_row: int = Field(alias="startRow")
@@ -1397,6 +1432,32 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ScoreFormFillInput,
             output_model=ScoreFormFillOutput,
             func=_simple("score_form_fill"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="apply_evalplan_fill",
+            description=(
+                "Whole-form 평가계획(교수학습운영 및 평가계획) fill in ONE call: "
+                "{blank province form + structured review markdown} -> byte-preserving "
+                "gold-quality 채움본. path = blank form; reviewMd = the review markdown "
+                "(Ⅰ 운영계획 + [1]~[11]: 목적/방향/방침/성취기준·성취수준/성취율/반영비율/"
+                "수행평가 세부기준 rubrics/정의적/결시자/유의사항/결과분석). Runs the "
+                "structure-driven recipe: delete the red/optional tables + 정기시험 column "
+                "+ surplus example tables, then fill 운영계획 21주 · 성취기준(상/중/하 or "
+                "A~E) · 성취수준 · 성취율(3단계 or 5단계) · 반영비율(영역·비율·성취기준·"
+                "평가요소) · rubrics incl. the 채점기준 배점 ladder · 가/나/다 prose "
+                "sections — PRESERVING the original table formatting byte-for-byte "
+                "(NEVER regenerates). Auto-handles BOTH the 2015-개정 and 2022-개정 form "
+                "families. Returns outputPath + per-region contentReport + "
+                "rubricNeedsReview/needsReviewNotes (honest-defer count — a region with "
+                "no byte-preserving map to the review is reported, never silently faked). "
+                "renderCheck='required' gates on a real Hancom render; scoreGoldPath (an "
+                "accepted form of the same family) also returns the 5-axis scorecard. Do "
+                "NOT rebuild the form by hand — this is the byte-preserving path."
+            ),
+            input_model=ApplyEvalplanFillInput,
+            output_model=ApplyEvalplanFillOutput,
+            func=_simple("apply_evalplan_fill"),
             category="pipeline",
         ),
         ToolDefinition(

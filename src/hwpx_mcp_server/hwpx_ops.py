@@ -2307,6 +2307,95 @@ class HwpxOps:
         )
         return card.to_dict()
 
+    def apply_evalplan_fill(
+        self,
+        path: str,
+        review_md: str,
+        *,
+        output: Optional[str] = None,
+        render_check: str = "off",
+        score_gold_path: Optional[str] = None,
+        expected_pages: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Whole-form 평가계획 fill: {blank province form + review markdown} ->
+        byte-preserving gold-quality 채움본 in ONE call. Runs the structure-driven
+        recipe (delete red/optional tables + 정기시험 column, fill 운영계획/성취기준/
+        성취수준/성취율/반영비율/rubrics incl. 채점기준 ladder/prose sections),
+        preserving the blank's formatting (never regenerates). Works on BOTH the
+        2015-개정 and 2022-개정 form families (auto-detected from the blank + review).
+
+        ``path`` = blank form, ``reviewMd`` = the structured review markdown
+        (Ⅰ 운영계획 + [1]~[11]). Returns the produced path + per-region contentReport
+        with rubricNeedsReview (honest-defer count, never silent). Set
+        renderCheck='required' to gate on a real Hancom render; pass scoreGoldPath
+        (an accepted form of the same family) to also return the 5-axis scorecard."""
+        try:
+            from hwpx.evalplan_fill import (
+                parse_review_file, fill_evalplan, expected_skeleton,
+            )
+        except Exception as exc:  # pragma: no cover - dependency compatibility
+            raise self._new_error(
+                "EVALPLAN_FILL_UNAVAILABLE",
+                "installed python-hwpx does not provide hwpx.evalplan_fill.fill_evalplan",
+            ) from exc
+
+        blank = self._resolve_path(path)
+        md = self._resolve_path(review_md)
+        content = parse_review_file(md)
+        res = fill_evalplan(blank, content, phase="all")
+        data = res["_data"]
+        target_path = self._resolve_output_path(output) if output else blank
+
+        report = res.get("content_report", {})
+        rubric_nr = [s for s in report.get("rubrics", {}).get("skipped", [])
+                     if "NEEDS_REVIEW" in s]
+        payload: Dict[str, Any] = {
+            "ok": bool(res.get("ok")),
+            "outputPath": str(target_path),
+            "byteIdentical": bool(res.get("byteIdentical")),
+            "transcript": res.get("transcript", []),
+            "expectedSkeleton": res.get("expected_skeleton"),
+            "contentReport": report,
+            "rubricNeedsReview": len(rubric_nr),
+            "needsReviewNotes": rubric_nr,
+            "changedParts": res.get("changedParts", []),
+            "skipped": res.get("skipped", []),
+        }
+        if not res.get("byteIdentical", True):
+            payload = self._write_patched(target_path, data, payload)
+
+        if render_check and render_check != "off":
+            try:
+                from hwpx.table_patch import verify_fill
+                verdict = verify_fill(blank, data, require=(render_check == "required"))
+                payload["renderVerdict"] = {
+                    "renderChecked": verdict.render_checked,
+                    "ok": verdict.ok,
+                    "overflowDetected": verdict.overflow_detected,
+                    "overlapDetected": verdict.overlap_detected,
+                    "pageCountChanged": verdict.page_count_changed,
+                    "warnings": list(verdict.warnings),
+                    "errors": list(verdict.errors),
+                }
+            except Exception as exc:
+                if render_check == "required":
+                    raise self._new_error("RENDER_CHECK_REQUIRED_FAILED", str(exc)) from exc
+                payload["renderVerdict"] = {"renderChecked": False, "note": str(exc)}
+
+        if score_gold_path:
+            try:
+                from hwpx.formfill_quality import score_form_fill as _score
+                card = _score(
+                    target_path, self._resolve_path(score_gold_path), blank,
+                    content=md, expected_skeleton=expected_skeleton(content, blank),
+                    run_render=(render_check and render_check != "off"),
+                    expected_pages=expected_pages,
+                )
+                payload["scorecard"] = card.to_dict()
+            except Exception as exc:  # pragma: no cover - scoring optional
+                payload["scorecard"] = {"error": str(exc)}
+        return payload
+
     def split_table_cell(
         self,
         path: str,
