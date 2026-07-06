@@ -611,6 +611,31 @@ class ScoreFormFillOutput(_BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class ScanFormGuidanceInput(DocumentLocatorInput):
+    max_items: int = Field(60, alias="maxItems")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["max_items"] = self.max_items
+        return payload
+
+
+class ScanFormGuidanceOutput(_BaseModel):
+    legend: List[Dict[str, Any]]
+    colorInventory: Dict[str, Any]
+    deleteCandidates: List[Dict[str, Any]]
+    deleteCandidatesTotal: int
+    modifyCandidatesByTable: Dict[str, Any]
+    emptyCellCandidates: List[Dict[str, Any]]
+    emptyCellTotal: int
+    placeholderCandidates: List[Dict[str, Any]]
+    conditionalChoices: List[Dict[str, Any]]
+    questions: List[str]
+    stats: Dict[str, int]
+    limitations: List[str]
+    markdownReport: str
+
+
 class ApplyEvalplanFillInput(DocumentLocatorInput):
     review_md: str = Field(alias="reviewMd")
     output: Optional[str] = None
@@ -1432,6 +1457,23 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ScoreFormFillInput,
             output_model=ScoreFormFillOutput,
             func=_simple("score_form_fill"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="scan_form_guidance",
+            description=(
+                "임의 양식 정찰(비변형) — universal form-fill Stage 1. 표 셀 내부·캡션 "
+                "포함 전체 run을 순회해 양식 스스로 선언한 색 범례(검정 유지/파랑 수정/"
+                "빨강 삭제 류)를 파싱하고, table_patch 좌표로 후보를 보고한다: 지울 것"
+                "(삭제색+안내 키워드), 수정 대상(표별 집계), placeholder(◯◯◯/**/□□□), "
+                "조건부 선택 블록('2개 중 하나만 남기고 삭제'), 빈 셀(인접 라벨+charPr "
+                "서식 컨텍스트), 질문 목록(확신 없는 곳). 처음 보는 양식은 이 도구부터 "
+                "실행해 사용자와 fill-plan을 상의하라. 후보는 제안일 뿐 — 삭제/구조 op는 "
+                "사용자 승인 후 apply_table_ops로. markdownReport가 사람이 읽는 리포트."
+            ),
+            input_model=ScanFormGuidanceInput,
+            output_model=ScanFormGuidanceOutput,
+            func=_simple("scan_form_guidance"),
             category="pipeline",
         ),
         ToolDefinition(

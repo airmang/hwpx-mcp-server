@@ -2307,6 +2307,67 @@ class HwpxOps:
         )
         return card.to_dict()
 
+    def scan_form_guidance(self, path: str, *, max_items: int = 60) -> Dict[str, Any]:
+        """Recon an unfamiliar form (NON-MUTATING) — universal form-fill Stage 1.
+
+        Walks every run INCLUDING table-cell interiors and table captions, parses
+        the form's own colour legend (e.g. "검정 유지/파랑 수정/빨강 삭제"), and
+        reports candidates with table_patch-compatible addresses: delete candidates
+        (legend-delete colour + guidance keywords), modify targets, placeholder
+        tokens (◯◯◯/**/□□□), conditional-choice blocks, empty cells with neighbour
+        label + charPr format context, and an honest question list. Candidates are
+        proposals — destructive ops still require user approval."""
+        try:
+            from hwpx.guidance_scan import scan_form_guidance as _scan
+        except Exception as exc:  # pragma: no cover - dependency compatibility
+            raise self._new_error(
+                "GUIDANCE_SCAN_UNAVAILABLE",
+                "installed python-hwpx does not provide hwpx.guidance_scan",
+            ) from exc
+        resolved = self._resolve_path(path)
+        report = _scan(resolved)
+        limit = max(1, int(max_items))
+
+        def _cand(c) -> Dict[str, Any]:
+            cell = None
+            if c.cell is not None:
+                cell = {"tableIndex": c.cell.table_index, "row": c.cell.row, "col": c.cell.col}
+            return {
+                "location": c.location,
+                "signals": c.signals,
+                "confidence": c.confidence,
+                "textPreview": c.text_preview,
+                "cell": cell,
+            }
+
+        def _cap(items) -> List[Dict[str, Any]]:
+            return [_cand(c) for c in items[:limit]]
+
+        return {
+            "legend": [
+                {
+                    "colorWord": b.color_word,
+                    "family": b.family,
+                    "exactHex": b.exact_hex,
+                    "action": b.action,
+                    "sourceText": b.source_text,
+                }
+                for b in report.legend
+            ],
+            "colorInventory": report.color_inventory,
+            "deleteCandidates": _cap(report.delete_candidates),
+            "deleteCandidatesTotal": len(report.delete_candidates),
+            "modifyCandidatesByTable": report.modify_candidates_by_table,
+            "emptyCellCandidates": _cap(report.empty_cell_candidates),
+            "emptyCellTotal": len(report.empty_cell_candidates),
+            "placeholderCandidates": _cap(report.placeholder_candidates),
+            "conditionalChoices": _cap(report.conditional_choices),
+            "questions": report.questions,
+            "stats": report.stats,
+            "limitations": report.limitations,
+            "markdownReport": report.to_markdown(),
+        }
+
     def apply_evalplan_fill(
         self,
         path: str,
