@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+
+## [2.16.0] - 2026-07-06
+### Added
+- **Document ingest gateway + Markdown-plan bridge (Spec 013)**: MCP surface to ingest external documents and bridge Markdown → `hwpx.document_plan` (`ingest_adapters`, `markdown_plan`).
 ### Fixed
 - **Styled paragraph/table font size (양식 채우기 글자 크기)**: `add_paragraph` / `insert_paragraph` (and therefore `create_document_from_plan`) now apply the paragraph *style's* char property (`charPrIDRef`) to the text run instead of letting python-hwpx default it to `charPrIDRef="0"`. On templates whose char property #0 is a large title font — e.g. the KACE 투고양식, where #0 = 17pt (국문_제목) — styled body text no longer renders at that title size; it uses the style's real size (`j-본문` = 9pt). `add_table` cells get the document body (바탕글/Normal) char property for the same reason. A guard (`_enforce_run_char_pr`) re-asserts the style char property on freshly created runs and warns on an unexpected mismatch (regression detection). `add_heading` already passed `char_pr_id_ref`; this restores the same behaviour for body paragraphs and table cells.
 
