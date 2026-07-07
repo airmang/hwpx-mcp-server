@@ -640,6 +640,23 @@ class ApplyBodyOpsOutput(_BaseModel):
     dryRun: Optional[bool] = None
 
 
+class InspectFillResidueInput(DocumentLocatorInput):
+    blank_path: Optional[str] = Field(None, alias="blankPath")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        if self.blank_path is not None:
+            payload["blank_path"] = self.blank_path
+        return payload
+
+
+class InspectFillResidueOutput(_BaseModel):
+    ok: bool
+    errors: List[Dict[str, Any]]
+    needsReview: List[Dict[str, Any]]
+    stats: Dict[str, int]
+
+
 class ScanFormGuidanceInput(DocumentLocatorInput):
     max_items: int = Field(60, alias="maxItems")
 
@@ -1513,6 +1530,23 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ApplyBodyOpsInput,
             output_model=ApplyBodyOpsOutput,
             func=_simple("apply_body_ops"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="inspect_fill_residue",
+            description=(
+                "채움본 잔존물 zero-체크(비변형) — 제출 전 기계 게이트. blankPath를 "
+                "주면 blank의 색 범례로 신호를 만든다: 삭제색 텍스트 잔존(빨간 지시문 "
+                "류)·미수정 샘플(수정색 텍스트가 blank와 동일 = 코드 없는 prose 샘플 "
+                "미교체 — 타과목 샘플을 잡는 일반 신호) = ERROR. placeholder "
+                "◯◯◯/□□□ = ERROR, 리터럴 ** = 각주 표식과 중의적이라 needsReview, "
+                "목록 마커만 있는 문단 = needsReview(의도된 빈 자리일 수 있음). "
+                "ok=true는 필요조건일 뿐 — 제출 확언은 렌더 PDF를 사람이 전 페이지 "
+                "확인한 뒤에만 한다. fill 실행 후·검수 요청 전에 반드시 돌려라."
+            ),
+            input_model=InspectFillResidueInput,
+            output_model=InspectFillResidueOutput,
+            func=_simple("inspect_fill_residue"),
             category="pipeline",
         ),
         ToolDefinition(

@@ -2352,6 +2352,29 @@ class HwpxOps:
                 payload = self._write_patched(target_path, result.data, payload)
         return payload
 
+    def inspect_fill_residue(
+        self,
+        path: str,
+        *,
+        blank_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """채움본 잔존물 zero-체크(비변형) — 제출 전 기계 게이트(Stage 3).
+
+        blank를 주면 범례 기반 신호까지: 삭제색 잔존·미수정 샘플(수정색이 blank와
+        동일=prose 샘플 미교체) = ERROR. placeholder ◯◯◯/□□□=ERROR, **=각주와
+        중의적이라 needs_review, 고아 마커=needs_review. ok=true는 필요조건일 뿐 —
+        제출 확언은 렌더 PDF를 사람이 전 페이지 본 뒤에만."""
+        try:
+            from hwpx.fill_residue import inspect_fill_residue as _inspect
+        except Exception as exc:  # pragma: no cover - dependency compatibility
+            raise self._new_error(
+                "FILL_RESIDUE_UNAVAILABLE",
+                "installed python-hwpx does not provide hwpx.fill_residue",
+            ) from exc
+        produced = self._resolve_path(path)
+        blank = self._resolve_path(blank_path) if blank_path else None
+        return _inspect(produced, blank=blank).to_dict()
+
     def scan_form_guidance(self, path: str, *, max_items: int = 60) -> Dict[str, Any]:
         """Recon an unfamiliar form (NON-MUTATING) — universal form-fill Stage 1.
 

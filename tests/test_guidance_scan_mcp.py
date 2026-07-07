@@ -91,3 +91,12 @@ def test_apply_body_ops_replace_and_dry_run(ops, tmp_path):
         output="body_out.hwpx",
     )
     assert wet["ok"] and (tmp_path / "body_out.hwpx").exists()
+
+
+def test_inspect_fill_residue_gate(ops):
+    out = ops.inspect_fill_residue("blank.hwpx", blank_path="blank.hwpx")
+    assert out["ok"] is False  # blank 그대로 = 최악의 채움본
+    kinds = {e["kind"] for e in out["errors"]}
+    assert {"delete_color_residue", "unmodified_sample"} <= kinds
+    names = {d.name for d in __import__("hwpx_mcp_server.tools", fromlist=["build_tool_definitions"]).build_tool_definitions()}
+    assert "inspect_fill_residue" in names
