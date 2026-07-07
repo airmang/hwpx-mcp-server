@@ -2317,6 +2317,41 @@ class HwpxOps:
         )
         return card.to_dict()
 
+    def apply_body_ops(
+        self,
+        path: str,
+        ops: Sequence[Dict[str, Any]],
+        *,
+        output: Optional[str] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """Byte-preserving BODY(표 밖 직속 문단) ops — Stage 2 결정표의 본문 어휘.
+
+        ops: replace_text{find,replace,count=1: <hp:t> 텍스트 안에서만, 개수 불일치
+        refuse} · delete_paragraph{index: 표 품은 문단 refuse} ·
+        insert_paragraph_by_clone{ref_index,count,texts?: 참조 문단 서식 verbatim
+        상속} · reorder_paragraphs{start,end,order}. index는 op 실행 시점 기준.
+        dryRun=true면 아무것도 쓰지 않고 transcript만(승인 근거)."""
+        try:
+            from hwpx.body_patch import apply_body_ops as _apply
+        except Exception as exc:  # pragma: no cover - dependency compatibility
+            raise self._new_error(
+                "BODY_OPS_UNAVAILABLE",
+                "installed python-hwpx does not provide hwpx.body_patch.apply_body_ops",
+            ) from exc
+        source_path = self._resolve_path(path)
+        target_path = self._resolve_output_path(output) if output else source_path
+        result = _apply(source_path, list(ops), dry_run=dry_run)
+        payload = result.to_dict()
+        if dry_run:
+            payload["dryRun"] = True
+            payload["outputPath"] = None
+        else:
+            payload["outputPath"] = str(target_path)
+            if not result.byte_identical:
+                payload = self._write_patched(target_path, result.data, payload)
+        return payload
+
     def scan_form_guidance(self, path: str, *, max_items: int = 60) -> Dict[str, Any]:
         """Recon an unfamiliar form (NON-MUTATING) — universal form-fill Stage 1.
 

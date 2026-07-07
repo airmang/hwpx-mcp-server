@@ -615,6 +615,31 @@ class ScoreFormFillOutput(_BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class ApplyBodyOpsInput(DocumentLocatorInput):
+    ops: List[Dict[str, Any]]
+    output: Optional[str] = None
+    dry_run: bool = Field(False, alias="dryRun")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["ops"] = [dict(op) for op in self.ops]
+        if self.output is not None:
+            payload["output"] = self.output
+        payload["dry_run"] = self.dry_run
+        return payload
+
+
+class ApplyBodyOpsOutput(_BaseModel):
+    ok: bool
+    skipped: List[Dict[str, Any]]
+    transcript: List[Dict[str, Any]]
+    changedParts: List[str]
+    byteIdentical: bool
+    openSafety: Dict[str, Any]
+    outputPath: Optional[str] = None
+    dryRun: Optional[bool] = None
+
+
 class ScanFormGuidanceInput(DocumentLocatorInput):
     max_items: int = Field(60, alias="maxItems")
 
@@ -1465,6 +1490,29 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=ScoreFormFillInput,
             output_model=ScoreFormFillOutput,
             func=_simple("score_form_fill"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="apply_body_ops",
+            description=(
+                "Byte-preserving BODY ops for paragraphs OUTSIDE tables (the body-"
+                "text counterpart of apply_table_ops). ops: replace_text{find, "
+                "replace, count=1 — matches ONLY inside <hp:t> text content; refuses "
+                "on count mismatch or run-spanning strings} · delete_paragraph"
+                "{index — refuses paragraphs that wrap a table} · "
+                "insert_paragraph_by_clone{ref_index, count, texts? — clones the "
+                "reference paragraph verbatim (formatting inherited from the "
+                "NEIGHBOUR, ids rewritten, layout cache stripped) then fills texts} "
+                "· reorder_paragraphs{start, end, order — contiguous permutation}. "
+                "Indices are section-direct paragraph order AT OP TIME. dryRun=true "
+                "runs the identical pipeline, writes NOTHING, and returns the "
+                "transcript as approval evidence — use in the consult loop first. "
+                "Proven by byte-identical replay of the KACE citation-renumbering "
+                "conversion (17 in-text replacements + 18-entry reorder)."
+            ),
+            input_model=ApplyBodyOpsInput,
+            output_model=ApplyBodyOpsOutput,
+            func=_simple("apply_body_ops"),
             category="pipeline",
         ),
         ToolDefinition(

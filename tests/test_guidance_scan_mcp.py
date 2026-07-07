@@ -73,3 +73,21 @@ def test_apply_table_ops_dry_run_writes_nothing(ops, tmp_path):
     assert "→" in out["transcript"][0]["dims"]
     assert (tmp_path / "blank.hwpx").read_bytes() == before
     assert not (tmp_path / "would_be.hwpx").exists()
+
+
+def test_apply_body_ops_replace_and_dry_run(ops, tmp_path):
+    before = (tmp_path / "blank.hwpx").read_bytes()
+    out = ops.apply_body_ops(
+        "blank.hwpx",
+        [{"op": "replace_text", "find": "성취수준별 고정분할점수(5단계)", "replace": "[1] 성취수준별 고정분할점수(5단계)"}],
+        dry_run=True,
+    )
+    assert out["dryRun"] is True and out["outputPath"] is None
+    assert out["transcript"][0]["status"] == "would_apply" and out["transcript"][0]["hits"] == 1
+    assert (tmp_path / "blank.hwpx").read_bytes() == before
+    wet = ops.apply_body_ops(
+        "blank.hwpx",
+        [{"op": "replace_text", "find": "성취수준별 고정분할점수(5단계)", "replace": "X단계"}],
+        output="body_out.hwpx",
+    )
+    assert wet["ok"] and (tmp_path / "body_out.hwpx").exists()
