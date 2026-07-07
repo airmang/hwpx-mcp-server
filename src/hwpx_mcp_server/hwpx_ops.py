@@ -2202,12 +2202,18 @@ class HwpxOps:
         *,
         output: Optional[str] = None,
         render_check: str = "off",
+        dry_run: bool = False,
     ) -> Dict[str, Any]:
         """Byte-preserving structural form-fill: apply cell fills + table structure
         ops (delete_column/row/table, insert_row_by_clone, insert_block_by_clone)
         preserving every untouched byte. Cells/tables may be addressed by
         tableAnchor/cellAnchor (unique-or-skip) as well as index. Optional
-        real-Hancom render gate."""
+        real-Hancom render gate.
+
+        dryRun=true: identical pipeline (resolution/validation/fail-closed all
+        real) but writes NOTHING — returns transcript (per-op resolution + before/
+        after dims) and applied old→new texts as approval evidence for the user
+        consult loop. renderCheck still works on the would-be bytes."""
         try:
             from hwpx.table_patch import apply_table_ops as _apply
         except Exception as exc:  # pragma: no cover - dependency compatibility
@@ -2218,11 +2224,15 @@ class HwpxOps:
 
         source_path = self._resolve_path(path)
         target_path = self._resolve_output_path(output) if output else source_path
-        result = _apply(source_path, list(ops))
+        result = _apply(source_path, list(ops), dry_run=dry_run)
         payload = result.to_dict()
-        payload["outputPath"] = str(target_path)
-        if not result.byte_identical:
-            payload = self._write_patched(target_path, result.data, payload)
+        if dry_run:
+            payload["dryRun"] = True
+            payload["outputPath"] = None
+        else:
+            payload["outputPath"] = str(target_path)
+            if not result.byte_identical:
+                payload = self._write_patched(target_path, result.data, payload)
 
         if render_check and render_check != "off":
             try:

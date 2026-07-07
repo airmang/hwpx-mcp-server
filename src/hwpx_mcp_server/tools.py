@@ -543,6 +543,7 @@ class ApplyTableOpsInput(DocumentLocatorInput):
     ops: List[Dict[str, Any]]
     output: Optional[str] = None
     render_check: str = Field("off", alias="renderCheck")
+    dry_run: bool = Field(False, alias="dryRun")
 
     def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
         payload = super().to_hwpx_payload(require_path=require_path)
@@ -550,6 +551,7 @@ class ApplyTableOpsInput(DocumentLocatorInput):
         if self.output is not None:
             payload["output"] = self.output
         payload["render_check"] = self.render_check
+        payload["dry_run"] = self.dry_run
         return payload
 
 
@@ -560,7 +562,9 @@ class ApplyTableOpsOutput(_BaseModel):
     changedParts: List[str]
     byteIdentical: bool
     zipMethod: str
-    outputPath: str
+    outputPath: Optional[str] = None  # dry-run이면 None(아무것도 안 씀)
+    dryRun: Optional[bool] = None
+    transcript: Optional[List[Dict[str, Any]]] = None
     verificationReport: Optional[Dict[str, Any]] = None
     openSafety: Optional[Dict[str, Any]] = None
     renderVerdict: Optional[Dict[str, Any]] = None
@@ -1414,7 +1418,11 @@ def build_tool_definitions() -> List[ToolDefinition]:
                 "delete_table shifts later indices — sequence deletes in reverse "
                 "order (or address by anchor). Structure edits are grid-validated "
                 "(fail-closed). Set renderCheck='required' to gate on a real Hancom "
-                "render, 'auto' to attach a render verdict when Hancom is reachable."
+                "render, 'auto' to attach a render verdict when Hancom is reachable. "
+                "dryRun=true: run the IDENTICAL pipeline but write NOTHING — returns "
+                "transcript (per-op resolution + dims before→after) and applied "
+                "old→new texts as approval evidence. USE THIS FIRST in the user "
+                "consult loop; apply for real only after the user approves the plan."
             ),
             input_model=ApplyTableOpsInput,
             output_model=ApplyTableOpsOutput,

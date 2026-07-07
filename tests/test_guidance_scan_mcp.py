@@ -57,3 +57,19 @@ def test_max_items_caps_lists(ops):
     assert len(out["deleteCandidates"]) == 5
     assert out["deleteCandidatesTotal"] >= 20  # 총계는 그대로 정직 보고
     assert len(out["emptyCellCandidates"]) == 5
+
+
+def test_apply_table_ops_dry_run_writes_nothing(ops, tmp_path):
+    before = (tmp_path / "blank.hwpx").read_bytes()
+    out = ops.apply_table_ops(
+        "blank.hwpx",
+        [{"op": "delete_table", "tableIndex": 5},
+         {"op": "fill_cell", "tableIndex": 2, "row": 5, "col": 3, "text": "미리보기"}],
+        output="would_be.hwpx",
+        dry_run=True,
+    )
+    assert out["dryRun"] is True and out["outputPath"] is None
+    assert out["transcript"][0]["status"] == "would_apply"
+    assert "→" in out["transcript"][0]["dims"]
+    assert (tmp_path / "blank.hwpx").read_bytes() == before
+    assert not (tmp_path / "would_be.hwpx").exists()
