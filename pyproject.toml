@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "2.16.0"
+version = "2.17.0"
 description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "python-hwpx>=2.23.0", # M10 byte-preserving structural form-fill + column-width fit (hwpx.table_patch) + M7 TOC + M6 read + M5 PII
+    "python-hwpx>=2.24.0", # M10 byte-preserving structural form-fill + column-width fit (hwpx.table_patch) + M7 TOC + M6 read + M5 PII
 
     "pydantic>=2.7",
     "anyio>=4.0",
