@@ -2468,16 +2468,33 @@ def get_document_outline(filename: str) -> dict:
     return _with_document_state({"outline": outline}, path)
 
 
+def _summary_table_map(path) -> dict:
+    """Compact per-table map (FR-006) via python-hwpx table_summary — bounded."""
+    try:
+        from hwpx.table_patch import table_summary
+    except Exception as exc:  # pragma: no cover - dependency compatibility
+        return {"tables": [], "count": 0, "note": f"summary unavailable: {exc}"}
+    tables = table_summary(path)
+    return {"tables": tables, "count": len(tables), "detail": "summary"}
+
+
 @mcp.tool()
 def get_document_map(
     filename: str,
     max_preview_chars: int = 80,
+    detail: str = "full",
 ) -> dict:
-    """문서 개요, 표, 양식 필드, 앵커를 한 번에 조회합니다."""
+    """문서 개요, 표, 양식 필드, 앵커를 한 번에 조회합니다.
+
+    detail="summary" (FR-006): 표는 셀 덤프 없이 표당 {tableIndex, rows, cols,
+    merges, heading, firstRow} 요약만 반환 — 37표 양식도 토큰한도 내 1콜. 헤딩은
+    apply_table_ops/fill_cells의 tableAnchor로 그대로 쓸 수 있는 텍스트.
+    detail="full"(기본)은 종전대로 셀 단위 표 지도를 반환한다."""
     path = resolve_path(filename)
     doc = open_doc(path)
     model = _build_read_model(doc)
     preview_limit = max(0, int(max_preview_chars))
+    summary_mode = str(detail).lower() == "summary"
 
     paragraph_anchors = []
     for item in model["items"]:
@@ -2537,7 +2554,7 @@ def get_document_map(
             }
             for section in model["sections"]
         ],
-        "tables": get_table_map_in_doc(doc),
+        "tables": _summary_table_map(path) if summary_mode else get_table_map_in_doc(doc),
         "formFields": form_fields,
         "anchors": {
             "paragraphs": paragraph_anchors,

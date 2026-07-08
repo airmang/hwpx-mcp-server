@@ -543,6 +543,7 @@ class ApplyTableOpsInput(DocumentLocatorInput):
     ops: List[Dict[str, Any]]
     output: Optional[str] = None
     render_check: str = Field("off", alias="renderCheck")
+    dry_run: bool = Field(False, alias="dryRun")
 
     def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
         payload = super().to_hwpx_payload(require_path=require_path)
@@ -550,6 +551,7 @@ class ApplyTableOpsInput(DocumentLocatorInput):
         if self.output is not None:
             payload["output"] = self.output
         payload["render_check"] = self.render_check
+        payload["dry_run"] = self.dry_run
         return payload
 
 
@@ -560,7 +562,9 @@ class ApplyTableOpsOutput(_BaseModel):
     changedParts: List[str]
     byteIdentical: bool
     zipMethod: str
-    outputPath: str
+    outputPath: Optional[str] = None  # dry-run이면 None(아무것도 안 씀)
+    dryRun: Optional[bool] = None
+    transcript: Optional[List[Dict[str, Any]]] = None
     verificationReport: Optional[Dict[str, Any]] = None
     openSafety: Optional[Dict[str, Any]] = None
     renderVerdict: Optional[Dict[str, Any]] = None
@@ -585,6 +589,132 @@ class VerifyFormFillOutput(_BaseModel):
     pageCountChanged: Optional[Any] = None
     warnings: List[str]
     errors: List[str]
+
+
+class ScoreFormFillInput(DocumentLocatorInput):
+    gold_path: str = Field(alias="goldPath")
+    blank_path: str = Field(alias="blankPath")
+    run_render: bool = Field(True, alias="runRender")
+    expected_pages: Optional[int] = Field(None, alias="expectedPages")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["gold_path"] = self.gold_path
+        payload["blank_path"] = self.blank_path
+        payload["run_render"] = self.run_render
+        payload["expected_pages"] = self.expected_pages
+        return payload
+
+
+class ScoreFormFillOutput(_BaseModel):
+    total: float
+    renderChecked: bool = Field(alias="render_checked")
+    axes: List[Dict[str, Any]]
+    lowestAxis: str = Field(alias="lowest_axis")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ApplyBodyOpsInput(DocumentLocatorInput):
+    ops: List[Dict[str, Any]]
+    output: Optional[str] = None
+    dry_run: bool = Field(False, alias="dryRun")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["ops"] = [dict(op) for op in self.ops]
+        if self.output is not None:
+            payload["output"] = self.output
+        payload["dry_run"] = self.dry_run
+        return payload
+
+
+class ApplyBodyOpsOutput(_BaseModel):
+    ok: bool
+    skipped: List[Dict[str, Any]]
+    transcript: List[Dict[str, Any]]
+    changedParts: List[str]
+    byteIdentical: bool
+    openSafety: Dict[str, Any]
+    outputPath: Optional[str] = None
+    dryRun: Optional[bool] = None
+
+
+class InspectFillResidueInput(DocumentLocatorInput):
+    blank_path: Optional[str] = Field(None, alias="blankPath")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        if self.blank_path is not None:
+            payload["blank_path"] = self.blank_path
+        return payload
+
+
+class InspectFillResidueOutput(_BaseModel):
+    ok: bool
+    errors: List[Dict[str, Any]]
+    needsReview: List[Dict[str, Any]]
+    stats: Dict[str, int]
+
+
+class ScanFormGuidanceInput(DocumentLocatorInput):
+    max_items: int = Field(60, alias="maxItems")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["max_items"] = self.max_items
+        return payload
+
+
+class ScanFormGuidanceOutput(_BaseModel):
+    legend: List[Dict[str, Any]]
+    colorInventory: Dict[str, Any]
+    deleteCandidates: List[Dict[str, Any]]
+    deleteCandidatesTotal: int
+    modifyCandidatesByTable: Dict[str, Any]
+    emptyCellCandidates: List[Dict[str, Any]]
+    emptyCellTotal: int
+    placeholderCandidates: List[Dict[str, Any]]
+    conditionalChoices: List[Dict[str, Any]]
+    questions: List[str]
+    stats: Dict[str, int]
+    limitations: List[str]
+    markdownReport: str
+
+
+class ApplyEvalplanFillInput(DocumentLocatorInput):
+    review_md: str = Field(alias="reviewMd")
+    output: Optional[str] = None
+    render_check: str = Field("off", alias="renderCheck")
+    score_gold_path: Optional[str] = Field(None, alias="scoreGoldPath")
+    expected_pages: Optional[int] = Field(None, alias="expectedPages")
+
+    def to_hwpx_payload(self, *, require_path: bool = True) -> Dict[str, Any]:
+        payload = super().to_hwpx_payload(require_path=require_path)
+        payload["review_md"] = self.review_md
+        if self.output is not None:
+            payload["output"] = self.output
+        payload["render_check"] = self.render_check
+        payload["score_gold_path"] = self.score_gold_path
+        payload["expected_pages"] = self.expected_pages
+        return payload
+
+
+class ApplyEvalplanFillOutput(_BaseModel):
+    ok: bool
+    outputPath: str
+    byteIdentical: bool
+    transcript: List[str]
+    expectedSkeleton: Optional[Dict[str, Any]] = None
+    contentReport: Dict[str, Any]
+    rubricNeedsReview: int
+    needsReviewNotes: List[str]
+    changedParts: Optional[List[str]] = None
+    skipped: Optional[List[Any]] = None
+    openSafety: Optional[Dict[str, Any]] = None
+    verificationReport: Optional[Dict[str, Any]] = None
+    renderVerdict: Optional[Dict[str, Any]] = None
+    scorecard: Optional[Dict[str, Any]] = None
 
 
 class ReplaceTableRegionInput(DocumentLocatorInput):
@@ -1310,19 +1440,39 @@ def build_tool_definitions() -> List[ToolDefinition]:
             description=(
                 "Byte-preserving structural form-fill: apply a list of ops "
                 "(fill_cell / delete_column / delete_row / delete_table / "
-                "insert_row_by_clone / set_column_widths / autofit_columns) to a "
-                "form, PRESERVING the original table formatting and every untouched "
-                "byte (never rebuild). ops: "
-                "[{op, tableIndex, row?, col?, cols?, ref_row?, count?, text?, widths?, max_lines?}]. "
-                "set_column_widths sets explicit logical column widths; "
-                "autofit_columns rebalances widths to content (widen content-heavy "
-                "columns, narrow light ones, total preserved) so long text is not "
-                "cramped in a narrow column. A fill_cell with max_lines shrinks the "
-                "cell font (down to a floor) so its text fits within that many lines. "
+                "insert_row_by_clone / insert_block_by_clone / set_column_widths / "
+                "autofit_columns / set_row_heights / set_cell_line_spacing / split_cell_vertical) to a form, PRESERVING the original table formatting "
+                "and every untouched byte (never rebuild). ops: "
+                "[{op, tableIndex?, tableAnchor?, row?, col?, cellAnchor?, cols?, "
+                "ref_row?, ref_rows?, count?, text?, widths?, max_lines?}]. "
+                "insert_block_by_clone clones a contiguous VERTICAL-MERGE block "
+                "(ref_rows:[r0,r1] — e.g. a 성취기준 A~E unit whose leading cell is "
+                "rowSpan=N) count times, formatting preserved (insert_row_by_clone "
+                "stays for the flat rowSpan==1 case). delete_column now handles "
+                "fully-merged tables with no uniform colSpan==1 row (widths derived "
+                "from the merged grid; refuses with a reason if unreconcilable). "
+                "ADDRESS BY ANCHOR to survive index shifts: tableAnchor = the text of "
+                "the table's preceding heading/label; cellAnchor = {label, dir} of an "
+                "adjacent cell — resolves to a UNIQUE target or is skipped with a "
+                "reason (never guessed). set_column_widths sets explicit logical "
+                "column widths; autofit_columns rebalances widths to content. A "
+                "fill_cell with max_lines shrinks the cell font (to a floor) to fit. "
                 "delete_table shifts later indices — sequence deletes in reverse "
-                "order. Structure edits are grid-validated (fail-closed). Set "
-                "renderCheck='required' to gate on a real Hancom render, 'auto' to "
-                "attach a render verdict when Hancom is reachable."
+                "order (or address by anchor). set_row_heights{heights:{row:HWPUNIT}} "
+                "resizes rows explicitly (1pt=100; merged cells get the sum of covered "
+                "rows; refuses when a current row height is underivable) — the human "
+                "editor's 'redistribute row heights to fit the page' move. "
+                "set_cell_line_spacing{tableIndex|tableAnchor, cells:[[r,c]]|rows:[r], "
+                "lineSpacing:percent} adjusts IN-CELL paragraph line spacing (the human "
+                "editor's #1 fit move — e.g. 160→130 to fit long text) by cloning the "
+                "paraPr with the new spacing and remapping only the target paragraphs; "
+                "cells wrapping a nested table are refused. split_cell_vertical{tableIndex|tableAnchor, row, col, sizes:[n1,n2,...]} splits a rowSpan MERGED cell into stacked cells with those spans (sum==rowSpan) — new cells inherit the split cell formatting with empty text; the human-editor move to turn one merged group into N vertically-aligned sub-groups (e.g. a rubric 평가항목 column from 1×7 into 3×3). Structure edits are grid-validated "
+                "(fail-closed). Set renderCheck='required' to gate on a real Hancom "
+                "render, 'auto' to attach a render verdict when Hancom is reachable. "
+                "dryRun=true: run the IDENTICAL pipeline but write NOTHING — returns "
+                "transcript (per-op resolution + dims before→after) and applied "
+                "old→new texts as approval evidence. USE THIS FIRST in the user "
+                "consult loop; apply for real only after the user approves the plan."
             ),
             input_model=ApplyTableOpsInput,
             output_model=ApplyTableOpsOutput,
@@ -1341,6 +1491,113 @@ def build_tool_definitions() -> List[ToolDefinition]:
             input_model=VerifyFormFillInput,
             output_model=VerifyFormFillOutput,
             func=_simple("verify_form_fill"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="score_form_fill",
+            description=(
+                "Score a filled 평가계획 form against a gold reference on 5 axes -> "
+                "weighted 0-100 total + per-axis GAP REPORT (the fitness function of "
+                "the form-fill quality loop). path = produced fill, goldPath = an "
+                "accepted submission of the same form family, blankPath = the empty "
+                "province form. Axes: A render_cleanliness(30, REAL-Hancom render: "
+                "text crossing a cell border = overflow; no oracle -> unverified, "
+                "never a silent pass) · B format_fidelity(25, byte preservation vs "
+                "blank — regeneration scores ~0; gold itself scores LOW here by "
+                "design) · C structure_conformance(20, vs gold skeleton: delete/keep "
+                "policy + 성취기준/루브릭 block counts) · D content_completeness(15) · "
+                "E compliance(10, gold-calibrated lint; manual rules -> needs_review). "
+                "Each axis reports status (measured/unverified/needs_review) and "
+                "findings with locations; lowestAxis names the weakest axis to fix "
+                "next. Set runRender=false for a fast structural-only pass (A -> "
+                "unverified). expectedPages penalises page-count overflow when set."
+            ),
+            input_model=ScoreFormFillInput,
+            output_model=ScoreFormFillOutput,
+            func=_simple("score_form_fill"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="apply_body_ops",
+            description=(
+                "Byte-preserving BODY ops for paragraphs OUTSIDE tables (the body-"
+                "text counterpart of apply_table_ops). ops: replace_text{find, "
+                "replace, count=1 — matches ONLY inside <hp:t> text content; refuses "
+                "on count mismatch or run-spanning strings} · delete_paragraph"
+                "{index — refuses paragraphs that wrap a table} · "
+                "insert_paragraph_by_clone{ref_index, count, texts? — clones the "
+                "reference paragraph verbatim (formatting inherited from the "
+                "NEIGHBOUR, ids rewritten, layout cache stripped) then fills texts} "
+                "· reorder_paragraphs{start, end, order — contiguous permutation}. "
+                "Indices are section-direct paragraph order AT OP TIME. dryRun=true "
+                "runs the identical pipeline, writes NOTHING, and returns the "
+                "transcript as approval evidence — use in the consult loop first. "
+                "Proven by byte-identical replay of the KACE citation-renumbering "
+                "conversion (17 in-text replacements + 18-entry reorder)."
+            ),
+            input_model=ApplyBodyOpsInput,
+            output_model=ApplyBodyOpsOutput,
+            func=_simple("apply_body_ops"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="inspect_fill_residue",
+            description=(
+                "채움본 잔존물 zero-체크(비변형) — 제출 전 기계 게이트. blankPath를 "
+                "주면 blank의 색 범례로 신호를 만든다: 삭제색 텍스트 잔존(빨간 지시문 "
+                "류)·미수정 샘플(수정색 텍스트가 blank와 동일 = 코드 없는 prose 샘플 "
+                "미교체 — 타과목 샘플을 잡는 일반 신호) = ERROR. placeholder "
+                "◯◯◯/□□□ = ERROR, 리터럴 ** = 각주 표식과 중의적이라 needsReview, "
+                "목록 마커만 있는 문단 = needsReview(의도된 빈 자리일 수 있음). "
+                "ok=true는 필요조건일 뿐 — 제출 확언은 렌더 PDF를 사람이 전 페이지 "
+                "확인한 뒤에만 한다. fill 실행 후·검수 요청 전에 반드시 돌려라."
+            ),
+            input_model=InspectFillResidueInput,
+            output_model=InspectFillResidueOutput,
+            func=_simple("inspect_fill_residue"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="scan_form_guidance",
+            description=(
+                "임의 양식 정찰(비변형) — universal form-fill Stage 1. 표 셀 내부·캡션 "
+                "포함 전체 run을 순회해 양식 스스로 선언한 색 범례(검정 유지/파랑 수정/"
+                "빨강 삭제 류)를 파싱하고, table_patch 좌표로 후보를 보고한다: 지울 것"
+                "(삭제색+안내 키워드), 수정 대상(표별 집계), placeholder(◯◯◯/**/□□□), "
+                "조건부 선택 블록('2개 중 하나만 남기고 삭제'), 빈 셀(인접 라벨+charPr "
+                "서식 컨텍스트), 질문 목록(확신 없는 곳). 처음 보는 양식은 이 도구부터 "
+                "실행해 사용자와 fill-plan을 상의하라. 후보는 제안일 뿐 — 삭제/구조 op는 "
+                "사용자 승인 후 apply_table_ops로. markdownReport가 사람이 읽는 리포트."
+            ),
+            input_model=ScanFormGuidanceInput,
+            output_model=ScanFormGuidanceOutput,
+            func=_simple("scan_form_guidance"),
+            category="pipeline",
+        ),
+        ToolDefinition(
+            name="apply_evalplan_fill",
+            description=(
+                "Whole-form 평가계획(교수학습운영 및 평가계획) fill in ONE call: "
+                "{blank province form + structured review markdown} -> byte-preserving "
+                "gold-quality 채움본. path = blank form; reviewMd = the review markdown "
+                "(Ⅰ 운영계획 + [1]~[11]: 목적/방향/방침/성취기준·성취수준/성취율/반영비율/"
+                "수행평가 세부기준 rubrics/정의적/결시자/유의사항/결과분석). Runs the "
+                "structure-driven recipe: delete the red/optional tables + 정기시험 column "
+                "+ surplus example tables, then fill 운영계획 21주 · 성취기준(상/중/하 or "
+                "A~E) · 성취수준 · 성취율(3단계 or 5단계) · 반영비율(영역·비율·성취기준·"
+                "평가요소) · rubrics incl. the 채점기준 배점 ladder · 가/나/다 prose "
+                "sections — PRESERVING the original table formatting byte-for-byte "
+                "(NEVER regenerates). Auto-handles BOTH the 2015-개정 and 2022-개정 form "
+                "families. Returns outputPath + per-region contentReport + "
+                "rubricNeedsReview/needsReviewNotes (honest-defer count — a region with "
+                "no byte-preserving map to the review is reported, never silently faked). "
+                "renderCheck='required' gates on a real Hancom render; scoreGoldPath (an "
+                "accepted form of the same family) also returns the 5-axis scorecard. Do "
+                "NOT rebuild the form by hand — this is the byte-preserving path."
+            ),
+            input_model=ApplyEvalplanFillInput,
+            output_model=ApplyEvalplanFillOutput,
+            func=_simple("apply_evalplan_fill"),
             category="pipeline",
         ),
         ToolDefinition(
