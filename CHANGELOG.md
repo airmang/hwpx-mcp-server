@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-07-08
+### Added
+- **Stage 3 universal form-fill tool surface**: `scan_form_guidance` (non-mutating form recon), `apply_body_ops` (byte-preserving body-paragraph ops incl. set_paragraph_text/strip/recolor, dryRun), `inspect_fill_residue` (fill residue zero-check gate). `apply_table_ops` gains `split_cell_vertical`·`clone_table`·`set_row_heights`·`set_cell_line_spacing` ops and `dryRun` transcript. Requires python-hwpx>=2.24.0.
+### 비고
+- Validated by producing a full 3학년 평가계획 from the blank form end-to-end (delete·reshape·fill·cleanup·recolor) with generic primitives only; real-Hancom render + owner review PASS.
+
+
 ## [2.16.0] - 2026-07-06
 ### Added
 - **Document ingest gateway + Markdown-plan bridge (Spec 013)**: MCP surface to ingest external documents and bridge Markdown → `hwpx.document_plan` (`ingest_adapters`, `markdown_plan`).
