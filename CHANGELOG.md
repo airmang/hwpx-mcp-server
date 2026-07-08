@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-07-08
+### Added
+- **`describe_capabilities`**: task-oriented capability map for agents. Groups the ~150 flat tools into 16 domains (read·form-fill·author·edit·tables·styles·layout·toc-xref·pii·redline·exam·seal·generators·memo·verify·package) with intent + when-to-use + entry-point tools; `domain=` filters one group. A coverage drift-guard test asserts every registered tool is mapped (adding a tool without mapping it fails CI). Lets an external agent orient itself with one call instead of reading ~150 tool descriptions.
+
+
 ## [2.17.0] - 2026-07-08
 ### Added
 - **Stage 3 universal form-fill tool surface**: `scan_form_guidance` (non-mutating form recon), `apply_body_ops` (byte-preserving body-paragraph ops incl. set_paragraph_text/strip/recolor, dryRun), `inspect_fill_residue` (fill residue zero-check gate). `apply_table_ops` gains `split_cell_vertical`·`clone_table`·`set_row_heights`·`set_cell_line_spacing` ops and `dryRun` transcript. Requires python-hwpx>=2.24.0.
