@@ -4171,6 +4171,28 @@ def _capability_block(tool_surface_skew: bool, missing_key_tools: list[str]) -> 
 
 
 @mcp.tool()
+def describe_capabilities(domain: str | None = None) -> dict:
+    """이 HWPX 툴킷이 무엇을 할 수 있는지 작업 종류별로 요약한 능력 지도를 반환합니다.
+
+    도구가 ~150개라 평평한 목록으로는 breadth를 파악하기 어렵습니다. 이 도구를 한 번
+    부르면 작업군(읽기·양식채움·생성·편집·표·서식·차례·PII·레드라인·시험지·직인·
+    대량생산·메모·검증·패키지)별 intent + 언제 쓰는지 + 진입점 도구가 나옵니다.
+    domain 인자로 한 작업군 상세만 필터할 수 있습니다(예: domain="form_fill").
+    처음 이 서버로 HWPX 작업을 시작하는 에이전트는 이걸 먼저 부르면 오리엔테이션이
+    됩니다. coverage에 등록 도구 대비 미매핑이 표시되면 그건 이 지도의 드리프트입니다."""
+    from .capabilities import build_capability_report, coverage_against
+
+    report = build_capability_report(domain if domain else None)
+    try:
+        live = set(_fastmcp_tool_names()) | set(_legacy_tool_names())
+    except Exception:  # pragma: no cover - registry introspection guard
+        live = set()
+    report["toolCount"] = len(live)
+    report["coverage"] = coverage_against(live) if live else {"unmapped": [], "mappedNotRegistered": []}
+    return report
+
+
+@mcp.tool()
 def mcp_server_health() -> dict:
     """MCP 서버 transport와 timeout/keepalive 점검 정보를 반환합니다."""
     transport = os.environ.get("HWPX_MCP_TRANSPORT", "stdio")
