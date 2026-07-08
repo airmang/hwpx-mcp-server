@@ -44,6 +44,79 @@ def _resolve_style(doc: HwpxDocument, style: str | None) -> str | None:
     return resolve_style_id(doc, style)
 
 
+def _style_char_pr(doc: HwpxDocument, style_id: str | int | None) -> str | None:
+    """문단 스타일(styleIDRef)이 참조하는 글자속성(charPrIDRef)을 돌려준다.
+
+    스타일이 없거나 글자속성이 지정되지 않으면 ``None``. ``add_paragraph`` 계열이
+    새 run에 스타일이 규정한 글자 크기·글꼴을 실어 주도록 하기 위한 조회 헬퍼다.
+    """
+    if style_id is None:
+        return None
+    from .formatting import list_styles_in_doc
+
+    target = str(style_id)
+    for style in list_styles_in_doc(doc):
+        if str(style.get("id")) == target:
+            ref = style.get("char_pr_id_ref")
+            return None if ref in (None, "") else str(ref)
+    return None
+
+
+def _default_body_char_pr(doc: HwpxDocument) -> str | None:
+    """본문(바탕글/Normal) 스타일의 글자속성을 돌려준다.
+
+    스타일 인자가 없는 표 셀 등에 제목용 큰 글자(charPr 0)가 새어 들어가지
+    않도록, 문서 기본 본문 크기를 적용하기 위한 fallback 값이다.
+    """
+    from .formatting import list_styles_in_doc
+
+    fallback: str | None = None
+    for style in list_styles_in_doc(doc):
+        name = (style.get("name") or "").strip()
+        eng = (style.get("eng_name") or "").strip()
+        ref = style.get("char_pr_id_ref")
+        if ref in (None, ""):
+            continue
+        if name in ("바탕글", "본문") or eng.lower() in ("normal", "body"):
+            return str(ref)
+        if fallback is None and str(style.get("id")) == "0":
+            fallback = str(ref)
+    return fallback
+
+
+def _enforce_run_char_pr(paragraph: Any, char_ref: str | None) -> None:
+    """방금 만든 문단의 run이 스타일 글자속성을 쓰도록 보정한다(회귀 가드).
+
+    python-hwpx는 글자속성을 명시하지 않은 새 run에 ``charPrIDRef="0"``을
+    박는다. 이 0번 글자속성이 본문 크기이면 문제없지만, 제목용 큰 글자
+    (예: 17pt)를 0번에 둔 투고 양식에서는 본문 전체가 그 크기로 렌더된다.
+    스타일을 지정해 문단을 넣었는데도 run이 스타일과 다른 글자속성을 가지면
+    스타일 값으로 교정한다. 기본값(0/None) 교정은 정상 경로라 DEBUG 로깅,
+    그 밖의 예상 못 한 불일치는 회귀 신호로 WARNING을 남긴다.
+    """
+    if char_ref is None or paragraph is None:
+        return
+    want = str(char_ref)
+    for run in getattr(paragraph, "runs", None) or []:
+        current = getattr(run, "char_pr_id_ref", None)
+        if current is not None and str(current) == want:
+            continue
+        if current in (None, 0, "0"):
+            logger.debug(
+                "styled run 기본 charPr(%s) → 스타일 charPr=%s 적용", current, want
+            )
+        else:
+            logger.warning(
+                "styled run charPrIDRef=%s 가 스타일 charPr=%s 와 불일치 → 교정",
+                current,
+                want,
+            )
+        try:
+            run.char_pr_id_ref = int(want) if want.isdigit() else want
+        except Exception:  # pragma: no cover - 방어적
+            logger.debug("run charPrIDRef 교정 실패", exc_info=True)
+
+
 def _clear_paragraph_layout_cache(paragraph: Any) -> None:
     element = getattr(paragraph, "element", None)
     if element is None:
@@ -115,10 +188,20 @@ def _last_paragraph_is_outline(doc: HwpxDocument) -> bool:
 def add_paragraph_to_doc(doc: HwpxDocument, text: str, style: str = None) -> int:
     """문서 끝에 일반 문단을 추가한다. 추가된 paragraph_index를 반환."""
     style_id = _resolve_style(doc, style)
+    # 스타일이 규정한 글자속성(크기·글꼴)을 run에 실어 준다. 이를 넘기지 않으면
+    # python-hwpx가 charPrIDRef="0"을 기본으로 박아, 0번이 제목 크기인 양식에서
+    # 본문이 통째로 커진다(add_heading_to_doc는 이미 char_pr_id_ref를 넘긴다).
+    char_ref = _style_char_pr(doc, style_id)
     # 직전 문단이 개요(헤딩) 스타일이면 상속을 끊는다 — 헤딩 뒤 본문이
     # 개요 수준·강조 서식을 물려받는 사고 방지.
     inherit = not (style_id is None and _last_paragraph_is_outline(doc))
-    doc.add_paragraph(text or "", style_id_ref=style_id, inherit_style=inherit)
+    paragraph = doc.add_paragraph(
+        text or "",
+        style_id_ref=style_id,
+        char_pr_id_ref=char_ref,
+        inherit_style=inherit,
+    )
+    _enforce_run_char_pr(paragraph, char_ref)
     return len(doc.paragraphs) - 1
 
 
@@ -134,7 +217,11 @@ def insert_paragraph_to_doc(doc: HwpxDocument, paragraph_index: int, text: str, 
     target = doc.paragraphs[paragraph_index]
     section = target.section
     style_id = _resolve_style(doc, style)
-    inserted = section.add_paragraph(text or "", style_id_ref=style_id)
+    char_ref = _style_char_pr(doc, style_id)
+    inserted = section.add_paragraph(
+        text or "", style_id_ref=style_id, char_pr_id_ref=char_ref
+    )
+    _enforce_run_char_pr(inserted, char_ref)
 
     section_element = section.element
     try:
@@ -176,11 +263,19 @@ def add_table_to_doc(doc: HwpxDocument, rows: int, cols: int, data: list[list[st
     if rows <= 0 or cols <= 0:
         raise ValueError("rows와 cols는 1 이상이어야 합니다.")
     table = doc.add_table(rows=rows, cols=cols)
+    # 표 셀도 스타일 인자가 없으면 charPrIDRef="0"이 박혀 제목 크기가 샐 수 있다.
+    # 문서 본문(바탕글) 글자속성을 셀 run에 적용해 크기 누수를 막는다.
+    cell_char_ref = _default_body_char_pr(doc)
     payload = data or []
-    for r in range(min(rows, len(payload))):
-        row_data = payload[r] or []
-        for c in range(min(cols, len(row_data))):
-            table.rows[r].cells[c].text = str(row_data[c])
+    for r in range(rows):
+        row_cells = table.rows[r].cells
+        row_data = (payload[r] or []) if r < len(payload) else []
+        for c in range(cols):
+            cell = row_cells[c]
+            if c < len(row_data):
+                cell.text = str(row_data[c])
+            for cell_para in getattr(cell, "paragraphs", None) or []:
+                _enforce_run_char_pr(cell_para, cell_char_ref)
     return len(list(_iter_tables(doc))) - 1
 
 
