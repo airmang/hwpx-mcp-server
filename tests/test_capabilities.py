@@ -7,23 +7,30 @@
 from __future__ import annotations
 
 from hwpx_mcp_server.capabilities import DOMAINS, build_capability_report, coverage_against
+from hwpx_mcp_server.tool_contract import contract_hash, expected_tool_names, skill_required_tool_names
 
 
 def _live_tools() -> set[str]:
     import hwpx_mcp_server.server as s
 
-    # 서버가 쓰는 동기 헬퍼 사용(asyncio 이벤트루프 공유 상태에 취약하지 않게)
-    return set(s._fastmcp_tool_names()) | set(s._legacy_tool_names())
+    return set(s._fastmcp_tool_names())
+
+
+def _active_advanced() -> bool:
+    import hwpx_mcp_server.server as s
+
+    return s._ACTIVE_ADVANCED
 
 
 def test_every_registered_tool_is_mapped():
-    cov = coverage_against(_live_tools())
-    assert cov["unmapped"] == [], f"지도에 없는 도구(드리프트): {cov['unmapped']}"
+    cov = coverage_against(_live_tools(), advanced=_active_advanced())
+    assert cov["ok"] is True, cov
 
 
 def test_no_phantom_tools_in_map():
-    cov = coverage_against(_live_tools())
-    assert cov["mappedNotRegistered"] == [], f"등록 안 된 지도 항목(오타?): {cov['mappedNotRegistered']}"
+    cov = coverage_against(_live_tools(), advanced=_active_advanced())
+    assert cov["missingExpected"] == []
+    assert _live_tools() == expected_tool_names(advanced=_active_advanced())
 
 
 def test_each_tool_in_exactly_one_domain():
@@ -36,7 +43,9 @@ def test_each_tool_in_exactly_one_domain():
 
 def test_report_shape_and_domain_filter():
     full = build_capability_report()
-    assert full["domainCount"] == len(DOMAINS) >= 12
+    assert full["domainCount"] >= 12
+    assert full["profile"] == "default"
+    assert full["contractHash"] == contract_hash()
     assert all({"key", "title", "intent", "whenToUse", "tools"} <= set(dm) for dm in full["domains"])
     one = build_capability_report("form_fill")
     assert len(one["domains"]) == 1 and one["domains"][0]["key"] == "form_fill"
@@ -48,4 +57,6 @@ def test_mcp_tool_registered_and_callable():
 
     assert "describe_capabilities" in set(s._fastmcp_tool_names())
     out = s.describe_capabilities()
-    assert out["coverage"]["unmapped"] == [] and out["toolCount"] >= 140
+    assert out["coverage"]["ok"] is True
+    assert out["toolCount"] == len(expected_tool_names(advanced=_active_advanced()))
+    assert skill_required_tool_names() <= set(s._fastmcp_tool_names())

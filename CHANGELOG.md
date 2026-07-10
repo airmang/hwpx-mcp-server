@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2.18.1] - 2026-07-10
+### Fixed
+- Restored the seven universal form-fill tools on the release-facing FastMCP entrypoint.
+- Replaced legacy-union/count-based health with an exact ToolSpec contract shared by registration,
+  capability reporting, generated skill API documentation, and installed-surface tests.
+- Tightened core/MCP/plugin compatibility reporting and added protocol-level plugin smoke coverage.
+
 ## [2.18.0] - 2026-07-08
 ### Added
 - **`describe_capabilities`**: task-oriented capability map for agents. Groups the ~150 flat tools into 16 domains (read·form-fill·author·edit·tables·styles·layout·toc-xref·pii·redline·exam·seal·generators·memo·verify·package) with intent + when-to-use + entry-point tools; `domain=` filters one group. A coverage drift-guard test asserts every registered tool is mapped (adding a tool without mapping it fails CI). Lets an external agent orient itself with one call instead of reading ~150 tool descriptions.

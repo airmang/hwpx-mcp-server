@@ -13,7 +13,6 @@ import os
 import re
 import tempfile
 from datetime import date, datetime
-from importlib.metadata import PackageNotFoundError, version
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -101,6 +100,12 @@ from .quality_generation import (
     inspect_quality_fallback,
 )
 from .storage import build_hwpx_open_safety_report, build_hwpx_verification_report
+from .tool_contract import (
+    contract_hash as tool_contract_hash,
+    expected_tool_names,
+    register_fastmcp_tools,
+    skill_required_tool_names,
+)
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
@@ -368,6 +373,9 @@ def _advanced_enabled() -> bool:
     return os.environ.get("HWPX_MCP_ADVANCED", "0") == "1"
 
 
+_ACTIVE_ADVANCED = _advanced_enabled()
+
+
 _OPS = HwpxOps(auto_backup=False)
 
 _OUTPUT_MODES = {"full", "chunks"}
@@ -377,36 +385,13 @@ _TABLE_LABEL_DIRECTIONS = ("right", "down")
 _DEFAULT_MAX_CHARS_PER_CHUNK = 8000
 _DEFAULT_MAX_INPUT_BYTES = 20 * 1024 * 1024
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
-_EXPECTED_FASTMCP_TOOL_COUNT = 91  # +add_tracked_edit (S-058/FR-009)
-_EXPECTED_LEGACY_TOOL_COUNT = 63
-_KEY_TOOL_NAMES = (
-    "create_document_from_plan",
-    "create_government_report_document",
-    "mail_merge",
-    "table_compute",
-    "extract_style_profile",
-    "list_templates",
-    "get_document_map",
-    "repair_hwpx",
-    "replace_by_anchor",
-    "add_memo_by_anchor",
-    "byte_preserving_patch",
-    "render_preview",
-    "apply_edits",
-    "add_tracked_edit",
-    "undo_last_edit",
-    "compose_exam",
-)
 _FIGURE_CAPTION_RE = re.compile(r"^\s*(?:Figure|Fig\.|그림)\s*\d*", re.IGNORECASE)
 _IDEMPOTENCY_CACHE: dict[str, dict[str, Any]] = {}
 _MAX_IDEMPOTENCY_CACHE_ENTRIES = 512
 
 
 def _package_version(package: str) -> str:
-    try:
-        return version(package)
-    except PackageNotFoundError:
-        return "unknown"
+    return quality_contract.package_version(package)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -1234,7 +1219,6 @@ def _paragraph_outline_level(
     return _outline_level(text)
 
 
-@mcp.tool()
 def create_document(
     filename: str,
     title: str = None,
@@ -1434,7 +1418,6 @@ def _next_action(quality: dict) -> str:
     return "review quality.gaps and profile repair_hints, then rerun validate/analyze/create"
 
 
-@mcp.tool()
 def get_document_plan_schema() -> dict:
     """document_plan(생성 계획)의 JSON Schema를 반환합니다.
 
@@ -1446,7 +1429,6 @@ def get_document_plan_schema() -> dict:
     return get_hwpx_document_plan_schema()
 
 
-@mcp.tool()
 def validate_document_plan(document_plan: dict) -> dict:
     """선언형 hwpx.document_plan.v1 생성 계획을 검증합니다. 파일은 쓰지 않습니다."""
     if validate_hwpx_document_plan is None or normalize_hwpx_document_plan is None:
@@ -1466,7 +1448,6 @@ def validate_document_plan(document_plan: dict) -> dict:
     return result
 
 
-@mcp.tool()
 def markdown_to_document_plan(
     markdown: str,
     title: str = None,
@@ -1504,7 +1485,6 @@ def markdown_to_document_plan(
     return result
 
 
-@mcp.tool()
 def analyze_document_plan(
     document_plan: dict,
     destination_filename: str = None,
@@ -1571,7 +1551,6 @@ def analyze_document_plan(
     return result
 
 
-@mcp.tool()
 def create_document_from_plan(
     filename: str,
     document_plan: dict,
@@ -1672,7 +1651,6 @@ def _create_document_from_plan_impl(
     return _apply_write_verbosity(result, verbosity)
 
 
-@mcp.tool()
 def create_government_report_document(
     filename: str,
     document_plan: dict,
@@ -1723,7 +1701,6 @@ def _optional_int(value: Any, default: int) -> int:
     return int(value)
 
 
-@mcp.tool()
 def compute_report_value(operation: str, values: list | dict = None) -> dict:
     """정부보고서 표/문장에 넣을 계산값을 python-hwpx report_utils로 계산합니다."""
     if hwpx_report_utils is None:
@@ -1771,7 +1748,6 @@ def compute_report_value(operation: str, values: list | dict = None) -> dict:
     return {"operation": normalized, "value": value, "warnings": []}
 
 
-@mcp.tool()
 def inspect_mail_merge_placeholders(filename: str) -> dict:
     """메일머지 템플릿의 placeholder key를 확인합니다."""
     if inspect_hwpx_mail_merge_placeholders is None:
@@ -1812,7 +1788,6 @@ def _mail_merge_open_safety_summary(report: dict) -> dict:
     }
 
 
-@mcp.tool()
 def mail_merge(
     template_filename: str,
     data_rows: list | dict = None,
@@ -1869,7 +1844,6 @@ def mail_merge(
     return report
 
 
-@mcp.tool()
 def table_compute(
     table: dict | list,
     value_columns: list = None,
@@ -1893,7 +1867,6 @@ def table_compute(
     )
 
 
-@mcp.tool()
 def extract_style_profile(filename: str) -> dict:
     """참조 HWPX의 페이지·폰트·표 프로파일을 plan 적용용 JSON으로 추출합니다."""
     if extract_hwpx_style_profile is None:
@@ -1901,7 +1874,6 @@ def extract_style_profile(filename: str) -> dict:
     return extract_hwpx_style_profile(resolve_path(filename))
 
 
-@mcp.tool()
 def apply_style_profile_to_plan(
     document_plan: dict,
     style_profile: dict = None,
@@ -1929,7 +1901,6 @@ def apply_style_profile_to_plan(
     }
 
 
-@mcp.tool()
 def compare_style_profiles(
     reference_filename: str = None,
     candidate_filename: str = None,
@@ -1953,7 +1924,6 @@ def compare_style_profiles(
     )
 
 
-@mcp.tool()
 def register_template(
     name: str,
     source_filename: str,
@@ -1973,7 +1943,6 @@ def register_template(
     )
 
 
-@mcp.tool()
 def list_templates(registry_path: str = None) -> dict:
     """등록된 템플릿 목록을 반환합니다."""
     if list_hwpx_templates is None:
@@ -1981,7 +1950,6 @@ def list_templates(registry_path: str = None) -> dict:
     return list_hwpx_templates(registry_path=resolve_path(registry_path) if registry_path else None)
 
 
-@mcp.tool()
 def describe_template(
     name: str,
     registry_path: str = None,
@@ -1997,7 +1965,6 @@ def describe_template(
     )
 
 
-@mcp.tool()
 def parse_government_report_text(text: str, title: str = "") -> dict:
     """붙여넣은 정부보고서 텍스트를 document_plan으로 파싱하고 검증합니다."""
     if parse_hwpx_government_report_text is None or validate_hwpx_document_plan is None:
@@ -2021,7 +1988,6 @@ def parse_government_report_text(text: str, title: str = "") -> dict:
     return result
 
 
-@mcp.tool()
 def inspect_document_authoring_quality(
     filename: str,
     document_plan: dict = None,
@@ -2038,7 +2004,6 @@ def inspect_document_authoring_quality(
     )
 
 
-@mcp.tool()
 def inspect_operating_plan_quality(
     filename: str,
     document_plan: dict = None,
@@ -2056,7 +2021,6 @@ def inspect_operating_plan_quality(
     return report.get("profiles", {}).get("operating_plan", report)
 
 
-@mcp.tool()
 def inspect_official_document_style(
     filename: str = None,
     paragraphs: list[str] = None,
@@ -2083,7 +2047,6 @@ def _single_block_plan(block: dict, *, title: str = "") -> dict:
     }
 
 
-@mcp.tool()
 def build_image_grid(
     images: list,
     columns: int = 2,
@@ -2105,7 +2068,6 @@ def build_image_grid(
     }
 
 
-@mcp.tool()
 def build_meeting_nameplates(
     names: list[str],
     size: str = "150x70",
@@ -2123,7 +2085,6 @@ def build_meeting_nameplates(
     }
 
 
-@mcp.tool()
 def build_organization_chart(
     hierarchy: dict | list,
     max_depth: int = 3,
@@ -2154,7 +2115,6 @@ def _diff_sources(
     raise ValueError("provide old_filename/new_filename or old_paragraphs/new_paragraphs")
 
 
-@mcp.tool()
 def doc_diff(
     old_filename: str = None,
     new_filename: str = None,
@@ -2173,7 +2133,6 @@ def doc_diff(
     return build_hwpx_doc_diff(old_source, new_source)
 
 
-@mcp.tool()
 def create_comparison_table_document(
     filename: str,
     old_filename: str = None,
@@ -2225,7 +2184,6 @@ def create_comparison_table_document(
     return _apply_write_verbosity(result, verbosity)
 
 
-@mcp.tool()
 def inspect_reference_consistency(
     filename: str = None,
     paragraphs: list[str] = None,
@@ -2253,7 +2211,6 @@ def _template_formfit_baseline_arg(baseline: dict | str) -> dict | str:
     return text
 
 
-@mcp.tool()
 def analyze_template_formfit(
     source_filename: str,
     baseline: dict | str,
@@ -2273,7 +2230,6 @@ def analyze_template_formfit(
     )
 
 
-@mcp.tool()
 def apply_template_formfit(
     analysis: dict = None,
     source_filename: str = None,
@@ -2295,7 +2251,6 @@ def apply_template_formfit(
     )
 
 
-@mcp.tool()
 def create_proposal_document(
     filename: str,
     proposal_spec: dict,
@@ -2330,7 +2285,6 @@ def create_proposal_document(
     return _apply_write_verbosity(result, verbosity)
 
 
-@mcp.tool()
 def inspect_document_quality(filename: str, rubric: str = "proposal") -> dict:
     """생성된 HWPX 문서를 제안서 품질 루브릭으로 점검합니다."""
     if rubric != "proposal":
@@ -2352,7 +2306,6 @@ def _proposal_quality_fallback(path: str) -> dict:
     return report
 
 
-@mcp.tool()
 def analyze_quality_generation(
     form_filename: str,
     idea_brief: str | dict,
@@ -2370,7 +2323,6 @@ def analyze_quality_generation(
     )
 
 
-@mcp.tool()
 def apply_quality_generation(
     plan_id: str = None,
     analysis: dict = None,
@@ -2392,7 +2344,6 @@ def apply_quality_generation(
     )
 
 
-@mcp.tool()
 def get_document_info(filename: str) -> dict:
     """문서 메타데이터와 구조 요약을 조회합니다."""
     path = resolve_path(filename)
@@ -2407,7 +2358,6 @@ def get_document_info(filename: str) -> dict:
     }, path)
 
 
-@mcp.tool()
 def get_document_text(filename: str, max_chars: int | None = None, mask: bool = True) -> dict:
     """문서 전체 텍스트를 조회합니다. (기본: 기계검증 PII 마스킹 ON — `mask=False`로 원본)"""
     path = resolve_path(filename)
@@ -2416,7 +2366,6 @@ def get_document_text(filename: str, max_chars: int | None = None, mask: bool = 
     return _with_document_state(truncate_response(text, max_chars=max_chars), path)
 
 
-@mcp.tool()
 def scan_personal_info(filename: str | None = None, text: str | None = None) -> dict:
     """문서/텍스트의 개인정보(PII)를 탐지하는 read-only 감사 (원본값 미노출).
 
@@ -2447,7 +2396,6 @@ def scan_personal_info(filename: str | None = None, text: str | None = None) -> 
     }
 
 
-@mcp.tool()
 def get_document_outline(filename: str) -> dict:
     """문단 기준 제목/개요 구조를 조회합니다."""
     path = resolve_path(filename)
@@ -2478,7 +2426,6 @@ def _summary_table_map(path) -> dict:
     return {"tables": tables, "count": len(tables), "detail": "summary"}
 
 
-@mcp.tool()
 def get_document_map(
     filename: str,
     max_preview_chars: int = 80,
@@ -2572,7 +2519,6 @@ def get_document_map(
     return _with_document_state(result, path)
 
 
-@mcp.tool()
 def hwpx_to_markdown(
     hwpx_base64: str | None = None,
     url: str | None = None,
@@ -2606,7 +2552,6 @@ def hwpx_to_markdown(
     return result
 
 
-@mcp.tool()
 def document_to_markdown(
     filename: str,
     output: str = "full",
@@ -2643,7 +2588,6 @@ def document_to_markdown(
     return payload
 
 
-@mcp.tool()
 def hwpx_to_html(
     hwpx_base64: str | None = None,
     url: str | None = None,
@@ -2675,7 +2619,6 @@ def hwpx_to_html(
     return payload
 
 
-@mcp.tool()
 def render_preview(
     filename: str,
     output_dir: str | None = None,
@@ -2724,7 +2667,6 @@ def render_preview(
     )
 
 
-@mcp.tool()
 def hwpx_extract_json(
     hwpx_base64: str | None = None,
     url: str | None = None,
@@ -2766,7 +2708,6 @@ def hwpx_extract_json(
     return result
 
 
-@mcp.tool()
 def document_extract_json(
     filename: str,
     output: str = "full",
@@ -2815,7 +2756,6 @@ def document_extract_json(
     return payload
 
 
-@mcp.tool()
 def get_paragraph_text(
     filename: str,
     paragraph_index: int | None = None,
@@ -2830,13 +2770,11 @@ def get_paragraph_text(
     return _with_document_state(result, path)
 
 
-@mcp.tool()
 def get_location_text(filename: str, location: dict[str, Any]) -> dict:
     """get_table_map/find_text가 반환한 location으로 텍스트를 조회합니다."""
     return get_paragraph_text(filename, location=location)
 
 
-@mcp.tool()
 def get_paragraphs_text(
     filename: str,
     start_index: int = 0,
@@ -2868,7 +2806,6 @@ def get_paragraphs_text(
     return _with_document_state({"paragraphs": picked, "truncated": truncated}, path)
 
 
-@mcp.tool()
 def find_text(filename: str, text_to_find: str, match_case: bool = True, max_results: int = 50) -> dict:
     """문서에서 텍스트를 검색합니다. 원본은 수정하지 않습니다."""
     path = resolve_path(filename)
@@ -2989,7 +2926,6 @@ def _apply_edit_operation(doc: Any, operation: dict[str, Any], index: int) -> di
     raise ValueError(f"unsupported operation type: {raw_type}")
 
 
-@mcp.tool()
 def search_and_replace(
     filename: str,
     find_text: str,
@@ -3033,7 +2969,6 @@ def search_and_replace(
     )
 
 
-@mcp.tool()
 def batch_replace(
     filename: str,
     replacements: list[dict[str, str]],
@@ -3074,7 +3009,6 @@ def batch_replace(
     )
 
 
-@mcp.tool()
 def apply_edits(
     filename: str,
     operations: list[dict[str, Any]],
@@ -3148,14 +3082,12 @@ def apply_edits(
     )
 
 
-@mcp.tool()
 def undo_last_edit(filename: str) -> dict:
     """마지막 저장 전 .bak 백업과 현재 문서를 교체해 직전 편집을 되돌립니다."""
     path = resolve_path(filename)
     return undo_last_backup(path)
 
 
-@mcp.tool()
 def byte_preserving_patch(
     filename: str,
     patches: list[dict[str, Any]],
@@ -3193,6 +3125,115 @@ def byte_preserving_patch(
     payload["verificationReport"] = verification
     payload["openSafety"] = verification["openSafety"]
     return payload
+
+
+def apply_table_ops(
+    filename: str,
+    ops: list[dict[str, Any]],
+    output: str | None = None,
+    render_check: str = "off",
+    dry_run: bool = False,
+) -> dict:
+    """바이트 보존으로 표 셀/행/열/표 구조 연산을 원자 적용합니다."""
+
+    if not dry_run:
+        quality_contract.assert_write_capability()
+    return _OPS.apply_table_ops(
+        resolve_path(filename),
+        ops,
+        output=resolve_path(output) if output else None,
+        render_check=render_check,
+        dry_run=dry_run,
+    )
+
+
+def verify_form_fill(
+    filename: str,
+    before_path: str,
+    require: bool = False,
+) -> dict:
+    """실제 한컴 렌더로 양식 채움의 넘침·겹침·페이지 변화를 검증합니다."""
+
+    return _OPS.verify_form_fill(
+        resolve_path(filename),
+        resolve_path(before_path),
+        require=require,
+    )
+
+
+def score_form_fill(
+    filename: str,
+    gold_path: str,
+    blank_path: str,
+    run_render: bool = True,
+    expected_pages: int | None = None,
+) -> dict:
+    """채움본을 gold/blank와 비교해 렌더·서식·구조·내용·규정 5축으로 채점합니다."""
+
+    return _OPS.score_form_fill(
+        resolve_path(filename),
+        resolve_path(gold_path),
+        resolve_path(blank_path),
+        run_render=run_render,
+        expected_pages=expected_pages,
+    )
+
+
+def apply_body_ops(
+    filename: str,
+    ops: list[dict[str, Any]],
+    output: str | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """표 밖 본문 문단에 바이트 보존 연산을 적용합니다."""
+
+    if not dry_run:
+        quality_contract.assert_write_capability()
+    return _OPS.apply_body_ops(
+        resolve_path(filename),
+        ops,
+        output=resolve_path(output) if output else None,
+        dry_run=dry_run,
+    )
+
+
+def inspect_fill_residue(
+    filename: str,
+    blank_path: str | None = None,
+) -> dict:
+    """채움본의 삭제색 안내문·미수정 샘플·placeholder 잔존을 검사합니다."""
+
+    return _OPS.inspect_fill_residue(
+        resolve_path(filename),
+        blank_path=resolve_path(blank_path) if blank_path else None,
+    )
+
+
+def scan_form_guidance(filename: str, max_items: int = 60) -> dict:
+    """처음 보는 양식의 색 범례·삭제/수정 후보·빈 셀·질문을 비변형 정찰합니다."""
+
+    return _OPS.scan_form_guidance(resolve_path(filename), max_items=max_items)
+
+
+def apply_evalplan_fill(
+    filename: str,
+    review_md: str,
+    output: str | None = None,
+    render_check: str = "off",
+    score_gold_path: str | None = None,
+    expected_pages: int | None = None,
+) -> dict:
+    """빈 평가계획 양식과 검토용 Markdown을 바이트 보존 채움본으로 만듭니다."""
+
+    quality_contract.assert_write_capability()
+    return _OPS.apply_evalplan_fill(
+        resolve_path(filename),
+        resolve_path(review_md),
+        output=resolve_path(output) if output else None,
+        render_check=render_check,
+        score_gold_path=resolve_path(score_gold_path) if score_gold_path else None,
+        expected_pages=expected_pages,
+    )
 
 
 _REDLINE_RECEIPT_FIELDS = (
@@ -3548,7 +3589,6 @@ def _save_verified_redline_document(
         raise
 
 
-@mcp.tool()
 def add_tracked_edit(
     source_filename: str,
     destination_filename: str,
@@ -3760,7 +3800,6 @@ def _toc_format_guard(filename: str, path: str) -> dict | None:
     }
 
 
-@mcp.tool()
 def add_toc(
     filename: str,
     level: int = 2,
@@ -3800,7 +3839,6 @@ def add_toc(
     return _with_save_verification({"ok": True, **summary}, verification)
 
 
-@mcp.tool()
 def add_cross_reference(
     filename: str,
     paragraph_index: int,
@@ -3843,7 +3881,6 @@ def add_cross_reference(
     return _with_save_verification({"ok": True, **result}, verification)
 
 
-@mcp.tool()
 def verify_toc(
     filename: str,
     refresh: bool = False,
@@ -3898,7 +3935,6 @@ def verify_toc(
     return report
 
 
-@mcp.tool()
 def add_heading(
     filename: str,
     text: str,
@@ -3941,7 +3977,6 @@ def add_heading(
     )
 
 
-@mcp.tool()
 def add_paragraph(
     filename: str,
     text: str,
@@ -3984,7 +4019,6 @@ def add_paragraph(
     )
 
 
-@mcp.tool()
 def insert_paragraph(
     filename: str,
     paragraph_index: int,
@@ -4029,7 +4063,6 @@ def insert_paragraph(
     )
 
 
-@mcp.tool()
 def delete_paragraph(
     filename: str,
     paragraph_index: int,
@@ -4071,7 +4104,6 @@ def delete_paragraph(
     )
 
 
-@mcp.tool()
 def add_table(
     filename: str,
     rows: int,
@@ -4116,7 +4148,6 @@ def add_table(
     )
 
 
-@mcp.tool()
 def get_table_text(filename: str, table_index: int = 0) -> dict:
     """표 셀 텍스트를 2D 배열로 조회합니다."""
     path = resolve_path(filename)
@@ -4130,7 +4161,6 @@ def get_table_text(filename: str, table_index: int = 0) -> dict:
     }, path)
 
 
-@mcp.tool()
 def get_table_map(filename: str) -> dict:
     """문서 내 표 위치, 크기, 문맥 요약을 조회합니다."""
     path = resolve_path(filename)
@@ -4138,43 +4168,46 @@ def get_table_map(filename: str) -> dict:
     return _with_document_state(get_table_map_in_doc(doc), path)
 
 
-def _capability_block(tool_surface_skew: bool, missing_key_tools: list[str]) -> dict:
+def _capability_block(tool_surface_skew: bool, surface_details: list[str]) -> dict:
     """Core/mcp/plugin capability handshake (plan §2 Phase F).
 
     Versions + a fingerprint hash + skew. Writes fail closed on a *version* skew
-    (the SavePipeline gate would otherwise be unavailable); a tool-surface skew is
-    surfaced for the doctor but does not itself block writes.
+    (the SavePipeline gate would otherwise be unavailable). Tool-surface skew is
+    part of the installed capability verdict and is never reported healthy.
     """
 
     state = quality_contract.capability_state()
     skew = list(state["skew"])
     if tool_surface_skew:
-        detail = ", ".join(missing_key_tools) or "expected tool count mismatch"
+        detail = "; ".join(surface_details) or "ToolSpec mismatch"
         skew.append(f"MCP tool surface skew: {detail}")
     fail_closed = quality_contract.fail_closed_enabled()
     return {
         "handshake": "hwpx.capability.v1",
         "versions": state["versions"],
         "minPythonHwpx": state["minPythonHwpx"],
+        "minMcpVersion": state["minMcpVersion"],
+        "minSkillVersion": state["minSkillVersion"],
         "savePipelineAvailable": state["savePipelineAvailable"],
         "hash": state["hash"],
+        "toolContractHash": state["toolContractHash"],
         "skew": skew,
         "ok": not skew,
         "failClosed": fail_closed,
-        "writesBlocked": fail_closed and not state["ok"],
+        "writesBlocked": fail_closed and bool(skew),
         "diagnosis": (
             "Capability handshake OK; every write funnels through the SavePipeline gate."
             if not skew
-            else "Capability skew: refresh python-hwpx>=2.12.0 and reinstall the hwpx plugin, then restart the host."
+            else "Capability skew: install the contract-required core/MCP/plugin versions and restart the host."
         ),
     }
 
 
-@mcp.tool()
 def describe_capabilities(domain: str | None = None) -> dict:
     """이 HWPX 툴킷이 무엇을 할 수 있는지 작업 종류별로 요약한 능력 지도를 반환합니다.
 
-    도구가 ~150개라 평평한 목록으로는 breadth를 파악하기 어렵습니다. 이 도구를 한 번
+    도구 등록을 단일 ToolSpec 계약에서 생성하므로 실제 FastMCP 표면과
+    capability map이 항상 같은 진실을 반영합니다. 이 도구를 한 번
     부르면 작업군(읽기·양식채움·생성·편집·표·서식·차례·PII·레드라인·시험지·직인·
     대량생산·메모·검증·패키지)별 intent + 언제 쓰는지 + 진입점 도구가 나옵니다.
     domain 인자로 한 작업군 상세만 필터할 수 있습니다(예: domain="form_fill").
@@ -4182,31 +4215,33 @@ def describe_capabilities(domain: str | None = None) -> dict:
     됩니다. coverage에 등록 도구 대비 미매핑이 표시되면 그건 이 지도의 드리프트입니다."""
     from .capabilities import build_capability_report, coverage_against
 
-    report = build_capability_report(domain if domain else None)
-    try:
-        live = set(_fastmcp_tool_names()) | set(_legacy_tool_names())
-    except Exception:  # pragma: no cover - registry introspection guard
-        live = set()
+    advanced = _ACTIVE_ADVANCED
+    report = build_capability_report(domain if domain else None, advanced=advanced)
+    live = set(_fastmcp_tool_names())
     report["toolCount"] = len(live)
-    report["coverage"] = coverage_against(live) if live else {"unmapped": [], "mappedNotRegistered": []}
+    report["coverage"] = coverage_against(live, advanced=advanced)
     return report
 
 
-@mcp.tool()
 def mcp_server_health() -> dict:
     """MCP 서버 transport와 timeout/keepalive 점검 정보를 반환합니다."""
     transport = os.environ.get("HWPX_MCP_TRANSPORT", "stdio")
     sandbox_root = os.environ.get("HWPX_MCP_SANDBOX_ROOT")
-    fastmcp_tool_names = _fastmcp_tool_names()
+    advanced = _ACTIVE_ADVANCED
+    fastmcp_tool_names = set(_fastmcp_tool_names())
     legacy_tool_names = _legacy_tool_names()
-    expected_fastmcp = _env_int("HWPX_EXPECTED_FASTMCP_TOOL_COUNT", _EXPECTED_FASTMCP_TOOL_COUNT)
-    expected_legacy = _env_int("HWPX_EXPECTED_LEGACY_TOOL_COUNT", _EXPECTED_LEGACY_TOOL_COUNT)
-    missing_key_tools = [name for name in _KEY_TOOL_NAMES if name not in fastmcp_tool_names]
-    skew_detected = (
-        len(fastmcp_tool_names) < expected_fastmcp
-        or len(legacy_tool_names) < expected_legacy
-        or bool(missing_key_tools)
-    )
+    expected = expected_tool_names(advanced=advanced)
+    missing_expected = sorted(expected - fastmcp_tool_names)
+    unexpected_registered = sorted(fastmcp_tool_names - expected)
+    missing_required = sorted(skill_required_tool_names() - fastmcp_tool_names)
+    skew_detected = bool(missing_expected or unexpected_registered or missing_required)
+    surface_details = []
+    if missing_expected:
+        surface_details.append(f"missing expected: {', '.join(missing_expected)}")
+    if unexpected_registered:
+        surface_details.append(f"unexpected registered: {', '.join(unexpected_registered)}")
+    if missing_required:
+        surface_details.append(f"missing skill-required: {', '.join(missing_required)}")
     return {
         "server": "hwpx-mcp-server",
         "version": _package_version("hwpx-mcp-server"),
@@ -4217,20 +4252,25 @@ def mcp_server_health() -> dict:
         "streamable_http_available": callable(getattr(mcp, "streamable_http_app", None)),
         "toolSurface": {
             "status": "skewed" if skew_detected else "ok",
-            "expectedFastMcpToolCount": expected_fastmcp,
+            "profile": "advanced" if advanced else "default",
+            "contractHash": tool_contract_hash(),
+            "expectedFastMcpToolCount": len(expected),
             "actualFastMcpToolCount": len(fastmcp_tool_names),
-            "expectedLegacyToolCount": expected_legacy,
             "actualLegacyToolCount": len(legacy_tool_names),
-            "missingKeyTools": missing_key_tools,
-            "keyTools": list(_KEY_TOOL_NAMES),
+            "missingExpectedTools": missing_expected,
+            "unexpectedRegisteredTools": unexpected_registered,
+            "missingSkillRequiredTools": missing_required,
+            # Compatibility alias for older skill startup checks.
+            "missingKeyTools": missing_required,
+            "keyTools": sorted(skill_required_tool_names()),
             "diagnosis": (
                 "Installed MCP surface is missing expected tools; reinstall the hwpx plugin, "
                 "remove stale plugin venv/cache, then start a fresh host session."
                 if skew_detected
-                else "Installed MCP surface matches the expected tool count and key tools."
+                else "Installed MCP surface exactly matches the active ToolSpec contract."
             ),
         },
-        "capability": _capability_block(skew_detected, missing_key_tools),
+        "capability": _capability_block(skew_detected, surface_details),
         "unitPolicy": {
             "status": "audited",
             "fontSize": "points",
@@ -4268,7 +4308,6 @@ def mcp_server_health() -> dict:
     }
 
 
-@mcp.tool()
 def find_cell_by_label(filename: str, label_text: str, direction: str = "right") -> dict:
     """양식 문서에서 라벨 기준 인접 셀 후보를 조회합니다. direction: right 또는 down."""
     path = resolve_path(filename)
@@ -4277,7 +4316,6 @@ def find_cell_by_label(filename: str, label_text: str, direction: str = "right")
     return _with_document_state(find_cell_by_label_in_doc(doc, label_text, direction=safe_direction), path)
 
 
-@mcp.tool()
 def fill_by_path(
     filename: str,
     mappings: dict[str, str],
@@ -4321,7 +4359,6 @@ def fill_by_path(
     return _idempotency_store(scope, fingerprint=fingerprint, payload=result)
 
 
-@mcp.tool()
 def set_table_cell_text(
     filename: str,
     table_index: int,
@@ -4388,7 +4425,6 @@ def set_table_cell_text(
     )
 
 
-@mcp.tool()
 def add_page_break(
     filename: str,
     dry_run: bool = False,
@@ -4407,7 +4443,6 @@ def add_page_break(
     return _with_save_verification({"success": True}, verification)
 
 
-@mcp.tool()
 def set_paragraph_format(
     filename: str,
     paragraph_index: int | None = None,
@@ -4459,7 +4494,6 @@ def set_paragraph_format(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def set_page_setup(
     filename: str,
     paper_size: str | None = None,
@@ -4524,7 +4558,6 @@ def _header_footer_payload(wrapper: Any, *, kind: str, page_type: str) -> dict[s
     }
 
 
-@mcp.tool()
 def set_header_footer(
     filename: str,
     kind: str,
@@ -4558,7 +4591,6 @@ def set_header_footer(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def set_page_number(
     filename: str,
     target: str = "footer",
@@ -4602,7 +4634,6 @@ def set_page_number(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def set_list_format(
     filename: str,
     paragraph_index: int | None = None,
@@ -4637,7 +4668,6 @@ def set_list_format(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def insert_picture(
     filename: str,
     image_base64: str,
@@ -4685,7 +4715,6 @@ def insert_picture(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def replace_picture(
     filename: str,
     image_base64: str,
@@ -4786,7 +4815,6 @@ def _check_seal_compliance_impl(
     return out
 
 
-@mcp.tool()
 def place_seal(
     filename: str,
     sender_text: str,
@@ -4891,7 +4919,6 @@ def place_seal(
     return result
 
 
-@mcp.tool()
 def check_seal_compliance(
     filename: str,
     sender_text: str,
@@ -4907,7 +4934,6 @@ def check_seal_compliance(
     return _check_seal_compliance_impl(path, sender_text, tol_pt=tol_pt)
 
 
-@mcp.tool()
 def compose_exam(
     form_filename: str,
     output: str,
@@ -4995,7 +5021,6 @@ def compose_exam(
     return payload
 
 
-@mcp.tool()
 def verify_question_splits(
     filename: str,
     valid_question_numbers: list[str] | None = None,
@@ -5085,7 +5110,6 @@ def verify_question_splits(
     }
 
 
-@mcp.tool()
 def add_memo(
     filename: str,
     paragraph_index: int | None = None,
@@ -5109,7 +5133,6 @@ def add_memo(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def add_memo_by_anchor(
     filename: str,
     anchor: dict[str, Any] | str,
@@ -5127,7 +5150,6 @@ def add_memo_by_anchor(
     )
 
 
-@mcp.tool()
 def remove_memo(
     filename: str,
     paragraph_index: int | None = None,
@@ -5201,7 +5223,6 @@ def _replace_visible_span_in_runs(
     return 1
 
 
-@mcp.tool()
 def replace_in_paragraph(
     filename: str,
     old_text: str,
@@ -5263,7 +5284,6 @@ def replace_in_paragraph(
     return {"replaced_count": replaced, "location": resolved.location, "dryRun": dry_run}
 
 
-@mcp.tool()
 def replace_by_anchor(
     filename: str,
     anchor: dict[str, Any] | str,
@@ -5315,7 +5335,6 @@ def replace_by_anchor(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def list_available_documents(directory: str = ".") -> dict:
     """지정 디렉토리의 .hwpx 파일 목록을 조회합니다."""
     import glob
@@ -5335,7 +5354,6 @@ def list_available_documents(directory: str = ".") -> dict:
     return {"directory": directory, "documents": docs, "count": len(docs)}
 
 
-@mcp.tool()
 def format_text(
     filename: str,
     paragraph_index: int,
@@ -5375,7 +5393,6 @@ def format_text(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def create_custom_style(
     filename: str,
     style_name: str,
@@ -5408,7 +5425,6 @@ def create_custom_style(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def list_styles(filename: str) -> dict:
     """문서에 정의된 스타일 목록을 조회합니다."""
     path = resolve_path(filename)
@@ -5417,7 +5433,6 @@ def list_styles(filename: str) -> dict:
     return {"styles": styles, "count": len(styles)}
 
 
-@mcp.tool()
 def merge_table_cells(
     filename: str,
     table_index: int,
@@ -5442,7 +5457,6 @@ def merge_table_cells(
     return _with_save_verification(result, verification)
 
 
-@mcp.tool()
 def split_table_cell(
     filename: str,
     table_index: int,
@@ -5464,7 +5478,6 @@ def split_table_cell(
     return _with_save_verification({"split": True, "original_span": span_info}, verification)
 
 
-@mcp.tool()
 def format_table(
     filename: str,
     table_index: int,
@@ -5485,7 +5498,6 @@ def format_table(
     return _with_save_verification({"formatted": True, "table_index": table_index}, verification)
 
 
-@mcp.tool()
 def copy_document(source_filename: str, destination_filename: str = None) -> dict:
     """HWPX 문서를 새 경로로 복사합니다. 원본은 유지됩니다."""
     source = resolve_path(source_filename)
@@ -5501,7 +5513,6 @@ def copy_document(source_filename: str, destination_filename: str = None) -> dic
     }
 
 
-@mcp.tool()
 def repair_hwpx(
     source_filename: str,
     output_filename: str,
@@ -5523,14 +5534,12 @@ def repair_hwpx(
     )
 
 
-@mcp.tool()
 def list_form_fields(filename: str) -> dict:
     """문서의 네이티브 누름틀/FORM 필드 목록과 현재 값을 반환합니다."""
     path = resolve_path(filename)
     return _with_document_state(_OPS.list_form_fields(path), path)
 
 
-@mcp.tool()
 def fill_form_field(
     filename: str,
     value: str,
@@ -5556,7 +5565,6 @@ def fill_form_field(
     return _with_document_state(result, path)
 
 
-@mcp.tool()
 def analyze_form_fill(
     source_filename: str,
     input_json: dict = None,
@@ -5576,7 +5584,6 @@ def analyze_form_fill(
     )
 
 
-@mcp.tool()
 def apply_form_fill(
     plan_id: str = None,
     analysis: dict = None,
@@ -5596,68 +5603,61 @@ def apply_form_fill(
     )
 
 
-if _advanced_enabled():
+if _ACTIVE_ADVANCED:
 
-    @mcp.tool()
     def package_parts(filename: str) -> dict:
         """[고급] HWPX 패키지 파트 목록을 조회합니다."""
         path = resolve_path(filename)
         return _OPS.package_parts(path)
 
-    @mcp.tool()
     def package_get_xml(filename: str, part_name: str, max_chars: int = 5000) -> dict:
         """[고급] 특정 패키지 파트의 XML을 조회합니다."""
         path = resolve_path(filename)
         result = _OPS.package_get_xml(path, part_name)
         return truncate_response(result.get("xmlString", ""), max_chars=max_chars)
 
-    @mcp.tool()
     def package_get_text(filename: str, part_name: str, max_chars: int = 5000) -> dict:
         """[고급] 특정 패키지 파트의 텍스트를 조회합니다."""
         path = resolve_path(filename)
         result = _OPS.package_get_text(path, part_name)
         return truncate_response(result.get("text", ""), max_chars=max_chars)
 
-    @mcp.tool()
     def object_find_by_tag(filename: str, tag_name: str, max_results: int = 20) -> dict:
         """[고급] 문서 XML에서 태그를 검색합니다."""
         path = resolve_path(filename)
         return _OPS.object_find_by_tag(path, tag_name, max_results=max_results)
 
-    @mcp.tool()
     def object_find_by_attr(filename: str, attr_name: str, attr_value: str = None, max_results: int = 20) -> dict:
         """[고급] 문서 XML에서 속성을 검색합니다."""
         path = resolve_path(filename)
         return _OPS.object_find_by_attr(path, None, attr_name, attr_value, max_results=max_results)
 
-    @mcp.tool()
     def plan_edit(filename: str, instruction: str) -> dict:
         """[고급] instruction 기준 검증용 편집 계획을 생성합니다."""
         path = resolve_path(filename)
         operation = _build_verification_plan_operation(path, instruction)
         return _OPS.plan_edit(path=path, operations=[operation])
 
-    @mcp.tool()
     def preview_edit(filename: str, plan_id: str) -> dict:
         """[고급] plan_edit 결과 미리보기를 조회합니다."""
         del filename
         return _OPS.preview_edit(plan_id=plan_id)
 
-    @mcp.tool()
     def apply_edit(filename: str, plan_id: str) -> dict:
         """[고급] 검증 계획을 적용합니다. 원본 HWPX는 직접 수정하지 않습니다."""
         del filename
         return _OPS.apply_edit(plan_id=plan_id, confirm=True)
 
-    @mcp.tool()
     def validate_structure(filename: str) -> dict:
         """[고급] HWPX 구조 유효성을 검사합니다."""
         return _OPS.validate_structure(resolve_path(filename))
 
-    @mcp.tool()
     def lint_text_conventions(filename: str) -> dict:
         """[고급] 텍스트 규칙 위반 여부를 검사합니다."""
         return _OPS.lint_text_conventions(resolve_path(filename))
+
+
+register_fastmcp_tools(mcp, globals(), advanced=_ACTIVE_ADVANCED)
 
 
 def main(argv: list[str] | None = None) -> None:

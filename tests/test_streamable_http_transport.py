@@ -35,8 +35,10 @@ def test_mcp_server_health_reports_disconnect_and_path_diagnostics(
     assert health["streamable_http_available"] is True
     assert health["pythonHwpxVersion"] != "unknown"
     assert health["toolSurface"]["status"] == "ok"
-    assert health["toolSurface"]["actualFastMcpToolCount"] >= health["toolSurface"]["expectedFastMcpToolCount"]
-    assert health["toolSurface"]["actualLegacyToolCount"] >= health["toolSurface"]["expectedLegacyToolCount"]
+    assert health["toolSurface"]["actualFastMcpToolCount"] == health["toolSurface"]["expectedFastMcpToolCount"]
+    assert health["toolSurface"]["missingExpectedTools"] == []
+    assert health["toolSurface"]["unexpectedRegisteredTools"] == []
+    assert health["toolSurface"]["missingSkillRequiredTools"] == []
     assert health["toolSurface"]["missingKeyTools"] == []
     assert "byte_preserving_patch" in health["toolSurface"]["keyTools"]
     assert health["unitPolicy"]["fontSize"] == "points"

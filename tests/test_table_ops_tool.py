@@ -15,7 +15,7 @@ import pytest
 pytest.importorskip("hwpx.table_patch", reason="requires python-hwpx with byte-preserving form-fill")
 
 from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.tools import build_tool_definitions
+from hwpx_mcp_server import server
 
 FIXT = Path(__file__).parent.parent.parent / "python-hwpx-s064" / "tests" / "fixtures" / "m2_corpus" / "public_official_table.hwpx"
 if not FIXT.exists():
@@ -23,7 +23,7 @@ if not FIXT.exists():
 
 
 def test_tools_registered():
-    names = {t.name for t in build_tool_definitions()}
+    names = set(server._fastmcp_tool_names())
     assert "apply_table_ops" in names
     assert "verify_form_fill" in names
 

@@ -21,8 +21,17 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import os
+import tomllib
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from pathlib import Path
 from typing import Any, Mapping
+
+from .tool_contract import (
+    MIN_MCP_VERSION,
+    MIN_PYTHON_HWPX,
+    MIN_SKILL_VERSION,
+    contract_hash,
+)
 
 # FastMCP's call_tool catches a tool's exception and returns an isError result in
 # a copied context, so the structured gate/skew error can't be caught at the
@@ -52,9 +61,6 @@ def _record_gate_error(err: Any) -> None:
     global _LAST_GATE_ERROR
     _LAST_GATE_ERROR = err
 
-# The minimum python-hwpx that exposes the SavePipeline quality stack (Phase B-E).
-MIN_PYTHON_HWPX = "2.12.0"
-
 _QUALITY_ENV = "HWPX_MCP_QUALITY"  # global default policy (transparent|strict)
 _REQUIRE_CAPABILITY_ENV = "HWPX_MCP_REQUIRE_CAPABILITY"  # set "0" to disable fail-closed
 
@@ -67,6 +73,22 @@ def _quality_available() -> bool:
 
 
 def package_version(package: str) -> str:
+    module_name = {"python-hwpx": "hwpx", "hwpx-mcp-server": "hwpx_mcp_server"}.get(package)
+    if module_name:
+        spec = importlib.util.find_spec(module_name)
+        origin = Path(spec.origin).resolve() if spec and spec.origin else None
+        if origin is not None:
+            for parent in origin.parents:
+                pyproject = parent / "pyproject.toml"
+                if not pyproject.is_file():
+                    continue
+                try:
+                    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+                    project = data.get("project", {})
+                    if project.get("name") == package and isinstance(project.get("version"), str):
+                        return project["version"]
+                except (OSError, tomllib.TOMLDecodeError):
+                    break
     try:
         return _pkg_version(package)
     except PackageNotFoundError:
@@ -230,18 +252,33 @@ def capability_state() -> dict[str, Any]:
     if not has_pipeline:
         skew.append("python-hwpx is missing the hwpx.quality SavePipeline gate")
     elif _version_lt(core, MIN_PYTHON_HWPX):
-        skew.append(f"python-hwpx {core} < {MIN_PYTHON_HWPX} (no VisualComplete gate)")
+        skew.append(f"python-hwpx {core} < required {MIN_PYTHON_HWPX}")
     if mcp == "unknown":
         skew.append("hwpx-mcp-server version is unresolved")
+    elif _version_lt(mcp, MIN_MCP_VERSION):
+        skew.append(f"hwpx-mcp-server {mcp} < required {MIN_MCP_VERSION}")
+    if plugin != "unknown" and _version_lt(plugin, MIN_SKILL_VERSION):
+        skew.append(f"hwpx skill {plugin} < required {MIN_SKILL_VERSION}")
 
     fingerprint = hashlib.sha256(
-        "|".join(["core", core, "mcp", mcp, "plugin", plugin, "pipeline", str(has_pipeline)]).encode()
+        "|".join(
+            [
+                "core", core,
+                "mcp", mcp,
+                "plugin", plugin,
+                "pipeline", str(has_pipeline),
+                "toolContract", contract_hash(),
+            ]
+        ).encode()
     ).hexdigest()[:16]
 
     return {
         "versions": {"core": core, "mcp": mcp, "plugin": plugin},
         "minPythonHwpx": MIN_PYTHON_HWPX,
+        "minMcpVersion": MIN_MCP_VERSION,
+        "minSkillVersion": MIN_SKILL_VERSION,
         "savePipelineAvailable": has_pipeline,
+        "toolContractHash": contract_hash(),
         "hash": fingerprint,
         "skew": skew,
         "ok": not skew,
