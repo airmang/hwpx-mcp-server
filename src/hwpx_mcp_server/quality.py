@@ -21,10 +21,14 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import os
-import tomllib
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any, Mapping
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 runtime compatibility
+    import tomli as tomllib
 
 from .tool_contract import (
     MIN_MCP_VERSION,

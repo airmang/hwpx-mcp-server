@@ -25,6 +25,7 @@ dependencies = [
     "anyio>=4.0",
     "mcp>=1.14.1",
     "modelcontextprotocol>=0.1.0",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
