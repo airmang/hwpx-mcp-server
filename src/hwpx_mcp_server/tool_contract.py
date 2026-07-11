@@ -78,6 +78,20 @@ _SKILL_REQUIRED_TOOLS = {
 
 DOMAIN_SPECS: tuple[DomainSpec, ...] = (
     DomainSpec(
+        "workflow",
+        "자율 문서 워크플로",
+        "서버가 상태·정책·결정·예산·검증을 강제하는 재시작 가능한 고수준 문서 작업.",
+        "호스트별 스킬 지식 없이 HWPX 작업을 안전하게 시작·진행·승인·재개할 때.",
+        (
+            "start_workflow",
+            "get_workflow",
+            "continue_workflow",
+            "approve_workflow_decision",
+            "cancel_workflow",
+            "resume_workflow",
+        ),
+    ),
+    DomainSpec(
         "read",
         "읽기·추출·변환",
         "HWPX 문서를 읽어 텍스트·구조·서식을 뽑거나 Markdown/HTML/JSON으로 변환.",

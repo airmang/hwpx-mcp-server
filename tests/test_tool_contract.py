@@ -10,6 +10,7 @@ import anyio
 
 from hwpx_mcp_server import server
 from hwpx_mcp_server.tool_contract import (
+    DOMAIN_SPECS,
     contract_hash,
     expected_tool_names,
     skill_required_tool_names,
@@ -17,6 +18,14 @@ from hwpx_mcp_server.tool_contract import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW_TOOLS = {
+    "start_workflow",
+    "get_workflow",
+    "continue_workflow",
+    "approve_workflow_decision",
+    "cancel_workflow",
+    "resume_workflow",
+}
 
 
 def test_active_registry_exactly_matches_contract() -> None:
@@ -24,6 +33,11 @@ def test_active_registry_exactly_matches_contract() -> None:
         advanced=server._ACTIVE_ADVANCED
     )
     assert skill_required_tool_names() <= set(server._fastmcp_tool_names())
+    assert WORKFLOW_TOOLS <= set(server._fastmcp_tool_names())
+    assert len(expected_tool_names(advanced=False) - WORKFLOW_TOOLS) == 106
+    workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
+    assert len(workflow_domains) == 1
+    assert set(workflow_domains[0].tools) == WORKFLOW_TOOLS
 
 
 def test_advanced_registry_exactly_matches_contract_in_fresh_process() -> None:
@@ -71,6 +85,17 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
         "score_gold_path",
         "expected_pages",
     } == inputs["apply_evalplan_fill"]
+    assert {
+        "family",
+        "idempotency_key",
+        "source_path",
+        "output_path",
+        "expected_revision",
+        "parameters",
+        "budget",
+        "policy",
+    } == inputs["start_workflow"]
+    assert {"workflow_id", "approved", "action_hash"} == inputs["approve_workflow_decision"]
 
 
 def test_health_fails_exactly_when_required_tool_missing(monkeypatch) -> None:
