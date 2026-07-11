@@ -224,6 +224,7 @@ class RenderClientV2(Protocol):
     def submit(self, job: RenderJobV2, source_path: Path) -> RenderReceiptV2: ...
     def get(self, job_id: str) -> RenderReceiptV2: ...
     def cancel(self, job_id: str) -> RenderReceiptV2: ...
+    def fetch_artifact(self, job_id: str, content_hash: str) -> bytes: ...
 
 
 class NullRenderClientV2:
@@ -248,6 +249,9 @@ class NullRenderClientV2:
         raise KeyError(job_id)
 
     def cancel(self, job_id: str) -> RenderReceiptV2:
+        raise KeyError(job_id)
+
+    def fetch_artifact(self, job_id: str, content_hash: str) -> bytes:
         raise KeyError(job_id)
 
 
@@ -275,6 +279,12 @@ class QueueRenderClientV2:
 
     def cancel(self, job_id: str) -> RenderReceiptV2:
         return self.queue.cancel(job_id)
+
+    def fetch_artifact(self, job_id: str, content_hash: str) -> bytes:
+        receipt = self.queue.get(job_id)
+        if content_hash not in {item.content_hash for item in receipt.artifacts}:
+            raise KeyError(content_hash)
+        return self.queue.content.path_for(content_hash).read_bytes()
 
 
 class NullRenderBackend:

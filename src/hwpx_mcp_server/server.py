@@ -111,6 +111,7 @@ from .workflow.service import WorkflowService
 from .workflow.rendering import NullRenderClientV2, QueueRenderClientV2, RenderJobV2
 from .workflow.render_queue import DurableRenderQueue, RenderQueueError
 from .workflow.render_security import RenderSecurityPolicy
+from .workflow.render_transport import RemoteRenderClientV2
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
@@ -5619,7 +5620,10 @@ def _workflow_service() -> WorkflowService:
 
 def _render_client():
     root = os.environ.get("HWPX_RENDER_QUEUE_ROOT")
+    remote_url = os.environ.get("HWPX_RENDER_QUEUE_URL")
     secret = os.environ.get("HWPX_RENDER_QUEUE_SECRET")
+    if remote_url and secret:
+        return RemoteRenderClientV2(remote_url, secret=secret.encode("utf-8"))
     if not root or not secret:
         return NullRenderClientV2()
     queue_root = Path(root).expanduser().resolve()
@@ -5660,7 +5664,7 @@ def render_submit(
     return {"ok": receipt.status.value not in {"failed", "unavailable"}, "receipt": receipt.model_dump(mode="json")}
 
 
-def render_status(job_id: str) -> dict:
+def render_status(job_id: str, output_dir: str = None) -> dict:
     """렌더 job 상태를 한 번 조회합니다. 서버는 poll 동안 호출을 점유하지 않습니다."""
 
     client = _render_client()
@@ -5668,7 +5672,19 @@ def render_status(job_id: str) -> dict:
         receipt = client.get(job_id)
     except (KeyError, RenderQueueError):
         return {"ok": False, "jobId": job_id, "status": "unverified", "errorCode": "RENDER_JOB_NOT_FOUND_OR_UNAVAILABLE"}
-    return {"ok": True, "receipt": receipt.model_dump(mode="json")}
+    response = {"ok": True, "receipt": receipt.model_dump(mode="json")}
+    if output_dir and receipt.status.value == "succeeded":
+        destination = Path(resolve_path(output_dir))
+        destination.mkdir(parents=True, exist_ok=True)
+        saved = []
+        for artifact in receipt.artifacts:
+            name = "document.pdf" if artifact.kind.value == "pdf" else f"page-{artifact.page_number:04d}.png"
+            data = client.fetch_artifact(job_id, artifact.content_hash)
+            target = destination / name
+            target.write_bytes(data)
+            saved.append({"path": str(target), "contentHash": artifact.content_hash, "kind": artifact.kind.value})
+        response["savedArtifacts"] = saved
+    return response
 
 
 def render_cancel(job_id: str) -> dict:
