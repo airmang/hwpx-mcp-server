@@ -22,7 +22,10 @@ import pytest
 builtins.ET = _ET
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_LOCAL_PYTHON_HWPX_SRC = _REPO_ROOT.parent / "python-hwpx" / "src"
+_LOCAL_PYTHON_HWPX_REPO = Path(
+    os.environ.get("PYTHON_HWPX_REPO", _REPO_ROOT.parent / "python-hwpx")
+).expanduser().resolve()
+_LOCAL_PYTHON_HWPX_SRC = _LOCAL_PYTHON_HWPX_REPO / "src"
 
 if _LOCAL_PYTHON_HWPX_SRC.exists():
     local_hwpx_src = str(_LOCAL_PYTHON_HWPX_SRC)
