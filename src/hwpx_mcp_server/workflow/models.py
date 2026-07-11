@@ -101,6 +101,7 @@ class WorkflowPolicy(BaseModel):
     require_decision_for_destructive: bool = True
     require_open_safety: bool = True
     require_verified_completion: bool = True
+    require_real_hancom_render: bool = False
 
     @field_validator("preserve_original")
     @classmethod

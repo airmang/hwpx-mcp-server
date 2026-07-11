@@ -8,6 +8,7 @@ real-Hancom backend and provenance receipts behind this frozen contract.
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import Path
 from typing import Literal, Protocol, runtime_checkable
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -217,6 +218,65 @@ class RenderBackend(Protocol):
     def cancel(self, job_id: str) -> RenderReceipt: ...
 
 
+@runtime_checkable
+class RenderClientV2(Protocol):
+    def capabilities(self) -> dict[str, object]: ...
+    def submit(self, job: RenderJobV2, source_path: Path) -> RenderReceiptV2: ...
+    def get(self, job_id: str) -> RenderReceiptV2: ...
+    def cancel(self, job_id: str) -> RenderReceiptV2: ...
+
+
+class NullRenderClientV2:
+    def capabilities(self) -> dict[str, object]:
+        return {
+            "schemaVersion": "hwpx.render-health.v1", "available": False,
+            "degraded": True, "degradedReason": "NOT_CONFIGURED", "queueDepth": 0,
+            "runningJobs": 0, "oldestQueuedAgeSeconds": 0.0,
+            "lastSuccessfulRealRender": None, "workerVersion": None, "hancomBuild": None,
+        }
+
+    def submit(self, job: RenderJobV2, source_path: Path) -> RenderReceiptV2:
+        del source_path
+        return RenderReceiptV2(
+            job_id=job.job_id, workflow_id=job.workflow_id,
+            input_content_hash=job.source_content_hash, status=RenderStatus.UNAVAILABLE,
+            queued_at=job.submitted_at, completed_at=job.submitted_at,
+            terminal_reason="REAL_HANCOM_BACKEND_UNAVAILABLE",
+        )
+
+    def get(self, job_id: str) -> RenderReceiptV2:
+        raise KeyError(job_id)
+
+    def cancel(self, job_id: str) -> RenderReceiptV2:
+        raise KeyError(job_id)
+
+
+class QueueRenderClientV2:
+    """Trusted local client for the authenticated private durable queue."""
+
+    def __init__(self, queue: object, *, secret: bytes, principal_id: str = "hwpx-mcp-server") -> None:
+        self.queue = queue
+        self.secret = secret
+        self.principal_id = principal_id
+
+    def capabilities(self) -> dict[str, object]:
+        return self.queue.health()
+
+    def submit(self, job: RenderJobV2, source_path: Path) -> RenderReceiptV2:
+        from .render_queue import sign_submission
+
+        return self.queue.submit(
+            job, source_path.read_bytes(), signature=sign_submission(self.secret, job),
+            principal_id=self.principal_id, filename=source_path.name,
+        )
+
+    def get(self, job_id: str) -> RenderReceiptV2:
+        return self.queue.get(job_id)
+
+    def cancel(self, job_id: str) -> RenderReceiptV2:
+        return self.queue.cancel(job_id)
+
+
 class NullRenderBackend:
     """Honest S-067 default: render evidence is unavailable, never silently true."""
 
@@ -251,9 +311,12 @@ __all__ = [
     "RENDER_SCHEMA_VERSION",
     "RENDER_SCHEMA_VERSION_V2",
     "NullRenderBackend",
+    "NullRenderClientV2",
+    "QueueRenderClientV2",
     "RenderArtifactKind",
     "RenderArtifactV2",
     "RenderBackend",
+    "RenderClientV2",
     "RenderJob",
     "RenderJobV2",
     "RenderReceipt",

@@ -161,6 +161,17 @@ def test_retention_purge_deletes_unreferenced_blob(tmp_path):
         q.get(j.job_id)
 
 
+def test_health_is_honest_until_fresh_worker_heartbeat(tmp_path):
+    q = queue(tmp_path)
+    cold = q.health(now=NOW)
+    assert cold["available"] is False and cold["degradedReason"] == "NO_WORKER_HEARTBEAT"
+    q.heartbeat(worker_version="worker/1", hancom_build="Hancom 2024", available=True, now=NOW)
+    warm = q.health(now=NOW + timedelta(seconds=30))
+    assert warm["available"] is True and warm["workerVersion"] == "worker/1"
+    stale = q.health(now=NOW + timedelta(seconds=121))
+    assert stale["available"] is False and stale["degradedReason"] == "NO_WORKER_HEARTBEAT"
+
+
 def _success(j: RenderJobV2, completed_at: datetime) -> RenderReceiptV2:
     from hwpx_mcp_server.workflow.rendering import RenderArtifactKind, RenderArtifactV2
 

@@ -26,6 +26,12 @@ WORKFLOW_TOOLS = {
     "cancel_workflow",
     "resume_workflow",
 }
+RENDER_TOOLS = {
+    "render_submit",
+    "render_status",
+    "render_cancel",
+    "render_health",
+}
 
 
 def test_active_registry_exactly_matches_contract() -> None:
@@ -34,10 +40,16 @@ def test_active_registry_exactly_matches_contract() -> None:
     )
     assert skill_required_tool_names() <= set(server._fastmcp_tool_names())
     assert WORKFLOW_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False) - WORKFLOW_TOOLS) == 106
+    assert RENDER_TOOLS <= set(server._fastmcp_tool_names())
+    assert len(expected_tool_names(advanced=False)) == 116
+    assert len(expected_tool_names(advanced=False) - WORKFLOW_TOOLS - RENDER_TOOLS) == 106
     workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
     assert len(workflow_domains) == 1
     assert set(workflow_domains[0].tools) == WORKFLOW_TOOLS
+    render_domains = [domain for domain in DOMAIN_SPECS if domain.key == "real_hancom_render"]
+    assert len(render_domains) == 1
+    assert set(render_domains[0].tools) == RENDER_TOOLS
+    assert "unverified" in render_domains[0].when_to_use
 
 
 def test_advanced_registry_exactly_matches_contract_in_fresh_process() -> None:

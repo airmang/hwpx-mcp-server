@@ -189,6 +189,13 @@ class DurableRenderQueue:
                     terminal_at TEXT
                 )"""
             )
+            con.execute(
+                """CREATE TABLE IF NOT EXISTS worker_heartbeat (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton=1), observed_at TEXT NOT NULL,
+                    worker_version TEXT NOT NULL, hancom_build TEXT NOT NULL,
+                    available INTEGER NOT NULL, degraded_reason TEXT
+                )"""
+            )
 
     def pragmas(self) -> tuple[str, int]:
         with self._connect() as con:
@@ -375,6 +382,58 @@ class DurableRenderQueue:
         if not row:
             raise RenderQueueError("JOB_NOT_FOUND", "render job not found")
         return self._receipt_from_row(row)
+
+    def heartbeat(
+        self, *, worker_version: str, hancom_build: str, available: bool,
+        degraded_reason: str | None = None, now: datetime | None = None,
+    ) -> None:
+        if not worker_version or not hancom_build:
+            raise ValueError("worker_version and hancom_build are required")
+        if not available and not degraded_reason:
+            raise ValueError("unavailable heartbeat requires degraded_reason")
+        now = now or utcnow()
+        with self._connect() as con:
+            con.execute(
+                """INSERT INTO worker_heartbeat
+                (singleton,observed_at,worker_version,hancom_build,available,degraded_reason)
+                VALUES (1,?,?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET
+                observed_at=excluded.observed_at,worker_version=excluded.worker_version,
+                hancom_build=excluded.hancom_build,available=excluded.available,
+                degraded_reason=excluded.degraded_reason""",
+                (_iso(now), worker_version, hancom_build, int(available), degraded_reason),
+            )
+
+    def health(self, *, now: datetime | None = None, heartbeat_ttl_seconds: int = 120) -> dict[str, object]:
+        now = now or utcnow()
+        with self._connect() as con:
+            counts = {row["state"]: int(row["count"]) for row in con.execute(
+                "SELECT state, COUNT(*) AS count FROM render_jobs GROUP BY state"
+            )}
+            oldest = con.execute("SELECT MIN(created_at) FROM render_jobs WHERE state='queued'").fetchone()[0]
+            success = con.execute(
+                "SELECT receipt_json,terminal_at FROM render_jobs WHERE state='succeeded' ORDER BY terminal_at DESC LIMIT 1"
+            ).fetchone()
+            heartbeat = con.execute("SELECT * FROM worker_heartbeat WHERE singleton=1").fetchone()
+        last_receipt = self._receipt_from_row(success) if success else None
+        heartbeat_fresh = bool(
+            heartbeat and (now - _dt(heartbeat["observed_at"])).total_seconds() <= heartbeat_ttl_seconds
+        )
+        available = bool(heartbeat_fresh and heartbeat["available"])
+        degraded_reason = None if available else (
+            heartbeat["degraded_reason"] if heartbeat_fresh else "NO_WORKER_HEARTBEAT"
+        )
+        return {
+            "schemaVersion": "hwpx.render-health.v1",
+            "available": available,
+            "degraded": not available,
+            "degradedReason": degraded_reason,
+            "queueDepth": counts.get("queued", 0),
+            "runningJobs": counts.get("running", 0),
+            "oldestQueuedAgeSeconds": max(0.0, (now - _dt(oldest)).total_seconds()) if oldest else 0.0,
+            "lastSuccessfulRealRender": success["terminal_at"] if success else None,
+            "workerVersion": heartbeat["worker_version"] if heartbeat else (last_receipt.worker_version if last_receipt else None),
+            "hancomBuild": heartbeat["hancom_build"] if heartbeat else (last_receipt.hancom_build if last_receipt else None),
+        }
 
     def purge(self, *, now: datetime | None = None) -> int:
         now = now or utcnow()

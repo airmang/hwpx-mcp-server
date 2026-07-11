@@ -78,6 +78,19 @@ _SKILL_REQUIRED_TOOLS = {
 
 DOMAIN_SPECS: tuple[DomainSpec, ...] = (
     DomainSpec(
+        "real_hancom_render",
+        "실한컴 비동기 렌더",
+        "인증된 private queue로 HWPX를 제출하고 실한컴 PDF·페이지 영수증을 비동기로 조회.",
+        "render_submit 후 즉시 job id를 받고 render_status로 폴링한다. render_health가 unavailable/degraded이면 "
+        "로컬 미리보기를 실한컴 검증으로 간주하지 말고 unverified로 보류한다.",
+        (
+            "render_submit",
+            "render_status",
+            "render_cancel",
+            "render_health",
+        ),
+    ),
+    DomainSpec(
         "workflow",
         "자율 문서 워크플로",
         "서버가 상태·정책·결정·예산·검증을 강제하는 재시작 가능한 고수준 문서 작업.",

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Mapping
@@ -24,6 +25,7 @@ from .models import (
 )
 from .policy import ActionRequest, PolicyViolation, WorkflowPolicyEngine
 from .store import WorkflowStore
+from .rendering import NullRenderClientV2, RenderClientV2, RenderJobV2, RenderStatus
 
 
 def default_workflow_store_path() -> Path:
@@ -48,11 +50,13 @@ class WorkflowService:
         *,
         store: WorkflowStore | None = None,
         capability_ok: bool = True,
+        render_client: RenderClientV2 | None = None,
     ) -> None:
         self.store = store or WorkflowStore(default_workflow_store_path())
         self.dispatcher = AllowlistedDispatcher(namespace)
         self.policy = WorkflowPolicyEngine()
         self.capability_ok = capability_ok
+        self.render_client = render_client or NullRenderClientV2()
 
     def start(
         self,
@@ -218,7 +222,14 @@ class WorkflowService:
                     "openSafetyOk": True if read_only else evidence.get("openSafetyOk") is True,
                     "renderChecked": False,
                 }
-                if verification["verified"] and verification["openSafetyOk"]:
+                if (
+                    verification["verified"]
+                    and verification["openSafetyOk"]
+                    and record.work_order.policy.require_real_hancom_render
+                    and not read_only
+                ):
+                    record = self._advance_render_verification(record)
+                elif verification["verified"] and verification["openSafetyOk"]:
                     record = self.policy.complete(
                         self.store,
                         record,
@@ -274,6 +285,9 @@ class WorkflowService:
         record = self.store.get(workflow_id)
         if record.terminal:
             return self.receipt(record)
+        render_receipt = self._render_receipt(record)
+        if render_receipt and render_receipt.status in {RenderStatus.QUEUED, RenderStatus.RUNNING}:
+            self.render_client.cancel(render_receipt.job_id)
         record = self.store.transition(
             workflow_id,
             WorkflowState.CANCELLED,
@@ -309,9 +323,22 @@ class WorkflowService:
             if event.event_type in {"decision.approved", "decision.rejected"}
         ]
         evidence = self._execution_evidence(record.workflow_id)
+        render_receipt = self._render_receipt(record)
+        try:
+            render_job = self._render_job(record) if render_receipt else None
+        except PolicyViolation:
+            render_job = None
+        render_checked = bool(
+            render_receipt and render_job
+            and render_receipt.status == RenderStatus.SUCCEEDED
+            and render_receipt.render_checked and render_receipt.binds(render_job)
+        )
         read_only = record.work_order.family == WorkFamily.READ_EXTRACT
         if record.state == WorkflowState.COMPLETED:
-            verification_status = "verified_read_only" if read_only else "structurally_verified_render_unverified"
+            verification_status = (
+                "verified_read_only" if read_only else
+                ("real_hancom_verified" if render_checked else "structurally_verified_render_unverified")
+            )
         elif record.state == WorkflowState.NEEDS_REVIEW:
             verification_status = "needs_review"
         else:
@@ -333,8 +360,9 @@ class WorkflowService:
             "semanticDiff": {"status": "not_computed", "available": False},
             "openSafety": {
                 "ok": True if read_only and record.state == WorkflowState.COMPLETED else evidence.get("openSafetyOk"),
-                "renderChecked": False,
+                "renderChecked": render_checked,
             },
+            "render": render_receipt.model_dump(mode="json") if render_receipt else None,
             "verificationStatus": verification_status,
             "unresolvedFindings": [] if record.state == WorkflowState.COMPLETED else self._findings(stop_reason),
             "versions": {
@@ -358,6 +386,79 @@ class WorkflowService:
             if event.event_type == "execution.completed":
                 return dict(event.payload)
         return {}
+
+    def _advance_render_verification(self, record: WorkflowRecord) -> WorkflowRecord:
+        job = self._render_job(record)
+        submitted = next(
+            (event for event in self.store.events(record.workflow_id) if event.event_type == "render.submitted"),
+            None,
+        )
+        if submitted is None:
+            receipt = self.render_client.submit(job, Path(record.work_order.output_path))
+            record, _, _ = self.store.append_event(
+                record.workflow_id, "render.submitted", expected_state=record.state,
+                expected_version=record.state_version,
+                payload={"jobId": job.job_id, "inputHash": job.source_content_hash, "status": receipt.status.value},
+                event_key=f"render-submit:{job.job_id}",
+            )
+        else:
+            try:
+                receipt = self.render_client.get(job.job_id)
+            except (KeyError, RuntimeError):
+                return self.store.transition(
+                    record.workflow_id, WorkflowState.NEEDS_REVIEW,
+                    expected_state=record.state, expected_version=record.state_version,
+                    event_type="render.unverified", payload={"jobId": job.job_id},
+                    stop_reason="RENDER_RECEIPT_UNAVAILABLE",
+                )
+        if receipt.status in {RenderStatus.QUEUED, RenderStatus.RUNNING}:
+            return record
+        if receipt.status == RenderStatus.SUCCEEDED and receipt.render_checked and receipt.binds(job):
+            record, _, _ = self.store.append_event(
+                record.workflow_id, "render.completed", expected_state=record.state,
+                expected_version=record.state_version,
+                payload={"jobId": job.job_id, "inputHash": job.source_content_hash, "status": receipt.status.value},
+                event_key=f"render-complete:{job.job_id}",
+            )
+            return self.policy.complete(
+                self.store, record,
+                {"verified": True, "openSafetyOk": True, "renderChecked": True},
+                output_content_hash=job.source_content_hash,
+            )
+        return self.store.transition(
+            record.workflow_id, WorkflowState.NEEDS_REVIEW,
+            expected_state=record.state, expected_version=record.state_version,
+            event_type="render.unverified",
+            payload={"jobId": job.job_id, "status": receipt.status.value},
+            stop_reason=receipt.terminal_reason or "REAL_HANCOM_RENDER_UNVERIFIED",
+        )
+
+    def _render_job(self, record: WorkflowRecord) -> RenderJobV2:
+        output = Path(record.work_order.output_path or "")
+        if not output.is_file():
+            raise PolicyViolation("RENDER_OUTPUT_MISSING", "workflow output is unavailable for rendering")
+        digest = "sha256:" + hashlib.sha256(output.read_bytes()).hexdigest()
+        stable = hashlib.sha256(record.workflow_id.encode("utf-8")).hexdigest()[:24]
+        return RenderJobV2(
+            job_id=f"render-{stable}", workflow_id=record.workflow_id,
+            idempotency_key=f"render-{stable}-{digest[7:23]}",
+            source_content_hash=digest, source_size_bytes=output.stat().st_size,
+            submitted_at=record.created_at,
+        )
+
+    def _render_receipt(self, record: WorkflowRecord):
+        if not record.work_order.policy.require_real_hancom_render:
+            return None
+        try:
+            job = self._render_job(record)
+        except PolicyViolation:
+            return None
+        if not any(event.event_type == "render.submitted" for event in self.store.events(record.workflow_id)):
+            return None
+        try:
+            return self.render_client.get(job.job_id)
+        except (KeyError, RuntimeError):
+            return None
 
     def _abstain_existing(self, record: WorkflowRecord, reason: str) -> WorkflowRecord:
         if record.state == WorkflowState.INTAKE:

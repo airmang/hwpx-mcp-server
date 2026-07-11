@@ -7,12 +7,13 @@ import argparse
 import base64
 import binascii
 import copy
+import hashlib
 import html
 import json
 import os
 import re
 import tempfile
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -107,6 +108,9 @@ from .tool_contract import (
     skill_required_tool_names,
 )
 from .workflow.service import WorkflowService
+from .workflow.rendering import NullRenderClientV2, QueueRenderClientV2, RenderJobV2
+from .workflow.render_queue import DurableRenderQueue, RenderQueueError
+from .workflow.render_security import RenderSecurityPolicy
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
@@ -5608,7 +5612,80 @@ def _workflow_service() -> WorkflowService:
     """Build a request-scoped service over the durable configured store."""
 
     capability = mcp_server_health()["capability"]
-    return WorkflowService(globals(), capability_ok=bool(capability["ok"]))
+    return WorkflowService(
+        globals(), capability_ok=bool(capability["ok"]), render_client=_render_client(),
+    )
+
+
+def _render_client():
+    root = os.environ.get("HWPX_RENDER_QUEUE_ROOT")
+    secret = os.environ.get("HWPX_RENDER_QUEUE_SECRET")
+    if not root or not secret:
+        return NullRenderClientV2()
+    queue_root = Path(root).expanduser().resolve()
+    policy = RenderSecurityPolicy(sandbox_root=queue_root / "sandboxes")
+    queue = DurableRenderQueue(queue_root, secret=secret.encode("utf-8"), policy=policy)
+    return QueueRenderClientV2(queue, secret=secret.encode("utf-8"))
+
+
+def render_submit(
+    filename: str,
+    idempotency_key: str,
+    workflow_id: str = None,
+    dpi: int = 144,
+) -> dict:
+    """실한컴 렌더 큐에 비동기로 제출하고 즉시 receipt를 반환합니다."""
+
+    source = Path(resolve_path(filename))
+    data = source.read_bytes()
+    digest = "sha256:" + hashlib.sha256(data).hexdigest()
+    stable = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()[:24]
+    safe_workflow = workflow_id or f"direct-{stable}"
+    client = _render_client()
+    if not isinstance(client, NullRenderClientV2):
+        try:
+            existing = client.get(f"render-{stable}")
+        except RenderQueueError:
+            existing = None
+        if existing is not None:
+            if existing.input_content_hash != digest:
+                return {"ok": False, "errorCode": "IDEMPOTENCY_CONFLICT", "jobId": existing.job_id}
+            return {"ok": True, "receipt": existing.model_dump(mode="json")}
+    job = RenderJobV2(
+        job_id=f"render-{stable}", workflow_id=safe_workflow,
+        idempotency_key=idempotency_key, source_content_hash=digest,
+        source_size_bytes=len(data), submitted_at=datetime.now(timezone.utc), dpi=dpi,
+    )
+    receipt = client.submit(job, source)
+    return {"ok": receipt.status.value not in {"failed", "unavailable"}, "receipt": receipt.model_dump(mode="json")}
+
+
+def render_status(job_id: str) -> dict:
+    """렌더 job 상태를 한 번 조회합니다. 서버는 poll 동안 호출을 점유하지 않습니다."""
+
+    client = _render_client()
+    try:
+        receipt = client.get(job_id)
+    except (KeyError, RenderQueueError):
+        return {"ok": False, "jobId": job_id, "status": "unverified", "errorCode": "RENDER_JOB_NOT_FOUND_OR_UNAVAILABLE"}
+    return {"ok": True, "receipt": receipt.model_dump(mode="json")}
+
+
+def render_cancel(job_id: str) -> dict:
+    """대기 job을 취소하거나 실행 worker에 취소 요청을 기록합니다."""
+
+    client = _render_client()
+    try:
+        receipt = client.cancel(job_id)
+    except (KeyError, RenderQueueError):
+        return {"ok": False, "jobId": job_id, "status": "unverified", "errorCode": "RENDER_JOB_NOT_FOUND_OR_UNAVAILABLE"}
+    return {"ok": True, "receipt": receipt.model_dump(mode="json")}
+
+
+def render_health() -> dict:
+    """큐/worker/Hancom 상태와 적체를 반환하며 미구성·stale heartbeat는 degraded입니다."""
+
+    return _render_client().capabilities()
 
 
 def start_workflow(
