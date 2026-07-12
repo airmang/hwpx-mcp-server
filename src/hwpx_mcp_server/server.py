@@ -101,6 +101,10 @@ from .quality_generation import (
     inspect_quality_fallback,
 )
 from .storage import build_hwpx_open_safety_report, build_hwpx_verification_report
+from .blind_eval import (
+    export_fixture_benchmark as export_fixture_benchmark_bundle,
+    run_fixture_benchmark as run_fixture_benchmark_manifest,
+)
 from .tool_contract import (
     contract_hash as tool_contract_hash,
     expected_tool_names,
@@ -5652,6 +5656,34 @@ def visual_review_fixture(
     if artifact:
         review["outputPath"] = artifact
     return review
+
+
+def run_fixture_benchmark(
+    manifest_path: str,
+    output_dir: str = None,
+    strict: bool = True,
+) -> dict:
+    """동결 fixture 실행·판정의 provenance, 익명화, 전수 coverage를 검증합니다."""
+
+    return run_fixture_benchmark_manifest(
+        resolve_path(manifest_path),
+        output_dir=resolve_path(output_dir) if output_dir else None,
+        strict=strict,
+    )
+
+
+def export_fixture_benchmark(
+    result_manifest_path: str,
+    output_dir: str,
+    strict: bool = True,
+) -> dict:
+    """검증된 fixture 결과에서 private provenance가 없는 opaque 심사용 번들을 내보냅니다."""
+
+    return export_fixture_benchmark_bundle(
+        resolve_path(result_manifest_path),
+        output_dir=resolve_path(output_dir),
+        strict=strict,
+    )
 
 
 def visual_repair_fixture(

@@ -32,6 +32,7 @@ RENDER_TOOLS = {
     "render_cancel",
     "render_health",
 }
+BLIND_EVAL_TOOLS = {"run_fixture_benchmark", "export_fixture_benchmark"}
 
 
 def test_active_registry_exactly_matches_contract() -> None:
@@ -41,8 +42,9 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert skill_required_tool_names() <= set(server._fastmcp_tool_names())
     assert WORKFLOW_TOOLS <= set(server._fastmcp_tool_names())
     assert RENDER_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False)) == 118
-    assert len(expected_tool_names(advanced=False) - WORKFLOW_TOOLS - RENDER_TOOLS) == 108
+    assert BLIND_EVAL_TOOLS <= set(server._fastmcp_tool_names())
+    assert len(expected_tool_names(advanced=False)) == 120
+    assert len(expected_tool_names(advanced=False) - WORKFLOW_TOOLS - RENDER_TOOLS - BLIND_EVAL_TOOLS) == 108
     workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
     assert len(workflow_domains) == 1
     assert set(workflow_domains[0].tools) == WORKFLOW_TOOLS
@@ -50,6 +52,10 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert len(render_domains) == 1
     assert set(render_domains[0].tools) == RENDER_TOOLS
     assert "unverified" in render_domains[0].when_to_use
+    blind_domains = [domain for domain in DOMAIN_SPECS if domain.key == "blind_eval"]
+    assert len(blind_domains) == 1
+    assert set(blind_domains[0].tools) == BLIND_EVAL_TOOLS
+    assert "승격" in blind_domains[0].when_to_use
 
 
 def test_advanced_registry_exactly_matches_contract_in_fresh_process() -> None:

@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 
-MIN_PYTHON_HWPX = "2.26.0"
-MIN_MCP_VERSION = "2.20.0"
-MIN_SKILL_VERSION = "0.1.27"
+MIN_PYTHON_HWPX = "2.27.0"
+MIN_MCP_VERSION = "2.21.0"
+MIN_SKILL_VERSION = "0.1.28"
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +73,8 @@ _SKILL_REQUIRED_TOOLS = {
     "verify_form_fill",
     "apply_evalplan_fill",
     "score_form_fill",
+    "run_fixture_benchmark",
+    "export_fixture_benchmark",
 }
 
 
@@ -110,6 +112,15 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
         "버전 고정 fixture 페이지를 독립 어댑터로 검수하고 제한적으로 수정.",
         "visual_review_fixture로 모든 페이지와 어댑터 disagreement를 확인한 뒤, 안전하게 매핑된 결함만 visual_repair_fixture로 최대 3회 수정한다. fixture 결과는 항상 실렌더 미검증이다.",
         ("visual_review_fixture", "visual_repair_fixture"),
+    ),
+    DomainSpec(
+        "blind_eval",
+        "블라인드 fixture 실무 평가",
+        "동결된 fixture 실행·판정 증거를 검증하고 출처를 숨긴 심사용 번들을 내보냄.",
+        "run_fixture_benchmark로 실행·ToolSpec·판정·익명화 coverage를 검증한 뒤 "
+        "export_fixture_benchmark로 opaque 번들을 내보낸다. fixture 결과는 사람·실에이전트·실한컴 "
+        "또는 사람 대체 근거로 승격할 수 없다.",
+        ("run_fixture_benchmark", "export_fixture_benchmark"),
     ),
     DomainSpec(
         "read",
