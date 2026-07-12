@@ -105,6 +105,13 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
         ),
     ),
     DomainSpec(
+        "visual_qa",
+        "전 페이지 비전 검수",
+        "버전 고정 fixture 페이지를 독립 어댑터로 검수하고 제한적으로 수정.",
+        "visual_review_fixture로 모든 페이지와 어댑터 disagreement를 확인한 뒤, 안전하게 매핑된 결함만 visual_repair_fixture로 최대 3회 수정한다. fixture 결과는 항상 실렌더 미검증이다.",
+        ("visual_review_fixture", "visual_repair_fixture"),
+    ),
+    DomainSpec(
         "read",
         "읽기·추출·변환",
         "HWPX 문서를 읽어 텍스트·구조·서식을 뽑거나 Markdown/HTML/JSON으로 변환.",

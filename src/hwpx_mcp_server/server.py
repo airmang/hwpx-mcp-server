@@ -112,6 +112,7 @@ from .workflow.rendering import NullRenderClientV2, QueueRenderClientV2, RenderJ
 from .workflow.render_queue import DurableRenderQueue, RenderQueueError
 from .workflow.render_security import RenderSecurityPolicy
 from .workflow.render_transport import RemoteRenderClientV2
+from .visual_qa import repair_fixture, review_fixture_evidence, write_review_artifact
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
@@ -5630,6 +5631,90 @@ def _render_client():
     policy = RenderSecurityPolicy(sandbox_root=queue_root / "sandboxes")
     queue = DurableRenderQueue(queue_root, secret=secret.encode("utf-8"), policy=policy)
     return QueueRenderClientV2(queue, secret=secret.encode("utf-8"))
+
+
+def visual_review_fixture(
+    manifest_path: str,
+    case_id: str = None,
+    adapter_evidence_path: str = None,
+    output_dir: str = None,
+    strict: bool = True,
+) -> dict:
+    """전 페이지 fixture를 독립 어댑터로 검수합니다. 이 영수증은 실한컴 검증으로 승격되지 않습니다."""
+
+    review = review_fixture_evidence(
+        resolve_path(manifest_path),
+        case_id=case_id,
+        adapter_evidence_path=(resolve_path(adapter_evidence_path) if adapter_evidence_path else None),
+        strict=strict,
+    )
+    artifact = write_review_artifact(review, resolve_path(output_dir) if output_dir else None)
+    if artifact:
+        review["outputPath"] = artifact
+    return review
+
+
+def visual_repair_fixture(
+    filename: str,
+    manifest_path: str,
+    repair_plan_path: str,
+    output_path: str,
+    expected_revision: str,
+    idempotency_key: str,
+    case_id: str = None,
+    output_dir: str = None,
+    max_rounds: int = 3,
+) -> dict:
+    """revision/idempotency guard와 최대 3회 예산으로 allow-listed fixture 수리를 수행합니다."""
+
+    source = resolve_path(filename)
+    scope = _idempotency_scope("visual_repair_fixture", source, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": source,
+            "manifest_path": resolve_path(manifest_path),
+            "repair_plan_path": resolve_path(repair_plan_path),
+            "output_path": resolve_path(output_path),
+            "expected_revision": expected_revision,
+            "case_id": case_id,
+            "max_rounds": max_rounds,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        replay = dict(replay)
+        replay["idempotentReplay"] = True
+        return replay
+
+    def apply_allowlisted(
+        target: Path, repair: dict[str, Any], revision: str, action_key: str,
+    ) -> dict[str, Any]:
+        if repair.get("type") != "replace_text":
+            raise ValueError("repair action is not allow-listed")
+        find_text = repair.get("findText")
+        replace_text = repair.get("replaceText")
+        if not isinstance(find_text, str) or not find_text or not isinstance(replace_text, str):
+            raise ValueError("replace_text requires non-empty findText and string replaceText")
+        return search_and_replace(
+            str(target), find_text, replace_text,
+            expected_revision=revision, idempotency_key=action_key,
+        )
+
+    result = repair_fixture(
+        filename=source,
+        manifest_path=resolve_path(manifest_path),
+        repair_plan_path=resolve_path(repair_plan_path),
+        case_id=case_id,
+        output_path=resolve_path(output_path),
+        expected_revision=expected_revision,
+        idempotency_key=idempotency_key,
+        max_rounds=max_rounds,
+        apply_repair=apply_allowlisted,
+    )
+    artifact = write_review_artifact(result, resolve_path(output_dir) if output_dir else None)
+    if artifact:
+        result["reviewOutputPath"] = artifact
+    return _idempotency_store(scope, fingerprint=fingerprint, payload=result)
 
 
 def render_submit(

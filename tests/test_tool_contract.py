@@ -41,8 +41,8 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert skill_required_tool_names() <= set(server._fastmcp_tool_names())
     assert WORKFLOW_TOOLS <= set(server._fastmcp_tool_names())
     assert RENDER_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False)) == 116
-    assert len(expected_tool_names(advanced=False) - WORKFLOW_TOOLS - RENDER_TOOLS) == 106
+    assert len(expected_tool_names(advanced=False)) == 118
+    assert len(expected_tool_names(advanced=False) - WORKFLOW_TOOLS - RENDER_TOOLS) == 108
     workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
     assert len(workflow_domains) == 1
     assert set(workflow_domains[0].tools) == WORKFLOW_TOOLS
