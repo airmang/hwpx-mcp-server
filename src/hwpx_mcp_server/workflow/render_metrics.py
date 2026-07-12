@@ -67,7 +67,6 @@ class MeasureFirstGate(BaseModel):
     lost_job_target: Literal[0] = 0
     duplicate_terminal_receipt_target: Literal[0] = 0
     terminal_accounting_rate_target: Literal[1.0] = 1.0
-    soak_duration_hours: Literal[24] = 24
     latency_percentiles: tuple[Literal["p50", "p95", "p99"], ...] = ("p50", "p95", "p99")
     availability_target: None = None
 

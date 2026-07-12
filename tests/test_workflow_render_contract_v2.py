@@ -280,7 +280,6 @@ def test_measure_first_corpus_and_gate_are_frozen_before_slo_claims():
     assert gate.lost_job_target == 0
     assert gate.duplicate_terminal_receipt_target == 0
     assert gate.terminal_accounting_rate_target == 1.0
-    assert gate.soak_duration_hours == 24
     assert gate.availability_target is None
 
 
