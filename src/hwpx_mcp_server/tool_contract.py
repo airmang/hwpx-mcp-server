@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 
-MIN_PYTHON_HWPX = "2.25.0"
-MIN_MCP_VERSION = "2.19.0"
-MIN_SKILL_VERSION = "0.1.26"
+MIN_PYTHON_HWPX = "2.26.0"
+MIN_MCP_VERSION = "2.20.0"
+MIN_SKILL_VERSION = "0.1.27"
 
 
 @dataclass(frozen=True, slots=True)
