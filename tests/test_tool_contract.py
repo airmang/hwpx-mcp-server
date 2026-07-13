@@ -8,6 +8,7 @@ from pathlib import Path
 
 import anyio
 
+from hwpx_mcp_server import __version__
 from hwpx_mcp_server import server
 from hwpx_mcp_server.tool_contract import (
     DOMAIN_SPECS,
@@ -34,9 +35,11 @@ RENDER_TOOLS = {
     "render_health",
 }
 BLIND_EVAL_TOOLS = {"run_fixture_benchmark", "export_fixture_benchmark"}
+PRACTICE_TOOLS = {"start_practice_scenario", "apply_practice_scenario"}
 
 
 def test_active_registry_exactly_matches_contract() -> None:
+    assert server.mcp._mcp_server.version == __version__
     assert set(server._fastmcp_tool_names()) == expected_tool_names(
         advanced=server._ACTIVE_ADVANCED
     )
@@ -44,8 +47,15 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert WORKFLOW_TOOLS <= set(server._fastmcp_tool_names())
     assert RENDER_TOOLS <= set(server._fastmcp_tool_names())
     assert BLIND_EVAL_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False)) == 121
-    assert len(expected_tool_names(advanced=False) - WORKFLOW_TOOLS - RENDER_TOOLS - BLIND_EVAL_TOOLS) == 108
+    assert PRACTICE_TOOLS <= set(server._fastmcp_tool_names())
+    assert len(expected_tool_names(advanced=False)) == 123
+    assert len(
+        expected_tool_names(advanced=False)
+        - WORKFLOW_TOOLS
+        - RENDER_TOOLS
+        - BLIND_EVAL_TOOLS
+        - PRACTICE_TOOLS
+    ) == 108
     workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
     assert len(workflow_domains) == 1
     assert set(workflow_domains[0].tools) == WORKFLOW_TOOLS
@@ -57,6 +67,10 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert len(blind_domains) == 1
     assert set(blind_domains[0].tools) == BLIND_EVAL_TOOLS
     assert "승격" in blind_domains[0].when_to_use
+    practice_domains = [domain for domain in DOMAIN_SPECS if domain.key == "private_practice"]
+    assert len(practice_domains) == 1
+    assert set(practice_domains[0].tools) == PRACTICE_TOOLS
+    assert "경로" in practice_domains[0].intent
 
 
 def test_advanced_registry_exactly_matches_contract_in_fresh_process() -> None:
@@ -116,6 +130,15 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
     } == inputs["start_workflow"]
     assert {"workflow_id", "approved", "action_hash"} == inputs["approve_workflow_decision"]
     assert {"workflow_id", "action_hash"} == inputs["get_workflow_result"]
+    assert {"scenario_id", "idempotency_key"} == inputs["start_practice_scenario"]
+    assert {
+        "run_id",
+        "destination_filename",
+        "operation_kind",
+        "operations",
+        "use_suggested_operations",
+        "confirm",
+    } == inputs["apply_practice_scenario"]
 
 
 def test_health_fails_exactly_when_required_tool_missing(monkeypatch) -> None:

@@ -75,10 +75,20 @@ _SKILL_REQUIRED_TOOLS = {
     "score_form_fill",
     "run_fixture_benchmark",
     "export_fixture_benchmark",
+    "start_practice_scenario",
+    "apply_practice_scenario",
 }
 
 
 DOMAIN_SPECS: tuple[DomainSpec, ...] = (
+    DomainSpec(
+        "private_practice",
+        "비공개 코퍼스 합성 연습",
+        "불투명 scenario ID로 private 경로와 평가 gold를 숨긴 채 합성 HWPX 연습을 준비·적용.",
+        "start_practice_scenario로 합성 work order를 확인하고 decision preview 뒤 "
+        "apply_practice_scenario(confirm=true)로 별도 destination에만 적용한다.",
+        ("start_practice_scenario", "apply_practice_scenario"),
+    ),
     DomainSpec(
         "real_hancom_render",
         "실한컴 비동기 렌더",

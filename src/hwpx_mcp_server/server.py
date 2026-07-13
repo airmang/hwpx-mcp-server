@@ -24,6 +24,7 @@ from urllib.request import Request, urlopen
 import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
 
+from . import __version__
 from .core.content import (
     add_heading_to_doc,
     add_memo_to_doc,
@@ -112,6 +113,7 @@ from .tool_contract import (
     skill_required_tool_names,
 )
 from .workflow.service import WorkflowService
+from .practice import PracticeScenarioError, PracticeScenarioService
 from .workflow.rendering import NullRenderClientV2, QueueRenderClientV2, RenderJobV2
 from .workflow.render_queue import DurableRenderQueue, RenderQueueError
 from .workflow.render_security import RenderSecurityPolicy
@@ -265,6 +267,10 @@ except Exception:  # pragma: no cover - optional dependency compatibility
     verify_hwpx_redline = None
 
 mcp = FastMCP("hwpx-mcp-server")
+# The current FastMCP constructor does not expose the low-level Server version
+# argument. Without this assignment initialize.serverInfo.version reports the
+# MCP SDK version instead of the HWPX server package version.
+mcp._mcp_server.version = __version__
 
 
 def _error_data(
@@ -5621,6 +5627,76 @@ def _workflow_service() -> WorkflowService:
     return WorkflowService(
         globals(), capability_ok=bool(capability["ok"]), render_client=_render_client(),
     )
+
+
+def _practice_scenario_service() -> PracticeScenarioService:
+    root = os.environ.get("HWPX_PRACTICE_ROOT")
+    if not root:
+        raise PracticeScenarioError("HWPX_PRACTICE_ROOT is not configured")
+    manifest = os.environ.get("HWPX_PRACTICE_RUNNER_MANIFEST")
+    try:
+        return PracticeScenarioService(
+            resolve_path(root),
+            runner_manifest_path=resolve_path(manifest) if manifest else None,
+            apply_table_ops=apply_table_ops,
+            apply_body_ops=apply_body_ops,
+            inspect_fill_residue=inspect_fill_residue,
+        )
+    except PracticeScenarioError:
+        raise
+    except Exception as exc:
+        raise PracticeScenarioError("private practice configuration is unavailable") from exc
+
+
+def start_practice_scenario(scenario_id: str, idempotency_key: str) -> dict:
+    """불투명 scenario ID로 private 경로·gold를 숨긴 합성 HWPX 연습을 준비합니다."""
+    try:
+        return {
+            "ok": True,
+            **_practice_scenario_service().start(
+                scenario_id,
+                idempotency_key=idempotency_key,
+            ),
+        }
+    except PracticeScenarioError as exc:
+        return {
+            "ok": False,
+            "state": "needs_review",
+            "errorCode": "PRACTICE_SCENARIO_UNAVAILABLE",
+            "message": str(exc),
+            "privateStorageCoordinatesExposed": False,
+        }
+
+
+def apply_practice_scenario(
+    run_id: str,
+    destination_filename: str,
+    operation_kind: str = "table",
+    operations: list[dict[str, Any]] | None = None,
+    use_suggested_operations: bool = False,
+    confirm: bool = False,
+) -> dict:
+    """준비된 합성 연습을 별도 destination에 적용하고 경로-비공개 영수증을 반환합니다."""
+    try:
+        return {
+            "ok": True,
+            **_practice_scenario_service().apply(
+                run_id,
+                destination_path=resolve_path(destination_filename),
+                operation_kind=operation_kind,
+                operations=operations,
+                use_suggested_operations=use_suggested_operations,
+                confirm=confirm,
+            ),
+        }
+    except PracticeScenarioError as exc:
+        return {
+            "ok": False,
+            "state": "needs_review",
+            "errorCode": "PRACTICE_APPLY_FAILED",
+            "message": str(exc),
+            "privateStorageCoordinatesExposed": False,
+        }
 
 
 def _render_client():
