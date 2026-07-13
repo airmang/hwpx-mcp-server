@@ -63,6 +63,7 @@ from .document_state import document_state_payload, revision_mismatch_response
 from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from . import quality as quality_contract
 from .hwpx_ops import HwpxOps
+from .upstream import repair_pathological_text_spacing
 from hwpx.tools.pii import DEFAULT_POLICY, detect_pii, mask_pii, mask_value
 from hwpx.tools import read_fidelity as _read_fidelity
 
@@ -5247,6 +5248,7 @@ def replace_in_paragraph(
     resolved = resolve_paragraph_reference(doc, paragraph_index=paragraph_index, location=location)
     paragraph = resolved.paragraph
     runs = list(getattr(paragraph, "runs", []))
+    before_run_texts = [run.text or "" for run in runs]
 
     if count is None:
         replaced = _replace_in_runs(runs, old_text, new_text) if runs else 0
@@ -5276,6 +5278,17 @@ def replace_in_paragraph(
             replaced = before.count(old_text) if count is None else min(before.count(old_text), count)
 
     if replaced:
+        changed_runs = [
+            run
+            for index, run in enumerate(getattr(paragraph, "runs", []) or [])
+            if (run.text or "")
+            and (index >= len(before_run_texts) or (run.text or "") != before_run_texts[index])
+        ]
+        repair_pathological_text_spacing(
+            doc,
+            paragraph=paragraph,
+            runs=changed_runs,
+        )
         result = {"replaced_count": replaced, "location": resolved.location}
         if dry_run:
             return _with_dry_run_verification(result, doc, path)
@@ -5322,11 +5335,24 @@ def replace_by_anchor(
         raise ValueError("anchor position does not match old_text")
 
     runs = list(getattr(paragraph, "runs", []))
+    before_run_texts = [run.text or "" for run in runs]
     if runs:
         replaced = _replace_visible_span_in_runs(runs, position, end, new_text)
     else:
         paragraph.text = before[:position] + new_text + before[end:]
         replaced = 1
+
+    changed_runs = [
+        run
+        for index, run in enumerate(getattr(paragraph, "runs", []) or [])
+        if (run.text or "")
+        and (index >= len(before_run_texts) or (run.text or "") != before_run_texts[index])
+    ]
+    repair_pathological_text_spacing(
+        doc,
+        paragraph=paragraph,
+        runs=changed_runs,
+    )
 
     result = {"replaced_count": replaced, "location": resolved.location, "position": position}
     if dry_run:

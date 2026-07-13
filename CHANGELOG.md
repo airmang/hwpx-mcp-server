@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Prevent unreadable glyph over-print after text replacement, paragraph insertion, and table-cell fills when a template placeholder carries pathological character spacing (`hh:spacing <= -40`). Only touched runs are remapped to a deduplicated safe clone; the source character style and legitimate compressed spacing (for example `-37`) remain unchanged. Paragraph insertion now inherits the target neighbor instead of the unrelated section tail.
 
 ## [2.18.1] - 2026-07-10
 ### Fixed

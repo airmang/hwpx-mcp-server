@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 from xml.etree import ElementTree as ET
 
+from ..upstream import repair_pathological_text_spacing
 from .locations import iter_paragraph_locations, location_anchor
 
 _HP_NS = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
@@ -186,6 +187,7 @@ def replace_in_doc(doc: Any, find_text: str, replace_text: str) -> int:
     try:
         for para in doc.paragraphs:
             runs = list(getattr(para, "runs", []))
+            before_run_texts = [run.text or "" for run in runs]
             replaced = _replace_in_runs(runs, find_text, replace_text) if runs else 0
             has_tables = bool(getattr(para, "tables", []))
             if replaced == 0 and not has_tables:
@@ -193,6 +195,15 @@ def replace_in_doc(doc: Any, find_text: str, replace_text: str) -> int:
                 if find_text in text:
                     replaced = text.count(find_text)
                     para.text = text.replace(find_text, replace_text)
+            if replaced:
+                current_runs = list(getattr(para, "runs", []))
+                changed_runs = [
+                    run
+                    for index, run in enumerate(current_runs)
+                    if (run.text or "")
+                    and (index >= len(before_run_texts) or (run.text or "") != before_run_texts[index])
+                ]
+                repair_pathological_text_spacing(doc, paragraph=para, runs=changed_runs)
             count += replaced
 
         for para in doc.paragraphs:
@@ -204,12 +215,29 @@ def replace_in_doc(doc: Any, find_text: str, replace_text: str) -> int:
                             cell_replaced = 0
                             for cell_para in cell_paragraphs:
                                 runs = list(getattr(cell_para, "runs", []))
+                                before_run_texts = [run.text or "" for run in runs]
                                 para_replaced = _replace_in_runs(runs, find_text, replace_text) if runs else 0
                                 if para_replaced == 0:
                                     text = cell_para.text or ""
                                     if find_text in text:
                                         para_replaced = text.count(find_text)
                                         cell_para.text = text.replace(find_text, replace_text)
+                                if para_replaced:
+                                    current_runs = list(getattr(cell_para, "runs", []))
+                                    changed_runs = [
+                                        run
+                                        for index, run in enumerate(current_runs)
+                                        if (run.text or "")
+                                        and (
+                                            index >= len(before_run_texts)
+                                            or (run.text or "") != before_run_texts[index]
+                                        )
+                                    ]
+                                    repair_pathological_text_spacing(
+                                        doc,
+                                        paragraph=cell_para,
+                                        runs=changed_runs,
+                                    )
                                 cell_replaced += para_replaced
                             count += cell_replaced
                             continue
@@ -223,6 +251,14 @@ def replace_in_doc(doc: Any, find_text: str, replace_text: str) -> int:
                                     continue
                                 para_replaced = _replace_in_xml_runs(run_elements, find_text, replace_text)
                                 if para_replaced:
+                                    repair_pathological_text_spacing(
+                                        doc,
+                                        runs=[
+                                            run
+                                            for run in run_elements
+                                            if _xml_run_text(run)
+                                        ],
+                                    )
                                     _clear_xml_paragraph_layout_cache(cell_para_element)
                                     xml_replaced += para_replaced
                         if xml_replaced:

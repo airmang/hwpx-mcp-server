@@ -15,7 +15,7 @@ from xml.etree import ElementTree as ET
 
 from ..compat import patch_python_hwpx
 from ..storage import build_hwpx_open_safety_report
-from ..upstream import HP_NS as _HP_NS, HwpxDocument
+from ..upstream import HP_NS as _HP_NS, HwpxDocument, repair_pathological_text_spacing
 from .formatting import resolve_style_id
 from .locations import resolve_paragraph_reference
 
@@ -202,6 +202,11 @@ def add_paragraph_to_doc(doc: HwpxDocument, text: str, style: str = None) -> int
         inherit_style=inherit,
     )
     _enforce_run_char_pr(paragraph, char_ref)
+    repair_pathological_text_spacing(
+        doc,
+        paragraph=paragraph,
+        fallback_char_pr_id=char_ref or _default_body_char_pr(doc),
+    )
     return len(doc.paragraphs) - 1
 
 
@@ -217,11 +222,30 @@ def insert_paragraph_to_doc(doc: HwpxDocument, paragraph_index: int, text: str, 
     target = doc.paragraphs[paragraph_index]
     section = target.section
     style_id = _resolve_style(doc, style)
+    para_pr_id_ref = None
+    if style_id is None:
+        # 삽입 위치와 무관한 섹션 마지막 문단이 아니라 바로 뒤 대상 문단의
+        # 문단/글자 스타일을 이어받는다.
+        style_id = getattr(target, "style_id_ref", None)
+        para_pr_id_ref = getattr(target, "para_pr_id_ref", None)
     char_ref = _style_char_pr(doc, style_id)
+    if char_ref is None and style is None:
+        target_runs = list(getattr(target, "runs", None) or [])
+        if target_runs:
+            char_ref = getattr(target_runs[0], "char_pr_id_ref", None)
     inserted = section.add_paragraph(
-        text or "", style_id_ref=style_id, char_pr_id_ref=char_ref
+        text or "",
+        style_id_ref=style_id,
+        para_pr_id_ref=para_pr_id_ref,
+        char_pr_id_ref=char_ref,
+        inherit_style=False,
     )
     _enforce_run_char_pr(inserted, char_ref)
+    repair_pathological_text_spacing(
+        doc,
+        paragraph=inserted,
+        fallback_char_pr_id=_style_char_pr(doc, style_id) or _default_body_char_pr(doc),
+    )
 
     section_element = section.element
     try:
@@ -337,6 +361,14 @@ def set_cell_text(
         )
     except TypeError:
         table.rows[row].cells[col].text = text or ""
+
+    cell = table.rows[row].cells[col]
+    for paragraph in getattr(cell, "paragraphs", None) or []:
+        repair_pathological_text_spacing(
+            doc,
+            paragraph=paragraph,
+            fallback_char_pr_id=_default_body_char_pr(doc),
+        )
 
 
 def merge_cells_in_table(

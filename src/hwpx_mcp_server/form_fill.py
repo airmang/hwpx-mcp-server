@@ -45,7 +45,7 @@ from .core.document import open_doc
 from .core.formatting import list_styles_in_doc
 from .hwpx_ops import HwpxOps
 from .storage import build_hwpx_open_safety_report
-from .upstream import HP_NS, validate_document_path
+from .upstream import HP_NS, repair_pathological_text_spacing, validate_document_path
 from .utils.helpers import resolve_path
 
 _FORM_FILL_SCHEMA_VERSION = "hwpx.formfill.v1"
@@ -895,12 +895,20 @@ def _replace_placeholder(doc: Any, token: str, value: str) -> list[dict[str, Any
             continue
         before_style = _paragraph_style_snapshot(paragraph)
         replace_count = 0
+        changed_runs: list[Any] = []
         for run in paragraph.runs:
             text = run.text or ""
             if token in text:
                 replace_count += text.count(token)
                 run.text = text.replace(token, value)
+                if run.text:
+                    changed_runs.append(run)
         if replace_count:
+            repair_pathological_text_spacing(
+                doc,
+                paragraph=paragraph,
+                runs=changed_runs,
+            )
             _clear_paragraph_layout_cache(paragraph)
         after_style = _paragraph_style_snapshot(paragraph)
         replacements.append(

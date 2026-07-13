@@ -7,8 +7,9 @@ of the codebase has fewer direct dependencies on internal upstream details.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from os import PathLike
-from typing import Any, Literal
+from typing import Any, Iterable, Literal
 from xml.etree import ElementTree as ET
 
 from .compat import patch_python_hwpx
@@ -49,6 +50,7 @@ _FONT_FACE_LANGS = {
 }
 _DEFAULT_TEXT_COLOR = "#000000"
 _DEFAULT_CHAR_HEIGHT = "1000"
+_PATHOLOGICAL_CHAR_SPACING_LIMIT = -40
 
 
 def open_document(source: str | PathLike[str] | Any) -> HwpxDocument:
@@ -451,6 +453,201 @@ def ensure_char_style(
     if not char_id:
         raise RuntimeError("char property does not expose an identifier")
     return char_id
+
+
+def _char_property_element(
+    document: HwpxDocument,
+    char_pr_id_ref: str | int | None,
+) -> tuple[Any, ET.Element] | None:
+    if char_pr_id_ref is None:
+        return None
+    target = str(char_pr_id_ref).strip()
+    if not target:
+        return None
+
+    for header in document.headers:
+        ref_list = header.element.find(f"{HH_NS}refList")
+        if ref_list is None:
+            continue
+        char_properties = ref_list.find(f"{HH_NS}charProperties")
+        if char_properties is None:
+            continue
+        for element in char_properties.findall(f"{HH_NS}charPr"):
+            if (element.get("id") or "").strip() == target:
+                return header, element
+    return None
+
+
+def _spacing_values(element: ET.Element | None) -> dict[str, int]:
+    if element is None:
+        return {}
+    spacing = element.find(f"{HH_NS}spacing")
+    if spacing is None:
+        return {}
+
+    values: dict[str, int] = {}
+    for key in _FONT_REF_KEYS:
+        raw = spacing.get(key)
+        if raw is None:
+            continue
+        try:
+            values[key] = int(raw)
+        except ValueError:
+            continue
+    return values
+
+
+def _safe_spacing_fallback_refs(
+    document: HwpxDocument,
+    paragraph: Any | None,
+    explicit_ref: str | int | None,
+) -> list[str]:
+    refs: list[str] = []
+
+    def append(value: str | int | None) -> None:
+        if value is None:
+            return
+        normalized = str(value).strip()
+        if normalized and normalized not in refs:
+            refs.append(normalized)
+
+    append(explicit_ref)
+    if paragraph is not None:
+        style = document.style(getattr(paragraph, "style_id_ref", None))
+        append(getattr(style, "char_pr_id_ref", None))
+        append(getattr(paragraph, "char_pr_id_ref", None))
+
+    style_zero_ref: str | int | None = None
+    for style in iter_unique_styles(document):
+        style_id = style_identifier(style)
+        name = str(getattr(style, "name", None) or "").strip()
+        eng_name = str(getattr(style, "eng_name", None) or "").strip().lower()
+        char_ref = getattr(style, "char_pr_id_ref", None)
+        if name in {"바탕글", "본문"} or eng_name in {"normal", "body"}:
+            append(char_ref)
+        if style_id == "0":
+            style_zero_ref = char_ref
+    append(style_zero_ref)
+    append("0")
+    return refs
+
+
+def _element_signature(element: ET.Element) -> bytes:
+    clone = deepcopy(element)
+    clone.attrib.pop("id", None)
+    return ET.tostring(clone, encoding="utf-8")
+
+
+def _run_element(run: Any) -> ET.Element | None:
+    element = getattr(run, "element", None)
+    if element is not None:
+        return element
+    if hasattr(run, "get") and hasattr(run, "set"):
+        return run
+    return None
+
+
+def repair_pathological_text_spacing(
+    document: HwpxDocument,
+    *,
+    paragraph: Any | None = None,
+    runs: Iterable[Any] | None = None,
+    fallback_char_pr_id: str | int | None = None,
+) -> int:
+    """Remap touched text runs whose character spacing would over-print glyphs.
+
+    Some form templates use ``hh:spacing=-50`` on short placeholder runs.  If a
+    replacement or newly-added paragraph blindly keeps that ``charPr``, Hancom
+    renders normal text with roughly half-width glyph advance and the letters
+    overlap.  Only the touched runs are remapped: the source ``charPr`` remains
+    byte-for-byte intact, while a deduplicated clone changes only pathological
+    spacing values (``<= -40``) to a safe paragraph/body-style fallback.
+    """
+
+    selected_runs = list(runs if runs is not None else (getattr(paragraph, "runs", None) or []))
+    if not selected_runs:
+        return 0
+
+    fallback_values: list[dict[str, int]] = []
+    for fallback_ref in _safe_spacing_fallback_refs(document, paragraph, fallback_char_pr_id):
+        found = _char_property_element(document, fallback_ref)
+        if found is not None:
+            fallback_values.append(_spacing_values(found[1]))
+
+    remapped = 0
+    replacements_by_ref: dict[str, str] = {}
+    for run in selected_runs:
+        element = _run_element(run)
+        if element is None:
+            continue
+        base_ref = (element.get("charPrIDRef") or "").strip()
+        if not base_ref:
+            continue
+
+        found = _char_property_element(document, base_ref)
+        if found is None:
+            continue
+        header, base_element = found
+        base_spacing = _spacing_values(base_element)
+        unsafe_keys = [
+            key
+            for key, value in base_spacing.items()
+            if value <= _PATHOLOGICAL_CHAR_SPACING_LIMIT
+        ]
+        if not unsafe_keys:
+            continue
+
+        target_ref = replacements_by_ref.get(base_ref)
+        if target_ref is None:
+            target_values: dict[str, int] = {}
+            for key in unsafe_keys:
+                safe_value = 0
+                for candidate in fallback_values:
+                    value = candidate.get(key, 0)
+                    if value > _PATHOLOGICAL_CHAR_SPACING_LIMIT:
+                        safe_value = value
+                        break
+                target_values[key] = safe_value
+
+            target_element = deepcopy(base_element)
+            target_element.attrib.pop("id", None)
+            target_spacing = target_element.find(f"{HH_NS}spacing")
+            if target_spacing is None:  # pragma: no cover - unsafe keys imply spacing exists
+                target_spacing = append_xml_child(target_element, f"{HH_NS}spacing")
+            for key, value in target_values.items():
+                target_spacing.set(key, str(value))
+            target_signature = _element_signature(target_element)
+
+            def predicate(candidate: ET.Element) -> bool:
+                return _element_signature(candidate) == target_signature
+
+            def modifier(candidate: ET.Element) -> None:
+                spacing = candidate.find(f"{HH_NS}spacing")
+                if spacing is None:  # pragma: no cover - cloned unsafe style has spacing
+                    spacing = append_xml_child(candidate, f"{HH_NS}spacing")
+                for key, value in target_values.items():
+                    spacing.set(key, str(value))
+
+            safe_element = header.ensure_char_property(
+                predicate=predicate,
+                modifier=modifier,
+                base_char_pr_id=base_ref,
+            )
+            target_ref = safe_element.get("id")
+            if not target_ref:  # pragma: no cover - upstream guarantees an id
+                raise RuntimeError("safe character property does not expose an identifier")
+            replacements_by_ref[base_ref] = target_ref
+
+        if hasattr(run, "char_pr_id_ref"):
+            run.char_pr_id_ref = target_ref
+        else:
+            element.set("charPrIDRef", target_ref)
+            section = getattr(paragraph, "section", None)
+            if section is not None and hasattr(section, "mark_dirty"):
+                section.mark_dirty()
+        remapped += 1
+
+    return remapped
 
 
 def document_styles_element(document: HwpxDocument) -> ET.Element:
