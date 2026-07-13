@@ -22,8 +22,10 @@ dependencies = [
     "python-hwpx>=2.27.0", # fixture blind-eval contracts and prior document capabilities
 
     "pydantic>=2.7",
+    "cryptography>=42.0",
     "anyio>=4.0",
-    "mcp>=1.14.1",
+    # mcp 2.x moved the public type surface; this server targets the 1.x API.
+    "mcp>=1.14.1,<2",
     "modelcontextprotocol>=0.1.0",
     "tomli>=2.0; python_version < '3.11'",
 ]

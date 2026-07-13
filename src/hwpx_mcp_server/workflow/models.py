@@ -209,9 +209,24 @@ class WorkflowRecord(BaseModel):
         return self.state in TERMINAL_STATES
 
 
+class ActionResult(BaseModel):
+    """Decrypted durable result plus non-sensitive retention metadata."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
+
+    workflow_id: str = Field(serialization_alias="workflowId")
+    action_hash: str = Field(serialization_alias="actionHash")
+    result: Any
+    content_hash: str = Field(serialization_alias="contentHash")
+    size_bytes: int = Field(ge=0, serialization_alias="sizeBytes")
+    created_at: datetime = Field(serialization_alias="createdAt")
+    expires_at: datetime = Field(serialization_alias="expiresAt")
+
+
 __all__ = [
     "TERMINAL_STATES",
     "WORKFLOW_SCHEMA_VERSION",
+    "ActionResult",
     "WorkFamily",
     "WorkOrder",
     "WorkflowBudget",

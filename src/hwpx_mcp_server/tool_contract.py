@@ -100,6 +100,7 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
         (
             "start_workflow",
             "get_workflow",
+            "get_workflow_result",
             "continue_workflow",
             "approve_workflow_decision",
             "cancel_workflow",

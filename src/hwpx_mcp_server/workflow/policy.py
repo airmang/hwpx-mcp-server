@@ -145,6 +145,11 @@ class WorkflowPolicyEngine:
             raise PolicyViolation("OPEN_SAFETY_REQUIRED", "openSafety evidence is required for completion")
         if record.work_order.policy.require_verified_completion and verification.get("verified") is not True:
             raise PolicyViolation("VERIFIED_COMPLETION_REQUIRED", "unverified work cannot be marked completed")
+        if verification.get("domainVerified") is not True:
+            raise PolicyViolation(
+                "DOMAIN_VERIFICATION_REQUIRED",
+                "family-specific result and quality verification are required for completion",
+            )
 
     def record_decision(
         self,

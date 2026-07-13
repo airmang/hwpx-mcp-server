@@ -122,7 +122,12 @@ def test_unverified_or_unsafe_work_cannot_complete(tmp_path):
     with pytest.raises(PolicyViolation) as unverified:
         engine.authorize_completion(record, {"verified": False, "openSafetyOk": True})
     assert unverified.value.code == "VERIFIED_COMPLETION_REQUIRED"
-    engine.authorize_completion(record, {"verified": True, "openSafetyOk": True})
+    with pytest.raises(PolicyViolation) as missing_domain:
+        engine.authorize_completion(record, {"verified": True, "openSafetyOk": True})
+    assert missing_domain.value.code == "DOMAIN_VERIFICATION_REQUIRED"
+    engine.authorize_completion(
+        record, {"verified": True, "openSafetyOk": True, "domainVerified": True}
+    )
 
 
 def test_dispatcher_is_family_and_toolspec_allowlisted():
@@ -168,7 +173,7 @@ def test_durable_dispatch_writes_receipts_and_completed_retry_never_executes_twi
 
     assert first.result == {"ok": True, "count": 1}
     assert first.replayed is False
-    assert replay.result is None
+    assert replay.result == first.result
     assert replay.replayed is True
     assert calls == [{"path": str(source)}]
     events = store.events(record.workflow_id)
@@ -339,7 +344,7 @@ def test_policy_gated_complete_persists_verification_receipt(tmp_path):
     completed = WorkflowPolicyEngine().complete(
         store,
         record,
-        {"verified": True, "openSafetyOk": True},
+        {"verified": True, "openSafetyOk": True, "domainVerified": True},
         output_content_hash="sha256:output",
     )
     assert completed.state == WorkflowState.COMPLETED

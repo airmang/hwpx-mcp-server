@@ -33,6 +33,7 @@ def tools():
     return {
         "validate_document_plan": lambda **arguments: {"ok": True},
         "create_document_from_plan": create,
+        "inspect_document_authoring_quality": lambda **arguments: {"pass": True},
     }
 
 

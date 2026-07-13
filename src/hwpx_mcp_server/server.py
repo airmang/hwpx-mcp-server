@@ -5628,7 +5628,18 @@ def _render_client():
     remote_url = os.environ.get("HWPX_RENDER_QUEUE_URL")
     secret = os.environ.get("HWPX_RENDER_QUEUE_SECRET")
     if remote_url and secret:
-        return RemoteRenderClientV2(remote_url, secret=secret.encode("utf-8"))
+        transport_auth = os.environ.get("HWPX_RENDER_TRANSPORT_AUTH", "mtls")
+        ca_file = os.environ.get("HWPX_RENDER_CA_FILE")
+        client_certfile = os.environ.get("HWPX_RENDER_CLIENT_CERT_FILE")
+        client_keyfile = os.environ.get("HWPX_RENDER_CLIENT_KEY_FILE")
+        return RemoteRenderClientV2(
+            remote_url,
+            secret=secret.encode("utf-8"),
+            transport_auth=transport_auth,
+            ca_file=Path(ca_file).expanduser().resolve() if ca_file else None,
+            client_certfile=Path(client_certfile).expanduser().resolve() if client_certfile else None,
+            client_keyfile=Path(client_keyfile).expanduser().resolve() if client_keyfile else None,
+        )
     if not root or not secret:
         return NullRenderClientV2()
     queue_root = Path(root).expanduser().resolve()
@@ -5849,6 +5860,12 @@ def get_workflow(workflow_id: str) -> dict:
     """현재 상태와 증거를 구조화된 workflow receipt로 조회합니다."""
 
     return _workflow_service().get(workflow_id)
+
+
+def get_workflow_result(workflow_id: str, action_hash: str = None) -> dict:
+    """암호화 저장된 workflow primitive 결과를 content hash와 함께 조회합니다."""
+
+    return _workflow_service().workflow_result(workflow_id, action_hash=action_hash)
 
 
 def continue_workflow(workflow_id: str) -> dict:

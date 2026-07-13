@@ -22,6 +22,7 @@ from .models import (
     WorkflowEvent,
     WorkflowRecord,
     WorkflowState,
+    canonical_json,
 )
 from .policy import ActionRequest, PolicyViolation, WorkflowPolicyEngine
 from .store import WorkflowStore
@@ -217,9 +218,82 @@ class WorkflowService:
             elif record.state == WorkflowState.VERIFY:
                 evidence = self._execution_evidence(workflow_id)
                 read_only = record.work_order.family == WorkFamily.READ_EXTRACT
+                verification_actions = adapter.verification_actions(record)
+                for action in verification_actions:
+                    result = self._stored_action_result(workflow_id, action)
+                    if result is None:
+                        try:
+                            outcome = self.dispatcher.dispatch_durable(
+                                self.store,
+                                workflow_id,
+                                action,
+                                expected_version=record.state_version,
+                                capability_ok=self.capability_ok,
+                                policy=self.policy,
+                            )
+                        except PolicyViolation:
+                            record, _, _ = self.store.append_event(
+                                workflow_id,
+                                "verification.checked",
+                                expected_state=record.state,
+                                expected_version=record.state_version,
+                                payload={
+                                    "actionHash": action.action_hash,
+                                    "tool": action.tool_name,
+                                    "ok": False,
+                                },
+                                event_key=f"verification:{action.action_hash}",
+                            )
+                            raise
+                        result = outcome.result
+                        record = self.store.get(workflow_id)
+                    already_checked = any(
+                        event.event_type == "verification.checked"
+                        and event.payload.get("actionHash") == action.action_hash
+                        for event in self.store.events(workflow_id)
+                    )
+                    if not already_checked:
+                        record, _, _ = self.store.append_event(
+                            workflow_id,
+                            "verification.checked",
+                            expected_state=record.state,
+                            expected_version=record.state_version,
+                            payload={
+                                "actionHash": action.action_hash,
+                                "tool": action.tool_name,
+                                "ok": isinstance(result, Mapping)
+                                and result.get("ok") is not False
+                                and result.get("pass") is not False,
+                            },
+                            event_key=f"verification:{action.action_hash}",
+                        )
+                    record = self.store.get(workflow_id)
+                    if result is None:
+                        break
+                primary_action_hash = self._primary_action_hash(record)
+                try:
+                    primary_result = (
+                        self.store.get_action_result(workflow_id, primary_action_hash)
+                        if primary_action_hash is not None
+                        else None
+                    )
+                except KeyError:
+                    primary_result = None
+                verifier_results = tuple(
+                    result
+                    for action in verification_actions
+                    if (result := self._stored_action_result(workflow_id, action)) is not None
+                )
+                domain_verified = (
+                    adapter.execution_evidence_ok(record, primary_result)
+                    and adapter.verification_ok(record, verifier_results)
+                )
                 verification = {
                     "verified": evidence.get("ok") is True,
                     "openSafetyOk": True if read_only else evidence.get("openSafetyOk") is True,
+                    "domainVerified": domain_verified,
+                    "verifierCount": len(verifier_results),
+                    "requiredVerifierCount": len(verification_actions),
                     "renderChecked": False,
                 }
                 if (
@@ -229,7 +303,7 @@ class WorkflowService:
                     and not read_only
                 ):
                     record = self._advance_render_verification(record)
-                elif verification["verified"] and verification["openSafetyOk"]:
+                elif verification["verified"] and verification["openSafetyOk"] and domain_verified:
                     record = self.policy.complete(
                         self.store,
                         record,
@@ -257,6 +331,11 @@ class WorkflowService:
                 )
         except AdapterAbstention as error:
             record = self._abstain_existing(record, error.code)
+        except PolicyViolation as error:
+            current = self.store.get(workflow_id)
+            if current.state != WorkflowState.VERIFY:
+                raise
+            record = self._abstain_existing(current, error.code)
         return self.receipt(record)
 
     def approve_decision(self, workflow_id: str, *, approved: bool, action_hash: str | None = None) -> dict[str, Any]:
@@ -348,6 +427,7 @@ class WorkflowService:
             stop_reason = "DECISION_REQUIRED"
         elif record.state == WorkflowState.COMPLETED:
             stop_reason = "VERIFIED_COMPLETION"
+        result_envelope = self._result_envelope(record)
         return {
             "schemaVersion": WORKFLOW_SCHEMA_VERSION,
             "workflowId": record.workflow_id,
@@ -357,7 +437,10 @@ class WorkflowService:
             "terminal": record.state in TERMINAL_STATES,
             "artifacts": self._artifacts(record),
             "decisions": decisions,
-            "semanticDiff": {"status": "not_computed", "available": False},
+            "result": result_envelope.get("inline"),
+            "resultRef": result_envelope.get("reference"),
+            "semanticDiff": self._semantic_diff(record),
+            "domainVerification": self._domain_verification(record),
             "openSafety": {
                 "ok": True if read_only and record.state == WorkflowState.COMPLETED else evidence.get("openSafetyOk"),
                 "renderChecked": render_checked,
@@ -380,6 +463,105 @@ class WorkflowService:
             for event in self.store.events(workflow_id)
             if event.payload.get("actionHash") == action.action_hash
         ]
+
+    def _stored_action_result(self, workflow_id: str, action: ActionRequest) -> Any | None:
+        try:
+            return self.store.get_action_result(workflow_id, action.action_hash)
+        except KeyError:
+            return None
+
+    def _primary_action_hash(self, record: WorkflowRecord) -> str | None:
+        events = self.store.events(record.workflow_id)
+        event_type = "recon.completed" if record.work_order.family == WorkFamily.READ_EXTRACT else "execution.completed"
+        event = next((item for item in reversed(events) if item.event_type == event_type), None)
+        return str(event.payload.get("actionHash")) if event and event.payload.get("actionHash") else None
+
+    def _result_envelope(self, record: WorkflowRecord) -> dict[str, Any]:
+        action_hash = self._primary_action_hash(record)
+        if action_hash is None:
+            return {"inline": None, "reference": None}
+        try:
+            result = self.store.get_action_result(record.workflow_id, action_hash)
+        except KeyError:
+            return {"inline": None, "reference": None}
+        metadata = self.store.action_result_metadata(record.workflow_id, action_hash)
+        encoded_size = len(canonical_json(result).encode("utf-8"))
+        if encoded_size <= 32 * 1024:
+            return {"inline": result, "reference": None}
+        return {
+            "inline": None,
+            "reference": {
+                "workflowId": record.workflow_id,
+                "actionHash": action_hash,
+                "contentHash": metadata["contentHash"],
+                "sizeBytes": metadata["sizeBytes"],
+                "expiresAt": metadata["expiresAt"],
+                "retrievalTool": "get_workflow_result",
+            },
+        }
+
+    def workflow_result(self, workflow_id: str, *, action_hash: str | None = None) -> dict[str, Any]:
+        record = self.store.get(workflow_id)
+        if action_hash is None:
+            action_hash = self._primary_action_hash(record)
+            if action_hash is None:
+                raise KeyError("workflow has no primary result")
+        result = self.store.get_action_result(workflow_id, action_hash)
+        metadata = self.store.action_result_metadata(workflow_id, action_hash)
+        return {
+            "workflowId": workflow_id,
+            "actionHash": action_hash,
+            "contentHash": metadata["contentHash"],
+            "sizeBytes": metadata["sizeBytes"],
+            "expiresAt": metadata["expiresAt"],
+            "result": result,
+        }
+
+    def _semantic_diff(self, record: WorkflowRecord) -> dict[str, Any]:
+        if record.work_order.family != WorkFamily.TRANSACTIONAL_EDIT:
+            return {"status": "not_applicable", "available": False}
+        envelope = self._result_envelope(record)
+        result = envelope.get("inline")
+        if result is None:
+            try:
+                action_hash = self._primary_action_hash(record)
+                result = self.store.get_action_result(record.workflow_id, action_hash) if action_hash else None
+            except KeyError:
+                result = None
+        semantic_diff = result.get("semanticDiff") if isinstance(result, Mapping) else None
+        if isinstance(semantic_diff, Mapping):
+            return {**dict(semantic_diff), "status": "computed", "available": True}
+        return {"status": "missing", "available": False}
+
+    def _domain_verification(self, record: WorkflowRecord) -> dict[str, Any]:
+        rows = []
+        for event in self.store.events(record.workflow_id):
+            if event.event_type != "verification.checked":
+                continue
+            action_hash = str(event.payload.get("actionHash"))
+            try:
+                result = self.store.get_action_result(record.workflow_id, action_hash)
+            except KeyError:
+                result = None
+            metadata = None
+            if result is not None:
+                metadata = self.store.action_result_metadata(record.workflow_id, action_hash)
+            rows.append(
+                {
+                    "tool": event.payload.get("tool"),
+                    "actionHash": action_hash,
+                    "ok": isinstance(result, Mapping)
+                    and result.get("ok") is not False
+                    and result.get("pass") is not False,
+                    "contentHash": metadata["contentHash"] if metadata else None,
+                }
+            )
+        return {
+            "required": bool(rows),
+            "complete": all(row["contentHash"] for row in rows),
+            "ok": all(row["ok"] for row in rows),
+            "verifiers": rows,
+        }
 
     def _execution_evidence(self, workflow_id: str) -> dict[str, Any]:
         for event in reversed(self.store.events(workflow_id)):
@@ -422,7 +604,12 @@ class WorkflowService:
             )
             return self.policy.complete(
                 self.store, record,
-                {"verified": True, "openSafetyOk": True, "renderChecked": True},
+                {
+                    "verified": True,
+                    "openSafetyOk": True,
+                    "domainVerified": self._domain_verification(record)["ok"],
+                    "renderChecked": True,
+                },
                 output_content_hash=job.source_content_hash,
             )
         return self.store.transition(

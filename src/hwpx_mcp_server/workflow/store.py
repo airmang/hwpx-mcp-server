@@ -3,15 +3,21 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 from .models import (
+    ActionResult,
+    TERMINAL_STATES,
     WorkOrder,
     WorkflowEvent,
     WorkflowRecord,
@@ -40,10 +46,28 @@ class WorkflowStore:
     process-crash recovery.
     """
 
-    def __init__(self, path: str | Path) -> None:
+    _ENCRYPTED_PREFIX = "enc:v1:"
+    _MAX_RESULT_RETENTION_SECONDS = 30 * 24 * 60 * 60
+
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        encryption_key: bytes | str | None = None,
+        result_retention_seconds: int = 24 * 60 * 60,
+    ) -> None:
         self.path = Path(path).expanduser().resolve()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize()
+        if not 1 <= result_retention_seconds <= self._MAX_RESULT_RETENTION_SECONDS:
+            raise ValueError("result retention must be between 1 second and 30 days")
+        self.result_retention_seconds = result_retention_seconds
+        self._key = self._load_or_create_key(encryption_key)
+        self._aead = AESGCM(self._key)
+        migrated = self._initialize()
+        if migrated:
+            # Ensure legacy plaintext does not survive in free pages or the WAL.
+            self._compact_sensitive_storage()
+        self.purge_expired_results()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30, isolation_level=None)
@@ -51,7 +75,91 @@ class WorkflowStore:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA secure_delete=ON")
         return connection
+
+    def _load_or_create_key(self, supplied: bytes | str | None) -> bytes:
+        if supplied is not None:
+            key = supplied if isinstance(supplied, bytes) else base64.urlsafe_b64decode(supplied)
+            if len(key) != 32:
+                raise ValueError("workflow encryption key must be exactly 32 bytes")
+            return key
+        configured = os.environ.get("HWPX_WORKFLOW_ENCRYPTION_KEY")
+        if configured:
+            try:
+                key = base64.urlsafe_b64decode(configured)
+            except Exception as exc:
+                raise ValueError("HWPX_WORKFLOW_ENCRYPTION_KEY must be URL-safe base64") from exc
+            if len(key) != 32:
+                raise ValueError("HWPX_WORKFLOW_ENCRYPTION_KEY must decode to exactly 32 bytes")
+            return key
+        key_path = self.path.with_name(f"{self.path.name}.key")
+        try:
+            key = key_path.read_bytes()
+        except FileNotFoundError:
+            key = AESGCM.generate_key(bit_length=256)
+            temporary = key_path.with_name(f".{key_path.name}.{uuid.uuid4().hex}.tmp")
+            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            try:
+                with os.fdopen(descriptor, "wb") as stream:
+                    stream.write(key)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                try:
+                    os.link(temporary, key_path)
+                except FileExistsError:
+                    key = key_path.read_bytes()
+            finally:
+                temporary.unlink(missing_ok=True)
+        if len(key) != 32:
+            raise WorkflowConflict(f"invalid workflow encryption key file: {key_path}")
+        return key
+
+    def _compact_sensitive_storage(self) -> None:
+        """Remove replaced encrypted payloads from the WAL and free pages."""
+
+        with self._connect() as connection:
+            connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            connection.execute("VACUUM")
+
+    def _encrypt_json(self, value: Any, *, associated_data: str) -> str:
+        nonce = os.urandom(12)
+        plaintext = canonical_json(value).encode("utf-8")
+        ciphertext = self._aead.encrypt(nonce, plaintext, associated_data.encode("utf-8"))
+        return self._ENCRYPTED_PREFIX + base64.urlsafe_b64encode(nonce + ciphertext).decode("ascii")
+
+    def _decrypt_json(self, envelope: str, *, associated_data: str) -> Any:
+        if not envelope.startswith(self._ENCRYPTED_PREFIX):
+            return json.loads(envelope)
+        try:
+            packed = base64.urlsafe_b64decode(envelope[len(self._ENCRYPTED_PREFIX) :])
+            plaintext = self._aead.decrypt(
+                packed[:12], packed[12:], associated_data.encode("utf-8")
+            )
+            return json.loads(plaintext)
+        except Exception as exc:
+            raise WorkflowConflict("encrypted workflow data failed authentication") from exc
+
+    @staticmethod
+    def _action_result_aad(
+        workflow_id: str,
+        action_hash: str,
+        result_hash: str,
+        size_bytes: int,
+        created_at: str,
+        expires_at: str,
+    ) -> str:
+        return canonical_json(
+            {
+                "kind": "action-result",
+                "workflowId": workflow_id,
+                "actionHash": action_hash,
+                "contentHash": result_hash,
+                "sizeBytes": size_bytes,
+                "createdAt": created_at,
+                "expiresAt": expires_at,
+            }
+        )
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
@@ -66,7 +174,8 @@ class WorkflowStore:
         finally:
             connection.close()
 
-    def _initialize(self) -> None:
+    def _initialize(self) -> bool:
+        migrated = False
         with self._transaction() as connection:
             connection.executescript(
                 """
@@ -100,6 +209,18 @@ class WorkflowStore:
                 );
                 CREATE INDEX IF NOT EXISTS workflow_events_lookup
                     ON workflow_events(workflow_id, event_index);
+                CREATE TABLE IF NOT EXISTS workflow_action_results (
+                    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,
+                    action_hash TEXT NOT NULL,
+                    result_ciphertext TEXT NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    PRIMARY KEY (workflow_id, action_hash)
+                );
+                CREATE INDEX IF NOT EXISTS workflow_action_results_expiry
+                    ON workflow_action_results(expires_at);
                 """
             )
             columns = {
@@ -112,6 +233,33 @@ class WorkflowStore:
                     "CREATE UNIQUE INDEX IF NOT EXISTS workflow_events_event_key "
                     "ON workflow_events(workflow_id, event_key) WHERE event_key IS NOT NULL"
                 )
+            rows = connection.execute(
+                "SELECT workflow_id, idempotency_key, work_order_json FROM workflows"
+            ).fetchall()
+            for row in rows:
+                idempotency_key = str(row["idempotency_key"])
+                if not idempotency_key.startswith("sha256:"):
+                    connection.execute(
+                        "UPDATE workflows SET idempotency_key = ? WHERE workflow_id = ?",
+                        (content_hash(idempotency_key), row["workflow_id"]),
+                    )
+                    migrated = True
+                serialized = str(row["work_order_json"])
+                if serialized.startswith(self._ENCRYPTED_PREFIX):
+                    continue
+                parsed = json.loads(serialized)
+                connection.execute(
+                    "UPDATE workflows SET work_order_json = ? WHERE workflow_id = ?",
+                    (
+                        self._encrypt_json(
+                            parsed,
+                            associated_data=f"work-order:{row['workflow_id']}",
+                        ),
+                        row["workflow_id"],
+                    ),
+                )
+                migrated = True
+        return migrated
 
     def create(
         self,
@@ -128,11 +276,15 @@ class WorkflowStore:
 
         workflow_id = workflow_id or f"wf_{uuid.uuid4().hex}"
         now = utc_now()
-        order_json = canonical_json(work_order.model_dump(mode="json"))
+        idempotency_key_hash = content_hash(work_order.idempotency_key)
+        order_json = self._encrypt_json(
+            work_order.model_dump(mode="json"),
+            associated_data=f"work-order:{workflow_id}",
+        )
         order_hash = work_order.fingerprint()
         with self._transaction() as connection:
             existing = connection.execute(
-                "SELECT * FROM workflows WHERE idempotency_key = ?", (work_order.idempotency_key,)
+                "SELECT * FROM workflows WHERE idempotency_key = ?", (idempotency_key_hash,)
             ).fetchone()
             if existing is not None:
                 if existing["work_order_hash"] != order_hash:
@@ -146,7 +298,7 @@ class WorkflowStore:
                 ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)""",
                 (
                     workflow_id,
-                    work_order.idempotency_key,
+                    idempotency_key_hash,
                     order_json,
                     order_hash,
                     WorkflowState.INTAKE.value,
@@ -202,17 +354,27 @@ class WorkflowStore:
                 )
             assert_transition(current, target)
             now = utc_now()
+            work_order_json = row["work_order_json"]
+            if target in TERMINAL_STATES:
+                raw_order = self._decrypt_json(
+                    str(work_order_json), associated_data=f"work-order:{workflow_id}"
+                )
+                raw_order["parameters"] = {}
+                work_order_json = self._encrypt_json(
+                    raw_order, associated_data=f"work-order:{workflow_id}"
+                )
             updated = connection.execute(
                 """UPDATE workflows
                    SET state = ?, state_version = state_version + 1, updated_at = ?,
                        output_content_hash = COALESCE(?, output_content_hash),
-                       stop_reason = COALESCE(?, stop_reason)
+                       stop_reason = COALESCE(?, stop_reason), work_order_json = ?
                    WHERE workflow_id = ? AND state = ? AND state_version = ?""",
                 (
                     target.value,
                     now.isoformat(),
                     output_content_hash,
                     stop_reason,
+                    work_order_json,
                     workflow_id,
                     current.value,
                     version,
@@ -231,7 +393,134 @@ class WorkflowStore:
             )
             result = connection.execute("SELECT * FROM workflows WHERE workflow_id = ?", (workflow_id,)).fetchone()
             assert result is not None
-            return self._record_from_row(result)
+            transitioned = self._record_from_row(result)
+        if target in TERMINAL_STATES:
+            self._compact_sensitive_storage()
+        return transitioned
+
+    def put_action_result(
+        self,
+        workflow_id: str,
+        action_hash: str,
+        result: Any,
+        *,
+        retention_seconds: int | None = None,
+    ) -> ActionResult:
+        """Persist a JSON result using authenticated encryption.
+
+        Repeating the same workflow/action/result is idempotent. Reusing an
+        action hash for different content fails closed.
+        """
+
+        retention = self.result_retention_seconds if retention_seconds is None else retention_seconds
+        if not 1 <= retention <= self._MAX_RESULT_RETENTION_SECONDS:
+            raise ValueError("result retention must be between 1 second and 30 days")
+        raw = canonical_json(result).encode("utf-8")
+        result_hash = content_hash(raw)
+        now = utc_now()
+        expires_at = now + timedelta(seconds=retention)
+        created_at_text = now.isoformat()
+        expires_at_text = expires_at.isoformat()
+        with self._transaction() as connection:
+            if connection.execute(
+                "SELECT 1 FROM workflows WHERE workflow_id = ?", (workflow_id,)
+            ).fetchone() is None:
+                raise WorkflowNotFound(workflow_id)
+            existing = connection.execute(
+                "SELECT * FROM workflow_action_results WHERE workflow_id = ? AND action_hash = ?",
+                (workflow_id, action_hash),
+            ).fetchone()
+            if existing is not None:
+                if existing["content_hash"] != result_hash:
+                    raise WorkflowConflict("action hash was already used for a different result")
+                return self._action_result_from_row(existing, include_result=True)
+            ciphertext = self._encrypt_json(
+                result,
+                associated_data=self._action_result_aad(
+                    workflow_id,
+                    action_hash,
+                    result_hash,
+                    len(raw),
+                    created_at_text,
+                    expires_at_text,
+                ),
+            )
+            connection.execute(
+                """INSERT INTO workflow_action_results(
+                    workflow_id, action_hash, result_ciphertext, content_hash,
+                    size_bytes, created_at, expires_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    workflow_id,
+                    action_hash,
+                    ciphertext,
+                    result_hash,
+                    len(raw),
+                    created_at_text,
+                    expires_at_text,
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM workflow_action_results WHERE workflow_id = ? AND action_hash = ?",
+                (workflow_id, action_hash),
+            ).fetchone()
+            assert row is not None
+            return self._action_result_from_row(row, include_result=True)
+
+    def get_action_result(self, workflow_id: str, action_hash: str) -> Any:
+        """Return the decrypted result body, or raise ``KeyError`` if unavailable."""
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM workflow_action_results
+                   WHERE workflow_id = ? AND action_hash = ? AND expires_at > ?""",
+                (workflow_id, action_hash, utc_now().isoformat()),
+            ).fetchone()
+        if row is None:
+            raise KeyError((workflow_id, action_hash))
+        return self._action_result_from_row(row, include_result=True).result
+
+    def action_result_metadata(self, workflow_id: str, action_hash: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM workflow_action_results
+                   WHERE workflow_id = ? AND action_hash = ? AND expires_at > ?""",
+                (workflow_id, action_hash, utc_now().isoformat()),
+            ).fetchone()
+        if row is None:
+            return None
+        value = self._action_result_from_row(row, include_result=False)
+        return value.model_dump(mode="json", by_alias=True, exclude={"result"})
+
+    def list_action_results(self, workflow_id: str) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM workflow_action_results
+                   WHERE workflow_id = ? AND expires_at > ? ORDER BY created_at, action_hash""",
+                (workflow_id, utc_now().isoformat()),
+            ).fetchall()
+        if not rows and not self._exists(workflow_id):
+            raise WorkflowNotFound(workflow_id)
+        return [
+            self._action_result_from_row(row, include_result=False).model_dump(
+                mode="json", by_alias=True, exclude={"result"}
+            )
+            for row in rows
+        ]
+
+    def purge_expired_results(self, *, now: datetime | None = None) -> int:
+        cutoff = now or utc_now()
+        if cutoff.tzinfo is None:
+            cutoff = cutoff.replace(tzinfo=timezone.utc)
+        cutoff = cutoff.astimezone(timezone.utc)
+        with self._transaction() as connection:
+            deleted = connection.execute(
+                "DELETE FROM workflow_action_results WHERE expires_at <= ?", (cutoff.isoformat(),)
+            )
+            deleted_count = int(deleted.rowcount)
+        if deleted_count:
+            self._compact_sensitive_storage()
+        return deleted_count
 
     def append_event(
         self,
@@ -397,11 +686,13 @@ class WorkflowStore:
             hashed["eventKey"] = event.event_key
         return content_hash(hashed)
 
-    @staticmethod
-    def _record_from_row(row: sqlite3.Row) -> WorkflowRecord:
+    def _record_from_row(self, row: sqlite3.Row) -> WorkflowRecord:
+        work_order = self._decrypt_json(
+            str(row["work_order_json"]), associated_data=f"work-order:{row['workflow_id']}"
+        )
         return WorkflowRecord(
             workflow_id=row["workflow_id"],
-            work_order=WorkOrder.model_validate_json(row["work_order_json"]),
+            work_order=WorkOrder.model_validate(work_order),
             state=WorkflowState(row["state"]),
             state_version=int(row["state_version"]),
             created_at=datetime.fromisoformat(row["created_at"]),
@@ -409,6 +700,32 @@ class WorkflowStore:
             original_content_hash=row["original_content_hash"],
             output_content_hash=row["output_content_hash"],
             stop_reason=row["stop_reason"],
+        )
+
+    def _action_result_from_row(
+        self, row: sqlite3.Row, *, include_result: bool
+    ) -> ActionResult:
+        result = None
+        if include_result:
+            result = self._decrypt_json(
+                str(row["result_ciphertext"]),
+                associated_data=self._action_result_aad(
+                    str(row["workflow_id"]),
+                    str(row["action_hash"]),
+                    str(row["content_hash"]),
+                    int(row["size_bytes"]),
+                    str(row["created_at"]),
+                    str(row["expires_at"]),
+                ),
+            )
+        return ActionResult(
+            workflow_id=row["workflow_id"],
+            action_hash=row["action_hash"],
+            result=result,
+            content_hash=row["content_hash"],
+            size_bytes=int(row["size_bytes"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+            expires_at=datetime.fromisoformat(row["expires_at"]),
         )
 
     @staticmethod

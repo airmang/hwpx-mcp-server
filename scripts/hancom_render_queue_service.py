@@ -19,17 +19,23 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--cert", type=Path)
     parser.add_argument("--key", type=Path)
+    parser.add_argument("--client-ca", type=Path, help="CA trust root for mTLS client certificates")
+    parser.add_argument("--transport-auth", choices=("mtls", "signed_https"), default="mtls")
     parser.add_argument("--secret-env", default="HWPX_RENDER_QUEUE_SECRET")
     parser.add_argument("--allow-insecure-loopback", action="store_true", help="tests only")
     args = parser.parse_args()
     secret = os.environ.get(args.secret_env)
     if not secret:
         parser.error(f"secret environment variable {args.secret_env} is required")
-    policy = RenderSecurityPolicy(sandbox_root=args.root.resolve() / "sandboxes")
+    policy = RenderSecurityPolicy(
+        sandbox_root=args.root.resolve() / "sandboxes",
+        transport_auth=args.transport_auth,
+    )
     queue = DurableRenderQueue(args.root, secret=secret.encode(), policy=policy)
     server = serve_private_queue(
         queue, secret=secret.encode(), host=args.host, port=args.port,
         certfile=args.cert, keyfile=args.key,
+        client_ca_file=args.client_ca,
         allow_insecure_loopback=args.allow_insecure_loopback,
     )
     server.serve_forever()

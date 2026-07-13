@@ -35,6 +35,27 @@ class WorkflowAdapter:
     def prepare_execution(self, record: WorkflowRecord) -> None:
         return None
 
+    def verification_actions(self, record: WorkflowRecord) -> tuple[ActionRequest, ...]:
+        """Return the mandatory, read-only quality gates for this family."""
+
+        return ()
+
+    def execution_evidence_ok(self, record: WorkflowRecord, result: Any) -> bool:
+        return isinstance(result, Mapping) and result.get("ok") is not False
+
+    def verification_ok(self, record: WorkflowRecord, results: tuple[Any, ...]) -> bool:
+        """Fail closed when a mandatory verifier is absent or explicitly fails."""
+
+        actions = self.verification_actions(record)
+        if len(results) != len(actions):
+            return False
+        for result in results:
+            if not isinstance(result, Mapping):
+                return False
+            if result.get("ok") is False or result.get("pass") is False:
+                return False
+        return True
+
     def recon_ok(self, result: Any) -> bool:
         return not isinstance(result, Mapping) or result.get("ok", True) is not False
 
@@ -95,6 +116,23 @@ class TransactionalEditAdapter(WorkflowAdapter):
             destructive=True,
         )
 
+    def verification_actions(self, record: WorkflowRecord) -> tuple[ActionRequest, ...]:
+        return (
+            ActionRequest(
+                tool_name="doc_diff",
+                arguments={
+                    "old_filename": record.work_order.source_path,
+                    "new_filename": record.work_order.output_path,
+                },
+            ),
+        )
+
+    def execution_evidence_ok(self, record: WorkflowRecord, result: Any) -> bool:
+        return (
+            super().execution_evidence_ok(record, result)
+            and isinstance(result.get("semanticDiff"), Mapping)
+        )
+
 
 class KnownTemplateFillAdapter(WorkflowAdapter):
     def _required(self, record: WorkflowRecord) -> tuple[Any, dict[str, Any]]:
@@ -130,6 +168,30 @@ class KnownTemplateFillAdapter(WorkflowAdapter):
             destructive=True,
         )
 
+    def verification_actions(self, record: WorkflowRecord) -> tuple[ActionRequest, ...]:
+        return (
+            ActionRequest(
+                tool_name="inspect_fill_residue",
+                arguments={
+                    "filename": record.work_order.output_path,
+                    "blank_path": record.work_order.source_path,
+                },
+            ),
+            ActionRequest(
+                tool_name="verify_form_fill",
+                arguments={
+                    "filename": record.work_order.output_path,
+                    "before_path": record.work_order.source_path,
+                    "require": False,
+                },
+            ),
+        )
+
+    def verification_ok(self, record: WorkflowRecord, results: tuple[Any, ...]) -> bool:
+        return len(results) == 2 and all(
+            isinstance(result, Mapping) and result.get("ok") is True for result in results
+        )
+
 
 class UnknownFormFillAdapter(WorkflowAdapter):
     def recon_action(self, record: WorkflowRecord) -> ActionRequest:
@@ -154,6 +216,30 @@ class UnknownFormFillAdapter(WorkflowAdapter):
         if tool == "apply_table_ops":
             arguments["render_check"] = "off"
         return ActionRequest(tool_name=tool, arguments=arguments, destructive=True)
+
+    def verification_actions(self, record: WorkflowRecord) -> tuple[ActionRequest, ...]:
+        return (
+            ActionRequest(
+                tool_name="inspect_fill_residue",
+                arguments={
+                    "filename": record.work_order.output_path,
+                    "blank_path": record.work_order.source_path,
+                },
+            ),
+            ActionRequest(
+                tool_name="verify_form_fill",
+                arguments={
+                    "filename": record.work_order.output_path,
+                    "before_path": record.work_order.source_path,
+                    "require": False,
+                },
+            ),
+        )
+
+    def verification_ok(self, record: WorkflowRecord, results: tuple[Any, ...]) -> bool:
+        return len(results) == 2 and all(
+            isinstance(result, Mapping) and result.get("ok") is True for result in results
+        )
 
 
 class TypedAuthoringAdapter(WorkflowAdapter):
@@ -184,6 +270,40 @@ class TypedAuthoringAdapter(WorkflowAdapter):
                 "verify_render": False,
             },
             destructive=True,
+        )
+
+    def verification_actions(self, record: WorkflowRecord) -> tuple[ActionRequest, ...]:
+        actions = [
+            ActionRequest(
+                tool_name="inspect_document_authoring_quality",
+                arguments={
+                    "filename": record.work_order.output_path,
+                    "document_plan": self._plan(record),
+                    "quality_profile": record.work_order.parameters.get("qualityProfile"),
+                },
+            )
+        ]
+        metadata = self._plan(record).get("metadata")
+        document_type = metadata.get("document_type") if isinstance(metadata, Mapping) else None
+        if document_type in {"gongmun", "official", "official_document", "공문"}:
+            actions.append(
+                ActionRequest(
+                    tool_name="inspect_official_document_style",
+                    arguments={"filename": record.work_order.output_path},
+                )
+            )
+        return tuple(actions)
+
+    def verification_ok(self, record: WorkflowRecord, results: tuple[Any, ...]) -> bool:
+        actions = self.verification_actions(record)
+        if len(results) != len(actions) or not results:
+            return False
+        quality = results[0]
+        if not isinstance(quality, Mapping) or quality.get("pass") is not True:
+            return False
+        return all(
+            isinstance(result, Mapping) and result.get("ok") is True
+            for result in results[1:]
         )
 
 

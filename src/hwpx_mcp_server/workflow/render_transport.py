@@ -6,13 +6,15 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
+import socket
 import ssl
 import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.error import HTTPError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
@@ -28,14 +30,43 @@ def request_signature(secret: bytes, method: str, path: str, timestamp: str, bod
 
 
 class RemoteRenderClientV2:
-    def __init__(self, base_url: str, *, secret: bytes, timeout: float = 30, allow_insecure_loopback: bool = False) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        secret: bytes,
+        transport_auth: Literal["mtls", "signed_https"] = "mtls",
+        ca_file: Path | None = None,
+        client_certfile: Path | None = None,
+        client_keyfile: Path | None = None,
+        timeout: float = 30,
+        allow_insecure_loopback: bool = False,
+    ) -> None:
         parsed = urlparse(base_url)
-        if parsed.scheme != "https" and not (
+        if transport_auth not in {"mtls", "signed_https"}:
+            raise ValueError("transport_auth must be 'mtls' or 'signed_https'")
+        insecure_loopback = bool(
             allow_insecure_loopback and parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
-        ):
+        )
+        if parsed.scheme != "https" and not insecure_loopback:
             raise ValueError("render queue URL must use HTTPS (HTTP is test-only loopback)")
+        if transport_auth == "mtls" and not insecure_loopback:
+            if not ca_file or not client_certfile or not client_keyfile:
+                raise ValueError("mTLS requires a CA trust root, client certificate, and client key")
+            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=str(ca_file))
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
+            context.load_cert_chain(str(client_certfile), str(client_keyfile))
+        elif transport_auth == "signed_https":
+            if client_certfile or client_keyfile:
+                raise ValueError("signed_https does not accept mTLS client credentials")
+            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=str(ca_file) if ca_file else None)
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
+        else:  # explicit test-only HTTP loopback in mTLS mode
+            context = None
         self.base_url = base_url.rstrip("/")
         self.secret = secret
+        self.transport_auth = transport_auth
+        self._ssl_context = context
         self.timeout = timeout
 
     def _request(self, method: str, path: str, payload: dict[str, Any] | None = None, *, raw: bool = False):
@@ -49,7 +80,7 @@ class RemoteRenderClientV2:
             },
         )
         try:
-            with urlopen(request, timeout=self.timeout) as response:
+            with urlopen(request, timeout=self.timeout, context=self._ssl_context) as response:
                 data = response.read()
         except HTTPError as exc:
             raise RenderQueueError(f"REMOTE_HTTP_{exc.code}", "remote render queue request failed") from exc
@@ -158,18 +189,53 @@ def make_queue_handler(queue: DurableRenderQueue, *, secret: bytes, max_clock_sk
 def serve_private_queue(
     queue: DurableRenderQueue, *, secret: bytes, host: str, port: int,
     certfile: Path | None = None, keyfile: Path | None = None,
+    client_ca_file: Path | None = None,
     allow_insecure_loopback: bool = False,
+    allow_non_private_test_bind: bool = False,
 ) -> ThreadingHTTPServer:
+    if queue.policy.private_network_required and not allow_non_private_test_bind and not _is_private_bind_host(host):
+        raise ValueError("render queue must bind only to a private or loopback address")
+    insecure_loopback = bool(
+        allow_insecure_loopback and host in {"127.0.0.1", "localhost", "::1"}
+    )
     if not certfile or not keyfile:
-        if not (allow_insecure_loopback and host in {"127.0.0.1", "localhost", "::1"}):
+        if not insecure_loopback:
             raise ValueError("TLS certificate and key are required outside test-only loopback")
+    if queue.policy.transport_auth == "mtls" and not insecure_loopback and not client_ca_file:
+        raise ValueError("mTLS requires a CA trust root for client-certificate verification")
+    if queue.policy.transport_auth == "signed_https" and client_ca_file:
+        raise ValueError("signed_https must not be configured as implicit mTLS")
     server = ThreadingHTTPServer((host, port), make_queue_handler(queue, secret=secret))
     if certfile and keyfile:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.minimum_version = ssl.TLSVersion.TLSv1_2
-        context.load_cert_chain(certfile, keyfile)
+        context.load_cert_chain(str(certfile), str(keyfile))
+        if queue.policy.transport_auth == "mtls":
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(cafile=str(client_ca_file))
         server.socket = context.wrap_socket(server.socket, server_side=True)
     return server
+
+
+def _is_private_bind_host(host: str) -> bool:
+    """Fail closed unless every address represented by *host* is private/loopback."""
+
+    try:
+        addresses = {ipaddress.ip_address(host)}
+    except ValueError:
+        try:
+            addresses = {
+                ipaddress.ip_address(item[4][0].split("%", 1)[0])
+                for item in socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+            }
+        except (OSError, ValueError):
+            return False
+    return bool(addresses) and all(
+        (address.is_private or address.is_loopback)
+        and not address.is_unspecified
+        and not address.is_multicast
+        for address in addresses
+    )
 
 
 __all__ = ["RemoteRenderClientV2", "make_queue_handler", "request_signature", "serve_private_queue"]

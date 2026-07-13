@@ -37,7 +37,10 @@ FAMILY_TOOL_ALLOWLISTS: dict[WorkFamily, frozenset[str]] = {
         }
     ),
     WorkFamily.KNOWN_TEMPLATE_FILL: frozenset(
-        {"list_form_fields", "fill_form_field", "analyze_template_formfit", "apply_template_formfit", "verify_form_fill"}
+        {
+            "list_form_fields", "fill_form_field", "analyze_template_formfit",
+            "apply_template_formfit", "inspect_fill_residue", "verify_form_fill",
+        }
     ),
     WorkFamily.UNKNOWN_FORM_FILL: frozenset(
         {"scan_form_guidance", "apply_table_ops", "apply_body_ops", "inspect_fill_residue", "verify_form_fill"}
@@ -49,6 +52,7 @@ FAMILY_TOOL_ALLOWLISTS: dict[WorkFamily, frozenset[str]] = {
             "analyze_document_plan",
             "create_document_from_plan",
             "inspect_document_authoring_quality",
+            "inspect_official_document_style",
         }
     ),
 }
@@ -129,7 +133,14 @@ class AllowlistedDispatcher:
         action_events = [event for event in events if event.payload.get("actionHash") == action.action_hash]
         completed = next((event for event in reversed(action_events) if event.event_type == "dispatch.completed"), None)
         if completed is not None:
-            return DispatchOutcome(result=None, replayed=True, receipt=completed)
+            # The primitive result is encrypted outside the append-only ledger.
+            # Replays must return the exact prior result so workflow planning and
+            # verification never depend on an in-memory first execution.
+            return DispatchOutcome(
+                result=store.get_action_result(workflow_id, action.action_hash),
+                replayed=True,
+                receipt=completed,
+            )
         started_attempts = [event for event in action_events if event.event_type == "dispatch.started"]
         terminal_attempts = {
             int(event.payload["attempt"])
@@ -184,6 +195,7 @@ class AllowlistedDispatcher:
                 event_key=f"dispatch:{action.action_hash}:{attempt}:failed",
             )
             raise
+        store.put_action_result(workflow_id, action.action_hash, result)
         completed_record, completed_receipt, _ = store.append_event(
             workflow_id,
             "dispatch.completed",

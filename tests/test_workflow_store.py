@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -13,6 +14,7 @@ from hwpx_mcp_server.workflow import (
     WorkflowState,
     WorkflowStore,
 )
+from hwpx_mcp_server.workflow.models import utc_now
 
 
 def order(**changes: object) -> WorkOrder:
@@ -297,3 +299,98 @@ def test_binary_payload_and_original_overwrite_policy_are_rejected():
         order(parameters={"document": b"PK..."})
     with pytest.raises(ValidationError, match="preserve the original"):
         order(policy={"preserve_original": False})
+
+
+def test_work_order_and_action_results_are_authenticated_and_not_plaintext(tmp_path):
+    path = tmp_path / "workflow.sqlite3"
+    secret = "900101-1234567"
+    store = WorkflowStore(path, encryption_key=b"x" * 32)
+    record, _ = store.create(order(parameters={"residentNumber": secret}))
+    saved = store.put_action_result(
+        record.workflow_id, "sha256:action", {"residentNumber": secret, "ok": True}
+    )
+
+    assert store.get(record.workflow_id).work_order.parameters["residentNumber"] == secret
+    assert store.get_action_result(record.workflow_id, "sha256:action") == saved.result
+    assert saved.result["residentNumber"] == secret
+    assert secret.encode() not in path.read_bytes()
+    assert b"request-0001" not in path.read_bytes()
+    metadata = store.action_result_metadata(record.workflow_id, "sha256:action")
+    assert metadata is not None
+    assert metadata["contentHash"].startswith("sha256:")
+    assert metadata["sizeBytes"] > 0
+    assert "result" not in metadata
+
+
+def test_action_result_tampering_fails_authentication(tmp_path):
+    path = tmp_path / "workflow.sqlite3"
+    store = WorkflowStore(path, encryption_key=b"y" * 32)
+    record, _ = store.create(order())
+    store.put_action_result(record.workflow_id, "sha256:action", {"value": "secret"})
+    with sqlite3.connect(path) as connection:
+        envelope = connection.execute(
+            "SELECT result_ciphertext FROM workflow_action_results"
+        ).fetchone()[0]
+        replacement = envelope[:-1] + ("A" if envelope[-1] != "A" else "B")
+        connection.execute(
+            "UPDATE workflow_action_results SET result_ciphertext = ?", (replacement,)
+        )
+
+    with pytest.raises(WorkflowConflict, match="failed authentication"):
+        store.get_action_result(record.workflow_id, "sha256:action")
+
+
+def test_terminal_transition_scrubs_parameters_and_result_retention_is_bounded(tmp_path):
+    path = tmp_path / "workflow.sqlite3"
+    store = WorkflowStore(path, encryption_key=b"z" * 32, result_retention_seconds=60)
+    current, _ = store.create(order(parameters={"residentNumber": "900101-1234567"}))
+    store.put_action_result(current.workflow_id, "sha256:action", {"answer": 42})
+    for target in (
+        WorkflowState.RECON,
+        WorkflowState.PLAN,
+        WorkflowState.EXECUTE,
+        WorkflowState.VERIFY,
+        WorkflowState.COMPLETED,
+    ):
+        current = store.transition(
+            current.workflow_id,
+            target,
+            expected_state=current.state,
+            expected_version=current.state_version,
+        )
+
+    assert current.work_order.parameters == {}
+    assert store.get(current.workflow_id).work_order.parameters == {}
+    assert store.purge_expired_results(now=utc_now() + timedelta(seconds=61)) == 1
+    with pytest.raises(KeyError):
+        store.get_action_result(current.workflow_id, "sha256:action")
+    with pytest.raises(ValueError, match="between 1 second and 30 days"):
+        WorkflowStore(tmp_path / "too-long.sqlite3", result_retention_seconds=31 * 24 * 60 * 60)
+
+
+def test_action_result_hash_reuse_with_different_content_fails_closed(tmp_path):
+    store = WorkflowStore(tmp_path / "workflow.sqlite3", encryption_key=b"k" * 32)
+    record, _ = store.create(order())
+    first = store.put_action_result(record.workflow_id, "sha256:action", {"value": 1})
+    repeated = store.put_action_result(record.workflow_id, "sha256:action", {"value": 1})
+    assert repeated == first
+    with pytest.raises(WorkflowConflict, match="different result"):
+        store.put_action_result(record.workflow_id, "sha256:action", {"value": 2})
+
+
+def test_legacy_plaintext_work_order_is_migrated_and_vacuumed(tmp_path):
+    path = tmp_path / "workflow.sqlite3"
+    key = b"m" * 32
+    store = WorkflowStore(path, encryption_key=key)
+    record, _ = store.create(order())
+    legacy_secret = "legacy-900101-1234567"
+    legacy_order = order(parameters={"residentNumber": legacy_secret}).model_dump_json()
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "UPDATE workflows SET work_order_json = ? WHERE workflow_id = ?",
+            (legacy_order, record.workflow_id),
+        )
+
+    reopened = WorkflowStore(path, encryption_key=key)
+    assert reopened.get(record.workflow_id).work_order.parameters["residentNumber"] == legacy_secret
+    assert legacy_secret.encode() not in path.read_bytes()

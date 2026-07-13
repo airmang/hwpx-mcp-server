@@ -26,7 +26,7 @@ def namespace(calls: list[str]):
     def read(name):
         def function(**arguments):
             calls.append(name)
-            return {"ok": True, "filename": arguments.get("filename")}
+            return {"ok": True, "filename": arguments.get("filename"), "payload": "durable-result"}
 
         return function
 
@@ -46,6 +46,7 @@ def namespace(calls: list[str]):
                 "created": True,
                 "openSafety": {"ok": True},
                 "verificationReport": {"ok": True, "openSafety": {"ok": True}},
+                "semanticDiff": {"changed": True, "operations": 1},
             }
 
         return function
@@ -59,6 +60,11 @@ def namespace(calls: list[str]):
         "apply_template_formfit": write("apply_template_formfit"),
         "apply_table_ops": write("apply_table_ops"),
         "create_document_from_plan": write("create_document_from_plan"),
+        "doc_diff": lambda **arguments: calls.append("doc_diff") or {"changes": []},
+        "inspect_fill_residue": lambda **arguments: calls.append("inspect_fill_residue") or {"ok": True, "errors": []},
+        "verify_form_fill": lambda **arguments: calls.append("verify_form_fill") or {"ok": True, "renderChecked": False},
+        "inspect_document_authoring_quality": lambda **arguments: calls.append("inspect_document_authoring_quality") or {"pass": True},
+        "inspect_official_document_style": lambda **arguments: calls.append("inspect_official_document_style") or {"ok": True},
     }
 
 
@@ -128,6 +134,87 @@ def test_weak_client_drives_each_family_using_only_high_level_api(
     if family != WorkFamily.READ_EXTRACT:
         assert output.exists()
         assert terminal["decisions"][0]["status"] == "approved"
+        assert terminal["domainVerification"]["ok"] is True
+    else:
+        assert terminal["result"]["payload"] == "durable-result"
+
+
+def test_transactional_receipt_preserves_real_semantic_diff(tmp_path: Path):
+    calls: list[str] = []
+    source = tmp_path / "source.hwpx"
+    output = tmp_path / "output.hwpx"
+    source.write_bytes(b"fixture")
+    service = WorkflowService(namespace(calls), store=WorkflowStore(tmp_path / "workflow.sqlite3"))
+    terminal = drive(
+        service,
+        service.start(
+            family="transactional_edit",
+            idempotency_key="semantic-diff-result",
+            source_path=str(source),
+            output_path=str(output),
+            parameters={"operations": [{"op": "replace_text", "find": "a", "replace": "b"}]},
+        ),
+    )
+
+    assert terminal["state"] == "completed"
+    assert terminal["semanticDiff"] == {
+        "changed": True,
+        "operations": 1,
+        "status": "computed",
+        "available": True,
+    }
+    assert terminal["result"]["semanticDiff"]["changed"] is True
+    fetched = service.workflow_result(terminal["workflowId"])
+    assert fetched["contentHash"].startswith("sha256:")
+    assert fetched["result"] == terminal["result"]
+
+
+def test_failed_family_verifier_never_completes(tmp_path: Path):
+    calls: list[str] = []
+    source = tmp_path / "blank.hwpx"
+    output = tmp_path / "filled.hwpx"
+    source.write_bytes(b"fixture")
+    tools = namespace(calls)
+    tools["inspect_fill_residue"] = lambda **arguments: {"ok": False, "errors": [{"kind": "placeholder"}]}
+    service = WorkflowService(tools, store=WorkflowStore(tmp_path / "workflow.sqlite3"))
+    terminal = drive(
+        service,
+        service.start(
+            family="unknown_form_fill",
+            idempotency_key="domain-verifier-failure",
+            source_path=str(source),
+            output_path=str(output),
+            parameters={"operationKind": "table", "operations": []},
+        ),
+    )
+
+    assert terminal["state"] == "needs_review"
+    assert terminal["stopReason"] == "VERIFICATION_EVIDENCE_REQUIRED"
+    assert terminal["domainVerification"]["ok"] is False
+
+
+def test_missing_family_verifier_abstains_instead_of_completing(tmp_path: Path):
+    calls: list[str] = []
+    source = tmp_path / "blank.hwpx"
+    output = tmp_path / "filled.hwpx"
+    source.write_bytes(b"fixture")
+    tools = namespace(calls)
+    del tools["verify_form_fill"]
+    service = WorkflowService(tools, store=WorkflowStore(tmp_path / "workflow.sqlite3"))
+    terminal = drive(
+        service,
+        service.start(
+            family="known_template_fill",
+            idempotency_key="missing-domain-verifier",
+            source_path=str(source),
+            output_path=str(output),
+            parameters={"baseline": {"schema": "fixture"}, "content": {"name": "홍길동"}},
+        ),
+    )
+
+    assert terminal["state"] == "needs_review"
+    assert terminal["stopReason"] == "TOOL_UNAVAILABLE"
+    assert terminal["domainVerification"]["complete"] is False
 
 
 def test_unsupported_intent_and_incomplete_adapter_abstain_honestly(tmp_path):

@@ -2,6 +2,7 @@
 """Durable server-enforced HWPX workflow engine contracts."""
 
 from .models import (
+    ActionResult,
     WORKFLOW_SCHEMA_VERSION,
     WorkFamily,
     WorkOrder,
@@ -25,6 +26,7 @@ from .state_machine import ALLOWED_TRANSITIONS, InvalidTransition
 from .store import WorkflowConflict, WorkflowNotFound, WorkflowStore
 
 __all__ = [
+    "ActionResult",
     "ALLOWED_TRANSITIONS",
     "ActionRequest",
     "AllowlistedDispatcher",

@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_TOOLS = {
     "start_workflow",
     "get_workflow",
+    "get_workflow_result",
     "continue_workflow",
     "approve_workflow_decision",
     "cancel_workflow",
@@ -43,7 +44,7 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert WORKFLOW_TOOLS <= set(server._fastmcp_tool_names())
     assert RENDER_TOOLS <= set(server._fastmcp_tool_names())
     assert BLIND_EVAL_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False)) == 120
+    assert len(expected_tool_names(advanced=False)) == 121
     assert len(expected_tool_names(advanced=False) - WORKFLOW_TOOLS - RENDER_TOOLS - BLIND_EVAL_TOOLS) == 108
     workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
     assert len(workflow_domains) == 1
@@ -114,6 +115,7 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
         "policy",
     } == inputs["start_workflow"]
     assert {"workflow_id", "approved", "action_hash"} == inputs["approve_workflow_decision"]
+    assert {"workflow_id", "action_hash"} == inputs["get_workflow_result"]
 
 
 def test_health_fails_exactly_when_required_tool_missing(monkeypatch) -> None:
