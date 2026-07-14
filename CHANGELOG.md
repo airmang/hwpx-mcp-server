@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [2.23.0] - 2026-07-15
+
+### Added
+- **Typed agent document and blueprint surfaces**: compact semantic node/query/atomic-command tools plus typed
+  `.hwpxbp` dump and strict atomic replay facades, sharing the core catalog, revision, fidelity, dependency,
+  idempotency, rollback, lossless, and open-safety contracts.
+- **Durable document workflows and rendering**: server-enforced workflow policy, authenticated durable Hancom
+  render queue/transport, fixture visual-QA and guarded repair, blind benchmark receipts, and privacy-preserving
+  practice scenario/campaign execution with independent evaluator provenance and chaos gates.
+- The exact release-facing ToolSpec expands to 133 default / 143 advanced tools.
+
+### Fixed
+- Retains the public 2.18.2 pathological-spacing repair for every touched replacement, paragraph insertion,
+  addition, form fill, and table path while preserving legitimate compressed spacing and untouched source styles.
+- Retains the public 2.18.3 SQUEEZE-cell safety through `python-hwpx>=2.29.0`; changed non-empty cells wrap with
+  `BREAK`, while no-op, clear, and untouched cells preserve their original mode.
+
+### Note
+- 2.19.0–2.22.0 were staged local candidates rather than public releases; their accumulated changes are
+  consolidated into this 2.23.0 public entry.
+
 ## [2.18.3] - 2026-07-14
 
 ### Fixed

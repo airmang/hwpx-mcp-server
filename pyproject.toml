@@ -50,9 +50,8 @@ Issues = "https://github.com/airmang/hwpx-mcp-server/issues"
 [project.scripts]
 "hwpx-mcp-server" = "hwpx_mcp_server.server:main"
 
-# Co-located development: resolve python-hwpx from the sibling checkout so the
-# unreleased 2.12.0 (VisualComplete quality stack) is used as an editable source.
-# Affects local `uv` resolution only; the published wheel keeps `python-hwpx>=2.12.0`.
+# Co-located development: resolve python-hwpx from the sibling checkout.
+# This affects local `uv` resolution only; published metadata keeps `python-hwpx>=2.29.0`.
 [tool.uv.sources]
 python-hwpx = { path = "../python-hwpx", editable = true }
 
