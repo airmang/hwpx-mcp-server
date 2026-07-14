@@ -10,6 +10,11 @@ __all__ = [
     "PracticeRegistryStore",
     "PracticeScenarioError",
     "PracticeScenarioService",
+    "PracticeSandbox",
+    "PracticeSandboxError",
+    "PracticeSandboxManager",
+    "SandboxLimits",
+    "validate_practice_roots",
 ]
 
 
@@ -29,4 +34,14 @@ def __getattr__(name: str) -> Any:
         from . import store
 
         return getattr(store, name)
+    if name in {
+        "PracticeSandbox",
+        "PracticeSandboxError",
+        "PracticeSandboxManager",
+        "SandboxLimits",
+        "validate_practice_roots",
+    }:
+        from . import sandbox
+
+        return getattr(sandbox, name)
     raise AttributeError(name)
