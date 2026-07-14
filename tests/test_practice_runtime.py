@@ -14,18 +14,43 @@ import pytest
 
 from hwpx import validate_editor_open_safety
 from hwpx.builder import Document, Paragraph, Section
-from hwpx.practice import PRACTICE_RUN_SCHEMA, build_campaign_manifest, practice_run_id
+from hwpx.practice import (
+    PRACTICE_RUN_SCHEMA,
+    abstention_inventory_authentication_key_id,
+    build_domain_evaluation_bundle,
+    build_domain_requirement,
+    build_form_target_policy,
+    build_package_policy,
+    build_campaign_manifest,
+    current_evaluator_code_sha256,
+    controlled_mutation,
+    domain_row_sha256,
+    domain_value_sha256,
+    evaluator_authentication_key_id,
+    evaluation_policy_sha256,
+    must_abstain_verifier_policy_sha256,
+    practice_run_id,
+    redact_run_receipt,
+    structural_verifier_policy_sha256,
+    synthetic_dossier,
+    workflow_event_id,
+)
+from hwpx.practice.evaluator import semantic_diff_sha256
+from hwpx.practice.run import PRACTICE_RUN_EVENT_SCHEMA
 from hwpx_mcp_server import server
 from hwpx_mcp_server.practice import runtime as runtime_module
 from hwpx_mcp_server.practice.runtime import (
     PracticeRuntimeError,
     _TerminalArtifactStore,
+    _TerminalEvaluatorStore,
+    _structural_workflow_parameters,
     _reset_practice_campaign_runtime_for_tests,
     _startup_reap,
     _task_dispatch_sha256,
     build_practice_campaign_service,
     installed_runtime_provenance,
 )
+from hwpx_mcp_server.practice.dispatch import ResolvedPracticeTask
 
 
 def _digest(value: str | bytes) -> str:
@@ -44,11 +69,16 @@ def _budgets() -> dict[str, int]:
     }
 
 
-def _provenance(skill_root: Path, skill_version: str) -> dict[str, Any]:
+_EVALUATOR_KEY = b"runtime-evaluator-owner-key-material-01"
+
+
+def _provenance(
+    skill_root: Path, skill_version: str, evaluator_key: bytes = _EVALUATOR_KEY
+) -> dict[str, Any]:
     return installed_runtime_provenance(
         skill_root,
         skill_version,
-        "EVK-0123456789ABCDEF0123",
+        evaluator_authentication_key_id(evaluator_key),
     )
 
 
@@ -65,10 +95,10 @@ def _campaign(source_bytes: bytes, provenance: dict[str, Any]):
     task_material = {
         "scenarioRef": scenario_ref,
         "evaluationPolicySha256": _digest("evaluation-policy"),
-        "workflowFamily": "unknown_form_fill",
+        "workflowFamily": "transactional_edit",
         "artifactScope": "practice",
         "sourceArtifactSha256": source_hash,
-        "parameters": {"operationKind": "table", "operations": []},
+        "parameters": {"operations": []},
         "privacy": {
             "syntheticInputsOnly": True,
             "highConfidencePiiCount": 0,
@@ -202,8 +232,22 @@ def _layout(
     (skill_root / "references" / "runner.md").write_text(
         "synthetic runner contract\n", encoding="utf-8"
     )
-    for name in ("campaigns", "queue", "results", "sandboxes", "workflow"):
+    for name in (
+        "campaigns",
+        "queue",
+        "results",
+        "sandboxes",
+        "workflow",
+        "evaluator",
+    ):
         (runtime_root / name).mkdir(parents=True, exist_ok=True)
+    evaluator_root = runtime_root / "evaluator"
+    evaluator_root.chmod(0o700)
+    for name in ("materials", "results", "snapshots", "assets"):
+        (evaluator_root / name).mkdir(mode=0o700)
+    key_path = evaluator_root / "authentication.key"
+    key_path.write_bytes(_EVALUATOR_KEY)
+    key_path.chmod(0o600)
     skill_version = "0.1.28"
     monkeypatch.setenv("HWPX_CORPUS_SOURCE", str(source_root))
     monkeypatch.setenv("HWPX_PRACTICE_ROOT", str(practice_root))
@@ -228,6 +272,42 @@ def _layout(
     tasks_root.mkdir(parents=True)
     _write_json(campaign_root / "manifest.json", manifest)
     _write_json(tasks_root / f"{run_ref['runId']}.json", task)
+    evaluator_material_path = (
+        evaluator_root / "materials" / f"{run_ref['runId']}.json"
+    )
+    _write_json(
+        evaluator_material_path,
+        {
+            "schema": "hwpx.practice-evaluator-material/v1",
+            "runId": run_ref["runId"],
+            "scenarioId": run_ref["scenarioId"],
+            "evaluationPolicySha256": run_ref["evaluationPolicySha256"],
+            "packagePolicy": build_package_policy(),
+            "semanticPolicy": {
+                "schema": "hwpx.practice-semantic-policy/v1",
+                "expectedDiff": {"required": False, "sha256": None},
+                "allowedChangedMembers": [],
+                "promisedUntouchedMembers": [],
+                "revision": {
+                    "required": False,
+                    "expectedBefore": None,
+                    "expectedAfter": None,
+                },
+                "idempotency": {
+                    "required": False,
+                    "expectedMutationCount": None,
+                },
+            },
+            "domainAdapter": {
+                "kind": "edit",
+                "taskKind": "constrained_edit",
+                "family": run_ref["family"],
+                "verifierPolicySha256s": {},
+                "config": {},
+            },
+        },
+    )
+    evaluator_material_path.chmod(0o600)
     return {
         "sourceRoot": source_root,
         "practiceRoot": practice_root,
@@ -305,6 +385,8 @@ def test_env_runtime_lazily_wires_public_start_preview_and_queue(
     assert first is replay
     assert first.startup_reaper_receipt["supported"] is True
     assert isinstance(first.terminal_artifact_hook, _TerminalArtifactStore)
+    assert isinstance(first.terminal_evaluator_hook, _TerminalEvaluatorStore)
+    assert first.terminal_artifact_hook is not first.terminal_evaluator_hook
     encoded = json.dumps([preview, started], ensure_ascii=False)
     assert str(fixture["sourceRoot"]) not in encoded
     assert str(fixture["practiceRoot"]) not in encoded
@@ -328,7 +410,7 @@ def test_task_resolution_uses_only_fixed_opaque_and_content_addressed_paths(
     resolved = service.task_resolver(fixture["manifest"], lease)
 
     assert resolved.source_artifact == fixture["artifact"]
-    assert resolved.parameters == {"operationKind": "table", "operations": []}
+    assert resolved.parameters == {"operations": []}
 
     injected = dict(fixture["task"])
     injected["parameters"] = {"outputPath": "/tmp/private.hwpx"}
@@ -340,6 +422,104 @@ def test_task_resolution_uses_only_fixed_opaque_and_content_addressed_paths(
     tampered["parameters"] = {"operationKind": "body", "operations": []}
     _write_json(fixture["taskPath"], tampered)
     with pytest.raises(ValueError, match="content address"):
+        service.task_resolver(fixture["manifest"], lease)
+
+
+def test_structural_task_maps_only_to_dedicated_installed_table_adapter(
+    tmp_path: Path, monkeypatch
+) -> None:
+    fixture = _layout(tmp_path, monkeypatch)
+    run_ref = fixture["runRef"]
+    row_sha = domain_row_sha256(["SYNTHETIC", "PURPOSE", "1000"])
+    value_shas = sorted(
+        domain_value_sha256(value)
+        for value in ("SYNTHETIC", "PURPOSE", "1000")
+    )
+    policy_sha = structural_verifier_policy_sha256(
+        expected_start_sha256=run_ref["startArtifactSha256"],
+        expected_row_sha256=row_sha,
+        expected_value_sha256s=value_shas,
+    )
+    material_path = (
+        fixture["runtimeRoot"]
+        / "evaluator"
+        / "materials"
+        / f"{run_ref['runId']}.json"
+    )
+    material = json.loads(material_path.read_text(encoding="utf-8"))
+    material["domainAdapter"] = {
+        "kind": "structural_table",
+        "taskKind": "structural_edit",
+        "family": run_ref["family"],
+        "verifierPolicySha256s": {"structural_table": policy_sha},
+        "config": {
+            "expectedStartSha256": run_ref["startArtifactSha256"],
+            "expectedRowSha256": row_sha,
+            "expectedValueSha256s": value_shas,
+        },
+    }
+    _write_json(material_path, material)
+    task = dict(fixture["task"])
+    task["workflowFamily"] = "structural_table_edit"
+    mutation = controlled_mutation(
+        "structural_edit",
+        synthetic_dossier("p5-structural", 0),
+        seed="p5-structural",
+        index=0,
+    )
+    task["parameters"] = _structural_workflow_parameters(
+        mutation, table_index=5, reference_row=9
+    )
+    task["dispatch"] = {
+        **task["dispatch"],
+        "seedSha256": _task_dispatch_sha256(task),
+    }
+    _write_json(fixture["taskPath"], task)
+    service = _build()
+    lease = SimpleNamespace(slot=0, run_id=run_ref["runId"])
+
+    resolved = service.task_resolver(fixture["manifest"], lease)
+
+    assert resolved.workflow_family == "structural_table_edit"
+    assert resolved.parameters["operations"][0]["op"] == "insert_row_by_clone"
+    assert resolved.parameters["operations"][0]["table_index"] == 5
+    assert resolved.parameters["operations"][0]["ref_row"] == 9
+    assert [row["col"] for row in resolved.parameters["operations"][1:]] == [
+        0,
+        1,
+        2,
+    ]
+    assert {row["row"] for row in resolved.parameters["operations"][1:]} == {10}
+
+    unsafe = dict(task)
+    unsafe["workflowFamily"] = "transactional_edit"
+    unsafe["dispatch"] = {
+        **unsafe["dispatch"],
+        "seedSha256": _task_dispatch_sha256(unsafe),
+    }
+    _write_json(fixture["taskPath"], unsafe)
+    with pytest.raises(ValueError, match="installed workflow mapping"):
+        service.task_resolver(fixture["manifest"], lease)
+
+    generic = dict(task)
+    generic["parameters"] = {
+        "operationKind": "table",
+        "operations": [{"op": "append_table_row"}],
+    }
+    generic["dispatch"] = {
+        **generic["dispatch"],
+        "seedSha256": _task_dispatch_sha256(generic),
+    }
+    _write_json(fixture["taskPath"], generic)
+    with pytest.raises(ValueError, match="structural task workflow mapping"):
+        service.task_resolver(fixture["manifest"], lease)
+
+    _write_json(fixture["taskPath"], task)
+    material["domainAdapter"]["verifierPolicySha256s"] = {
+        "structural_table": _digest("unbound-structural-policy")
+    }
+    _write_json(material_path, material)
+    with pytest.raises(ValueError, match="structural policy binding"):
         service.task_resolver(fixture["manifest"], lease)
 
 
@@ -676,6 +856,499 @@ def test_terminal_artifact_store_never_follows_existing_target_symlink(
     with pytest.raises(PracticeRuntimeError):
         _TerminalArtifactStore(results)(SimpleNamespace(), outcome)
     assert outside.read_bytes() == b"unchanged"
+
+
+def _changed_members(start: Path, output: Path) -> list[str]:
+    def members(path: Path) -> dict[str, str]:
+        with zipfile.ZipFile(path, "r") as package:
+            return {
+                item.filename: _digest(package.read(item))
+                for item in package.infolist()
+                if not item.is_dir()
+            }
+
+    before = members(start)
+    after = members(output)
+    return sorted(
+        name
+        for name in set(before) | set(after)
+        if before.get(name) != after.get(name)
+    )
+
+
+def _semantic_policy(start: Path, output: Path) -> dict[str, Any]:
+    return {
+        "schema": "hwpx.practice-semantic-policy/v1",
+        "expectedDiff": {
+            "required": True,
+            "sha256": semantic_diff_sha256(start, output),
+        },
+        "allowedChangedMembers": _changed_members(start, output),
+        "promisedUntouchedMembers": [],
+        "revision": {
+            "required": False,
+            "expectedBefore": None,
+            "expectedAfter": None,
+        },
+        "idempotency": {
+            "required": False,
+            "expectedMutationCount": None,
+        },
+    }
+
+
+def _evaluator_case(
+    tmp_path: Path,
+    *,
+    start: Path,
+    output: Path | None,
+    task_kind: str,
+    family: str,
+    adapter_kind: str,
+    verifier_policies: Mapping[str, str],
+    adapter_config: Mapping[str, Any],
+    terminal_state: str,
+) -> tuple[
+    _TerminalEvaluatorStore,
+    _TerminalArtifactStore,
+    ResolvedPracticeTask,
+    SimpleNamespace,
+    dict[str, Any],
+    dict[str, Any],
+]:
+    evaluator_root = tmp_path / "evaluator"
+    artifact_root = tmp_path / "retained"
+    evaluator_root.mkdir(mode=0o700)
+    artifact_root.mkdir(mode=0o700)
+    for name in ("materials", "results", "snapshots", "assets"):
+        (evaluator_root / name).mkdir(mode=0o700)
+    key_path = evaluator_root / "authentication.key"
+    key_path.write_bytes(_EVALUATOR_KEY)
+    key_path.chmod(0o600)
+
+    scenario_ref = {
+        "scenarioId": "SCN-00000000000000000091",
+        "scenarioSha256": _digest(f"scenario-{adapter_kind}"),
+        "runnerManifestSha256": _digest("runner-manifest"),
+        "derivativeSha256": _digest("derivative"),
+        "startArtifactId": "ART-00000000000000000091",
+        "startArtifactSha256": _digest(start.read_bytes()),
+    }
+    provenance = {
+        "stack": {
+            "core": {"version": "2.12.0.dev1", "sha256": _digest("core")},
+            "server": {"version": "2.5.0.dev1", "sha256": _digest("server")},
+            "skill": {"version": "0.1.9.dev1", "sha256": _digest("skill")},
+        },
+        "toolSpec": {"version": "tool-spec/v1", "sha256": "0123456789abcdef"},
+        "evaluator": {
+            "version": "practice-evaluator/v1",
+            "sha256": current_evaluator_code_sha256(),
+            "authenticationKeyId": evaluator_authentication_key_id(
+                _EVALUATOR_KEY
+            ),
+        },
+    }
+    dispatch = {
+        "slot": 0,
+        "dispatchKey": "DSP-00000000000000000091",
+        "seedSha256": _digest(f"dispatch-{adapter_kind}"),
+    }
+    budgets = _budgets()
+    run_seed = {
+        "schema": PRACTICE_RUN_SCHEMA,
+        "scenarioRef": scenario_ref,
+        "dispatch": dispatch,
+        "provenance": provenance,
+        "budgets": budgets,
+    }
+    run_id = practice_run_id(run_seed)
+    evaluated = output if output is not None else start
+    requirement = build_domain_requirement(
+        scenario_sha256=scenario_ref["scenarioSha256"],
+        artifact_sha256=_digest(evaluated.read_bytes()),
+        task_kind=task_kind,
+        family=family,
+        verifier_policy_sha256s=verifier_policies,
+    )
+    bundle = build_domain_evaluation_bundle(
+        requirement, [], observed_terminal_state=terminal_state
+    )
+    package_policy = build_package_policy(
+        expected_sha256=_digest(evaluated.read_bytes())
+    )
+    semantic_policy = _semantic_policy(start, evaluated)
+    policy_sha = evaluation_policy_sha256(
+        package_policy, semantic_policy, bundle
+    )
+    run_ref = {
+        "slot": 0,
+        "runId": run_id,
+        "scenarioId": scenario_ref["scenarioId"],
+        "scenarioSha256": scenario_ref["scenarioSha256"],
+        "evaluationPolicySha256": policy_sha,
+        "runnerManifestSha256": scenario_ref["runnerManifestSha256"],
+        "derivativeSha256": scenario_ref["derivativeSha256"],
+        "startArtifactId": scenario_ref["startArtifactId"],
+        "startArtifactSha256": scenario_ref["startArtifactSha256"],
+        "family": family,
+        "difficulty": "routine",
+        "budgets": budgets,
+    }
+    event = {
+        "schema": PRACTICE_RUN_EVENT_SCHEMA,
+        "sequence": 0,
+        "kind": "decision_gate" if terminal_state != "completed" else "mutation",
+        "status": "abstained" if terminal_state != "completed" else "succeeded",
+        "idempotencyKey": "IDEM-00000000000000000091",
+        "requestSha256": _digest("request"),
+        "responseSha256": _digest("response"),
+        "elapsedMilliseconds": 1,
+    }
+    event["eventId"] = workflow_event_id(event)
+    artifacts = (
+        [
+            {
+                "artifactId": "OUT-00000000000000000091",
+                "role": "output",
+                "sha256": _digest(output.read_bytes()),
+                "bytes": output.stat().st_size,
+            }
+        ]
+        if output is not None
+        else []
+    )
+    record = {
+        **run_seed,
+        "runId": run_id,
+        "state": terminal_state,
+        "terminalReason": (
+            "WORKFLOW_COMPLETED"
+            if terminal_state == "completed"
+            else "DECISION_REQUIRED"
+        ),
+        "workflowEvents": [event],
+        "artifacts": artifacts,
+        "evidence": {
+            "semanticDiff": {
+                "status": "passed" if terminal_state == "completed" else "unverified",
+                "receiptSha256": (
+                    _digest("runner-semantic")
+                    if terminal_state == "completed"
+                    else None
+                ),
+            },
+            "openSafety": {
+                "status": "passed" if terminal_state == "completed" else "unverified",
+                "receiptSha256": (
+                    _digest("runner-open-safety")
+                    if terminal_state == "completed"
+                    else None
+                ),
+            },
+            "domainVerdicts": (
+                [
+                    {
+                        "verifierId": "VER-00000000000000000091",
+                        "verifierSha256": _digest("runner-verifier"),
+                        "status": "passed",
+                        "receiptSha256": _digest("runner-domain"),
+                    }
+                ]
+                if terminal_state == "completed"
+                else []
+            ),
+            "render": {
+                "status": "unverified",
+                "receiptSha256": None,
+                "renderChecked": False,
+                "provenance": "none",
+            },
+            "visual": {
+                "status": "unverified",
+                "receiptSha256": None,
+                "allPagesChecked": False,
+                "visualComplete": False,
+            },
+            "unresolvedReasonCodes": (
+                [] if terminal_state == "completed" else ["DECISION_REQUIRED"]
+            ),
+        },
+        "usage": {
+            "toolCalls": 1,
+            "attempts": 1,
+            "repairRounds": 0,
+            "elapsedSeconds": 1,
+            "costMicrounits": 0,
+            "artifactBytes": output.stat().st_size if output is not None else 0,
+        },
+        "privacy": {
+            "localOnly": True,
+            "syntheticInputsOnly": True,
+            "highConfidencePiiCount": 0,
+            "privateCoordinatesExposed": False,
+            "evaluatorDataExposed": False,
+        },
+    }
+    terminal_receipt = redact_run_receipt(record)
+    sandbox_root = tmp_path / "sandbox"
+    output_root = sandbox_root / "output"
+    output_root.mkdir(parents=True, mode=0o700)
+    if output is not None:
+        sandbox_output = output_root / "result.hwpx"
+        sandbox_output.write_bytes(output.read_bytes())
+        output_path = sandbox_output
+    else:
+        output_path = None
+    outcome = SimpleNamespace(
+        run_receipt=terminal_receipt,
+        output_path=output_path,
+        sandbox=SimpleNamespace(root=sandbox_root),
+        artifact_hook_idempotency_key="IDEM-00000000000000000091",
+    )
+    material = {
+        "schema": "hwpx.practice-evaluator-material/v1",
+        "runId": run_id,
+        "scenarioId": scenario_ref["scenarioId"],
+        "evaluationPolicySha256": policy_sha,
+        "packagePolicy": package_policy,
+        "semanticPolicy": semantic_policy,
+        "domainAdapter": {
+            "kind": adapter_kind,
+            "taskKind": task_kind,
+            "family": family,
+            "verifierPolicySha256s": dict(verifier_policies),
+            "config": dict(adapter_config),
+        },
+    }
+    material_path = evaluator_root / "materials" / f"{run_id}.json"
+    _write_json(material_path, material)
+    material_path.chmod(0o600)
+    manifest_sha = _digest(f"campaign-{adapter_kind}")
+    manifest = {
+        "campaignId": f"PCMP-{manifest_sha[:20].upper()}",
+        "manifestSha256": manifest_sha,
+        "provenance": provenance,
+    }
+    task = ResolvedPracticeTask(
+        scenario_ref=scenario_ref,
+        dispatch=dispatch,
+        source_artifact=start,
+        workflow_family="unknown_form_fill",
+        parameters={},
+        evaluation_policy_sha256=policy_sha,
+    )
+    artifact_store = _TerminalArtifactStore(artifact_root)
+    evaluator_store = _TerminalEvaluatorStore(
+        evaluator_root,
+        artifact_store,
+        expected_key_id=provenance["evaluator"]["authenticationKeyId"],
+    )
+    return (
+        evaluator_store,
+        artifact_store,
+        task,
+        outcome,
+        manifest,
+        run_ref,
+    )
+
+
+def _run_evaluator_case(case):
+    evaluator, artifacts, task, outcome, manifest, run_ref = case
+    retained = artifacts(task, outcome)
+    first = evaluator(task, outcome, manifest, run_ref, retained)
+    replay = evaluator(task, outcome, manifest, run_ref, retained)
+    assert first == replay
+    assert first["overallStatus"] == "passed"
+    assert first["eligibleForSuccess"] is True
+    result_files = list((evaluator.results_root).rglob("*.json"))
+    assert len(result_files) == 1
+    assert result_files[0].read_bytes() == evaluator._canonical_result(first)
+    assert result_files[0].stat().st_nlink == 1
+    assert result_files[0].stat().st_mode & 0o777 == 0o600
+    return first
+
+
+def test_runtime_evaluator_runs_form_and_persists_authenticated_replay(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from types import SimpleNamespace as Result
+
+    import hwpx.form_fit.wordbox as wordbox_module
+    from hwpx.document import HwpxDocument
+
+    start = tmp_path / "form-start.hwpx"
+    output = tmp_path / "form-output.hwpx"
+    for path, value in ((start, "BLANK"), (output, "SYNTHETIC")):
+        document = HwpxDocument.new()
+        table = document.add_table(1, 1)
+        table.set_cell_text(0, 0, value)
+        document.save_to_path(path)
+        document.close()
+    target_policy = build_form_target_policy(
+        blank_artifact_sha256=_digest(start.read_bytes()),
+        bindings=[
+            {
+                "sectionIndex": 0,
+                "tableIndex": 0,
+                "row": 0,
+                "col": 0,
+                "blankValueSha256": domain_value_sha256("BLANK"),
+                "expectedValueSha256": domain_value_sha256("SYNTHETIC"),
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        wordbox_module,
+        "verify_form_fill",
+        lambda *args, **kwargs: Result(render_checked=True, ok=True),
+    )
+    case = _evaluator_case(
+        tmp_path,
+        start=start,
+        output=output,
+        task_kind="known_template_fill",
+        family="notice",
+        adapter_kind="form_fill",
+        verifier_policies={"form_fill": target_policy["policySha256"]},
+        adapter_config={
+            "targetPolicy": target_policy,
+            "frozenRenderArtifactSha256": None,
+        },
+        terminal_state="completed",
+    )
+    result = _run_evaluator_case(case)
+    assert result["layers"][2]["status"] == "passed"
+    result_file = next(case[0].results_root.rglob("*.json"))
+    os.link(result_file, tmp_path / "evaluator-result-alias.json")
+    retained = case[1](case[2], case[3])
+    with pytest.raises(PracticeRuntimeError):
+        case[0](case[2], case[3], case[4], case[5], retained)
+
+
+def test_runtime_evaluator_runs_structural_edit_from_retained_snapshots(
+    tmp_path: Path,
+) -> None:
+    from hwpx.document import HwpxDocument
+
+    start = tmp_path / "structural-start.hwpx"
+    output = tmp_path / "structural-output.hwpx"
+    before = HwpxDocument.new()
+    table = before.add_table(1, 2)
+    table.set_cell_text(0, 0, "BASE")
+    table.set_cell_text(0, 1, "ROW")
+    before.save_to_path(start)
+    before.close()
+    after = HwpxDocument.new()
+    table = after.add_table(2, 2)
+    table.set_cell_text(0, 0, "BASE")
+    table.set_cell_text(0, 1, "ROW")
+    table.set_cell_text(1, 0, "SYNTHETIC")
+    table.set_cell_text(1, 1, "VALUE")
+    after.save_to_path(output)
+    after.close()
+    row_sha = domain_row_sha256(["SYNTHETIC", "VALUE"])
+    value_shas = sorted(
+        [domain_value_sha256("SYNTHETIC"), domain_value_sha256("VALUE")]
+    )
+    policy_sha = structural_verifier_policy_sha256(
+        expected_start_sha256=_digest(start.read_bytes()),
+        expected_row_sha256=row_sha,
+        expected_value_sha256s=value_shas,
+    )
+    case = _evaluator_case(
+        tmp_path,
+        start=start,
+        output=output,
+        task_kind="structural_edit",
+        family="meeting_minutes",
+        adapter_kind="structural_table",
+        verifier_policies={"structural_table": policy_sha},
+        adapter_config={
+            "expectedStartSha256": _digest(start.read_bytes()),
+            "expectedRowSha256": row_sha,
+            "expectedValueSha256s": value_shas,
+        },
+        terminal_state="completed",
+    )
+    result = _run_evaluator_case(case)
+    assert result["layers"][2]["status"] == "passed"
+
+
+def test_runtime_evaluator_grades_actual_abstention_inventory_across_restart(
+    tmp_path: Path,
+) -> None:
+    start = tmp_path / "abstain-start.hwpx"
+    _minimal_hwpx(start, "Synthetic abstention input")
+    policy_sha = must_abstain_verifier_policy_sha256(
+        inventory_authentication_key_id=(
+            abstention_inventory_authentication_key_id(_EVALUATOR_KEY)
+        )
+    )
+    case = _evaluator_case(
+        tmp_path,
+        start=start,
+        output=None,
+        task_kind="must_abstain",
+        family="notice",
+        adapter_kind="must_abstain",
+        verifier_policies={"must_abstain": policy_sha},
+        adapter_config={},
+        terminal_state="refused",
+    )
+    result = _run_evaluator_case(case)
+    assert result["terminalState"] == "refused"
+    assert result["layers"][2]["status"] == "passed"
+    assert case[1](case[2], case[3]) is None
+
+
+@pytest.mark.parametrize("attack", ["mode", "hardlink", "key-id"])
+def test_runtime_evaluator_key_is_fixed_private_and_provenance_bound(
+    tmp_path: Path, attack: str
+) -> None:
+    root = tmp_path / "evaluator"
+    retained = tmp_path / "retained"
+    root.mkdir(mode=0o700)
+    retained.mkdir()
+    for name in ("materials", "results", "snapshots", "assets"):
+        (root / name).mkdir(mode=0o700)
+    key = root / "authentication.key"
+    key.write_bytes(_EVALUATOR_KEY)
+    key.chmod(0o600)
+    expected = evaluator_authentication_key_id(_EVALUATOR_KEY)
+    if attack == "mode":
+        key.chmod(0o644)
+    elif attack == "hardlink":
+        os.link(key, tmp_path / "key-alias")
+    else:
+        expected = "EVK-FFFFFFFFFFFFFFFFFFFF"
+    with pytest.raises(PracticeRuntimeError):
+        _TerminalEvaluatorStore(
+            root, _TerminalArtifactStore(retained), expected_key_id=expected
+        )
+
+
+@pytest.mark.parametrize("attack", ["mode", "hardlink"])
+def test_evaluator_material_is_private_single_link_storage(
+    tmp_path: Path, monkeypatch, attack: str
+) -> None:
+    fixture = _layout(tmp_path, monkeypatch)
+    material = (
+        fixture["runtimeRoot"]
+        / "evaluator"
+        / "materials"
+        / f"{fixture['runRef']['runId']}.json"
+    )
+    if attack == "mode":
+        material.chmod(0o644)
+    else:
+        os.link(material, tmp_path / "material-alias.json")
+    service = _build()
+    lease = SimpleNamespace(slot=0, run_id=fixture["runRef"]["runId"])
+
+    with pytest.raises(KeyError):
+        service.task_resolver(fixture["manifest"], lease)
 
 
 def test_startup_reaper_is_bounded_and_emits_only_path_free_evidence() -> None:

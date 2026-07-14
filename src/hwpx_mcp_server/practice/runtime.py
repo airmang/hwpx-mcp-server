@@ -37,7 +37,27 @@ from typing import Any
 from hwpx import validate_editor_open_safety
 from hwpx.opc.security import HwpxSecurityError, guard_zip_file, parse_xml_stdlib
 from hwpx.practice import (
+    abstention_inventory_authentication_key_id,
+    build_package_policy,
+    build_domain_evaluation_bundle,
+    build_domain_requirement,
+    build_edit_domain_evidence_from_semantic,
+    build_form_fill_domain_evidence_from_artifacts,
+    build_must_abstain_domain_evidence_from_receipt,
+    build_structural_table_domain_evidence_from_artifacts,
+    combine_evaluation_result,
     current_evaluator_code_sha256,
+    domain_layer_from_bundle,
+    evaluator_authentication_key_id,
+    evaluate_package_layer,
+    evaluate_semantic_layer,
+    evaluation_policy_sha256,
+    must_abstain_verifier_policy_sha256,
+    semantic_policy_projection,
+    structural_verifier_policy_sha256,
+    validate_form_target_policy,
+    validate_controlled_mutation,
+    validate_evaluation_result,
     validate_campaign_manifest,
     validate_exact_provenance,
 )
@@ -65,6 +85,7 @@ _FIXED_RUNTIME_CHILDREN = (
     "results",
     "sandboxes",
     "workflow",
+    "evaluator",
 )
 _EVALUATOR_COMPONENTS = (
     "run.py",
@@ -74,6 +95,10 @@ _EVALUATOR_COMPONENTS = (
     "aggregate.py",
 )
 _TERMINAL_ARTIFACT_SCHEMA = "hwpx.practice-terminal-artifact/v1"
+_EVALUATOR_MATERIAL_SCHEMA = "hwpx.practice-evaluator-material/v1"
+_EVALUATOR_RESULT_SCHEMA = "hwpx.practice-evaluator-result/v1"
+_EVALUATOR_KEY_NAME = "authentication.key"
+_EVALUATOR_CHILDREN = ("materials", "results", "snapshots", "assets")
 _STARTUP_REAPER_SCHEMA = "hwpx.practice-startup-reaper/v1"
 _MAX_RESULT_BYTES = 1024 * 1024 * 1024
 _MAX_ATTESTED_FILE_BYTES = 256 * 1024 * 1024
@@ -249,6 +274,23 @@ def _read_private_json(path: Path, root: Path) -> Mapping[str, Any]:
     return value
 
 
+def _read_evaluator_private_json(path: Path, root: Path) -> Mapping[str, Any]:
+    """Read one evaluator-owned 0600, single-link JSON object."""
+
+    try:
+        metadata = path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+        ):
+            raise _PrivateLookupError()
+        return _read_private_json(path, root)
+    except OSError as exc:
+        raise _PrivateLookupError() from exc
+
+
 def _normalized_key(value: object) -> str:
     return re.sub(r"[^a-z0-9]", "", str(value).casefold())
 
@@ -274,6 +316,62 @@ def _task_dispatch_sha256(value: Mapping[str, Any]) -> str:
         payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
+
+
+def _structural_workflow_parameters(
+    controlled_mutation: Mapping[str, Any],
+    *,
+    table_index: int,
+    reference_row: int,
+) -> dict[str, Any]:
+    """Map the S-072 append-row intent to installed table operations only."""
+
+    mutation = validate_controlled_mutation(controlled_mutation)
+    if (
+        mutation["taskKind"] != "structural_edit"
+        or mutation["operation"] != "append_table_row"
+        or isinstance(table_index, bool)
+        or not isinstance(table_index, int)
+        or not 0 <= table_index <= 10_000
+        or isinstance(reference_row, bool)
+        or not isinstance(reference_row, int)
+        or not 0 <= reference_row <= 100_000
+    ):
+        raise ValueError("structural provisioning mapping is invalid")
+    row = mutation["after"].get("row")
+    if (
+        not isinstance(row, list)
+        or not row
+        or len(row) > 256
+        or any(
+            not isinstance(value, str) or not value or len(value) > 4_096
+            for value in row
+        )
+    ):
+        raise ValueError("structural provisioning row is invalid")
+    _assert_task_material_safe(row)
+    target_row = reference_row + 1
+    return {
+        "operationKind": "table",
+        "operations": [
+            {
+                "op": "insert_row_by_clone",
+                "table_index": table_index,
+                "ref_row": reference_row,
+                "count": 1,
+            },
+            *(
+                {
+                    "op": "fill_cell",
+                    "table_index": table_index,
+                    "row": target_row,
+                    "col": column,
+                    "text": value,
+                }
+                for column, value in enumerate(row)
+            ),
+        ],
+    }
 
 
 def _assert_task_material_safe(value: object) -> None:
@@ -624,11 +722,16 @@ def _runtime_provenance(
 
 class _PrivateCampaignResolver:
     def __init__(
-        self, source_root: Path, practice_root: Path, campaigns_root: Path
+        self,
+        source_root: Path,
+        practice_root: Path,
+        campaigns_root: Path,
+        evaluator_materials_root: Path,
     ) -> None:
         self.source_root = source_root
         self.practice_root = practice_root
         self.campaigns_root = campaigns_root
+        self.evaluator_materials_root = evaluator_materials_root
 
     def _campaign_root(self, campaign_id: str) -> Path:
         if not isinstance(campaign_id, str) or not _CAMPAIGN_ID.fullmatch(campaign_id):
@@ -754,6 +857,79 @@ class _PrivateCampaignResolver:
             raise ValueError("private task artifact binding is invalid")
         if payload["evaluationPolicySha256"] != run_ref["evaluationPolicySha256"]:
             raise ValueError("private task evaluator policy binding is invalid")
+        material = _validate_evaluator_material(
+            _read_evaluator_private_json(
+                self.evaluator_materials_root / f"{run_id}.json",
+                self.evaluator_materials_root,
+            ),
+            run_ref=run_ref,
+        )
+        task_kind = material["domainAdapter"]["taskKind"]
+        required_workflow_family = {
+            "reverse_restore": "transactional_edit",
+            "constrained_edit": "transactional_edit",
+            "known_template_fill": "known_template_fill",
+            "unknown_form_fill": "unknown_form_fill",
+            "structural_edit": "structural_table_edit",
+            "typed_authoring": "typed_authoring",
+            "must_abstain": "must_abstain",
+        }[task_kind]
+        if payload["workflowFamily"] != required_workflow_family:
+            raise ValueError("private task installed workflow mapping is invalid")
+        if task_kind == "structural_edit":
+            parameters = payload["parameters"]
+            operations = (
+                parameters.get("operations")
+                if isinstance(parameters, Mapping)
+                else None
+            )
+            structure_rows = (
+                [dict(row) for row in operations if isinstance(row, Mapping)]
+                if isinstance(operations, list)
+                else []
+            )
+            structure_ops = [row.get("op") for row in structure_rows]
+            insertions = [
+                row for row in structure_rows if row.get("op") == "insert_row_by_clone"
+            ]
+            fills = [row for row in structure_rows if row.get("op") == "fill_cell"]
+            insertion = insertions[0] if len(insertions) == 1 else {}
+            table_index = insertion.get("tableIndex", insertion.get("table_index"))
+            reference_row = insertion.get("refRow", insertion.get("ref_row"))
+            fill_cells = [
+                (
+                    row.get("tableIndex", row.get("table_index")),
+                    row.get("row"),
+                    row.get("col"),
+                )
+                for row in fills
+            ]
+            if (
+                parameters.get("operationKind") != "table"
+                or structure_ops.count("insert_row_by_clone") != 1
+                or not fills
+                or any(
+                    operation not in {"insert_row_by_clone", "fill_cell"}
+                    for operation in structure_ops
+                )
+                or isinstance(table_index, bool)
+                or not isinstance(table_index, int)
+                or table_index < 0
+                or isinstance(reference_row, bool)
+                or not isinstance(reference_row, int)
+                or reference_row < 0
+                or insertion.get("count", 1) != 1
+                or any(
+                    fill_table != table_index
+                    or fill_row != reference_row + 1
+                    or isinstance(fill_col, bool)
+                    or not isinstance(fill_col, int)
+                    or fill_col < 0
+                    for fill_table, fill_row, fill_col in fill_cells
+                )
+                or len({fill_col for _, _, fill_col in fill_cells}) != len(fill_cells)
+            ):
+                raise ValueError("structural task workflow mapping is invalid")
         source = self._artifact(
             payload["artifactScope"], payload["sourceArtifactSha256"]
         )
@@ -805,6 +981,215 @@ def _fsync_directory(path: Path) -> None:
     finally:
         if descriptor is not None:
             os.close(descriptor)
+
+
+def _strict_named_directory(parent: Path, name: str) -> Path:
+    """Open one fixed runtime-owned directory and require private permissions."""
+
+    if name not in _EVALUATOR_CHILDREN:
+        raise PracticeRuntimeError()
+    child = _strict_descendant_directory(parent, name)
+    try:
+        metadata = child.lstat()
+        if stat.S_IMODE(metadata.st_mode) != 0o700:
+            raise PracticeRuntimeError()
+    except OSError as exc:
+        raise PracticeRuntimeError() from exc
+    return child
+
+
+def _load_evaluator_authentication_key(
+    evaluator_root: Path, expected_key_id: str
+) -> bytes:
+    """Load the evaluator-only key from its fixed, no-link 0600 location."""
+
+    path = evaluator_root / _EVALUATOR_KEY_NAME
+    try:
+        target = _strict_regular_file(path, evaluator_root)
+        before = target.lstat()
+        if (
+            before.st_nlink != 1
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or before.st_uid != os.getuid()
+            or not 32 <= before.st_size <= 64
+        ):
+            raise PracticeRuntimeError()
+        descriptor = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+            ):
+                raise PracticeRuntimeError()
+            key = os.read(descriptor, 65)
+            after = os.fstat(descriptor)
+        finally:
+            os.close(descriptor)
+        if (
+            len(key) != before.st_size
+            or not 32 <= len(key) <= 64
+            or (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_nlink,
+            )
+            != (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                1,
+            )
+            or evaluator_authentication_key_id(key) != expected_key_id
+        ):
+            raise PracticeRuntimeError()
+        return key
+    except (OSError, _PrivateLookupError, TypeError, ValueError) as exc:
+        raise PracticeRuntimeError() from exc
+
+
+def _validate_evaluator_material(
+    value: Mapping[str, Any], *, run_ref: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Validate private evaluator inputs without accepting filesystem coordinates."""
+
+    raw = dict(value)
+    expected = {
+        "schema",
+        "runId",
+        "scenarioId",
+        "evaluationPolicySha256",
+        "packagePolicy",
+        "semanticPolicy",
+        "domainAdapter",
+    }
+    if set(raw) != expected or raw.get("schema") != _EVALUATOR_MATERIAL_SCHEMA:
+        raise ValueError("evaluator material contract is invalid")
+    if (
+        raw.get("runId") != run_ref["runId"]
+        or raw.get("scenarioId") != run_ref["scenarioId"]
+        or raw.get("evaluationPolicySha256")
+        != run_ref["evaluationPolicySha256"]
+    ):
+        raise ValueError("evaluator material identity mismatch")
+
+    package = dict(raw["packagePolicy"])
+    expected_artifact = package.get("expectedArtifactHash")
+    if not isinstance(expected_artifact, Mapping):
+        raise ValueError("package policy is invalid")
+    expected_sha = expected_artifact.get("sha256")
+    if package != build_package_policy(expected_sha256=expected_sha):
+        raise ValueError("package policy is invalid")
+
+    semantic = dict(raw["semanticPolicy"])
+    projection = semantic_policy_projection(semantic)
+    if (
+        projection["revision"]["required"]
+        or projection["idempotency"]["required"]
+    ):
+        # Revision/replay receipts require a distinct authenticated workflow
+        # evidence adapter. Until that adapter is installed, never downgrade a
+        # required gate to caller-provided booleans.
+        raise ValueError("unsupported authenticated semantic evidence policy")
+
+    adapter = dict(raw["domainAdapter"])
+    if set(adapter) != {
+        "kind",
+        "taskKind",
+        "family",
+        "verifierPolicySha256s",
+        "config",
+    }:
+        raise ValueError("domain adapter contract is invalid")
+    kind = str(adapter["kind"])
+    task_kind = str(adapter["taskKind"])
+    family = str(adapter["family"])
+    expected_kind = {
+        "constrained_edit": "edit",
+        "reverse_restore": "edit",
+        "known_template_fill": "form_fill",
+        "unknown_form_fill": "form_fill",
+        "structural_edit": "structural_table",
+        "must_abstain": "must_abstain",
+    }.get(task_kind)
+    if kind != expected_kind or family != run_ref["family"]:
+        raise ValueError("domain adapter binding is invalid")
+    policies = dict(adapter["verifierPolicySha256s"])
+    if any(
+        not isinstance(key, str)
+        or not isinstance(digest, str)
+        or not _SHA256.fullmatch(digest)
+        for key, digest in policies.items()
+    ):
+        raise ValueError("domain verifier policy hashes are invalid")
+    config = dict(adapter["config"])
+    if kind == "edit":
+        if config or set(policies) - {"edit"}:
+            raise ValueError("edit adapter config is invalid")
+    elif kind == "form_fill":
+        if set(config) != {"targetPolicy", "frozenRenderArtifactSha256"}:
+            raise ValueError("form adapter config is invalid")
+        target_policy = validate_form_target_policy(config["targetPolicy"])
+        if policies != {"form_fill": target_policy["policySha256"]}:
+            raise ValueError("form adapter policy binding is invalid")
+        render_sha = config["frozenRenderArtifactSha256"]
+        if render_sha is not None and (
+            not isinstance(render_sha, str) or not _SHA256.fullmatch(render_sha)
+        ):
+            raise ValueError("form render artifact binding is invalid")
+        config = {
+            "targetPolicy": target_policy,
+            "frozenRenderArtifactSha256": render_sha,
+        }
+    elif kind == "structural_table":
+        if set(config) != {
+            "expectedStartSha256",
+            "expectedRowSha256",
+            "expectedValueSha256s",
+        }:
+            raise ValueError("structural adapter config is invalid")
+        values = config["expectedValueSha256s"]
+        if (
+            not isinstance(values, list)
+            or not values
+            or values != sorted(set(values))
+            or any(not isinstance(item, str) or not _SHA256.fullmatch(item) for item in values)
+        ):
+            raise ValueError("structural expected values are invalid")
+        for key in ("expectedStartSha256", "expectedRowSha256"):
+            if not isinstance(config[key], str) or not _SHA256.fullmatch(config[key]):
+                raise ValueError("structural artifact binding is invalid")
+        expected_policy = structural_verifier_policy_sha256(
+            expected_start_sha256=config["expectedStartSha256"],
+            expected_row_sha256=config["expectedRowSha256"],
+            expected_value_sha256s=config["expectedValueSha256s"],
+        )
+        if policies != {"structural_table": expected_policy}:
+            raise ValueError("structural policy binding is invalid")
+    elif kind == "must_abstain":
+        if config or set(policies) != {"must_abstain"}:
+            raise ValueError("must-abstain adapter config is invalid")
+    else:  # pragma: no cover - guarded by expected_kind
+        raise ValueError("unsupported domain adapter")
+
+    return {
+        "schema": _EVALUATOR_MATERIAL_SCHEMA,
+        "runId": raw["runId"],
+        "scenarioId": raw["scenarioId"],
+        "evaluationPolicySha256": raw["evaluationPolicySha256"],
+        "packagePolicy": package,
+        "semanticPolicy": semantic,
+        "domainAdapter": {
+            "kind": kind,
+            "taskKind": task_kind,
+            "family": family,
+            "verifierPolicySha256s": policies,
+            "config": config,
+        },
+    }
 
 
 class _TerminalArtifactStore:
@@ -1007,6 +1392,374 @@ class _TerminalArtifactStore:
             "retained": True,
             "privateStorageCoordinatesExposed": False,
         }
+
+    def retained_path(self, receipt: Mapping[str, Any]) -> Path:
+        """Resolve only a receipt-bound output retained by this store."""
+
+        run_id = str(receipt.get("runId", ""))
+        digest = str(receipt.get("artifactSha256", ""))
+        if not _RUN_ID.fullmatch(run_id) or not _SHA256.fullmatch(digest):
+            raise PracticeRuntimeError()
+        try:
+            prefix = _strict_existing_directory(self.results_root / digest[:2])
+            digest_root = _strict_existing_directory(prefix / digest)
+            target = _strict_regular_file(digest_root / f"{run_id}.hwpx", digest_root)
+            size = int(receipt["bytes"])
+            if not self._existing_matches(target, digest, size):
+                raise PracticeRuntimeError()
+            return target
+        except (_PrivateLookupError, OSError, TypeError, ValueError) as exc:
+            raise PracticeRuntimeError() from exc
+
+
+class _TerminalEvaluatorStore:
+    """Run and durably persist the authenticated P3 evaluator composite."""
+
+    def __init__(
+        self,
+        evaluator_root: Path,
+        artifact_store: _TerminalArtifactStore,
+        *,
+        expected_key_id: str,
+    ) -> None:
+        self.evaluator_root = _strict_existing_directory(evaluator_root)
+        metadata = self.evaluator_root.lstat()
+        if stat.S_IMODE(metadata.st_mode) != 0o700:
+            raise PracticeRuntimeError()
+        self.materials_root = _strict_named_directory(evaluator_root, "materials")
+        self.results_root = _strict_named_directory(evaluator_root, "results")
+        self.snapshots_root = _strict_named_directory(evaluator_root, "snapshots")
+        self.assets_root = _strict_named_directory(evaluator_root, "assets")
+        self.authentication_key = _load_evaluator_authentication_key(
+            evaluator_root, expected_key_id
+        )
+        self.authentication_key_id = expected_key_id
+        self.artifact_store = artifact_store
+
+    def _material(self, run_ref: Mapping[str, Any]) -> dict[str, Any]:
+        run_id = str(run_ref.get("runId", ""))
+        if not _RUN_ID.fullmatch(run_id):
+            raise PracticeRuntimeError()
+        try:
+            path = self.materials_root / f"{run_id}.json"
+            value = _read_evaluator_private_json(path, self.materials_root)
+            return _validate_evaluator_material(value, run_ref=run_ref)
+        except (KeyError, TypeError, ValueError, _PrivateLookupError) as exc:
+            raise PracticeRuntimeError() from exc
+
+    def _retain_start_snapshot(
+        self, source: Path, *, run_id: str, digest: str
+    ) -> Path:
+        payload = _read_strict_bytes(
+            source, source.parent, maximum=_MAX_SANITIZED_HWPX_BYTES
+        )
+        if hashlib.sha256(payload).hexdigest() != digest:
+            raise PracticeRuntimeError()
+        prefix = _strict_result_directory(self.snapshots_root, digest[:2])
+        digest_root = _strict_result_directory(prefix, digest)
+        target = digest_root / f"{run_id}.start.hwpx"
+        if not _TerminalArtifactStore._existing_matches(target, digest, len(payload)):
+            temporary = digest_root / f".{run_id}.{uuid.uuid4().hex}.tmp"
+            try:
+                _TerminalArtifactStore._copy_to_temp(
+                    source, temporary, digest, len(payload)
+                )
+                try:
+                    os.link(temporary, target, follow_symlinks=False)
+                except FileExistsError:
+                    if not _TerminalArtifactStore._existing_matches(
+                        target, digest, len(payload)
+                    ):
+                        raise PracticeRuntimeError()
+                finally:
+                    temporary.unlink(missing_ok=True)
+                _fsync_directory(digest_root)
+            except Exception:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                raise
+        return target
+
+    def _asset(self, digest: str) -> Path:
+        if not _SHA256.fullmatch(digest):
+            raise PracticeRuntimeError()
+        try:
+            prefix = _strict_existing_directory(self.assets_root / digest[:2])
+            target = _strict_regular_file(prefix / f"{digest}.json", self.assets_root)
+            metadata = target.lstat()
+            if (
+                metadata.st_nlink != 1
+                or metadata.st_uid != os.getuid()
+                or stat.S_IMODE(metadata.st_mode) != 0o600
+            ):
+                raise PracticeRuntimeError()
+            payload = _read_strict_bytes(target, self.assets_root, maximum=_MAX_PRIVATE_JSON_BYTES)
+            if hashlib.sha256(payload).hexdigest() != digest:
+                raise PracticeRuntimeError()
+            return target
+        except (_PrivateLookupError, OSError) as exc:
+            raise PracticeRuntimeError() from exc
+
+    @staticmethod
+    def _canonical_result(value: Mapping[str, Any]) -> bytes:
+        payload = json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        if len(payload) > _MAX_PRIVATE_JSON_BYTES:
+            raise PracticeRuntimeError()
+        return payload
+
+    @staticmethod
+    def _read_persisted_result(path: Path, root: Path) -> bytes:
+        """Read one immutable evaluator result through its private-file contract."""
+
+        try:
+            target = _strict_regular_file(path, root)
+            metadata = target.lstat()
+            if (
+                metadata.st_nlink != 1
+                or metadata.st_uid != os.getuid()
+                or stat.S_IMODE(metadata.st_mode) != 0o600
+            ):
+                raise PracticeRuntimeError()
+            return _read_strict_bytes(
+                target, root, maximum=_MAX_PRIVATE_JSON_BYTES
+            )
+        except (_PrivateLookupError, OSError) as exc:
+            raise PracticeRuntimeError() from exc
+
+    def _persist(
+        self, result: Mapping[str, Any], *, run_id: str, terminal_receipt_sha: str
+    ) -> dict[str, Any]:
+        prefix = _strict_result_directory(self.results_root, terminal_receipt_sha[:2])
+        receipt_root = _strict_result_directory(prefix, terminal_receipt_sha)
+        target = receipt_root / f"{run_id}.json"
+        payload = self._canonical_result(result)
+        if target.exists() or target.is_symlink():
+            existing = self._read_persisted_result(target, receipt_root)
+            if existing != payload:
+                raise PracticeRuntimeError()
+            return dict(json.loads(existing.decode("utf-8")))
+        temporary = receipt_root / f".{run_id}.{uuid.uuid4().hex}.tmp"
+        descriptor: int | None = None
+        try:
+            descriptor = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+            )
+            with os.fdopen(descriptor, "wb") as stream:
+                descriptor = None
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            try:
+                os.link(temporary, target, follow_symlinks=False)
+            except FileExistsError:
+                existing = self._read_persisted_result(target, receipt_root)
+                if existing != payload:
+                    raise PracticeRuntimeError()
+            finally:
+                temporary.unlink(missing_ok=True)
+            _fsync_directory(receipt_root)
+            return dict(json.loads(payload.decode("utf-8")))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise PracticeRuntimeError() from exc
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    def __call__(
+        self,
+        task: ResolvedPracticeTask,
+        outcome: Any,
+        manifest: Mapping[str, Any],
+        run_ref: Mapping[str, Any],
+        artifact_receipt: Mapping[str, Any] | None,
+    ) -> Mapping[str, Any]:
+        terminal_receipt = getattr(outcome, "run_receipt", None)
+        sandbox = getattr(outcome, "sandbox", None)
+        if not isinstance(terminal_receipt, Mapping) or sandbox is None:
+            raise PracticeRuntimeError()
+        material = self._material(run_ref)
+        run_id = str(run_ref["runId"])
+        start_sha = str(run_ref["startArtifactSha256"])
+        start_snapshot = self._retain_start_snapshot(
+            task.source_artifact, run_id=run_id, digest=start_sha
+        )
+        state = str(terminal_receipt.get("state", ""))
+        if state == "completed":
+            if artifact_receipt is None:
+                raise PracticeRuntimeError()
+            evaluated_snapshot = self.artifact_store.retained_path(artifact_receipt)
+        elif state in {"needs_review", "refused", "unverified"}:
+            if any(
+                isinstance(row, Mapping) and row.get("role") == "output"
+                for row in terminal_receipt.get("artifacts", [])
+            ):
+                raise PracticeRuntimeError()
+            evaluated_snapshot = start_snapshot
+        else:
+            raise PracticeRuntimeError()
+
+        evaluated_payload = _read_strict_bytes(
+            evaluated_snapshot,
+            evaluated_snapshot.parent,
+            maximum=_MAX_SANITIZED_HWPX_BYTES,
+        )
+        evaluated_sha = hashlib.sha256(evaluated_payload).hexdigest()
+        package_policy = material["packagePolicy"]
+        package_receipt = evaluate_package_layer(
+            evaluated_snapshot,
+            expected_sha256=package_policy["expectedArtifactHash"]["sha256"],
+        )
+        semantic_policy = material["semanticPolicy"]
+        semantic_receipt = evaluate_semantic_layer(
+            start_snapshot,
+            evaluated_snapshot,
+            semantic_policy,
+            package_receipt,
+            package_policy=package_policy,
+            authentication_key=self.authentication_key,
+        )
+
+        adapter = material["domainAdapter"]
+        policies = dict(adapter["verifierPolicySha256s"])
+        if adapter["kind"] == "must_abstain":
+            expected_policy = must_abstain_verifier_policy_sha256(
+                inventory_authentication_key_id=(
+                    abstention_inventory_authentication_key_id(
+                        self.authentication_key
+                    )
+                )
+            )
+            if policies != {"must_abstain": expected_policy}:
+                raise PracticeRuntimeError()
+        requirement = build_domain_requirement(
+            scenario_sha256=run_ref["scenarioSha256"],
+            artifact_sha256=evaluated_sha,
+            task_kind=adapter["taskKind"],
+            family=adapter["family"],
+            verifier_policy_sha256s=policies,
+        )
+        config = adapter["config"]
+        kind = adapter["kind"]
+        if kind == "edit":
+            evidence = build_edit_domain_evidence_from_semantic(
+                requirement,
+                semantic_receipt,
+                observed_terminal_state=state,
+            )
+        elif kind == "form_fill":
+            render_sha = config["frozenRenderArtifactSha256"]
+            evidence = build_form_fill_domain_evidence_from_artifacts(
+                requirement,
+                evaluated_snapshot,
+                start_snapshot,
+                target_policy=config["targetPolicy"],
+                observed_terminal_state=state,
+                frozen_render_path=(
+                    self._asset(render_sha) if render_sha is not None else None
+                ),
+            )
+        elif kind == "structural_table":
+            evidence = build_structural_table_domain_evidence_from_artifacts(
+                requirement,
+                start_snapshot,
+                evaluated_snapshot,
+                expected_start_sha256=config["expectedStartSha256"],
+                expected_row_sha256=config["expectedRowSha256"],
+                expected_value_sha256s=config["expectedValueSha256s"],
+                observed_terminal_state=state,
+            )
+        elif kind == "must_abstain":
+            output_root = Path(sandbox.root) / "output"
+            evidence = build_must_abstain_domain_evidence_from_receipt(
+                requirement,
+                start_snapshot,
+                terminal_receipt,
+                inventory_authentication_key=self.authentication_key,
+                expected_scenario_id=run_ref["scenarioId"],
+                sandbox_output_root=output_root,
+            )
+        else:  # pragma: no cover - validated material is closed
+            raise PracticeRuntimeError()
+
+        domain_keys = {
+            abstention_inventory_authentication_key_id(
+                self.authentication_key
+            ): self.authentication_key
+        }
+        bundle = build_domain_evaluation_bundle(
+            requirement,
+            [evidence],
+            observed_terminal_state=state,
+            oracle_authentication_keys=domain_keys,
+        )
+        domain_receipt = domain_layer_from_bundle(
+            bundle, domain_oracle_authentication_keys=domain_keys
+        )
+        actual_policy_sha = evaluation_policy_sha256(
+            package_policy,
+            semantic_policy,
+            bundle,
+            domain_oracle_authentication_keys=domain_keys,
+        )
+        if actual_policy_sha != material["evaluationPolicySha256"]:
+            raise PracticeRuntimeError()
+        campaign_ref = {
+            "campaignId": manifest["campaignId"],
+            "manifestSha256": manifest["manifestSha256"],
+            "slot": run_ref["slot"],
+            "family": run_ref["family"],
+            "difficulty": run_ref["difficulty"],
+        }
+        result = combine_evaluation_result(
+            package_receipt,
+            semantic_receipt,
+            domain_receipt,
+            run_id=run_id,
+            campaign_ref=campaign_ref,
+            scenario_ref=task.scenario_ref,
+            terminal_state=state,
+            terminal_receipt=terminal_receipt,
+            package_policy=package_policy,
+            semantic_policy=semantic_policy,
+            domain_bundle=bundle,
+            expected_evaluation_policy_sha256=material[
+                "evaluationPolicySha256"
+            ],
+            evaluator_code_sha256=manifest["provenance"]["evaluator"]["sha256"],
+            authentication_key=self.authentication_key,
+            domain_oracle_authentication_keys=domain_keys,
+            authentication_key_id=self.authentication_key_id,
+        )
+        result = validate_evaluation_result(
+            result,
+            authentication_key=self.authentication_key,
+            terminal_receipt=terminal_receipt,
+            domain_oracle_authentication_keys=domain_keys,
+        )
+        if result["schema"] != _EVALUATOR_RESULT_SCHEMA:
+            raise PracticeRuntimeError()
+        persisted = self._persist(
+            result,
+            run_id=run_id,
+            terminal_receipt_sha=terminal_receipt["receiptSha256"],
+        )
+        # Replay the persisted bytes rather than trusting the in-memory result.
+        return validate_evaluation_result(
+            persisted,
+            authentication_key=self.authentication_key,
+            terminal_receipt=terminal_receipt,
+            domain_oracle_authentication_keys=domain_keys,
+        )
 
 
 def _startup_reap(queue: Any, sandbox: Any) -> dict[str, Any]:
@@ -1214,7 +1967,10 @@ def build_practice_campaign_service(
             )
         workflow_db = workflow_paths[0]
         resolver = _PrivateCampaignResolver(
-            source_root, practice_root, children["campaigns"]
+            source_root,
+            practice_root,
+            children["campaigns"],
+            _strict_named_directory(children["evaluator"], "materials"),
         )
         _assert_root_identity(source_root, source_identity)
         _assert_root_identity(practice_root, practice_identity)
@@ -1244,12 +2000,19 @@ def build_practice_campaign_service(
         dispatcher = PracticeWorkflowDispatcher(
             workflow, sandbox, runtime_provenance=lambda: provenance
         )
+        artifact_store = _TerminalArtifactStore(children["results"])
+        evaluator_store = _TerminalEvaluatorStore(
+            children["evaluator"],
+            artifact_store,
+            expected_key_id=provenance["evaluator"]["authenticationKeyId"],
+        )
         service = PracticeCampaignService(
             queue,
             dispatcher,
             manifest_resolver=resolver.manifest,
             task_resolver=resolver.task,
-            terminal_artifact_hook=_TerminalArtifactStore(children["results"]),
+            terminal_artifact_hook=artifact_store,
+            terminal_evaluator_hook=evaluator_store,
         )
         service.startup_reaper_receipt = startup_reaper_receipt
         return service

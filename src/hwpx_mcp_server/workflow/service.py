@@ -94,6 +94,30 @@ class WorkflowService:
             order,
             original_content_hash=document_revision(source_path) if source_path else None,
         )
+        if typed_family == WorkFamily.MUST_ABSTAIN and not record.terminal:
+            # Persist a real no-mutation workflow identity and a closed,
+            # authenticated-by-ledger decision gate. Replays recover the same
+            # terminal record instead of returning a synthetic no-ID receipt.
+            if record.state == WorkflowState.INTAKE:
+                record = self.store.transition(
+                    record.workflow_id,
+                    WorkflowState.RECON,
+                    expected_state=record.state,
+                    expected_version=record.state_version,
+                    event_type="abstention.recognized",
+                    payload={"noMutation": True},
+                )
+            if record.state == WorkflowState.RECON:
+                record = self.store.transition(
+                    record.workflow_id,
+                    WorkflowState.NEEDS_REVIEW,
+                    expected_state=record.state,
+                    expected_version=record.state_version,
+                    event_type="decision_gate.abstained",
+                    payload={"reasonCode": "UNSUPPORTED_INTENT", "noMutation": True},
+                    stop_reason="UNSUPPORTED_INTENT",
+                )
+            return self.receipt(record)
         try:
             self.policy.validate_intake(record)
         except PolicyViolation as error:

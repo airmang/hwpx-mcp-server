@@ -135,6 +135,48 @@ class TransactionalEditAdapter(WorkflowAdapter):
 
 
 class KnownTemplateFillAdapter(WorkflowAdapter):
+    @staticmethod
+    def _coordinate_operations(record: WorkflowRecord) -> list[dict[str, Any]] | None:
+        if record.work_order.parameters.get("mode") != "coordinate_table":
+            return None
+        raw = record.work_order.parameters.get("operations")
+        if not isinstance(raw, list) or not raw:
+            raise AdapterAbstention(
+                "FROZEN_FILL_OPERATIONS_REQUIRED",
+                "coordinate-table fill requires frozen fill_cell operations",
+            )
+        operations: list[dict[str, Any]] = []
+        coordinates: set[tuple[int, int, int]] = set()
+        for value in raw:
+            if not isinstance(value, Mapping) or set(value) != {
+                "op",
+                "table_index",
+                "row",
+                "col",
+                "text",
+            }:
+                raise AdapterAbstention(
+                    "FROZEN_FILL_OPERATIONS_REQUIRED",
+                    "coordinate-table fill accepts exact fill_cell operations only",
+                )
+            operation = dict(value)
+            indices = tuple(operation[key] for key in ("table_index", "row", "col"))
+            if (
+                operation["op"] != "fill_cell"
+                or any(isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in indices)
+                or not isinstance(operation["text"], str)
+                or not operation["text"]
+                or len(operation["text"]) > 4_096
+                or indices in coordinates
+            ):
+                raise AdapterAbstention(
+                    "FROZEN_FILL_OPERATIONS_REQUIRED",
+                    "coordinate-table fill operation is invalid",
+                )
+            coordinates.add(indices)
+            operations.append(operation)
+        return operations
+
     def _required(self, record: WorkflowRecord) -> tuple[Any, dict[str, Any]]:
         baseline = record.work_order.parameters.get("baseline")
         content = record.work_order.parameters.get("content")
@@ -143,6 +185,11 @@ class KnownTemplateFillAdapter(WorkflowAdapter):
         return baseline, content
 
     def recon_action(self, record: WorkflowRecord) -> ActionRequest:
+        if self._coordinate_operations(record) is not None:
+            return ActionRequest(
+                tool_name="scan_form_guidance",
+                arguments={"filename": record.work_order.source_path},
+            )
         baseline, content = self._required(record)
         return ActionRequest(
             tool_name="analyze_template_formfit",
@@ -155,6 +202,19 @@ class KnownTemplateFillAdapter(WorkflowAdapter):
         )
 
     def execution_action(self, record: WorkflowRecord) -> ActionRequest:
+        coordinate_operations = self._coordinate_operations(record)
+        if coordinate_operations is not None:
+            return ActionRequest(
+                tool_name="apply_table_ops",
+                arguments={
+                    "filename": record.work_order.source_path,
+                    "ops": coordinate_operations,
+                    "output": record.work_order.output_path,
+                    "dry_run": False,
+                    "render_check": "off",
+                },
+                destructive=True,
+            )
         baseline, content = self._required(record)
         return ActionRequest(
             tool_name="apply_template_formfit",
@@ -242,6 +302,92 @@ class UnknownFormFillAdapter(WorkflowAdapter):
         )
 
 
+class StructuralTableEditAdapter(WorkflowAdapter):
+    """Apply one frozen row clone plus coordinate fills through ToolSpec."""
+
+    @staticmethod
+    def _operations(record: WorkflowRecord) -> list[dict[str, Any]]:
+        raw = record.work_order.parameters.get("operations")
+        if not isinstance(raw, list) or len(raw) < 2:
+            raise AdapterAbstention(
+                "STRUCTURAL_OPERATIONS_REQUIRED",
+                "structural table edit requires a row clone and frozen fills",
+            )
+        operations = [dict(value) for value in raw if isinstance(value, Mapping)]
+        if len(operations) != len(raw):
+            raise AdapterAbstention(
+                "STRUCTURAL_OPERATIONS_REQUIRED", "structural operations are invalid"
+            )
+        clone = operations[0]
+        if (
+            set(clone) != {"op", "table_index", "ref_row", "count"}
+            or clone.get("op") != "insert_row_by_clone"
+            or clone.get("count") != 1
+            or any(
+                isinstance(clone.get(key), bool)
+                or not isinstance(clone.get(key), int)
+                or clone.get(key) < 0
+                for key in ("table_index", "ref_row")
+            )
+        ):
+            raise AdapterAbstention(
+                "STRUCTURAL_OPERATIONS_REQUIRED", "row clone operation is invalid"
+            )
+        target_row = clone["ref_row"] + 1
+        columns: set[int] = set()
+        for fill in operations[1:]:
+            if (
+                set(fill) != {"op", "table_index", "row", "col", "text"}
+                or fill.get("op") != "fill_cell"
+                or fill.get("table_index") != clone["table_index"]
+                or fill.get("row") != target_row
+                or isinstance(fill.get("col"), bool)
+                or not isinstance(fill.get("col"), int)
+                or fill["col"] < 0
+                or fill["col"] in columns
+                or not isinstance(fill.get("text"), str)
+                or not fill["text"]
+                or len(fill["text"]) > 4_096
+            ):
+                raise AdapterAbstention(
+                    "STRUCTURAL_OPERATIONS_REQUIRED",
+                    "frozen structural fill operation is invalid",
+                )
+            columns.add(fill["col"])
+        return operations
+
+    def recon_action(self, record: WorkflowRecord) -> ActionRequest:
+        self._operations(record)
+        return ActionRequest(
+            tool_name="scan_form_guidance",
+            arguments={"filename": record.work_order.source_path},
+        )
+
+    def execution_action(self, record: WorkflowRecord) -> ActionRequest:
+        return ActionRequest(
+            tool_name="apply_table_ops",
+            arguments={
+                "filename": record.work_order.source_path,
+                "ops": self._operations(record),
+                "output": record.work_order.output_path,
+                "dry_run": False,
+                "render_check": "off",
+            },
+            destructive=True,
+        )
+
+    def verification_actions(self, record: WorkflowRecord) -> tuple[ActionRequest, ...]:
+        return (
+            ActionRequest(
+                tool_name="doc_diff",
+                arguments={
+                    "old_filename": record.work_order.source_path,
+                    "new_filename": record.work_order.output_path,
+                },
+            ),
+        )
+
+
 class TypedAuthoringAdapter(WorkflowAdapter):
     def _plan(self, record: WorkflowRecord) -> dict[str, Any]:
         plan = record.work_order.parameters.get("documentPlan")
@@ -307,12 +453,29 @@ class TypedAuthoringAdapter(WorkflowAdapter):
         )
 
 
+class MustAbstainAdapter(WorkflowAdapter):
+    """A durable, no-tool family for an expected safety abstention."""
+
+    def recon_action(self, record: WorkflowRecord) -> ActionRequest:
+        raise AdapterAbstention(
+            "UNSUPPORTED_INTENT",
+            "must-abstain work orders never dispatch document tools",
+        )
+
+    def execution_action(self, record: WorkflowRecord) -> None:
+        return None
+
+
 ADAPTERS: dict[WorkFamily, WorkflowAdapter] = {
     WorkFamily.READ_EXTRACT: ReadExtractAdapter(WorkFamily.READ_EXTRACT),
     WorkFamily.TRANSACTIONAL_EDIT: TransactionalEditAdapter(WorkFamily.TRANSACTIONAL_EDIT),
     WorkFamily.KNOWN_TEMPLATE_FILL: KnownTemplateFillAdapter(WorkFamily.KNOWN_TEMPLATE_FILL),
     WorkFamily.UNKNOWN_FORM_FILL: UnknownFormFillAdapter(WorkFamily.UNKNOWN_FORM_FILL),
+    WorkFamily.STRUCTURAL_TABLE_EDIT: StructuralTableEditAdapter(
+        WorkFamily.STRUCTURAL_TABLE_EDIT
+    ),
     WorkFamily.TYPED_AUTHORING: TypedAuthoringAdapter(WorkFamily.TYPED_AUTHORING),
+    WorkFamily.MUST_ABSTAIN: MustAbstainAdapter(WorkFamily.MUST_ABSTAIN),
 }
 
 

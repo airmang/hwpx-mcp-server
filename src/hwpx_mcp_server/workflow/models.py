@@ -57,7 +57,9 @@ class WorkFamily(str, Enum):
     TRANSACTIONAL_EDIT = "transactional_edit"
     KNOWN_TEMPLATE_FILL = "known_template_fill"
     UNKNOWN_FORM_FILL = "unknown_form_fill"
+    STRUCTURAL_TABLE_EDIT = "structural_table_edit"
     TYPED_AUTHORING = "typed_authoring"
+    MUST_ABSTAIN = "must_abstain"
 
 
 class WorkflowState(str, Enum):

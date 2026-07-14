@@ -40,10 +40,14 @@ FAMILY_TOOL_ALLOWLISTS: dict[WorkFamily, frozenset[str]] = {
         {
             "list_form_fields", "fill_form_field", "analyze_template_formfit",
             "apply_template_formfit", "inspect_fill_residue", "verify_form_fill",
+            "scan_form_guidance", "apply_table_ops",
         }
     ),
     WorkFamily.UNKNOWN_FORM_FILL: frozenset(
         {"scan_form_guidance", "apply_table_ops", "apply_body_ops", "inspect_fill_residue", "verify_form_fill"}
+    ),
+    WorkFamily.STRUCTURAL_TABLE_EDIT: frozenset(
+        {"scan_form_guidance", "apply_table_ops", "doc_diff"}
     ),
     WorkFamily.TYPED_AUTHORING: frozenset(
         {
@@ -55,6 +59,7 @@ FAMILY_TOOL_ALLOWLISTS: dict[WorkFamily, frozenset[str]] = {
             "inspect_official_document_style",
         }
     ),
+    WorkFamily.MUST_ABSTAIN: frozenset(),
 }
 
 

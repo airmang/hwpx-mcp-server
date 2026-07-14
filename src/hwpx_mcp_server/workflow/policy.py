@@ -16,6 +16,7 @@ MUTATING_FAMILIES = frozenset(
         WorkFamily.TRANSACTIONAL_EDIT,
         WorkFamily.KNOWN_TEMPLATE_FILL,
         WorkFamily.UNKNOWN_FORM_FILL,
+        WorkFamily.STRUCTURAL_TABLE_EDIT,
         WorkFamily.TYPED_AUTHORING,
     }
 )

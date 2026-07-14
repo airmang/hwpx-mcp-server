@@ -77,6 +77,15 @@ _PRIVATE_COORDINATE = re.compile(
     re.IGNORECASE,
 )
 _PRIVATE_FILENAME = re.compile(r"(?<![A-Za-z0-9_.-])[^/\\\s]+\.hwpx(?![A-Za-z0-9_.-])", re.IGNORECASE)
+_CLOSED_FAMILY = re.compile(r"[a-z0-9][a-z0-9_-]{1,63}\Z")
+_FAMILY_TAXONOMY = (
+    (("시험", "문항", "답안"), "exam_question_answer"),
+    (("공문", "기안", "시행"), "official_document_draft_dispatch"),
+    (("평가", "성취"), "assessment_plan_achievement_standard"),
+    (("시간표", "배당"), "timetable_course_allocation"),
+    (("회의", "협의"), "meeting_minutes"),
+    (("신청", "양식", "서식"), "forms"),
+)
 
 
 class PracticeSelectionError(RuntimeError):
@@ -122,8 +131,10 @@ class SelectionConfig:
         ):
             raise PracticeSelectionError("INVALID_CONFIG")
         normalized = tuple(_validate_label(item, "config") for item in self.required_families)
+        normalized = tuple(_canonical_family(item) for item in normalized)
         if normalized != tuple(sorted(set(normalized))):
             raise PracticeSelectionError("INVALID_CONFIG")
+        object.__setattr__(self, "required_families", normalized)
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -162,6 +173,20 @@ def _validate_label(value: object, kind: str) -> str:
         }.get(kind, "INVALID_WEIGHTS")
         raise PracticeSelectionError(error_code)
     return label
+
+
+def _canonical_family(value: str) -> str:
+    """Map local Korean discovery labels to a closed privacy-safe code."""
+
+    folded = value.casefold()
+    if _CLOSED_FAMILY.fullmatch(folded):
+        return folded
+    for tokens, code in _FAMILY_TAXONOMY:
+        if any(token in value for token in tokens):
+            return code
+    # Unknown local labels remain distinct without leaking their text into a
+    # manifest, public selection receipt, evaluator result, or aggregate.
+    return f"family_{hashlib.sha256(value.encode('utf-8')).hexdigest()[:20]}"
 
 
 def _strict_directory(value: str | Path, code: str) -> Path:
@@ -255,7 +280,7 @@ def _validate_runner_scenario(value: Mapping[str, Any]) -> dict[str, Any]:
     difficulty = str(raw.get("difficulty", ""))
     if task_kind not in TASK_KINDS or difficulty not in _DIFFICULTIES:
         raise PracticeSelectionError("INVALID_SCENARIO")
-    family = _validate_label(raw.get("family"), "scenario")
+    family = _canonical_family(_validate_label(raw.get("family"), "scenario"))
     start_artifact = raw.get("startArtifact")
     if not isinstance(start_artifact, Mapping) or set(start_artifact) != {
         "artifactId",
@@ -271,9 +296,18 @@ def _validate_runner_scenario(value: Mapping[str, Any]) -> dict[str, Any]:
     evaluation_policy_sha256 = str(raw.get("evaluationPolicySha256", ""))
     if not SHA256_PATTERN.fullmatch(evaluation_policy_sha256):
         raise PracticeSelectionError("INVALID_SCENARIO")
+    # The policy is provisioned after the frozen runner row and its domain
+    # projection is bound to this identity.  Keeping it outside the scenario
+    # hash avoids a circular fixed-point requirement while still carrying the
+    # policy as an independently authenticated run binding.
+    scenario_identity = {
+        key: child
+        for key, child in raw.items()
+        if key != "evaluationPolicySha256"
+    }
     return {
         "runnerScenarioId": scenario_id,
-        "scenarioSha256": _content_sha256(raw),
+        "scenarioSha256": _content_sha256(scenario_identity),
         "evaluationPolicySha256": evaluation_policy_sha256,
         "startArtifactId": start_artifact_id,
         "startArtifactSha256": start_artifact_sha256,
@@ -304,6 +338,8 @@ def _validate_weights_payload(value: Mapping[str, Any]) -> dict[str, dict[str, i
         normalized: dict[str, int] = {}
         for key, weight in rows.items():
             label = _validate_label(key, "weight")
+            if axis == "byFamily":
+                label = _canonical_family(label)
             if axis == "byDifficulty" and label not in _DIFFICULTIES:
                 raise PracticeSelectionError("INVALID_WEIGHTS")
             if axis == "byTaskKind" and label not in TASK_KINDS:

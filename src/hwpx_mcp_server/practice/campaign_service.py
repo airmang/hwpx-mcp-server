@@ -123,6 +123,16 @@ TaskResolver = Callable[[Mapping[str, Any], Any], ResolvedPracticeTask]
 TerminalArtifactHook = Callable[
     [ResolvedPracticeTask, PracticeDispatchResult], Mapping[str, Any] | None
 ]
+TerminalEvaluatorHook = Callable[
+    [
+        ResolvedPracticeTask,
+        PracticeDispatchResult,
+        Mapping[str, Any],
+        Mapping[str, Any],
+        Mapping[str, Any] | None,
+    ],
+    Mapping[str, Any],
+]
 
 
 class PracticeCampaignError(RuntimeError):
@@ -210,6 +220,7 @@ class PracticeCampaignService:
         manifest_resolver: ManifestResolver,
         task_resolver: TaskResolver,
         terminal_artifact_hook: TerminalArtifactHook | None = None,
+        terminal_evaluator_hook: TerminalEvaluatorHook | None = None,
         worker_id: str = "practice-local-worker",
         lease_seconds: int = 60,
     ) -> None:
@@ -220,6 +231,7 @@ class PracticeCampaignService:
         self.manifest_resolver = manifest_resolver
         self.task_resolver = task_resolver
         self.terminal_artifact_hook = terminal_artifact_hook
+        self.terminal_evaluator_hook = terminal_evaluator_hook
         self.worker_id = worker_id
         self.lease_seconds = lease_seconds
 
@@ -511,25 +523,90 @@ class PracticeCampaignService:
         manifest: Mapping[str, Any],
         run_ref: Mapping[str, Any],
     ) -> tuple[str | None, str | None]:
-        """Require one exact verifier verdict over the final accounted receipt."""
+        """Retain artifacts, then grade the final accounted terminal receipt.
 
-        if outcome.run_receipt is None or outcome.run_receipt.get("state") != "completed":
+        The legacy single-hook contract remains for injected P4 test services.
+        Production supplies a distinct evaluator hook: an artifact-retention
+        receipt by itself is never accepted as evaluator success.
+        """
+
+        if outcome.run_receipt is None:
             return None, None
-        if self.terminal_artifact_hook is None:
+        if (
+            self.terminal_evaluator_hook is None
+            and outcome.run_receipt.get("state") != "completed"
+        ):
+            return None, None
+        if self.terminal_evaluator_hook is None and self.terminal_artifact_hook is None:
             return None, "DOMAIN_VERIFIER_MISSING"
         try:
             receipt = validate_run_receipt(outcome.run_receipt)
             outputs = [
                 item for item in receipt["artifacts"] if item["role"] == "output"
             ]
-            if len(outputs) != 1:
+            if receipt["state"] == "completed" and len(outputs) != 1:
                 raise TypeError("completed verifier hook requires one output")
+            if receipt["state"] != "completed" and len(outputs) > 1:
+                raise TypeError("terminal verifier permits at most one output")
             idempotency_key = outcome.artifact_hook_idempotency_key
             if not isinstance(idempotency_key, str) or not re.fullmatch(
                 r"IDEM-[A-F0-9]{20}", idempotency_key
             ):
                 raise TypeError("terminal verifier requires a stable idempotency key")
             evaluator = dict(manifest["provenance"]["evaluator"])
+            if self.terminal_evaluator_hook is not None:
+                artifact_receipt = (
+                    self.terminal_artifact_hook(task, outcome)
+                    if self.terminal_artifact_hook is not None
+                    else None
+                )
+                if receipt["state"] == "completed":
+                    if not isinstance(artifact_receipt, Mapping):
+                        return None, "DOMAIN_VERIFIER_MISSING"
+                    if (
+                        artifact_receipt.get("schema")
+                        != "hwpx.practice-terminal-artifact/v1"
+                        or artifact_receipt.get("runId") != receipt["runId"]
+                        or artifact_receipt.get("artifactSha256")
+                        != outputs[0]["sha256"]
+                        or artifact_receipt.get("bytes") != outputs[0]["bytes"]
+                        or artifact_receipt.get("retained") is not True
+                        or artifact_receipt.get("privateStorageCoordinatesExposed")
+                        is not False
+                    ):
+                        raise TypeError("terminal artifact retention binding mismatch")
+                    assert_receipt_safe(_receipt_safety_projection(artifact_receipt))
+                elif artifact_receipt is not None:
+                    raise TypeError("non-completed run cannot retain an output")
+
+                evaluation = self.terminal_evaluator_hook(
+                    task, outcome, manifest, run_ref, artifact_receipt
+                )
+                if not isinstance(evaluation, Mapping):
+                    raise TypeError("terminal evaluator result is missing")
+                evaluator = dict(manifest["provenance"]["evaluator"])
+                if (
+                    evaluation.get("schema")
+                    != "hwpx.practice-evaluator-result/v1"
+                    or evaluation.get("runId") != receipt["runId"]
+                    or evaluation.get("terminalState") != receipt["state"]
+                    or evaluation.get("terminalReceiptSha256")
+                    != receipt["receiptSha256"]
+                    or evaluation.get("evaluationPolicySha256")
+                    != run_ref["evaluationPolicySha256"]
+                    or evaluation.get("evaluatorCodeSha256")
+                    != evaluator["sha256"]
+                    or evaluation.get("authenticationKeyId")
+                    != evaluator["authenticationKeyId"]
+                    or evaluation.get("overallStatus") != "passed"
+                    or evaluation.get("eligibleForSuccess") is not True
+                ):
+                    raise TypeError("terminal evaluator result binding mismatch")
+                assert_receipt_safe(_receipt_safety_projection(evaluation))
+                return _digest(evaluation), None
+
+            # Compatibility path for bounded injected services used by the P4
+            # chaos matrix. Production never enters this branch.
             expected = {
                 "schema": "hwpx.practice-terminal-verifier/v1",
                 "runId": receipt["runId"],
@@ -966,4 +1043,5 @@ __all__ = [
     "PracticeCampaignService",
     "TaskResolver",
     "TerminalArtifactHook",
+    "TerminalEvaluatorHook",
 ]

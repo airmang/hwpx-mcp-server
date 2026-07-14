@@ -40,6 +40,7 @@ _WORKFLOW_FAMILIES = frozenset(
         "transactional_edit",
         "known_template_fill",
         "unknown_form_fill",
+        "structural_table_edit",
         "typed_authoring",
         "must_abstain",
     }
@@ -514,7 +515,13 @@ class PracticeWorkflowDispatcher:
     def _run_events(self, workflow_id: str | None) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = []
         for sequence, event in enumerate(self._ledger_events(workflow_id)):
-            kind = re.sub(r"[^a-z0-9_]+", "_", event.event_type.casefold()).strip("_")
+            kind = (
+                "decision_gate"
+                if event.event_type == "decision_gate.abstained"
+                else re.sub(
+                    r"[^a-z0-9_]+", "_", event.event_type.casefold()
+                ).strip("_")
+            )
             if not kind or not kind[0].isalpha():
                 kind = "workflow_event"
             status = (
@@ -619,7 +626,18 @@ class PracticeWorkflowDispatcher:
             return "completed", "VERIFIED_COMPLETION"
         if state == "needs_review":
             reason = str(receipt.get("stopReason") or "WORKFLOW_NEEDS_REVIEW")
-            return "needs_review", reason if _CLOSED_CODE.fullmatch(reason) else "WORKFLOW_NEEDS_REVIEW"
+            closed_reason = (
+                reason if _CLOSED_CODE.fullmatch(reason) else "WORKFLOW_NEEDS_REVIEW"
+            )
+            if (
+                receipt.get("family") == "must_abstain"
+                and closed_reason == "UNSUPPORTED_INTENT"
+            ):
+                # The workflow ledger uses NEEDS_REVIEW as its durable
+                # abstention terminal, while the frozen practice scenario
+                # contract names the corresponding run outcome `refused`.
+                return "refused", closed_reason
+            return "needs_review", closed_reason
         if state == "failed":
             reason = str(receipt.get("stopReason") or "WORKFLOW_FAILED")
             return "failed", reason if _CLOSED_CODE.fullmatch(reason) else "WORKFLOW_FAILED"

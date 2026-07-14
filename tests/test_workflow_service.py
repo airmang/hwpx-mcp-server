@@ -95,6 +95,27 @@ def drive(service: WorkflowService, receipt: dict) -> dict:
             "apply_table_ops",
         ),
         (
+            WorkFamily.STRUCTURAL_TABLE_EDIT,
+            {
+                "operations": [
+                    {
+                        "op": "insert_row_by_clone",
+                        "table_index": 5,
+                        "ref_row": 9,
+                        "count": 1,
+                    },
+                    {
+                        "op": "fill_cell",
+                        "table_index": 5,
+                        "row": 10,
+                        "col": 0,
+                        "text": "SYNTHETIC",
+                    },
+                ]
+            },
+            "apply_table_ops",
+        ),
+        (
             WorkFamily.TYPED_AUTHORING,
             {"documentPlan": {"schemaVersion": "hwpx.document_plan.v2", "sections": []}},
             "create_document_from_plan",
@@ -137,6 +158,96 @@ def test_weak_client_drives_each_family_using_only_high_level_api(
         assert terminal["domainVerification"]["ok"] is True
     else:
         assert terminal["result"]["payload"] == "durable-result"
+
+
+def test_must_abstain_is_a_durable_idempotent_no_tool_workflow(tmp_path: Path):
+    calls: list[str] = []
+    source = tmp_path / "abstain-source.hwpx"
+    output = tmp_path / "abstain-output.hwpx"
+    source.write_bytes(b"synthetic HWPX fixture")
+    service = WorkflowService(
+        namespace(calls), store=WorkflowStore(tmp_path / "must-abstain.sqlite3")
+    )
+
+    first = service.start(
+        family=WorkFamily.MUST_ABSTAIN.value,
+        idempotency_key="must-abstain-idempotent",
+        source_path=str(source),
+        output_path=str(output),
+        parameters={},
+    )
+    replay = service.start(
+        family=WorkFamily.MUST_ABSTAIN.value,
+        idempotency_key="must-abstain-idempotent",
+        source_path=str(source),
+        output_path=str(output),
+        parameters={},
+    )
+
+    assert first == replay
+    assert first["workflowId"]
+    assert first["state"] == "needs_review"
+    assert first["stopReason"] == "UNSUPPORTED_INTENT"
+    assert calls == []
+    assert not output.exists()
+    events = service.store.events(first["workflowId"])
+    assert [event.event_type for event in events][-1] == "decision_gate.abstained"
+    assert events[-1].payload["noMutation"] is True
+
+
+def test_known_template_coordinate_mode_accepts_only_frozen_fill_cells(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+    source = tmp_path / "coordinate-source.hwpx"
+    output = tmp_path / "coordinate-output.hwpx"
+    source.write_bytes(b"synthetic HWPX fixture")
+    service = WorkflowService(
+        namespace(calls), store=WorkflowStore(tmp_path / "coordinate.sqlite3")
+    )
+    operations = [
+        {
+            "op": "fill_cell",
+            "table_index": 0,
+            "row": 1,
+            "col": 2,
+            "text": "SYNTHETIC",
+        }
+    ]
+    terminal = drive(
+        service,
+        service.start(
+            family=WorkFamily.KNOWN_TEMPLATE_FILL.value,
+            idempotency_key="coordinate-fill-valid",
+            source_path=str(source),
+            output_path=str(output),
+            parameters={"mode": "coordinate_table", "operations": operations},
+        ),
+    )
+    assert terminal["state"] == "completed"
+    assert "apply_table_ops" in calls
+    assert "apply_template_formfit" not in calls
+
+    rejected = service.start(
+        family=WorkFamily.KNOWN_TEMPLATE_FILL.value,
+        idempotency_key="coordinate-fill-reject-structure",
+        source_path=str(source),
+        output_path=str(tmp_path / "rejected.hwpx"),
+        parameters={
+            "mode": "coordinate_table",
+            "operations": [
+                {
+                    "op": "insert_row_by_clone",
+                    "table_index": 0,
+                    "ref_row": 0,
+                    "count": 1,
+                }
+            ],
+        },
+    )
+    rejected = drive(service, rejected)
+    assert rejected["state"] == "needs_review"
+    assert rejected["stopReason"] == "FROZEN_FILL_OPERATIONS_REQUIRED"
 
 
 def test_transactional_receipt_preserves_real_semantic_diff(tmp_path: Path):

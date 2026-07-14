@@ -15,6 +15,7 @@ import pytest
 from hwpx_mcp_server.practice.selection import (
     PracticeSelectionError,
     SelectionConfig,
+    _validate_runner_scenario,
     experiment_workspace,
     load_l0_weights,
     select_campaign_scenarios,
@@ -84,6 +85,23 @@ def _balanced_scenarios() -> list[dict]:
             )
             index += 1
     return rows
+
+
+def test_scenario_identity_excludes_independent_evaluation_policy_binding() -> None:
+    frozen = _scenario(1, family="forms")
+    first = _validate_runner_scenario(frozen)
+
+    policy_changed = copy.deepcopy(frozen)
+    policy_changed["evaluationPolicySha256"] = _digest("replacement-policy")
+    second = _validate_runner_scenario(policy_changed)
+
+    content_changed = copy.deepcopy(policy_changed)
+    content_changed["instruction"] = "합성 문서에 다른 통제 편집을 적용한다."
+    third = _validate_runner_scenario(content_changed)
+
+    assert first["scenarioSha256"] == second["scenarioSha256"]
+    assert first["evaluationPolicySha256"] != second["evaluationPolicySha256"]
+    assert third["scenarioSha256"] != second["scenarioSha256"]
 
 
 def _config(
@@ -490,6 +508,32 @@ def test_public_result_is_content_addressed_and_omits_runner_content_and_paths(
     tampered["selected"][0]["weaknessScore"] += 1
     with pytest.raises(PracticeSelectionError):
         validate_selection_result(tampered)
+
+
+def test_korean_discovery_families_map_to_closed_nonleaking_codes(
+    tmp_path: Path,
+) -> None:
+    root = _root(tmp_path)
+    scenarios = [
+        _scenario(1, family="시험지-문항-답안"),
+        _scenario(2, family="공문-기안-시행"),
+        _scenario(3, family="합성미분류군"),
+    ]
+    result = select_campaign_scenarios(
+        scenarios,
+        config=_config(count=3, basis_points=10_000),
+        practice_root=root,
+        experiment_id=EXPERIMENT_ID,
+    )
+    families = {row["family"] for row in result["selected"]}
+    assert "exam_question_answer" in families
+    assert "official_document_draft_dispatch" in families
+    assert any(family.startswith("family_") for family in families)
+    encoded = json.dumps(result, ensure_ascii=False)
+    assert "시험지" not in encoded
+    assert "공문" not in encoded
+    assert "합성미분류군" not in encoded
+    assert validate_selection_result(result) == result
 
 
 def test_duplicate_scenario_ids_and_invalid_config_are_rejected(tmp_path: Path) -> None:

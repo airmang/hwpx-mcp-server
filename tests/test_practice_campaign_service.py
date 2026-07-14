@@ -726,7 +726,9 @@ def test_campaign_budget_maps_exactly_and_caps_repairs(campaign_fixture) -> None
     assert budget.max_repair_rounds == 3
 
 
-def test_must_abstain_closes_without_workflow_record(campaign_fixture) -> None:
+def test_must_abstain_closes_with_durable_no_mutation_decision_gate(
+    campaign_fixture,
+) -> None:
     fixture = campaign_fixture
     task = ResolvedPracticeTask(
         scenario_ref=fixture["task"].scenario_ref,
@@ -745,9 +747,41 @@ def test_must_abstain_closes_without_workflow_record(campaign_fixture) -> None:
 
     terminal = service.continue_campaign(fixture["manifest"]["campaignId"])
 
+    # The workflow boundary reports its durable ledger terminal; the campaign
+    # run contract independently preserves the frozen scenario's `refused`.
     assert terminal["boundary"]["state"] == "needs_review"
+    assert fixture["queue"].terminal_receipt["state"] == "refused"
     assert fixture["queue"].terminal_receipt["terminalReason"] == "UNSUPPORTED_INTENT"
+    assert any(
+        event["kind"] == "decision_gate" and event["status"] == "abstained"
+        for event in fixture["queue"].terminal_receipt["workflowEvents"]
+    )
+    recovered = fixture["dispatcher"]._recovery_receipt(
+        fixture["manifest"]["campaignId"], fixture["runRef"]["runId"]
+    )
+    assert recovered is not None and recovered["workflowId"]
+    assert fixture["dispatcher"].workflow_service.store.events(
+        recovered["workflowId"]
+    )
     assert terminal["sandboxCleanup"]["removed"] is True
+
+
+def test_only_must_abstain_unsupported_terminal_maps_to_refused() -> None:
+    generic = {
+        "state": "needs_review",
+        "family": "unknown_form_fill",
+        "stopReason": "UNSUPPORTED_INTENT",
+    }
+    expected_abstention = {**generic, "family": "must_abstain"}
+
+    assert PracticeWorkflowDispatcher._terminal_mapping(generic) == (
+        "needs_review",
+        "UNSUPPORTED_INTENT",
+    )
+    assert PracticeWorkflowDispatcher._terminal_mapping(expected_abstention) == (
+        "refused",
+        "UNSUPPORTED_INTENT",
+    )
 
 
 def test_export_requires_exact_complete_bijection(campaign_fixture, monkeypatch) -> None:
