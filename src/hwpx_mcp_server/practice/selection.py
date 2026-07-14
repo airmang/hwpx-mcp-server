@@ -28,6 +28,7 @@ else:
     import fcntl
 
 from hwpx.practice.registry import SHA256_PATTERN, assert_redacted_payload
+from hwpx.practice.run import OPAQUE_ID_PATTERN
 from hwpx.practice.scenario import SCENARIO_ID_PATTERN, TASK_KINDS
 from hwpx.tools.pii import detect_pii
 
@@ -203,6 +204,12 @@ def _contains_private_or_evaluator_data(value: object) -> bool:
             for key, child in item.items():
                 normalized = _normalized_key(key)
                 if (
+                    normalized == "evaluationpolicysha256"
+                    and isinstance(child, str)
+                    and SHA256_PATTERN.fullmatch(child)
+                ):
+                    continue
+                if (
                     normalized in _FORBIDDEN_INPUT_KEYS
                     or "gold" in normalized
                     or "holdout" in normalized
@@ -249,9 +256,27 @@ def _validate_runner_scenario(value: Mapping[str, Any]) -> dict[str, Any]:
     if task_kind not in TASK_KINDS or difficulty not in _DIFFICULTIES:
         raise PracticeSelectionError("INVALID_SCENARIO")
     family = _validate_label(raw.get("family"), "scenario")
+    start_artifact = raw.get("startArtifact")
+    if not isinstance(start_artifact, Mapping) or set(start_artifact) != {
+        "artifactId",
+        "sha256",
+    }:
+        raise PracticeSelectionError("INVALID_SCENARIO")
+    start_artifact_id = str(start_artifact["artifactId"])
+    start_artifact_sha256 = str(start_artifact["sha256"])
+    if not OPAQUE_ID_PATTERN.fullmatch(start_artifact_id) or not SHA256_PATTERN.fullmatch(
+        start_artifact_sha256
+    ):
+        raise PracticeSelectionError("INVALID_SCENARIO")
+    evaluation_policy_sha256 = str(raw.get("evaluationPolicySha256", ""))
+    if not SHA256_PATTERN.fullmatch(evaluation_policy_sha256):
+        raise PracticeSelectionError("INVALID_SCENARIO")
     return {
         "runnerScenarioId": scenario_id,
         "scenarioSha256": _content_sha256(raw),
+        "evaluationPolicySha256": evaluation_policy_sha256,
+        "startArtifactId": start_artifact_id,
+        "startArtifactSha256": start_artifact_sha256,
         "family": family,
         "difficulty": difficulty,
         "taskKind": task_kind,
@@ -624,6 +649,9 @@ def validate_selection_result(value: Mapping[str, Any]) -> dict[str, Any]:
             "slot",
             "runnerScenarioId",
             "scenarioSha256",
+            "evaluationPolicySha256",
+            "startArtifactId",
+            "startArtifactSha256",
             "family",
             "difficulty",
             "taskKind",
@@ -634,6 +662,12 @@ def validate_selection_result(value: Mapping[str, Any]) -> dict[str, Any]:
         if not SCENARIO_ID_PATTERN.fullmatch(scenario_id):
             raise PracticeSelectionError("INVALID_SCENARIO")
         if not SHA256_PATTERN.fullmatch(str(item["scenarioSha256"])):
+            raise PracticeSelectionError("INVALID_SCENARIO")
+        if not SHA256_PATTERN.fullmatch(str(item["evaluationPolicySha256"])):
+            raise PracticeSelectionError("INVALID_SCENARIO")
+        if not OPAQUE_ID_PATTERN.fullmatch(str(item["startArtifactId"])):
+            raise PracticeSelectionError("INVALID_SCENARIO")
+        if not SHA256_PATTERN.fullmatch(str(item["startArtifactSha256"])):
             raise PracticeSelectionError("INVALID_SCENARIO")
         family = _validate_label(item["family"], "result")
         difficulty = str(item["difficulty"])
@@ -800,6 +834,9 @@ def select_campaign_scenarios(
                 "slot": slot,
                 "runnerScenarioId": chosen["runnerScenarioId"],
                 "scenarioSha256": chosen["scenarioSha256"],
+                "evaluationPolicySha256": chosen["evaluationPolicySha256"],
+                "startArtifactId": chosen["startArtifactId"],
+                "startArtifactSha256": chosen["startArtifactSha256"],
                 "family": chosen["family"],
                 "difficulty": chosen["difficulty"],
                 "taskKind": chosen["taskKind"],
@@ -816,7 +853,13 @@ def select_campaign_scenarios(
         family for family, cap in family_caps.items() if family_counts[family] >= cap
     )
     candidate_fingerprints = [
-        {"runnerScenarioId": item["runnerScenarioId"], "scenarioSha256": item["scenarioSha256"]}
+        {
+            "runnerScenarioId": item["runnerScenarioId"],
+            "scenarioSha256": item["scenarioSha256"],
+            "evaluationPolicySha256": item["evaluationPolicySha256"],
+            "startArtifactId": item["startArtifactId"],
+            "startArtifactSha256": item["startArtifactSha256"],
+        }
         for item in candidates
     ]
     result: dict[str, Any] = {

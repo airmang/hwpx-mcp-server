@@ -45,6 +45,7 @@ def _provenance() -> dict:
         "evaluator": {
             "version": "practice-evaluator/v1",
             "sha256": _digest("evaluator"),
+            "authenticationKeyId": "EVK-0123456789ABCDEF0123",
         },
     }
 
@@ -159,8 +160,10 @@ def _run_ref(run: dict, *, family: str = "known_form_fill") -> dict:
         "runId": run["runId"],
         "scenarioId": run["scenarioRef"]["scenarioId"],
         "scenarioSha256": run["scenarioRef"]["scenarioSha256"],
+        "evaluationPolicySha256": _digest(f"evaluation-policy-{run['dispatch']['slot']}"),
         "runnerManifestSha256": run["scenarioRef"]["runnerManifestSha256"],
         "derivativeSha256": run["scenarioRef"]["derivativeSha256"],
+        "startArtifactId": run["scenarioRef"]["startArtifactId"],
         "startArtifactSha256": run["scenarioRef"]["startArtifactSha256"],
         "family": family,
         "difficulty": "routine",

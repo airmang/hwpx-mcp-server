@@ -58,6 +58,7 @@ def _provenance(*, tool_spec_hash: str | None = None) -> dict[str, Any]:
         "evaluator": {
             "version": "practice-evaluator/v1",
             "sha256": _digest("evaluator"),
+            "authenticationKeyId": "EVK-0123456789ABCDEF0123",
         },
     }
 
@@ -113,8 +114,10 @@ def _fixture_contract(
         "runId": run_id,
         "scenarioId": scenario_ref["scenarioId"],
         "scenarioSha256": scenario_ref["scenarioSha256"],
+        "evaluationPolicySha256": _digest("evaluation-policy"),
         "runnerManifestSha256": scenario_ref["runnerManifestSha256"],
         "derivativeSha256": scenario_ref["derivativeSha256"],
+        "startArtifactId": scenario_ref["startArtifactId"],
         "startArtifactSha256": scenario_ref["startArtifactSha256"],
         "family": "unknown_form_fill",
         "difficulty": "routine",

@@ -46,6 +46,7 @@ def _scenario(
     return {
         "schema": "hwpx.practice-runner-manifest/v1",
         "runnerScenarioId": f"SCN-{index:020X}",
+        "evaluationPolicySha256": _digest(f"evaluation-policy-{index}"),
         "taskKind": task_kind,
         "family": family,
         "difficulty": difficulty,

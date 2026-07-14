@@ -45,7 +45,11 @@ def _budgets() -> dict[str, int]:
 
 
 def _provenance(skill_root: Path, skill_version: str) -> dict[str, Any]:
-    return installed_runtime_provenance(skill_root, skill_version)
+    return installed_runtime_provenance(
+        skill_root,
+        skill_version,
+        "EVK-0123456789ABCDEF0123",
+    )
 
 
 def _campaign(source_bytes: bytes, provenance: dict[str, Any]):
@@ -60,6 +64,7 @@ def _campaign(source_bytes: bytes, provenance: dict[str, Any]):
     }
     task_material = {
         "scenarioRef": scenario_ref,
+        "evaluationPolicySha256": _digest("evaluation-policy"),
         "workflowFamily": "unknown_form_fill",
         "artifactScope": "practice",
         "sourceArtifactSha256": source_hash,
@@ -88,8 +93,10 @@ def _campaign(source_bytes: bytes, provenance: dict[str, Any]):
         "runId": run_id,
         "scenarioId": scenario_ref["scenarioId"],
         "scenarioSha256": scenario_ref["scenarioSha256"],
+        "evaluationPolicySha256": task_material["evaluationPolicySha256"],
         "runnerManifestSha256": scenario_ref["runnerManifestSha256"],
         "derivativeSha256": scenario_ref["derivativeSha256"],
+        "startArtifactId": scenario_ref["startArtifactId"],
         "startArtifactSha256": source_hash,
         "family": "unknown_form_fill",
         "difficulty": "routine",
@@ -117,6 +124,7 @@ def _campaign(source_bytes: bytes, provenance: dict[str, Any]):
         "campaignId": manifest["campaignId"],
         "runId": run_id,
         "scenarioRef": task_material["scenarioRef"],
+        "evaluationPolicySha256": task_material["evaluationPolicySha256"],
         "dispatch": dispatch,
         "workflowFamily": task_material["workflowFamily"],
         "artifactScope": task_material["artifactScope"],

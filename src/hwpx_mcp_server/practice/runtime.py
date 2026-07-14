@@ -36,7 +36,11 @@ from typing import Any
 
 from hwpx import validate_editor_open_safety
 from hwpx.opc.security import HwpxSecurityError, guard_zip_file, parse_xml_stdlib
-from hwpx.practice import validate_campaign_manifest, validate_exact_provenance
+from hwpx.practice import (
+    current_evaluator_code_sha256,
+    validate_campaign_manifest,
+    validate_exact_provenance,
+)
 from hwpx.tools.pii import detect_pii
 
 from hwpx_mcp_server import quality as quality_contract
@@ -259,6 +263,7 @@ def _task_dispatch_sha256(value: Mapping[str, Any]) -> str:
 
     payload = {
         "scenarioRef": value["scenarioRef"],
+        "evaluationPolicySha256": value["evaluationPolicySha256"],
         "workflowFamily": value["workflowFamily"],
         "artifactScope": value["artifactScope"],
         "sourceArtifactSha256": value["sourceArtifactSha256"],
@@ -544,16 +549,22 @@ def _evaluator_sha256(core_root: Path) -> str:
     required = {"run.py", "campaign.py"}
     if not required.issubset({item.name for item in relative_files}):
         raise PracticeRuntimeError()
-    return _hash_files(practice_root, relative_files)
+    installed = current_evaluator_code_sha256()
+    if installed != _hash_files(practice_root, relative_files):
+        raise PracticeRuntimeError()
+    return installed
 
 
 def installed_runtime_provenance(
     skill_root: str | Path,
     skill_version: str,
+    evaluator_authentication_key_id: str,
 ) -> dict[str, Any]:
     """Build exact provenance from installed bytes for offline provisioning."""
 
     if not isinstance(skill_version, str) or not skill_version.strip():
+        raise PracticeRuntimeError()
+    if not re.fullmatch(r"EVK-[A-F0-9]{20}", evaluator_authentication_key_id):
         raise PracticeRuntimeError()
     core_root = _package_root("hwpx")
     server_root = _package_root("hwpx_mcp_server")
@@ -577,6 +588,7 @@ def installed_runtime_provenance(
         "evaluator": {
             "version": "practice-evaluator/v1",
             "sha256": _evaluator_sha256(core_root),
+            "authenticationKeyId": evaluator_authentication_key_id,
         },
     }
 
@@ -588,7 +600,11 @@ def _runtime_provenance(
         configured = validate_exact_provenance(
             _read_private_json(runtime_root / "provenance.json", runtime_root)
         )
-        attested = installed_runtime_provenance(skill_root, skill_version)
+        attested = installed_runtime_provenance(
+            skill_root,
+            skill_version,
+            configured["evaluator"]["authenticationKeyId"],
+        )
         installed = quality_contract.capability_state()
         versions = installed["versions"]
         if not installed["ok"]:
@@ -695,6 +711,7 @@ class _PrivateCampaignResolver:
             "campaignId",
             "runId",
             "scenarioRef",
+            "evaluationPolicySha256",
             "dispatch",
             "workflowFamily",
             "artifactScope",
@@ -724,6 +741,7 @@ class _PrivateCampaignResolver:
             "scenarioSha256": run_ref["scenarioSha256"],
             "runnerManifestSha256": run_ref["runnerManifestSha256"],
             "derivativeSha256": run_ref["derivativeSha256"],
+            "startArtifactId": run_ref["startArtifactId"],
             "startArtifactSha256": run_ref["startArtifactSha256"],
         }
         if any(scenario_ref.get(key) != value for key, value in matching.items()):
@@ -734,6 +752,8 @@ class _PrivateCampaignResolver:
             raise ValueError("private task content address is invalid")
         if payload["sourceArtifactSha256"] != run_ref["startArtifactSha256"]:
             raise ValueError("private task artifact binding is invalid")
+        if payload["evaluationPolicySha256"] != run_ref["evaluationPolicySha256"]:
+            raise ValueError("private task evaluator policy binding is invalid")
         source = self._artifact(
             payload["artifactScope"], payload["sourceArtifactSha256"]
         )
