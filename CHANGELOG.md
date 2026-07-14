@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2.18.3] - 2026-07-14
+
+### Fixed
+- Prevent long values written into `lineWrap="SQUEEZE"` template cells from being compressed into unreadable overlapping glyphs. `apply_table_ops(fill_cell)` and regular table-cell edits now require `python-hwpx>=2.24.1`, which changes only touched non-empty cells to `lineWrap="BREAK"`; untouched/no-op/cleared cells retain their original wrap mode.
+
 ## [2.18.2] - 2026-07-13
 
 ### Fixed

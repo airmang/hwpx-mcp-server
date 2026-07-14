@@ -81,7 +81,7 @@ def test_resolve_policy_strict_and_dict_override():
 # --------------------------------------------------------------------------- #
 _SKEW = {
     "versions": {"core": "2.11.1", "mcp": "2.4.1", "plugin": "x"},
-    "minPythonHwpx": "2.24.0",
+    "minPythonHwpx": "2.24.1",
     "minMcpVersion": "2.18.1",
     "minSkillVersion": "0.1.25",
     "savePipelineAvailable": False,
