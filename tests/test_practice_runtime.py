@@ -28,9 +28,13 @@ from hwpx.practice import (
     domain_value_sha256,
     evaluator_authentication_key_id,
     evaluation_policy_sha256,
+    form_differential_oracle_provenance_sha256,
+    form_differential_receipt_sha256,
+    form_verifier_policy_sha256,
     must_abstain_verifier_policy_sha256,
     practice_run_id,
     redact_run_receipt,
+    serialize_form_differential_receipt,
     structural_verifier_policy_sha256,
     synthetic_dossier,
     workflow_event_id,
@@ -56,6 +60,47 @@ from hwpx_mcp_server.practice.dispatch import ResolvedPracticeTask
 def _digest(value: str | bytes) -> str:
     payload = value if isinstance(value, bytes) else value.encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _form_differential_asset(
+    blank: Path, output: Path
+) -> tuple[str, bytes, dict[str, Any]]:
+    backend = "tests.RuntimeFrozenDifferentialOracle"
+    receipt: dict[str, Any] = {
+        "schema": "hwpx.practice-form-differential-receipt/v1",
+        "blankArtifact": {
+            "sha256": _digest(blank.read_bytes()),
+            "bytes": blank.stat().st_size,
+        },
+        "outputArtifact": {
+            "sha256": _digest(output.read_bytes()),
+            "bytes": output.stat().st_size,
+        },
+        "backend": backend,
+        "oracleProvenanceSha256": form_differential_oracle_provenance_sha256(
+            backend=backend
+        ),
+        "renderChecked": True,
+        "overflowChecked": True,
+        "overflowDetected": False,
+        "overlapDetected": False,
+        "layoutStable": True,
+        "verdict": "passed",
+    }
+    receipt["receiptSha256"] = form_differential_receipt_sha256(receipt)
+    payload = serialize_form_differential_receipt(receipt)
+    return _digest(payload), payload, receipt
+
+
+def _install_evaluator_asset(
+    evaluator: _TerminalEvaluatorStore, digest: str, payload: bytes
+) -> Path:
+    prefix = evaluator.assets_root / digest[:2]
+    prefix.mkdir(mode=0o700)
+    target = prefix / f"{digest}.json"
+    target.write_bytes(payload)
+    target.chmod(0o600)
+    return target
 
 
 def _budgets() -> dict[str, int]:
@@ -1171,11 +1216,8 @@ def _run_evaluator_case(case):
 
 
 def test_runtime_evaluator_runs_form_and_persists_authenticated_replay(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path,
 ) -> None:
-    from types import SimpleNamespace as Result
-
-    import hwpx.form_fit.wordbox as wordbox_module
     from hwpx.document import HwpxDocument
 
     start = tmp_path / "form-start.hwpx"
@@ -1199,10 +1241,12 @@ def test_runtime_evaluator_runs_form_and_persists_authenticated_replay(
             }
         ],
     )
-    monkeypatch.setattr(
-        wordbox_module,
-        "verify_form_fill",
-        lambda *args, **kwargs: Result(render_checked=True, ok=True),
+    receipt_sha, receipt_payload, _receipt = _form_differential_asset(
+        start, output
+    )
+    verifier_policy = form_verifier_policy_sha256(
+        target_policy_sha256=target_policy["policySha256"],
+        differential_receipt_asset_sha256=receipt_sha,
     )
     case = _evaluator_case(
         tmp_path,
@@ -1211,13 +1255,14 @@ def test_runtime_evaluator_runs_form_and_persists_authenticated_replay(
         task_kind="known_template_fill",
         family="notice",
         adapter_kind="form_fill",
-        verifier_policies={"form_fill": target_policy["policySha256"]},
+        verifier_policies={"form_fill": verifier_policy},
         adapter_config={
             "targetPolicy": target_policy,
-            "frozenRenderArtifactSha256": None,
+            "frozenDifferentialReceiptSha256": receipt_sha,
         },
         terminal_state="completed",
     )
+    _install_evaluator_asset(case[0], receipt_sha, receipt_payload)
     result = _run_evaluator_case(case)
     assert result["layers"][2]["status"] == "passed"
     result_file = next(case[0].results_root.rglob("*.json"))
@@ -1225,6 +1270,148 @@ def test_runtime_evaluator_runs_form_and_persists_authenticated_replay(
     retained = case[1](case[2], case[3])
     with pytest.raises(PracticeRuntimeError):
         case[0](case[2], case[3], case[4], case[5], retained)
+
+
+@pytest.mark.parametrize("attack", ["missing", "tampered", "stale", "forged"])
+def test_runtime_form_evaluator_rejects_untrusted_differential_assets(
+    tmp_path: Path, attack: str
+) -> None:
+    from hwpx.document import HwpxDocument
+
+    start = tmp_path / "form-start.hwpx"
+    output = tmp_path / "form-output.hwpx"
+    stale_output = tmp_path / "form-stale.hwpx"
+    for path, value in (
+        (start, "BLANK"),
+        (output, "SYNTHETIC"),
+        (stale_output, "STALE"),
+    ):
+        document = HwpxDocument.new()
+        table = document.add_table(1, 1)
+        table.set_cell_text(0, 0, value)
+        document.save_to_path(path)
+        document.close()
+    target_policy = build_form_target_policy(
+        blank_artifact_sha256=_digest(start.read_bytes()),
+        bindings=[
+            {
+                "sectionIndex": 0,
+                "tableIndex": 0,
+                "row": 0,
+                "col": 0,
+                "blankValueSha256": domain_value_sha256("BLANK"),
+                "expectedValueSha256": domain_value_sha256("SYNTHETIC"),
+            }
+        ],
+    )
+    receipt_source = stale_output if attack == "stale" else output
+    receipt_sha, receipt_payload, receipt = _form_differential_asset(
+        start, receipt_source
+    )
+    if attack == "forged":
+        forged = dict(receipt)
+        forged["overflowDetected"] = True
+        receipt_payload = json.dumps(
+            forged, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        receipt_sha = _digest(receipt_payload)
+    verifier_policy = form_verifier_policy_sha256(
+        target_policy_sha256=target_policy["policySha256"],
+        differential_receipt_asset_sha256=receipt_sha,
+    )
+    case = _evaluator_case(
+        tmp_path,
+        start=start,
+        output=output,
+        task_kind="known_template_fill",
+        family="notice",
+        adapter_kind="form_fill",
+        verifier_policies={"form_fill": verifier_policy},
+        adapter_config={
+            "targetPolicy": target_policy,
+            "frozenDifferentialReceiptSha256": receipt_sha,
+        },
+        terminal_state="completed",
+    )
+    if attack != "missing":
+        installed_payload = (
+            receipt_payload + b"\n" if attack == "tampered" else receipt_payload
+        )
+        _install_evaluator_asset(case[0], receipt_sha, installed_payload)
+    retained = case[1](case[2], case[3])
+    if attack in {"missing", "tampered"}:
+        with pytest.raises(PracticeRuntimeError):
+            case[0](case[2], case[3], case[4], case[5], retained)
+    else:
+        result = case[0](case[2], case[3], case[4], case[5], retained)
+        assert result["overallStatus"] == "unverified"
+        assert result["eligibleForSuccess"] is False
+        assert result["layers"][2]["status"] == "unverified"
+
+
+def test_runtime_form_evaluator_requires_zero_residue(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from types import SimpleNamespace
+
+    import hwpx.fill_residue as residue_module
+    from hwpx.document import HwpxDocument
+
+    start = tmp_path / "form-start.hwpx"
+    output = tmp_path / "form-output.hwpx"
+    for path, value in ((start, "BLANK"), (output, "SYNTHETIC")):
+        document = HwpxDocument.new()
+        table = document.add_table(1, 1)
+        table.set_cell_text(0, 0, value)
+        document.save_to_path(path)
+        document.close()
+    target_policy = build_form_target_policy(
+        blank_artifact_sha256=_digest(start.read_bytes()),
+        bindings=[
+            {
+                "sectionIndex": 0,
+                "tableIndex": 0,
+                "row": 0,
+                "col": 0,
+                "blankValueSha256": domain_value_sha256("BLANK"),
+                "expectedValueSha256": domain_value_sha256("SYNTHETIC"),
+            }
+        ],
+    )
+    receipt_sha, receipt_payload, _receipt = _form_differential_asset(
+        start, output
+    )
+    verifier_policy = form_verifier_policy_sha256(
+        target_policy_sha256=target_policy["policySha256"],
+        differential_receipt_asset_sha256=receipt_sha,
+    )
+    case = _evaluator_case(
+        tmp_path,
+        start=start,
+        output=output,
+        task_kind="known_template_fill",
+        family="notice",
+        adapter_kind="form_fill",
+        verifier_policies={"form_fill": verifier_policy},
+        adapter_config={
+            "targetPolicy": target_policy,
+            "frozenDifferentialReceiptSha256": receipt_sha,
+        },
+        terminal_state="completed",
+    )
+    _install_evaluator_asset(case[0], receipt_sha, receipt_payload)
+    monkeypatch.setattr(
+        residue_module,
+        "inspect_fill_residue",
+        lambda *args, **kwargs: SimpleNamespace(
+            errors=["synthetic-residue"], needs_review=[]
+        ),
+    )
+    retained = case[1](case[2], case[3])
+    result = case[0](case[2], case[3], case[4], case[5], retained)
+    assert result["overallStatus"] == "failed"
+    assert result["eligibleForSuccess"] is False
+    assert result["layers"][2]["status"] == "failed"
 
 
 def test_runtime_evaluator_runs_structural_edit_from_retained_snapshots(

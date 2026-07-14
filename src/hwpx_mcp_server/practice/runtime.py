@@ -52,6 +52,7 @@ from hwpx.practice import (
     evaluate_package_layer,
     evaluate_semantic_layer,
     evaluation_policy_sha256,
+    form_verifier_policy_sha256,
     must_abstain_verifier_policy_sha256,
     semantic_policy_projection,
     structural_verifier_policy_sha256,
@@ -1130,19 +1131,24 @@ def _validate_evaluator_material(
         if config or set(policies) - {"edit"}:
             raise ValueError("edit adapter config is invalid")
     elif kind == "form_fill":
-        if set(config) != {"targetPolicy", "frozenRenderArtifactSha256"}:
+        if set(config) != {
+            "targetPolicy",
+            "frozenDifferentialReceiptSha256",
+        }:
             raise ValueError("form adapter config is invalid")
         target_policy = validate_form_target_policy(config["targetPolicy"])
-        if policies != {"form_fill": target_policy["policySha256"]}:
+        receipt_sha = config["frozenDifferentialReceiptSha256"]
+        if not isinstance(receipt_sha, str) or not _SHA256.fullmatch(receipt_sha):
+            raise ValueError("form differential receipt binding is invalid")
+        expected_policy = form_verifier_policy_sha256(
+            target_policy_sha256=target_policy["policySha256"],
+            differential_receipt_asset_sha256=receipt_sha,
+        )
+        if policies != {"form_fill": expected_policy}:
             raise ValueError("form adapter policy binding is invalid")
-        render_sha = config["frozenRenderArtifactSha256"]
-        if render_sha is not None and (
-            not isinstance(render_sha, str) or not _SHA256.fullmatch(render_sha)
-        ):
-            raise ValueError("form render artifact binding is invalid")
         config = {
             "targetPolicy": target_policy,
-            "frozenRenderArtifactSha256": render_sha,
+            "frozenDifferentialReceiptSha256": receipt_sha,
         }
     elif kind == "structural_table":
         if set(config) != {
@@ -1657,16 +1663,15 @@ class _TerminalEvaluatorStore:
                 observed_terminal_state=state,
             )
         elif kind == "form_fill":
-            render_sha = config["frozenRenderArtifactSha256"]
+            receipt_sha = config["frozenDifferentialReceiptSha256"]
             evidence = build_form_fill_domain_evidence_from_artifacts(
                 requirement,
                 evaluated_snapshot,
                 start_snapshot,
                 target_policy=config["targetPolicy"],
+                frozen_differential_receipt_path=self._asset(receipt_sha),
+                frozen_differential_receipt_asset_sha256=receipt_sha,
                 observed_terminal_state=state,
-                frozen_render_path=(
-                    self._asset(render_sha) if render_sha is not None else None
-                ),
             )
         elif kind == "structural_table":
             evidence = build_structural_table_domain_evidence_from_artifacts(
