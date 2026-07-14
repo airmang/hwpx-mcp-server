@@ -56,6 +56,7 @@ from hwpx_mcp_server.practice.runtime import (
     installed_runtime_provenance,
 )
 from hwpx_mcp_server.practice.dispatch import ResolvedPracticeTask
+from hwpx_mcp_server.tool_contract import MIN_SKILL_VERSION
 
 
 def _digest(value: str | bytes) -> str:
@@ -294,7 +295,7 @@ def _layout(
     key_path = evaluator_root / "authentication.key"
     key_path.write_bytes(_EVALUATOR_KEY)
     key_path.chmod(0o600)
-    skill_version = "0.1.28"
+    skill_version = MIN_SKILL_VERSION
     monkeypatch.setenv("HWPX_CORPUS_SOURCE", str(source_root))
     monkeypatch.setenv("HWPX_PRACTICE_ROOT", str(practice_root))
     monkeypatch.setenv("HWPX_SKILL_VERSION", skill_version)
