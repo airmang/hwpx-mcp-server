@@ -585,6 +585,7 @@ class PracticeCampaignService:
                 if not isinstance(evaluation, Mapping):
                     raise TypeError("terminal evaluator result is missing")
                 evaluator = dict(manifest["provenance"]["evaluator"])
+                authentication = evaluation.get("auth")
                 if (
                     evaluation.get("schema")
                     != "hwpx.practice-evaluator-result/v1"
@@ -596,8 +597,18 @@ class PracticeCampaignService:
                     != run_ref["evaluationPolicySha256"]
                     or evaluation.get("evaluatorCodeSha256")
                     != evaluator["sha256"]
-                    or evaluation.get("authenticationKeyId")
+                    or evaluation.get("evaluatorVersion")
+                    != evaluator["version"]
+                    or not isinstance(authentication, Mapping)
+                    or authentication.get("schema")
+                    != "hwpx.practice-evaluator-auth/v1"
+                    or authentication.get("algorithm") != "hmac-sha256"
+                    or authentication.get("keyId")
                     != evaluator["authenticationKeyId"]
+                    or not isinstance(authentication.get("macSha256"), str)
+                    or not re.fullmatch(
+                        r"[a-f0-9]{64}", authentication["macSha256"]
+                    )
                     or evaluation.get("overallStatus") != "passed"
                     or evaluation.get("eligibleForSuccess") is not True
                 ):

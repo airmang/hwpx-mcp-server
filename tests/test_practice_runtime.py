@@ -43,6 +43,7 @@ from hwpx.practice.evaluator import semantic_diff_sha256
 from hwpx.practice.run import PRACTICE_RUN_EVENT_SCHEMA
 from hwpx_mcp_server import server
 from hwpx_mcp_server.practice import runtime as runtime_module
+from hwpx_mcp_server.practice.campaign_service import PracticeCampaignService
 from hwpx_mcp_server.practice.runtime import (
     PracticeRuntimeError,
     _TerminalArtifactStore,
@@ -1263,6 +1264,14 @@ def test_runtime_evaluator_runs_form_and_persists_authenticated_replay(
         terminal_state="completed",
     )
     _install_evaluator_asset(case[0], receipt_sha, receipt_payload)
+    service = object.__new__(PracticeCampaignService)
+    service.terminal_artifact_hook = case[1]
+    service.terminal_evaluator_hook = case[0]
+    hook_sha, hook_error = service._retain_terminal_artifact(
+        case[2], case[3], case[4], case[5]
+    )
+    assert hook_error is None
+    assert isinstance(hook_sha, str) and len(hook_sha) == 64
     result = _run_evaluator_case(case)
     assert result["layers"][2]["status"] == "passed"
     result_file = next(case[0].results_root.rglob("*.json"))
