@@ -114,6 +114,24 @@ from .tool_contract import (
 )
 from .workflow.service import WorkflowService
 from .practice import PracticeScenarioError, PracticeScenarioService
+try:  # Leap B requires python-hwpx with the practice contract package.
+    from .practice.campaign_service import PracticeCampaignError, PracticeCampaignService
+    from .practice.dispatch import PracticeDispatchError
+except ImportError:
+    # Keep the established MCP surface importable during package-version skew.
+    # The new campaign tools remain registered, but fail closed until the Leap B
+    # service and its matching python-hwpx contracts are available.
+    PracticeCampaignService = Any  # type: ignore[misc,assignment]
+
+    class PracticeCampaignError(RuntimeError):
+        def __init__(self, code: str = "CAMPAIGN_UNAVAILABLE") -> None:
+            self.code = code
+            super().__init__(code)
+
+    class PracticeDispatchError(RuntimeError):
+        def __init__(self, code: str = "CAMPAIGN_UNAVAILABLE") -> None:
+            self.code = code
+            super().__init__(code)
 from .workflow.rendering import NullRenderClientV2, QueueRenderClientV2, RenderJobV2
 from .workflow.render_queue import DurableRenderQueue, RenderQueueError
 from .workflow.render_security import RenderSecurityPolicy
@@ -5697,6 +5715,98 @@ def apply_practice_scenario(
             "message": str(exc),
             "privateStorageCoordinatesExposed": False,
         }
+
+
+_PRACTICE_CAMPAIGN_SERVICE_OVERRIDE: PracticeCampaignService | None = None
+
+
+def _practice_campaign_service() -> PracticeCampaignService:
+    """Return the privately wired Leap B service, never public path material."""
+
+    if _PRACTICE_CAMPAIGN_SERVICE_OVERRIDE is None:
+        raise PracticeCampaignError("CAMPAIGN_UNAVAILABLE")
+    return _PRACTICE_CAMPAIGN_SERVICE_OVERRIDE
+
+
+def _practice_campaign_failure(exc: Exception) -> dict[str, Any]:
+    code = getattr(exc, "code", "CAMPAIGN_QUEUE_UNAVAILABLE")
+    return {
+        "ok": False,
+        "state": "needs_review",
+        "errorCode": str(code),
+        "privateStorageCoordinatesExposed": False,
+    }
+
+
+def start_practice_campaign(
+    campaign_id: str,
+    idempotency_key: str,
+    confirm: bool = False,
+) -> dict:
+    """불투명 campaign ID를 확인하고 명시적 confirm 뒤 durable queue에 등록합니다."""
+
+    try:
+        return {
+            "ok": True,
+            **_practice_campaign_service().start(
+                campaign_id,
+                idempotency_key=idempotency_key,
+                confirm=confirm,
+            ),
+        }
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
+
+
+def get_practice_campaign(campaign_id: str) -> dict:
+    """private 좌표 없이 캠페인의 durable aggregate 상태를 조회합니다."""
+
+    try:
+        return {"ok": True, **_practice_campaign_service().status(campaign_id)}
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
+
+
+def continue_practice_campaign(
+    campaign_id: str,
+    run_id: str = None,
+    max_steps: int = 8,
+    approved: bool = None,
+    decision_receipt_sha256: str = None,
+) -> dict:
+    """한 run을 bounded advance하고 decision receipt가 일치할 때만 실행합니다."""
+
+    try:
+        return {
+            "ok": True,
+            **_practice_campaign_service().continue_campaign(
+                campaign_id,
+                run_id=run_id,
+                max_steps=max_steps,
+                approved=approved,
+                decision_receipt_sha256=decision_receipt_sha256,
+            ),
+        }
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
+
+
+def cancel_practice_campaign(campaign_id: str) -> dict:
+    """캠페인의 새 claim을 중단하고 durable 취소 상태로 전환합니다."""
+
+    try:
+        return {"ok": True, **_practice_campaign_service().cancel(campaign_id)}
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
+
+
+def export_practice_campaign(campaign_id: str) -> dict:
+    """검증된 hash/code-only terminal receipt 묶음만 내보냅니다."""
+
+    try:
+        return {"ok": True, **_practice_campaign_service().export(campaign_id)}
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
 
 
 def _render_client():

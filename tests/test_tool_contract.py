@@ -35,7 +35,15 @@ RENDER_TOOLS = {
     "render_health",
 }
 BLIND_EVAL_TOOLS = {"run_fixture_benchmark", "export_fixture_benchmark"}
-PRACTICE_TOOLS = {"start_practice_scenario", "apply_practice_scenario"}
+PRACTICE_TOOLS = {
+    "start_practice_scenario",
+    "apply_practice_scenario",
+    "start_practice_campaign",
+    "get_practice_campaign",
+    "continue_practice_campaign",
+    "cancel_practice_campaign",
+    "export_practice_campaign",
+}
 
 
 def test_active_registry_exactly_matches_contract() -> None:
@@ -48,7 +56,7 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert RENDER_TOOLS <= set(server._fastmcp_tool_names())
     assert BLIND_EVAL_TOOLS <= set(server._fastmcp_tool_names())
     assert PRACTICE_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False)) == 123
+    assert len(expected_tool_names(advanced=False)) == 128
     assert len(
         expected_tool_names(advanced=False)
         - WORKFLOW_TOOLS
@@ -96,6 +104,33 @@ print(json.dumps({
     assert payload["actual"] == payload["expected"]
 
 
+def test_campaign_tools_fail_closed_during_python_hwpx_package_skew() -> None:
+    code = """
+import json
+from hwpx_mcp_server import server
+print(json.dumps(server.start_practice_campaign(
+    'PCMP-0123456789ABCDEFFEDC',
+    'package-skew-check',
+    True,
+)))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=ROOT,
+        env={key: value for key, value in os.environ.items() if key != "PYTHONPATH"},
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    payload = json.loads(result.stdout)
+    assert payload == {
+        "ok": False,
+        "state": "needs_review",
+        "errorCode": "CAMPAIGN_UNAVAILABLE",
+        "privateStorageCoordinatesExposed": False,
+    }
+
+
 def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
     async def schemas() -> dict[str, set[str]]:
         tools = await server.mcp.list_tools()
@@ -139,6 +174,19 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
         "use_suggested_operations",
         "confirm",
     } == inputs["apply_practice_scenario"]
+    assert {"campaign_id", "idempotency_key", "confirm"} == inputs[
+        "start_practice_campaign"
+    ]
+    assert {"campaign_id"} == inputs["get_practice_campaign"]
+    assert {
+        "campaign_id",
+        "run_id",
+        "max_steps",
+        "approved",
+        "decision_receipt_sha256",
+    } == inputs["continue_practice_campaign"]
+    assert {"campaign_id"} == inputs["cancel_practice_campaign"]
+    assert {"campaign_id"} == inputs["export_practice_campaign"]
 
 
 def test_health_fails_exactly_when_required_tool_missing(monkeypatch) -> None:
@@ -162,3 +210,18 @@ def test_generated_mcp_contract_is_current() -> None:
         check=True,
     )
     assert server.mcp_server_health()["toolSurface"]["contractHash"] == contract_hash()
+
+
+def test_unwired_campaign_tools_fail_closed_without_leaking_detail(monkeypatch) -> None:
+    monkeypatch.setattr(server, "_PRACTICE_CAMPAIGN_SERVICE_OVERRIDE", None)
+
+    result = server.start_practice_campaign(
+        "PCMP-00000000000000000000", "campaign-start-001", confirm=True
+    )
+
+    assert result == {
+        "ok": False,
+        "state": "needs_review",
+        "errorCode": "CAMPAIGN_UNAVAILABLE",
+        "privateStorageCoordinatesExposed": False,
+    }

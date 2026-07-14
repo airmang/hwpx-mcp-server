@@ -378,9 +378,9 @@ def test_policy_bypass_negative_matrix_reports_exact_fail_closed_codes(tmp_path,
     }
 
 
-def test_default_toolspec_regression_remains_exactly_123():
+def test_default_toolspec_regression_remains_exactly_128():
     from hwpx_mcp_server import server
 
     expected = expected_tool_names(advanced=False)
-    assert len(expected) == 123
+    assert len(expected) == 128
     assert set(server._fastmcp_tool_names()) == expected

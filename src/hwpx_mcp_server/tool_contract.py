@@ -84,10 +84,19 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
     DomainSpec(
         "private_practice",
         "비공개 코퍼스 합성 연습",
-        "불투명 scenario ID로 private 경로와 평가 gold를 숨긴 채 합성 HWPX 연습을 준비·적용.",
+        "불투명 scenario/campaign ID로 private 경로와 평가 gold를 숨긴 채 합성 HWPX 연습을 준비·실행.",
         "start_practice_scenario로 합성 work order를 확인하고 decision preview 뒤 "
-        "apply_practice_scenario(confirm=true)로 별도 destination에만 적용한다.",
-        ("start_practice_scenario", "apply_practice_scenario"),
+        "apply_practice_scenario(confirm=true)로 별도 destination에만 적용한다. Leap B 캠페인은 "
+        "start_practice_campaign(confirm=true) 뒤 bounded continue와 명시적 decision receipt로만 진행한다.",
+        (
+            "start_practice_scenario",
+            "apply_practice_scenario",
+            "start_practice_campaign",
+            "get_practice_campaign",
+            "continue_practice_campaign",
+            "cancel_practice_campaign",
+            "export_practice_campaign",
+        ),
     ),
     DomainSpec(
         "real_hancom_render",
