@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 
-MIN_PYTHON_HWPX = "2.24.1"
-MIN_MCP_VERSION = "2.18.1"
-MIN_SKILL_VERSION = "0.1.25"
+MIN_PYTHON_HWPX = "2.29.0"
+MIN_MCP_VERSION = "2.23.0"
+MIN_SKILL_VERSION = "0.1.30"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +50,11 @@ _ADVANCED_TOOLS = {
 }
 
 _SKILL_REQUIRED_TOOLS = {
+    "get_document_node",
+    "query_document_nodes",
+    "apply_document_commands",
+    "dump_document_blueprint",
+    "replay_document_blueprint",
     "create_document_from_plan",
     "create_government_report_document",
     "mail_merge",
@@ -73,10 +78,90 @@ _SKILL_REQUIRED_TOOLS = {
     "verify_form_fill",
     "apply_evalplan_fill",
     "score_form_fill",
+    "run_fixture_benchmark",
+    "export_fixture_benchmark",
+    "start_practice_scenario",
+    "apply_practice_scenario",
 }
 
 
 DOMAIN_SPECS: tuple[DomainSpec, ...] = (
+    DomainSpec(
+        "agent_document",
+        "에이전트 문서 인터페이스",
+        "공유 semantic node/path/query/command 계약으로 낯선 HWPX를 탐색하고 이종 편집을 한 번에 원자 적용.",
+        "get_document_node/query_document_nodes로 revision-bound canonical path를 찾은 뒤 "
+        "apply_document_commands 한 배치로 set/add/remove/move/copy를 적용한다. 양식·시험·PII 등 "
+        "도메인 증거가 필요한 작업은 기존 전문 도구를 사용한다.",
+        (
+            "get_document_node",
+            "query_document_nodes",
+            "apply_document_commands",
+            "dump_document_blueprint",
+            "replay_document_blueprint",
+        ),
+    ),
+    DomainSpec(
+        "private_practice",
+        "비공개 코퍼스 합성 연습",
+        "불투명 scenario/campaign ID로 private 경로와 평가 gold를 숨긴 채 합성 HWPX 연습을 준비·실행.",
+        "start_practice_scenario로 합성 work order를 확인하고 decision preview 뒤 "
+        "apply_practice_scenario(confirm=true)로 별도 destination에만 적용한다. Leap B 캠페인은 "
+        "start_practice_campaign(confirm=true) 뒤 bounded continue와 명시적 decision receipt로만 진행한다.",
+        (
+            "start_practice_scenario",
+            "apply_practice_scenario",
+            "start_practice_campaign",
+            "get_practice_campaign",
+            "continue_practice_campaign",
+            "cancel_practice_campaign",
+            "export_practice_campaign",
+        ),
+    ),
+    DomainSpec(
+        "real_hancom_render",
+        "실한컴 비동기 렌더",
+        "인증된 private queue로 HWPX를 제출하고 실한컴 PDF·페이지 영수증을 비동기로 조회.",
+        "render_submit 후 즉시 job id를 받고 render_status로 폴링한다. render_health가 unavailable/degraded이면 "
+        "로컬 미리보기를 실한컴 검증으로 간주하지 말고 unverified로 보류한다.",
+        (
+            "render_submit",
+            "render_status",
+            "render_cancel",
+            "render_health",
+        ),
+    ),
+    DomainSpec(
+        "workflow",
+        "자율 문서 워크플로",
+        "서버가 상태·정책·결정·예산·검증을 강제하는 재시작 가능한 고수준 문서 작업.",
+        "호스트별 스킬 지식 없이 HWPX 작업을 안전하게 시작·진행·승인·재개할 때.",
+        (
+            "start_workflow",
+            "get_workflow",
+            "get_workflow_result",
+            "continue_workflow",
+            "approve_workflow_decision",
+            "cancel_workflow",
+            "resume_workflow",
+        ),
+    ),
+    DomainSpec(
+        "visual_qa",
+        "전 페이지 비전 검수",
+        "버전 고정 fixture 페이지를 독립 어댑터로 검수하고 제한적으로 수정.",
+        "visual_review_fixture로 모든 페이지와 어댑터 disagreement를 확인한 뒤, 안전하게 매핑된 결함만 visual_repair_fixture로 최대 3회 수정한다. fixture 결과는 항상 실렌더 미검증이다.",
+        ("visual_review_fixture", "visual_repair_fixture"),
+    ),
+    DomainSpec(
+        "blind_eval",
+        "블라인드 fixture 실무 평가",
+        "동결된 fixture 실행·판정 증거를 검증하고 출처를 숨긴 심사용 번들을 내보냄.",
+        "run_fixture_benchmark로 실행·ToolSpec·판정·익명화 coverage를 검증한 뒤 "
+        "export_fixture_benchmark로 opaque 번들을 내보낸다. fixture 결과는 사람·실에이전트·실한컴 "
+        "또는 사람 대체 근거로 승격할 수 없다.",
+        ("run_fixture_benchmark", "export_fixture_benchmark"),
+    ),
     DomainSpec(
         "read",
         "읽기·추출·변환",

@@ -7,12 +7,13 @@ import argparse
 import base64
 import binascii
 import copy
+import hashlib
 import html
 import json
 import os
 import re
 import tempfile
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from urllib.request import Request, urlopen
 import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
 
+from . import __version__
 from .core.content import (
     add_heading_to_doc,
     add_memo_to_doc,
@@ -60,6 +62,27 @@ from .core.transactions import (
     undo_last_backup,
 )
 from .document_state import document_state_payload, revision_mismatch_response
+from .agent_document import (
+    AgentChildLimit,
+    AgentCommandList,
+    AgentQueryLimit,
+    AgentRevision,
+    AgentSelector,
+    AgentViewDepth,
+    BlueprintMode,
+    BlueprintPath,
+    BlueprintReplayRequest,
+    ScopedIdempotencyStore,
+    apply_document_command_batch,
+    batch_error_payload as agent_batch_error_payload,
+    blueprint_replay_error_payload,
+    dump_blueprint_document,
+    error_payload as agent_error_payload,
+    query_document_node_records,
+    read_document_node,
+    replay_blueprint_document,
+    tool_help as agent_tool_help,
+)
 from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from . import quality as quality_contract
 from .hwpx_ops import HwpxOps
@@ -101,12 +124,46 @@ from .quality_generation import (
     inspect_quality_fallback,
 )
 from .storage import build_hwpx_open_safety_report, build_hwpx_verification_report
+from .blind_eval import (
+    export_fixture_benchmark as export_fixture_benchmark_bundle,
+    run_fixture_benchmark as run_fixture_benchmark_manifest,
+)
 from .tool_contract import (
     contract_hash as tool_contract_hash,
     expected_tool_names,
     register_fastmcp_tools,
     skill_required_tool_names,
 )
+from .workflow.service import WorkflowService
+from .practice import PracticeScenarioError, PracticeScenarioService
+
+_PRACTICE_CAMPAIGN_RUNTIME_FACTORY: Any = None
+try:  # Leap B requires python-hwpx with the practice contract package.
+    from .practice.campaign_service import PracticeCampaignError, PracticeCampaignService
+    from .practice.dispatch import PracticeDispatchError
+    from .practice.runtime import get_practice_campaign_service
+
+    _PRACTICE_CAMPAIGN_RUNTIME_FACTORY = get_practice_campaign_service
+except ImportError:
+    # Keep the established MCP surface importable during package-version skew.
+    # The new campaign tools remain registered, but fail closed until the Leap B
+    # service and its matching python-hwpx contracts are available.
+    PracticeCampaignService = Any  # type: ignore[misc,assignment]
+
+    class PracticeCampaignError(RuntimeError):
+        def __init__(self, code: str = "CAMPAIGN_UNAVAILABLE") -> None:
+            self.code = code
+            super().__init__(code)
+
+    class PracticeDispatchError(RuntimeError):
+        def __init__(self, code: str = "CAMPAIGN_UNAVAILABLE") -> None:
+            self.code = code
+            super().__init__(code)
+from .workflow.rendering import NullRenderClientV2, QueueRenderClientV2, RenderJobV2
+from .workflow.render_queue import DurableRenderQueue, RenderQueueError
+from .workflow.render_security import RenderSecurityPolicy
+from .workflow.render_transport import RemoteRenderClientV2
+from .visual_qa import repair_fixture, review_fixture_evidence, write_review_artifact
 from .upstream import HP_NS, create_text_extractor, open_document
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
 
@@ -255,6 +312,10 @@ except Exception:  # pragma: no cover - optional dependency compatibility
     verify_hwpx_redline = None
 
 mcp = FastMCP("hwpx-mcp-server")
+# The current FastMCP constructor does not expose the low-level Server version
+# argument. Without this assignment initialize.serverInfo.version reports the
+# MCP SDK version instead of the HWPX server package version.
+mcp._mcp_server.version = __version__
 
 
 def _error_data(
@@ -2357,6 +2418,182 @@ def get_document_info(filename: str) -> dict:
         "tables": _table_count(doc),
         "file_size": str(file_size),
     }, path)
+
+
+def get_document_node(
+    filename: str,
+    path: str = "/",
+    depth: AgentViewDepth = 1,
+    child_limit: AgentChildLimit = 50,
+    expected_revision: AgentRevision = None,
+) -> dict:
+    """Generated from the shared python-hwpx agent catalog."""
+    try:
+        resolved = resolve_path(filename)
+        payload = read_document_node(
+            resolved,
+            path=path,
+            depth=depth,
+            child_limit=child_limit,
+            expected_revision=expected_revision,
+        )
+        payload.update(document_state_payload(resolved))
+        return payload
+    except Exception as exc:
+        return agent_error_payload(exc, target=path or "filename")
+
+
+def query_document_nodes(
+    filename: str,
+    selector: AgentSelector,
+    limit: AgentQueryLimit = 20,
+    node_depth: AgentViewDepth = 0,
+    child_limit: AgentChildLimit = 20,
+    expected_revision: AgentRevision = None,
+) -> dict:
+    """Generated from the shared python-hwpx agent catalog."""
+    try:
+        resolved = resolve_path(filename)
+        payload = query_document_node_records(
+            resolved,
+            selector=selector,
+            limit=limit,
+            node_depth=node_depth,
+            child_limit=child_limit,
+            expected_revision=expected_revision,
+        )
+        payload.update(document_state_payload(resolved))
+        return payload
+    except Exception as exc:
+        return agent_error_payload(exc, target=selector or "filename")
+
+
+def apply_document_commands(
+    filename: str,
+    output: str,
+    commands: AgentCommandList,
+    expected_revision: AgentRevision = None,
+    idempotency_key: str = None,
+    dry_run: bool = False,
+    quality: str | dict[str, Any] | None = "transparent",
+    verification_requirements: list[str] | None = None,
+    overwrite: bool = False,
+) -> dict:
+    """Generated from the shared python-hwpx agent catalog."""
+    resolved_input = filename
+    resolved_output = output
+    try:
+        resolved_input = resolve_path(filename)
+        resolved_output = resolve_path(output)
+        quality_contract.assert_write_capability()
+        store = ScopedIdempotencyStore(
+            _IDEMPOTENCY_CACHE,
+            namespace=str(Path(resolved_input).resolve()),
+        )
+        payload = apply_document_command_batch(
+            filename=resolved_input,
+            output=resolved_output,
+            commands=commands,
+            expected_revision=expected_revision,
+            idempotency_key=idempotency_key,
+            dry_run=dry_run,
+            quality=quality,
+            verification_requirements=verification_requirements,
+            overwrite=overwrite,
+            idempotency_store=store,
+        )
+        while len(_IDEMPOTENCY_CACHE) > _MAX_IDEMPOTENCY_CACHE_ENTRIES:
+            _IDEMPOTENCY_CACHE.pop(next(iter(_IDEMPOTENCY_CACHE)))
+        state_path = (
+            resolved_output
+            if payload.get("ok") and not dry_run and Path(resolved_output).exists()
+            else resolved_input
+        )
+        if Path(state_path).exists():
+            payload.update(document_state_payload(state_path))
+        return payload
+    except Exception as exc:
+        return agent_batch_error_payload(
+            exc,
+            input_filename=resolved_input,
+            output_filename=resolved_output,
+            dry_run=dry_run,
+        )
+
+
+def dump_document_blueprint(
+    filename: str,
+    path: BlueprintPath = "/",
+    mode: BlueprintMode = "portable",
+    expected_revision: AgentRevision = None,
+    output: str = None,
+    overwrite: bool = False,
+    include_assets: bool = True,
+    require_replayable: bool = True,
+    include_manifest: bool = True,
+) -> dict:
+    """Generated from the shared python-hwpx blueprint catalog."""
+    target = path or filename
+    try:
+        resolved_input = resolve_path(filename)
+        resolved_output = resolve_path(output) if output else None
+        if resolved_output is not None:
+            quality_contract.assert_write_capability()
+        payload = dump_blueprint_document(
+            filename=resolved_input,
+            path=path,
+            mode=mode,
+            expected_revision=expected_revision,
+            output=resolved_output,
+            overwrite=overwrite,
+            include_assets=include_assets,
+            require_replayable=require_replayable,
+            include_manifest=include_manifest,
+        )
+        payload.update(document_state_payload(resolved_input))
+        return payload
+    except Exception as exc:
+        return agent_error_payload(exc, target=target)
+
+
+def replay_document_blueprint(request: BlueprintReplayRequest) -> dict:
+    """Generated from the shared python-hwpx blueprint catalog."""
+    normalized = copy.deepcopy(request)
+    try:
+        bundle = normalized.get("bundle")
+        target = normalized.get("target")
+        if not isinstance(bundle, dict) or not isinstance(target, dict):
+            raise ValueError("request bundle and target must be objects")
+        bundle["filename"] = resolve_path(str(bundle.get("filename") or ""))
+        target["input"] = resolve_path(str(target.get("input") or ""))
+        target["output"] = resolve_path(str(target.get("output") or ""))
+        quality_contract.assert_write_capability()
+        store = ScopedIdempotencyStore(
+            _IDEMPOTENCY_CACHE,
+            namespace=str(Path(target["input"]).resolve()),
+            family="agent-blueprint",
+        )
+        payload = replay_blueprint_document(normalized, idempotency_store=store)
+        while len(_IDEMPOTENCY_CACHE) > _MAX_IDEMPOTENCY_CACHE_ENTRIES:
+            _IDEMPOTENCY_CACHE.pop(next(iter(_IDEMPOTENCY_CACHE)))
+        state_path = (
+            target["output"]
+            if payload.get("ok") and not payload.get("dryRun") and Path(target["output"]).exists()
+            else target["input"]
+        )
+        if Path(state_path).exists():
+            payload.update(document_state_payload(state_path))
+        return payload
+    except Exception as exc:
+        return blueprint_replay_error_payload(exc, request=normalized)
+
+
+_AGENT_TOOL_HELP = agent_tool_help()
+get_document_node.__doc__ = _AGENT_TOOL_HELP["get"]
+query_document_nodes.__doc__ = _AGENT_TOOL_HELP["query"]
+apply_document_commands.__doc__ = _AGENT_TOOL_HELP["apply"]
+dump_document_blueprint.__doc__ = _AGENT_TOOL_HELP["dumpBlueprint"]
+replay_document_blueprint.__doc__ = _AGENT_TOOL_HELP["replayBlueprint"]
 
 
 def get_document_text(filename: str, max_chars: int | None = None, mask: bool = True) -> dict:
@@ -5627,6 +5864,461 @@ def apply_form_fill(
         canonical_input=canonical_input,
         confirm=confirm,
     )
+
+
+def _workflow_service() -> WorkflowService:
+    """Build a request-scoped service over the durable configured store."""
+
+    capability = mcp_server_health()["capability"]
+    return WorkflowService(
+        globals(), capability_ok=bool(capability["ok"]), render_client=_render_client(),
+    )
+
+
+def _practice_scenario_service() -> PracticeScenarioService:
+    root = os.environ.get("HWPX_PRACTICE_ROOT")
+    if not root:
+        raise PracticeScenarioError("HWPX_PRACTICE_ROOT is not configured")
+    manifest = os.environ.get("HWPX_PRACTICE_RUNNER_MANIFEST")
+    try:
+        return PracticeScenarioService(
+            resolve_path(root),
+            runner_manifest_path=resolve_path(manifest) if manifest else None,
+            apply_table_ops=apply_table_ops,
+            apply_body_ops=apply_body_ops,
+            inspect_fill_residue=inspect_fill_residue,
+        )
+    except PracticeScenarioError:
+        raise
+    except Exception as exc:
+        raise PracticeScenarioError("private practice configuration is unavailable") from exc
+
+
+def start_practice_scenario(scenario_id: str, idempotency_key: str) -> dict:
+    """불투명 scenario ID로 private 경로·gold를 숨긴 합성 HWPX 연습을 준비합니다."""
+    try:
+        return {
+            "ok": True,
+            **_practice_scenario_service().start(
+                scenario_id,
+                idempotency_key=idempotency_key,
+            ),
+        }
+    except PracticeScenarioError as exc:
+        return {
+            "ok": False,
+            "state": "needs_review",
+            "errorCode": "PRACTICE_SCENARIO_UNAVAILABLE",
+            "message": str(exc),
+            "privateStorageCoordinatesExposed": False,
+        }
+
+
+def apply_practice_scenario(
+    run_id: str,
+    destination_filename: str,
+    operation_kind: str = "table",
+    operations: list[dict[str, Any]] | None = None,
+    use_suggested_operations: bool = False,
+    confirm: bool = False,
+) -> dict:
+    """준비된 합성 연습을 별도 destination에 적용하고 경로-비공개 영수증을 반환합니다."""
+    try:
+        return {
+            "ok": True,
+            **_practice_scenario_service().apply(
+                run_id,
+                destination_path=resolve_path(destination_filename),
+                operation_kind=operation_kind,
+                operations=operations,
+                use_suggested_operations=use_suggested_operations,
+                confirm=confirm,
+            ),
+        }
+    except PracticeScenarioError as exc:
+        return {
+            "ok": False,
+            "state": "needs_review",
+            "errorCode": "PRACTICE_APPLY_FAILED",
+            "message": str(exc),
+            "privateStorageCoordinatesExposed": False,
+        }
+
+
+_PRACTICE_CAMPAIGN_SERVICE_OVERRIDE: PracticeCampaignService | None = None
+
+
+def _practice_campaign_service() -> PracticeCampaignService:
+    """Return the privately wired Leap B service, never public path material."""
+
+    if _PRACTICE_CAMPAIGN_SERVICE_OVERRIDE is not None:
+        return _PRACTICE_CAMPAIGN_SERVICE_OVERRIDE
+    if _PRACTICE_CAMPAIGN_RUNTIME_FACTORY is None:
+        raise PracticeCampaignError("CAMPAIGN_UNAVAILABLE")
+    try:
+        return _PRACTICE_CAMPAIGN_RUNTIME_FACTORY(globals())
+    except Exception as exc:
+        # Configuration, package skew, and private lookup details never cross
+        # the public campaign boundary.
+        raise PracticeCampaignError("CAMPAIGN_UNAVAILABLE") from exc
+
+
+def _practice_campaign_failure(exc: Exception) -> dict[str, Any]:
+    code = getattr(exc, "code", "CAMPAIGN_QUEUE_UNAVAILABLE")
+    return {
+        "ok": False,
+        "state": "needs_review",
+        "errorCode": str(code),
+        "privateStorageCoordinatesExposed": False,
+    }
+
+
+def start_practice_campaign(
+    campaign_id: str,
+    idempotency_key: str,
+    confirm: bool = False,
+) -> dict:
+    """불투명 campaign ID를 확인하고 명시적 confirm 뒤 durable queue에 등록합니다."""
+
+    try:
+        return {
+            "ok": True,
+            **_practice_campaign_service().start(
+                campaign_id,
+                idempotency_key=idempotency_key,
+                confirm=confirm,
+            ),
+        }
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
+
+
+def get_practice_campaign(campaign_id: str) -> dict:
+    """private 좌표 없이 캠페인의 durable aggregate 상태를 조회합니다."""
+
+    try:
+        return {"ok": True, **_practice_campaign_service().status(campaign_id)}
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
+
+
+def continue_practice_campaign(
+    campaign_id: str,
+    run_id: str = None,
+    max_steps: int = 8,
+    approved: bool = None,
+    decision_receipt_sha256: str = None,
+) -> dict:
+    """한 run을 bounded advance하고 decision receipt가 일치할 때만 실행합니다."""
+
+    try:
+        return {
+            "ok": True,
+            **_practice_campaign_service().continue_campaign(
+                campaign_id,
+                run_id=run_id,
+                max_steps=max_steps,
+                approved=approved,
+                decision_receipt_sha256=decision_receipt_sha256,
+            ),
+        }
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
+
+
+def cancel_practice_campaign(campaign_id: str) -> dict:
+    """캠페인의 새 claim을 중단하고 durable 취소 상태로 전환합니다."""
+
+    try:
+        return {"ok": True, **_practice_campaign_service().cancel(campaign_id)}
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
+
+
+def export_practice_campaign(campaign_id: str) -> dict:
+    """검증된 hash/code-only terminal receipt 묶음만 내보냅니다."""
+
+    try:
+        return {"ok": True, **_practice_campaign_service().export(campaign_id)}
+    except (PracticeCampaignError, PracticeDispatchError) as exc:
+        return _practice_campaign_failure(exc)
+
+
+def _render_client():
+    root = os.environ.get("HWPX_RENDER_QUEUE_ROOT")
+    remote_url = os.environ.get("HWPX_RENDER_QUEUE_URL")
+    secret = os.environ.get("HWPX_RENDER_QUEUE_SECRET")
+    if remote_url and secret:
+        transport_auth = os.environ.get("HWPX_RENDER_TRANSPORT_AUTH", "mtls")
+        ca_file = os.environ.get("HWPX_RENDER_CA_FILE")
+        client_certfile = os.environ.get("HWPX_RENDER_CLIENT_CERT_FILE")
+        client_keyfile = os.environ.get("HWPX_RENDER_CLIENT_KEY_FILE")
+        return RemoteRenderClientV2(
+            remote_url,
+            secret=secret.encode("utf-8"),
+            transport_auth=transport_auth,
+            ca_file=Path(ca_file).expanduser().resolve() if ca_file else None,
+            client_certfile=Path(client_certfile).expanduser().resolve() if client_certfile else None,
+            client_keyfile=Path(client_keyfile).expanduser().resolve() if client_keyfile else None,
+        )
+    if not root or not secret:
+        return NullRenderClientV2()
+    queue_root = Path(root).expanduser().resolve()
+    policy = RenderSecurityPolicy(sandbox_root=queue_root / "sandboxes")
+    queue = DurableRenderQueue(queue_root, secret=secret.encode("utf-8"), policy=policy)
+    return QueueRenderClientV2(queue, secret=secret.encode("utf-8"))
+
+
+def visual_review_fixture(
+    manifest_path: str,
+    case_id: str = None,
+    adapter_evidence_path: str = None,
+    output_dir: str = None,
+    strict: bool = True,
+) -> dict:
+    """전 페이지 fixture를 독립 어댑터로 검수합니다. 이 영수증은 실한컴 검증으로 승격되지 않습니다."""
+
+    review = review_fixture_evidence(
+        resolve_path(manifest_path),
+        case_id=case_id,
+        adapter_evidence_path=(resolve_path(adapter_evidence_path) if adapter_evidence_path else None),
+        strict=strict,
+    )
+    artifact = write_review_artifact(review, resolve_path(output_dir) if output_dir else None)
+    if artifact:
+        review["outputPath"] = artifact
+    return review
+
+
+def run_fixture_benchmark(
+    manifest_path: str,
+    output_dir: str = None,
+    strict: bool = True,
+) -> dict:
+    """동결 fixture 실행·판정의 provenance, 익명화, 전수 coverage를 검증합니다."""
+
+    return run_fixture_benchmark_manifest(
+        resolve_path(manifest_path),
+        output_dir=resolve_path(output_dir) if output_dir else None,
+        strict=strict,
+    )
+
+
+def export_fixture_benchmark(
+    result_manifest_path: str,
+    output_dir: str,
+    strict: bool = True,
+) -> dict:
+    """검증된 fixture 결과에서 private provenance가 없는 opaque 심사용 번들을 내보냅니다."""
+
+    return export_fixture_benchmark_bundle(
+        resolve_path(result_manifest_path),
+        output_dir=resolve_path(output_dir),
+        strict=strict,
+    )
+
+
+def visual_repair_fixture(
+    filename: str,
+    manifest_path: str,
+    repair_plan_path: str,
+    output_path: str,
+    expected_revision: str,
+    idempotency_key: str,
+    case_id: str = None,
+    output_dir: str = None,
+    max_rounds: int = 3,
+) -> dict:
+    """revision/idempotency guard와 최대 3회 예산으로 allow-listed fixture 수리를 수행합니다."""
+
+    source = resolve_path(filename)
+    scope = _idempotency_scope("visual_repair_fixture", source, idempotency_key)
+    fingerprint = _idempotency_fingerprint(
+        {
+            "filename": source,
+            "manifest_path": resolve_path(manifest_path),
+            "repair_plan_path": resolve_path(repair_plan_path),
+            "output_path": resolve_path(output_path),
+            "expected_revision": expected_revision,
+            "case_id": case_id,
+            "max_rounds": max_rounds,
+        }
+    )
+    replay = _idempotency_replay(scope, fingerprint=fingerprint)
+    if replay is not None:
+        replay = dict(replay)
+        replay["idempotentReplay"] = True
+        return replay
+
+    def apply_allowlisted(
+        target: Path, repair: dict[str, Any], revision: str, action_key: str,
+    ) -> dict[str, Any]:
+        if repair.get("type") != "replace_text":
+            raise ValueError("repair action is not allow-listed")
+        find_text = repair.get("findText")
+        replace_text = repair.get("replaceText")
+        if not isinstance(find_text, str) or not find_text or not isinstance(replace_text, str):
+            raise ValueError("replace_text requires non-empty findText and string replaceText")
+        return search_and_replace(
+            str(target), find_text, replace_text,
+            expected_revision=revision, idempotency_key=action_key,
+        )
+
+    result = repair_fixture(
+        filename=source,
+        manifest_path=resolve_path(manifest_path),
+        repair_plan_path=resolve_path(repair_plan_path),
+        case_id=case_id,
+        output_path=resolve_path(output_path),
+        expected_revision=expected_revision,
+        idempotency_key=idempotency_key,
+        max_rounds=max_rounds,
+        apply_repair=apply_allowlisted,
+    )
+    artifact = write_review_artifact(result, resolve_path(output_dir) if output_dir else None)
+    if artifact:
+        result["reviewOutputPath"] = artifact
+    return _idempotency_store(scope, fingerprint=fingerprint, payload=result)
+
+
+def render_submit(
+    filename: str,
+    idempotency_key: str,
+    workflow_id: str = None,
+    dpi: int = 144,
+) -> dict:
+    """실한컴 렌더 큐에 비동기로 제출하고 즉시 receipt를 반환합니다."""
+
+    source = Path(resolve_path(filename))
+    data = source.read_bytes()
+    digest = "sha256:" + hashlib.sha256(data).hexdigest()
+    stable = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()[:24]
+    safe_workflow = workflow_id or f"direct-{stable}"
+    client = _render_client()
+    if not isinstance(client, NullRenderClientV2):
+        try:
+            existing = client.get(f"render-{stable}")
+        except RenderQueueError:
+            existing = None
+        if existing is not None:
+            if existing.input_content_hash != digest:
+                return {"ok": False, "errorCode": "IDEMPOTENCY_CONFLICT", "jobId": existing.job_id}
+            return {"ok": True, "receipt": existing.model_dump(mode="json")}
+    job = RenderJobV2(
+        job_id=f"render-{stable}", workflow_id=safe_workflow,
+        idempotency_key=idempotency_key, source_content_hash=digest,
+        source_size_bytes=len(data), submitted_at=datetime.now(timezone.utc), dpi=dpi,
+    )
+    receipt = client.submit(job, source)
+    return {"ok": receipt.status.value not in {"failed", "unavailable"}, "receipt": receipt.model_dump(mode="json")}
+
+
+def render_status(job_id: str, output_dir: str = None) -> dict:
+    """렌더 job 상태를 한 번 조회합니다. 서버는 poll 동안 호출을 점유하지 않습니다."""
+
+    client = _render_client()
+    try:
+        receipt = client.get(job_id)
+    except (KeyError, RenderQueueError):
+        return {"ok": False, "jobId": job_id, "status": "unverified", "errorCode": "RENDER_JOB_NOT_FOUND_OR_UNAVAILABLE"}
+    response = {"ok": True, "receipt": receipt.model_dump(mode="json")}
+    if output_dir and receipt.status.value == "succeeded":
+        destination = Path(resolve_path(output_dir))
+        destination.mkdir(parents=True, exist_ok=True)
+        saved = []
+        for artifact in receipt.artifacts:
+            name = "document.pdf" if artifact.kind.value == "pdf" else f"page-{artifact.page_number:04d}.png"
+            data = client.fetch_artifact(job_id, artifact.content_hash)
+            target = destination / name
+            target.write_bytes(data)
+            saved.append({"path": str(target), "contentHash": artifact.content_hash, "kind": artifact.kind.value})
+        response["savedArtifacts"] = saved
+    return response
+
+
+def render_cancel(job_id: str) -> dict:
+    """대기 job을 취소하거나 실행 worker에 취소 요청을 기록합니다."""
+
+    client = _render_client()
+    try:
+        receipt = client.cancel(job_id)
+    except (KeyError, RenderQueueError):
+        return {"ok": False, "jobId": job_id, "status": "unverified", "errorCode": "RENDER_JOB_NOT_FOUND_OR_UNAVAILABLE"}
+    return {"ok": True, "receipt": receipt.model_dump(mode="json")}
+
+
+def render_health() -> dict:
+    """큐/worker/Hancom 상태와 적체를 반환하며 미구성·stale heartbeat는 degraded입니다."""
+
+    return _render_client().capabilities()
+
+
+def start_workflow(
+    family: str,
+    idempotency_key: str,
+    source_path: str = None,
+    output_path: str = None,
+    expected_revision: str = None,
+    parameters: dict = None,
+    budget: dict = None,
+    policy: dict = None,
+) -> dict:
+    """타입화된 작업을 서버 강제 durable workflow로 시작합니다."""
+
+    return _workflow_service().start(
+        family=family,
+        idempotency_key=idempotency_key,
+        source_path=source_path,
+        output_path=output_path,
+        expected_revision=expected_revision,
+        parameters=parameters,
+        budget=budget,
+        policy=policy,
+    )
+
+
+def get_workflow(workflow_id: str) -> dict:
+    """현재 상태와 증거를 구조화된 workflow receipt로 조회합니다."""
+
+    return _workflow_service().get(workflow_id)
+
+
+def get_workflow_result(workflow_id: str, action_hash: str = None) -> dict:
+    """암호화 저장된 workflow primitive 결과를 content hash와 함께 조회합니다."""
+
+    return _workflow_service().workflow_result(workflow_id, action_hash=action_hash)
+
+
+def continue_workflow(workflow_id: str) -> dict:
+    """서버 정책에 따라 workflow를 다음 durable 경계까지 진행합니다."""
+
+    return _workflow_service().continue_workflow(workflow_id)
+
+
+def approve_workflow_decision(
+    workflow_id: str,
+    approved: bool,
+    action_hash: str = None,
+) -> dict:
+    """decision 상태의 정확한 계획 action을 승인하거나 거절합니다."""
+
+    return _workflow_service().approve_decision(
+        workflow_id,
+        approved=approved,
+        action_hash=action_hash,
+    )
+
+
+def cancel_workflow(workflow_id: str, reason: str = "CLIENT_CANCELLED") -> dict:
+    """아직 terminal이 아닌 workflow를 취소합니다."""
+
+    return _workflow_service().cancel(workflow_id, reason=reason)
+
+
+def resume_workflow(workflow_id: str) -> dict:
+    """재시작 후 durable receipt를 기준으로 안전하게 workflow를 재개합니다."""
+
+    return _workflow_service().resume(workflow_id)
 
 
 if _ACTIVE_ADVANCED:

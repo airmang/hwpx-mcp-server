@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import io
+import sys
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+WORKER_MODULE = ROOT / "python-hwpx-s067" / "src" / "hwpx" / "visual" / "hancom_worker.py"
+worker_spec = importlib.util.spec_from_file_location("hwpx.visual.hancom_worker", WORKER_MODULE)
+worker_module = importlib.util.module_from_spec(worker_spec)
+assert worker_spec and worker_spec.loader
+sys.modules["hwpx.visual.hancom_worker"] = worker_module
+worker_spec.loader.exec_module(worker_module)
+
+from hwpx.visual.hancom_worker import DeterministicFakeSession, SerializedHancomWorker
+from hwpx_mcp_server.workflow.render_queue import DurableRenderQueue, sign_submission
+from hwpx_mcp_server.workflow.render_security import RenderSecurityPolicy
+from hwpx_mcp_server.workflow.rendering import RenderJobV2, RenderStatus
+
+
+SCRIPT = ROOT / "python-hwpx-s067" / "scripts" / "hancom_render_worker.py"
+spec = importlib.util.spec_from_file_location("s068_hancom_render_worker", SCRIPT)
+module = importlib.util.module_from_spec(spec); assert spec and spec.loader; spec.loader.exec_module(module)
+run_queue_once = module.run_queue_once
+
+
+def hwpx() -> bytes:
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w") as archive:
+        archive.writestr("mimetype", "application/hwp+zip")
+        archive.writestr("Contents/section0.xml", "<section/>")
+    return stream.getvalue()
+
+
+def setup_queue(tmp_path):
+    secret = b"worker-integration-secret"
+    root = tmp_path / "queue"
+    queue = DurableRenderQueue(root, secret=secret, policy=RenderSecurityPolicy(sandbox_root=root / "sandboxes"), max_attempts=1)
+    data = hwpx(); digest = "sha256:" + hashlib.sha256(data).hexdigest()
+    job = RenderJobV2(
+        job_id="worker-integration-0001", workflow_id="workflow-integration-0001",
+        idempotency_key="worker-integration-key", source_content_hash=digest,
+        source_size_bytes=len(data), submitted_at=datetime.now(timezone.utc),
+    )
+    queue.submit(job, data, signature=sign_submission(secret, job), principal_id="integration")
+    return queue, job
+
+
+def fake_raster(pdf, destination, dpi):
+    page = destination / "page-0001.png"; page.write_bytes(b"png"); return [page]
+
+
+def test_fake_worker_queue_loop_ends_unverified_never_success(tmp_path, monkeypatch):
+    queue, job = setup_queue(tmp_path)
+    worker = SerializedHancomWorker(tmp_path / "worker", session_factory=DeterministicFakeSession, worker_version="fake/1")
+    monkeypatch.setattr(worker, "_rasterize", fake_raster)
+    assert run_queue_once(queue, worker, "worker-1") is True
+    receipt = queue.get(job.job_id)
+    assert receipt.status == RenderStatus.FAILED
+    assert receipt.render_checked is False and receipt.terminal_reason == "FAKE_RENDER_ONLY"
+
+
+class RealFixtureSession(DeterministicFakeSession):
+    real_hancom = True
+    hancom_build = "Hancom fixture build"
+
+
+def test_real_contract_worker_stores_hash_bound_downloadable_artifacts(tmp_path, monkeypatch):
+    queue, job = setup_queue(tmp_path)
+    worker = SerializedHancomWorker(tmp_path / "worker", session_factory=RealFixtureSession, worker_version="worker/1")
+    monkeypatch.setattr(worker, "_rasterize", fake_raster)
+    assert run_queue_once(queue, worker, "worker-1") is True
+    receipt = queue.get(job.job_id)
+    assert receipt.status == RenderStatus.SUCCEEDED and receipt.render_checked is True
+    assert receipt.binds(job)
+    for artifact in receipt.artifacts:
+        assert queue.content.path_for(artifact.content_hash).stat().st_size == artifact.size_bytes
