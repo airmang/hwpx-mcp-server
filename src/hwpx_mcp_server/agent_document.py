@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Annotated, Any, Iterator
+from typing import Annotated, Any, Iterator, Literal
 
 from pydantic import Field
 
@@ -27,11 +27,23 @@ from hwpx.agent import (
     catalog_hash,
     human_help,
 )
+from hwpx.agent.blueprint import (
+    BLUEPRINT_REPLAY_RESULT_SCHEMA,
+    BlueprintReplayResult,
+    blueprint_catalog,
+    blueprint_catalog_hash,
+    blueprint_human_help,
+    blueprint_json_schemas,
+    dump_document_blueprint as dump_core_document_blueprint,
+    replay_document_blueprint as replay_core_document_blueprint,
+)
 
 _EMPTY_REVISION = "sha256:" + hashlib.sha256(b"").hexdigest()
 _DEFAULT_REQUIREMENTS = ("package", "reopen", "openSafety", "semanticDiff", "bytePreservation")
 _SCHEMAS = agent_json_schemas()
 _CATALOG = agent_catalog()
+_BLUEPRINT_SCHEMAS = blueprint_json_schemas()
+_BLUEPRINT_CATALOG = blueprint_catalog()
 
 # FastMCP builds its input JSON Schema from the public function annotation.
 # Supplying the core-generated command union here prevents a second handwritten
@@ -64,6 +76,15 @@ AgentRevision = Annotated[
     str | None,
     Field(pattern=r"^sha256:[a-f0-9]{64}$"),
 ]
+BlueprintPath = Annotated[
+    str,
+    Field(min_length=1, max_length=4096),
+]
+BlueprintReplayRequest = Annotated[
+    dict[str, Any],
+    Field(json_schema_extra=_BLUEPRINT_SCHEMAS["replay"]),
+]
+BlueprintMode = Literal["portable", "source-bound"]
 
 
 def _suggestion(code: str) -> str:
@@ -147,9 +168,15 @@ def batch_error_payload(
 class ScopedIdempotencyStore(MutableMapping[str, Any]):
     """Namespace a core caller-owned store inside the server's bounded cache."""
 
-    def __init__(self, backing: MutableMapping[str, Any], namespace: str) -> None:
+    def __init__(
+        self,
+        backing: MutableMapping[str, Any],
+        namespace: str,
+        *,
+        family: str = "agent-document",
+    ) -> None:
         self._backing = backing
-        self._prefix = f"agent-document:{namespace}:"
+        self._prefix = f"{family}:{namespace}:"
 
     def _key(self, key: str) -> str:
         return self._prefix + key
@@ -240,6 +267,76 @@ def apply_document_command_batch(
     ).to_dict()
 
 
+def dump_blueprint_document(
+    *,
+    filename: str,
+    path: str,
+    mode: str,
+    expected_revision: str | None,
+    output: str | None,
+    overwrite: bool,
+    include_assets: bool,
+    require_replayable: bool,
+    include_manifest: bool,
+) -> dict[str, Any]:
+    result = dump_core_document_blueprint(
+        filename,
+        path=path,
+        mode=mode,
+        expected_revision=expected_revision,
+        output=output,
+        overwrite=overwrite,
+        include_assets=include_assets,
+        require_replayable=require_replayable,
+    )
+    return result.to_dict(include_manifest=include_manifest)
+
+
+def replay_blueprint_document(
+    request: Mapping[str, Any],
+    *,
+    idempotency_store: MutableMapping[str, Any],
+) -> dict[str, Any]:
+    return replay_core_document_blueprint(
+        dict(request),
+        idempotency_store=idempotency_store,
+    ).to_dict()
+
+
+def blueprint_replay_error_payload(
+    exc: BaseException,
+    *,
+    request: Mapping[str, Any],
+) -> dict[str, Any]:
+    target = request.get("target") if isinstance(request.get("target"), Mapping) else {}
+    bundle = request.get("bundle") if isinstance(request.get("bundle"), Mapping) else {}
+    input_filename = str(target.get("input") or "")
+    output_filename = str(target.get("output") or "")
+    revision = _EMPTY_REVISION
+    try:
+        revision = "sha256:" + hashlib.sha256(Path(input_filename).read_bytes()).hexdigest()
+    except OSError:
+        pass
+    blueprint_hash = str(bundle.get("blueprintHash") or "")
+    if not blueprint_hash.startswith("sha256:") or len(blueprint_hash) != 71:
+        blueprint_hash = "sha256:" + "0" * 64
+    return BlueprintReplayResult(
+        ok=False,
+        rolled_back=True,
+        dry_run=bool(request.get("dryRun", False)),
+        input_revision=revision,
+        document_revision=revision,
+        output_filename=output_filename,
+        blueprint_hash=blueprint_hash,
+        verification_report={
+            "schemaVersion": BLUEPRINT_REPLAY_RESULT_SCHEMA,
+            "catalogHash": blueprint_catalog_hash(),
+            "boundary": "mcp-capability-and-locator",
+        },
+        error=_agent_error(exc, target="replay"),
+    ).to_dict()
+
+
 def tool_help() -> dict[str, str]:
     """Generate MCP descriptions from the same catalog as ``hwpx help``."""
 
@@ -258,6 +355,16 @@ def tool_help() -> dict[str, str]:
             "set/add/remove/move/copy union; all commands commit once or roll back. "
             f"Shared catalog {catalog_hash()}."
         ),
+        "dumpBlueprint": (
+            "Dump one revision-bound HWPX document/subtree into a validated typed .hwpxbp; "
+            "returns bounded manifest/fidelity evidence and never exposes raw XML. "
+            f"Shared blueprint catalog {blueprint_catalog_hash()}.\n\n{blueprint_human_help()}"
+        ),
+        "replayBlueprint": (
+            "Atomically replay one validated typed blueprint request with strict dependency mapping, "
+            "caller-owned idempotency, one save, rollback, lossless/openSafety evidence, and no session state. "
+            f"Shared blueprint catalog {blueprint_catalog_hash()}."
+        ),
     }
 
 
@@ -268,11 +375,17 @@ __all__ = [
     "AgentRevision",
     "AgentSelector",
     "AgentViewDepth",
+    "BlueprintMode",
+    "BlueprintPath",
+    "BlueprintReplayRequest",
     "ScopedIdempotencyStore",
     "apply_document_command_batch",
     "batch_error_payload",
+    "blueprint_replay_error_payload",
+    "dump_blueprint_document",
     "error_payload",
     "query_document_node_records",
     "read_document_node",
+    "replay_blueprint_document",
     "tool_help",
 ]

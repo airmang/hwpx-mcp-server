@@ -48,6 +48,8 @@ AGENT_DOCUMENT_TOOLS = {
     "get_document_node",
     "query_document_nodes",
     "apply_document_commands",
+    "dump_document_blueprint",
+    "replay_document_blueprint",
 }
 
 
@@ -62,7 +64,7 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert BLIND_EVAL_TOOLS <= set(server._fastmcp_tool_names())
     assert PRACTICE_TOOLS <= set(server._fastmcp_tool_names())
     assert AGENT_DOCUMENT_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False)) == 131
+    assert len(expected_tool_names(advanced=False)) == 133
     assert len(
         expected_tool_names(advanced=False)
         - WORKFLOW_TOOLS
@@ -224,6 +226,18 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
         "verification_requirements",
         "overwrite",
     } == inputs["apply_document_commands"]
+    assert {
+        "filename",
+        "path",
+        "mode",
+        "expected_revision",
+        "output",
+        "overwrite",
+        "include_assets",
+        "require_replayable",
+        "include_manifest",
+    } == inputs["dump_document_blueprint"]
+    assert {"request"} == inputs["replay_document_blueprint"]
 
 
 def test_health_fails_exactly_when_required_tool_missing(monkeypatch) -> None:

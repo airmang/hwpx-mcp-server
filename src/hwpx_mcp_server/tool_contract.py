@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 
-MIN_PYTHON_HWPX = "2.28.0"
-MIN_MCP_VERSION = "2.22.0"
-MIN_SKILL_VERSION = "0.1.29"
+MIN_PYTHON_HWPX = "2.29.0"
+MIN_MCP_VERSION = "2.23.0"
+MIN_SKILL_VERSION = "0.1.30"
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +53,8 @@ _SKILL_REQUIRED_TOOLS = {
     "get_document_node",
     "query_document_nodes",
     "apply_document_commands",
+    "dump_document_blueprint",
+    "replay_document_blueprint",
     "create_document_from_plan",
     "create_government_report_document",
     "mail_merge",
@@ -91,7 +93,13 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
         "get_document_node/query_document_nodes로 revision-bound canonical path를 찾은 뒤 "
         "apply_document_commands 한 배치로 set/add/remove/move/copy를 적용한다. 양식·시험·PII 등 "
         "도메인 증거가 필요한 작업은 기존 전문 도구를 사용한다.",
-        ("get_document_node", "query_document_nodes", "apply_document_commands"),
+        (
+            "get_document_node",
+            "query_document_nodes",
+            "apply_document_commands",
+            "dump_document_blueprint",
+            "replay_document_blueprint",
+        ),
     ),
     DomainSpec(
         "private_practice",
