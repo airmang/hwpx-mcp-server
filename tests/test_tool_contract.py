@@ -44,6 +44,11 @@ PRACTICE_TOOLS = {
     "cancel_practice_campaign",
     "export_practice_campaign",
 }
+AGENT_DOCUMENT_TOOLS = {
+    "get_document_node",
+    "query_document_nodes",
+    "apply_document_commands",
+}
 
 
 def test_active_registry_exactly_matches_contract() -> None:
@@ -56,13 +61,15 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert RENDER_TOOLS <= set(server._fastmcp_tool_names())
     assert BLIND_EVAL_TOOLS <= set(server._fastmcp_tool_names())
     assert PRACTICE_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False)) == 128
+    assert AGENT_DOCUMENT_TOOLS <= set(server._fastmcp_tool_names())
+    assert len(expected_tool_names(advanced=False)) == 131
     assert len(
         expected_tool_names(advanced=False)
         - WORKFLOW_TOOLS
         - RENDER_TOOLS
         - BLIND_EVAL_TOOLS
         - PRACTICE_TOOLS
+        - AGENT_DOCUMENT_TOOLS
     ) == 108
     workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
     assert len(workflow_domains) == 1
@@ -79,6 +86,10 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert len(practice_domains) == 1
     assert set(practice_domains[0].tools) == PRACTICE_TOOLS
     assert "경로" in practice_domains[0].intent
+    agent_domains = [domain for domain in DOMAIN_SPECS if domain.key == "agent_document"]
+    assert len(agent_domains) == 1
+    assert set(agent_domains[0].tools) == AGENT_DOCUMENT_TOOLS
+    assert "전문 도구" in agent_domains[0].when_to_use
 
 
 def test_advanced_registry_exactly_matches_contract_in_fresh_process() -> None:
@@ -187,6 +198,32 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
     } == inputs["continue_practice_campaign"]
     assert {"campaign_id"} == inputs["cancel_practice_campaign"]
     assert {"campaign_id"} == inputs["export_practice_campaign"]
+    assert {
+        "filename",
+        "path",
+        "depth",
+        "child_limit",
+        "expected_revision",
+    } == inputs["get_document_node"]
+    assert {
+        "filename",
+        "selector",
+        "limit",
+        "node_depth",
+        "child_limit",
+        "expected_revision",
+    } == inputs["query_document_nodes"]
+    assert {
+        "filename",
+        "output",
+        "commands",
+        "expected_revision",
+        "idempotency_key",
+        "dry_run",
+        "quality",
+        "verification_requirements",
+        "overwrite",
+    } == inputs["apply_document_commands"]
 
 
 def test_health_fails_exactly_when_required_tool_missing(monkeypatch) -> None:

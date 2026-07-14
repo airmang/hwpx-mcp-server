@@ -50,6 +50,9 @@ _ADVANCED_TOOLS = {
 }
 
 _SKILL_REQUIRED_TOOLS = {
+    "get_document_node",
+    "query_document_nodes",
+    "apply_document_commands",
     "create_document_from_plan",
     "create_government_report_document",
     "mail_merge",
@@ -81,6 +84,15 @@ _SKILL_REQUIRED_TOOLS = {
 
 
 DOMAIN_SPECS: tuple[DomainSpec, ...] = (
+    DomainSpec(
+        "agent_document",
+        "에이전트 문서 인터페이스",
+        "공유 semantic node/path/query/command 계약으로 낯선 HWPX를 탐색하고 이종 편집을 한 번에 원자 적용.",
+        "get_document_node/query_document_nodes로 revision-bound canonical path를 찾은 뒤 "
+        "apply_document_commands 한 배치로 set/add/remove/move/copy를 적용한다. 양식·시험·PII 등 "
+        "도메인 증거가 필요한 작업은 기존 전문 도구를 사용한다.",
+        ("get_document_node", "query_document_nodes", "apply_document_commands"),
+    ),
     DomainSpec(
         "private_practice",
         "비공개 코퍼스 합성 연습",

@@ -62,6 +62,21 @@ from .core.transactions import (
     undo_last_backup,
 )
 from .document_state import document_state_payload, revision_mismatch_response
+from .agent_document import (
+    AgentChildLimit,
+    AgentCommandList,
+    AgentQueryLimit,
+    AgentRevision,
+    AgentSelector,
+    AgentViewDepth,
+    ScopedIdempotencyStore,
+    apply_document_command_batch,
+    batch_error_payload as agent_batch_error_payload,
+    error_payload as agent_error_payload,
+    query_document_node_records,
+    read_document_node,
+    tool_help as agent_tool_help,
+)
 from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from . import quality as quality_contract
 from .hwpx_ops import HwpxOps
@@ -2396,6 +2411,113 @@ def get_document_info(filename: str) -> dict:
         "tables": _table_count(doc),
         "file_size": str(file_size),
     }, path)
+
+
+def get_document_node(
+    filename: str,
+    path: str = "/",
+    depth: AgentViewDepth = 1,
+    child_limit: AgentChildLimit = 50,
+    expected_revision: AgentRevision = None,
+) -> dict:
+    """Generated from the shared python-hwpx agent catalog."""
+    try:
+        resolved = resolve_path(filename)
+        payload = read_document_node(
+            resolved,
+            path=path,
+            depth=depth,
+            child_limit=child_limit,
+            expected_revision=expected_revision,
+        )
+        payload.update(document_state_payload(resolved))
+        return payload
+    except Exception as exc:
+        return agent_error_payload(exc, target=path or "filename")
+
+
+def query_document_nodes(
+    filename: str,
+    selector: AgentSelector,
+    limit: AgentQueryLimit = 20,
+    node_depth: AgentViewDepth = 0,
+    child_limit: AgentChildLimit = 20,
+    expected_revision: AgentRevision = None,
+) -> dict:
+    """Generated from the shared python-hwpx agent catalog."""
+    try:
+        resolved = resolve_path(filename)
+        payload = query_document_node_records(
+            resolved,
+            selector=selector,
+            limit=limit,
+            node_depth=node_depth,
+            child_limit=child_limit,
+            expected_revision=expected_revision,
+        )
+        payload.update(document_state_payload(resolved))
+        return payload
+    except Exception as exc:
+        return agent_error_payload(exc, target=selector or "filename")
+
+
+def apply_document_commands(
+    filename: str,
+    output: str,
+    commands: AgentCommandList,
+    expected_revision: AgentRevision = None,
+    idempotency_key: str = None,
+    dry_run: bool = False,
+    quality: str | dict[str, Any] | None = "transparent",
+    verification_requirements: list[str] | None = None,
+    overwrite: bool = False,
+) -> dict:
+    """Generated from the shared python-hwpx agent catalog."""
+    resolved_input = filename
+    resolved_output = output
+    try:
+        resolved_input = resolve_path(filename)
+        resolved_output = resolve_path(output)
+        quality_contract.assert_write_capability()
+        store = ScopedIdempotencyStore(
+            _IDEMPOTENCY_CACHE,
+            namespace=str(Path(resolved_input).resolve()),
+        )
+        payload = apply_document_command_batch(
+            filename=resolved_input,
+            output=resolved_output,
+            commands=commands,
+            expected_revision=expected_revision,
+            idempotency_key=idempotency_key,
+            dry_run=dry_run,
+            quality=quality,
+            verification_requirements=verification_requirements,
+            overwrite=overwrite,
+            idempotency_store=store,
+        )
+        while len(_IDEMPOTENCY_CACHE) > _MAX_IDEMPOTENCY_CACHE_ENTRIES:
+            _IDEMPOTENCY_CACHE.pop(next(iter(_IDEMPOTENCY_CACHE)))
+        state_path = (
+            resolved_output
+            if payload.get("ok") and not dry_run and Path(resolved_output).exists()
+            else resolved_input
+        )
+        if Path(state_path).exists():
+            payload.update(document_state_payload(state_path))
+        return payload
+    except Exception as exc:
+        return agent_batch_error_payload(
+            exc,
+            input_filename=resolved_input,
+            output_filename=resolved_output,
+            dry_run=dry_run,
+        )
+
+
+_AGENT_TOOL_HELP = agent_tool_help()
+get_document_node.__doc__ = _AGENT_TOOL_HELP["get"]
+query_document_nodes.__doc__ = _AGENT_TOOL_HELP["query"]
+apply_document_commands.__doc__ = _AGENT_TOOL_HELP["apply"]
 
 
 def get_document_text(filename: str, max_chars: int | None = None, mask: bool = True) -> dict:
