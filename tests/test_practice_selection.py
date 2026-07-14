@@ -5,7 +5,10 @@ import hashlib
 import itertools
 import json
 import stat
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import get_context
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 
@@ -99,6 +102,27 @@ def _config(
 
 def _empty_weights() -> dict:
     return {"byFamily": {}, "byDifficulty": {}, "byTaskKind": {}}
+
+
+def _process_weight_cas(
+    root: str,
+    weights: dict,
+    ready: object,
+    gate: object,
+    results: object,
+) -> None:
+    ready.put(True)
+    gate.wait()
+    try:
+        receipt = update_l0_weights(
+            root,
+            EXPERIMENT_ID,
+            weights=weights,
+            expected_revision=0,
+        )
+        results.put(("ok", receipt["revision"]))
+    except PracticeSelectionError as exc:
+        results.put(("error", exc.code))
 
 
 def test_selection_is_deterministic_under_input_permutations_and_replay(
@@ -330,6 +354,65 @@ def test_weight_revision_conflict_and_tampering_fail_closed(tmp_path: Path) -> N
     assert captured.value.code == "INVALID_WEIGHTS"
 
 
+def test_weight_cas_serializes_thread_and_process_races(tmp_path: Path) -> None:
+    thread_root = _root(tmp_path / "threads")
+    contenders = [
+        {**_empty_weights(), "byFamily": {"forms": 1}},
+        {**_empty_weights(), "byFamily": {"tables": 1}},
+    ]
+    barrier = Barrier(2)
+
+    def thread_update(weights: dict) -> tuple[str, object]:
+        barrier.wait()
+        try:
+            receipt = update_l0_weights(
+                thread_root,
+                EXPERIMENT_ID,
+                weights=weights,
+                expected_revision=0,
+            )
+            return "ok", receipt["revision"]
+        except PracticeSelectionError as exc:
+            return "error", exc.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        thread_results = list(pool.map(thread_update, contenders))
+    assert sorted(thread_results) == [("error", "WEIGHT_CONFLICT"), ("ok", 1)]
+    assert load_l0_weights(thread_root, EXPERIMENT_ID)["revision"] == 1
+
+    process_root = _root(tmp_path / "processes")
+    context = get_context("spawn")
+    ready = context.Queue()
+    gate = context.Event()
+    results = context.Queue()
+    processes = [
+        context.Process(
+            target=_process_weight_cas,
+            args=(str(process_root), weights, ready, gate, results),
+        )
+        for weights in contenders
+    ]
+    for process in processes:
+        process.start()
+    for _process in processes:
+        assert ready.get(timeout=10) is True
+    gate.set()
+    for process in processes:
+        process.join(timeout=20)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+        assert process.exitcode == 0
+    process_results = [results.get(timeout=5) for _process in processes]
+    assert sorted(process_results) == [("error", "WEIGHT_CONFLICT"), ("ok", 1)]
+    assert load_l0_weights(process_root, EXPERIMENT_ID)["revision"] == 1
+    lock_path = (
+        experiment_workspace(process_root, EXPERIMENT_ID)
+        / ".l0-selection-weights.lock"
+    )
+    assert stat.S_IMODE(lock_path.stat().st_mode) == 0o600
+
+
 def test_experiment_identity_and_symlink_workspace_are_rejected_without_path_leak(
     tmp_path: Path,
 ) -> None:
@@ -426,4 +509,3 @@ def test_duplicate_scenario_ids_and_invalid_config_are_rejected(tmp_path: Path) 
     ):
         with pytest.raises(PracticeSelectionError):
             SelectionConfig(**bad)  # type: ignore[arg-type]
-

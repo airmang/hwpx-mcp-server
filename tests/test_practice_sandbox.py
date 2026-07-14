@@ -98,6 +98,55 @@ def test_prepare_is_idempotent_for_same_run_and_rejects_owned_copy_tampering(
     assert captured.value.code == "SANDBOX_CONFLICT"
 
 
+def test_open_owned_is_deterministic_missing_safe_and_fail_closed(
+    tmp_path: Path,
+) -> None:
+    manager, _source_root, _practice, _storage, source = _manager(tmp_path)
+    digest = _sha(source)
+    assert manager.open_owned(RUN_A, digest) is None
+
+    prepared = manager.prepare(source, run_id=RUN_A, expected_sha256=digest)
+    reopened = manager.open_owned(RUN_A, f"sha256:{digest}")
+    assert reopened is not None
+    assert reopened.root == prepared.root
+    assert reopened.reused is True
+    assert reopened.redacted_receipt()["sourceContentHash"] == digest
+
+    (prepared.root / ".hwpx-practice-sandbox").write_text("{}")
+    with pytest.raises(PracticeSandboxError) as captured:
+        manager.open_owned(RUN_A, digest)
+    assert captured.value.code == "SANDBOX_CONFLICT"
+
+
+def test_terminal_candidate_cleanup_reopens_after_restart_and_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    manager, source_root, practice, storage, source = _manager(tmp_path)
+    digest = _sha(source)
+    sandbox = manager.prepare(source, run_id=RUN_A, expected_sha256=digest)
+    sandbox.writable_path("output/result.hwpx", create_parents=True).write_bytes(
+        b"terminal-output"
+    )
+    restarted = PracticeSandboxManager(source_root, practice, storage)
+    valid = {"runId": RUN_A, "startArtifactSha256": digest}
+    candidates = (
+        {"runId": RUN_B, "startArtifactSha256": "malformed"},
+        valid,
+    )
+
+    first = restarted.cleanup_terminal_candidates(candidates)
+    replay = restarted.cleanup_terminal_candidates((valid,))
+
+    assert first["removedCount"] == 1
+    assert first["failureCount"] == 1
+    assert first["failureCodes"] == ["INVALID_HASH"]
+    assert first["candidates"][0]["failed"] is True
+    assert first["candidates"][1]["removed"] is True
+    assert replay["removedCount"] == 0
+    assert replay["candidates"][0]["alreadyAbsent"] is True
+    assert not sandbox.root.exists()
+
+
 @pytest.mark.parametrize(
     ("source_parts", "practice_parts", "storage_parts"),
     [
@@ -199,6 +248,41 @@ def test_writable_paths_refuse_absolute_traversal_source_and_symlinks(tmp_path: 
     output.write_bytes(b"sandbox-output")
     assert sandbox.root in output.parents
     assert source.read_bytes() == b"immutable-source-bytes"
+
+
+def test_writable_and_reopen_reject_hardlink_aliases_to_immutable_inputs(
+    tmp_path: Path,
+) -> None:
+    manager, _source_root, _practice, _storage, source = _manager(tmp_path)
+    digest = _sha(source)
+    sandbox = manager.prepare(source, run_id=RUN_A, expected_sha256=digest)
+    output_dir = sandbox.root / "output"
+    output_dir.mkdir()
+    source_alias = output_dir / "source-alias.hwpx"
+    source_alias.hardlink_to(source)
+
+    with pytest.raises(PracticeSandboxError) as captured:
+        sandbox.writable_path("output/source-alias.hwpx")
+    assert captured.value.code == "SANDBOX_CONFLICT"
+    assert source.read_bytes() == b"immutable-source-bytes"
+
+    source_alias.unlink()
+    sentinel_alias = output_dir / "sentinel-alias"
+    sentinel_alias.hardlink_to(sandbox.root / ".hwpx-practice-sandbox")
+    with pytest.raises(PracticeSandboxError) as captured:
+        manager.open_owned(RUN_A, digest)
+    assert captured.value.code == "SANDBOX_CONFLICT"
+    sentinel_alias.unlink()
+
+    working_alias = output_dir / "working-alias.hwpx"
+    working_alias.hardlink_to(sandbox.working_path)
+    with pytest.raises(PracticeSandboxError) as captured:
+        manager.open_owned(RUN_A, digest)
+    assert captured.value.code == "SANDBOX_CONFLICT"
+    with pytest.raises(PracticeSandboxError) as captured:
+        sandbox.writable_path("output/working-alias.hwpx")
+    assert captured.value.code == "SANDBOX_CONFLICT"
+    assert sandbox.working_path.read_bytes() == source.read_bytes()
 
 
 def test_lease_guarantees_cleanup_on_failure_and_checks_source_integrity(

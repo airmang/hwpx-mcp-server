@@ -17,8 +17,9 @@ import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from itertools import islice
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterable, Iterator, Mapping
 
 from hwpx.practice.registry import validate_storage_roots
 
@@ -251,7 +252,7 @@ def _atomic_write(path: Path, payload: bytes) -> None:
 
 def _read_regular_json(path: Path) -> object:
     before = _regular_lstat(path, "SANDBOX_CONFLICT")
-    if before.st_size > 16 * 1024:
+    if before.st_nlink != 1 or before.st_size > 16 * 1024:
         raise PracticeSandboxError("SANDBOX_CONFLICT")
     descriptor: int | None = None
     try:
@@ -491,6 +492,9 @@ class PracticeSandboxManager:
                 maximum=self.limits.max_input_bytes,
                 code="SANDBOX_CONFLICT",
             )
+            working_stat = _regular_lstat(working, "SANDBOX_CONFLICT")
+            if working_stat.st_nlink != 1:
+                raise PracticeSandboxError("SANDBOX_CONFLICT")
             if copied_hash != sandbox.source_content_hash:
                 raise PracticeSandboxError("SANDBOX_CONFLICT")
 
@@ -640,6 +644,136 @@ class PracticeSandboxManager:
                         raise PracticeSandboxError("CLEANUP_FAILED") from cleanup_exc
             raise PracticeSandboxError("COPY_FAILED") from exc
 
+    def open_owned(
+        self, run_id: str, expected_sha256: str
+    ) -> PracticeSandbox | None:
+        """Re-open one deterministic owned sandbox without consulting the source.
+
+        This recovery-only entrypoint is deliberately narrower than ``prepare``:
+        it never copies source material or creates a directory.  The complete
+        deterministic address and sentinel are revalidated so a restarted
+        runner can clean a terminal sandbox without keeping an in-memory handle.
+        """
+
+        self._ensure_storage_owned()
+        digest = _normalize_hash(expected_sha256)
+        sandbox_id, root = self._sandbox_path(run_id, digest)
+        if not root.exists() and not root.is_symlink():
+            return None
+        sandbox = PracticeSandbox(
+            sandbox_id=sandbox_id,
+            run_id=run_id,
+            source_content_hash=digest,
+            root=root,
+            working_path=root / _WORKING_NAME,
+            reused=True,
+            _source_path=None,
+            _manager=self,
+        )
+        self._verify_owned(sandbox)
+        return sandbox
+
+    def cleanup_terminal_candidates(
+        self, candidates: Iterable[object]
+    ) -> dict[str, Any]:
+        """Boundedly clean queue-authorized terminal sandbox candidates.
+
+        Candidates contain only an opaque run ID and the content address used by
+        :meth:`open_owned`.  Missing directories are an idempotent success; any
+        existing directory must pass full deterministic ownership validation
+        before removal.
+        """
+
+        if isinstance(candidates, (str, bytes, Mapping)):
+            raise PracticeSandboxError("SANDBOX_CONFLICT")
+        batch = list(islice(iter(candidates), 65))
+        if len(batch) > 64:
+            raise PracticeSandboxError("SANDBOX_LIMIT")
+        rows: list[dict[str, Any]] = []
+        for candidate in batch:
+            try:
+                if not isinstance(candidate, Mapping) or set(candidate) != {
+                    "runId",
+                    "startArtifactSha256",
+                }:
+                    raise PracticeSandboxError("SANDBOX_CONFLICT")
+                run_id = candidate.get("runId")
+                expected = candidate.get("startArtifactSha256")
+                if not isinstance(run_id, str) or not isinstance(expected, str):
+                    raise PracticeSandboxError("SANDBOX_CONFLICT")
+                digest = _normalize_hash(expected)
+                sandbox_id, root = self._sandbox_path(run_id, digest)
+                if not root.exists() and not root.is_symlink():
+                    rows.append(
+                        {
+                            "runId": run_id,
+                            "sandboxId": sandbox_id,
+                            "removed": False,
+                            "alreadyAbsent": True,
+                            "failed": False,
+                            "failureCode": None,
+                        }
+                    )
+                    continue
+                sandbox = self.open_owned(run_id, digest)
+                if sandbox is None:  # disappeared after the initial absence check
+                    rows.append(
+                        {
+                            "runId": run_id,
+                            "sandboxId": sandbox_id,
+                            "removed": False,
+                            "alreadyAbsent": True,
+                            "failed": False,
+                            "failureCode": None,
+                        }
+                    )
+                    continue
+                receipt = self.cleanup(sandbox)
+                rows.append(
+                    {
+                        "runId": run_id,
+                        "sandboxId": receipt["sandboxId"],
+                        "removed": True,
+                        "alreadyAbsent": False,
+                        "failed": False,
+                        "failureCode": None,
+                    }
+                )
+            except PracticeSandboxError as exc:
+                rows.append(
+                    {
+                        "removed": False,
+                        "alreadyAbsent": False,
+                        "failed": True,
+                        "failureCode": exc.code,
+                    }
+                )
+            except Exception:
+                rows.append(
+                    {
+                        "removed": False,
+                        "alreadyAbsent": False,
+                        "failed": True,
+                        "failureCode": "SANDBOX_CONFLICT",
+                    }
+                )
+        failure_codes = sorted(
+            {
+                str(row["failureCode"])
+                for row in rows
+                if row.get("failed") is True
+            }
+        )
+        return {
+            "schema": "hwpx.practice-sandbox-terminal-cleanup/v1",
+            "candidateCount": len(rows),
+            "removedCount": sum(row.get("removed") is True for row in rows),
+            "failureCount": sum(row.get("failed") is True for row in rows),
+            "failureCodes": failure_codes,
+            "candidates": rows,
+            "privateStorageCoordinatesExposed": False,
+        }
+
     def assert_source_unchanged(self, sandbox: PracticeSandbox) -> None:
         if sandbox._source_path is None:
             raise PracticeSandboxError("SOURCE_CHANGED")
@@ -697,6 +831,25 @@ class PracticeSandboxManager:
                 raise PracticeSandboxError("SANDBOX_SYMLINK") from exc
             if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
                 raise PracticeSandboxError("SANDBOX_SYMLINK")
+            if metadata.st_nlink != 1:
+                raise PracticeSandboxError("SANDBOX_CONFLICT")
+            working = _regular_lstat(
+                sandbox.working_path, "SANDBOX_CONFLICT"
+            )
+            if (metadata.st_dev, metadata.st_ino) == (
+                working.st_dev,
+                working.st_ino,
+            ):
+                raise PracticeSandboxError("SANDBOX_CONFLICT")
+            if sandbox._source_path is not None:
+                source = _regular_lstat(
+                    sandbox._source_path, "SOURCE_CHANGED"
+                )
+                if (metadata.st_dev, metadata.st_ino) == (
+                    source.st_dev,
+                    source.st_ino,
+                ):
+                    raise PracticeSandboxError("SANDBOX_CONFLICT")
         try:
             resolved_parent = target.parent.resolve(strict=True)
         except OSError as exc:

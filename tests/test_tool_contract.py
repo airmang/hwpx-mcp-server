@@ -214,6 +214,7 @@ def test_generated_mcp_contract_is_current() -> None:
 
 def test_unwired_campaign_tools_fail_closed_without_leaking_detail(monkeypatch) -> None:
     monkeypatch.setattr(server, "_PRACTICE_CAMPAIGN_SERVICE_OVERRIDE", None)
+    monkeypatch.setattr(server, "_PRACTICE_CAMPAIGN_RUNTIME_FACTORY", None)
 
     result = server.start_practice_campaign(
         "PCMP-00000000000000000000", "campaign-start-001", confirm=True
@@ -225,3 +226,26 @@ def test_unwired_campaign_tools_fail_closed_without_leaking_detail(monkeypatch) 
         "errorCode": "CAMPAIGN_UNAVAILABLE",
         "privateStorageCoordinatesExposed": False,
     }
+
+
+def test_campaign_runtime_package_skew_keeps_tools_importable_and_fails_closed(
+    monkeypatch,
+) -> None:
+    def skewed_factory(_namespace):
+        raise ImportError("private package location must not escape")
+
+    monkeypatch.setattr(server, "_PRACTICE_CAMPAIGN_SERVICE_OVERRIDE", None)
+    monkeypatch.setattr(server, "_PRACTICE_CAMPAIGN_RUNTIME_FACTORY", skewed_factory)
+
+    result = server.start_practice_campaign(
+        "PCMP-00000000000000000000", "campaign-start-001", confirm=True
+    )
+
+    assert "start_practice_campaign" in server._fastmcp_tool_names()
+    assert result == {
+        "ok": False,
+        "state": "needs_review",
+        "errorCode": "CAMPAIGN_UNAVAILABLE",
+        "privateStorageCoordinatesExposed": False,
+    }
+    assert "location" not in json.dumps(result)

@@ -17,9 +17,15 @@ import stat
 import uuid
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
+
+if os.name == "nt":  # pragma: no cover - exercised on Windows hosts
+    import msvcrt
+else:
+    import fcntl
 
 from hwpx.practice.registry import SHA256_PATTERN, assert_redacted_payload
 from hwpx.practice.scenario import SCENARIO_ID_PATTERN, TASK_KINDS
@@ -33,6 +39,7 @@ L0_WEIGHTS_RECEIPT_SCHEMA = "hwpx.practice-l0-weights-receipt/v1"
 _SELECTION_ID = re.compile(r"PSEL-[A-F0-9]{20}\Z")
 _EXPERIMENT_ID = re.compile(r"EXP-[A-F0-9]{20}\Z")
 _WEIGHT_FILE = "l0-selection-weights.json"
+_WEIGHT_LOCK_FILE = ".l0-selection-weights.lock"
 _DIFFICULTIES = ("routine", "intermediate", "advanced")
 _WEIGHT_AXES = ("byFamily", "byDifficulty", "byTaskKind")
 _FORBIDDEN_INPUT_KEYS = frozenset(
@@ -308,6 +315,65 @@ def _weights_path(practice_root: str | Path, experiment_id: str) -> Path:
     return experiment_workspace(practice_root, experiment_id) / _WEIGHT_FILE
 
 
+@contextmanager
+def _exclusive_weight_lock(path: Path) -> Iterator[None]:
+    """Hold a process- and thread-safe lock for one experiment's CAS update."""
+
+    lock_path = path.with_name(_WEIGHT_LOCK_FILE)
+    descriptor: int | None = None
+    locked = False
+    try:
+        descriptor = os.open(
+            lock_path,
+            os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        metadata = lock_path.lstat()
+        opened = os.fstat(descriptor)
+        if (
+            stat.S_ISLNK(metadata.st_mode)
+            or not stat.S_ISREG(metadata.st_mode)
+            or not stat.S_ISREG(opened.st_mode)
+            or (metadata.st_dev, metadata.st_ino) != (opened.st_dev, opened.st_ino)
+            or opened.st_nlink != 1
+        ):
+            raise PracticeSelectionError("WEIGHT_IO")
+        os.fchmod(descriptor, 0o600)
+        if os.name == "nt":  # pragma: no cover - exercised on Windows hosts
+            if opened.st_size == 0:
+                os.write(descriptor, b"\0")
+                os.fsync(descriptor)
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+        else:
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        locked = True
+        after = lock_path.lstat()
+        if (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino):
+            raise PracticeSelectionError("WEIGHT_IO")
+    except PracticeSelectionError:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise
+    except OSError as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise PracticeSelectionError("WEIGHT_IO") from exc
+    try:
+        yield
+    finally:
+        assert descriptor is not None
+        try:
+            if locked:
+                if os.name == "nt":  # pragma: no cover - exercised on Windows hosts
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
+
 def _read_regular_json(path: Path) -> object:
     try:
         metadata = path.lstat()
@@ -346,7 +412,7 @@ def load_l0_weights(practice_root: str | Path, experiment_id: str) -> dict[str, 
     """Load and verify experiment-local weights without exposing a path."""
 
     path = _weights_path(practice_root, experiment_id)
-    if not path.exists():
+    if not path.exists() and not path.is_symlink():
         return _empty_weights()
     return _validate_weight_state(_read_regular_json(path))
 
@@ -368,6 +434,13 @@ def _atomic_write_state(path: Path, state: Mapping[str, Any]) -> None:
         os.chmod(temporary, 0o600, follow_symlinks=False)
         os.replace(temporary, path)
         os.chmod(path, 0o600, follow_symlinks=False)
+        directory_descriptor = os.open(
+            path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        )
+        try:
+            os.fsync(directory_descriptor)
+        finally:
+            os.close(directory_descriptor)
     except PracticeSelectionError:
         raise
     except OSError as exc:
@@ -398,18 +471,23 @@ def update_l0_weights(
     expected = _require_int(expected_revision)
     normalized = _validate_weights_payload(weights)
     path = _weights_path(practice_root, experiment_id)
-    current = load_l0_weights(practice_root, experiment_id)
-    if current["revision"] != expected:
-        raise PracticeSelectionError("WEIGHT_CONFLICT")
-    changed = current["weights"] != normalized
-    state = {
-        "schema": L0_WEIGHTS_SCHEMA,
-        "revision": current["revision"] + (1 if changed else 0),
-        "weights": normalized,
-        "weightsSha256": _content_sha256(normalized),
-    }
-    if changed or not path.exists():
-        _atomic_write_state(path, state)
+    with _exclusive_weight_lock(path):
+        current = (
+            _validate_weight_state(_read_regular_json(path))
+            if path.exists() or path.is_symlink()
+            else _empty_weights()
+        )
+        if current["revision"] != expected:
+            raise PracticeSelectionError("WEIGHT_CONFLICT")
+        changed = current["weights"] != normalized
+        state = {
+            "schema": L0_WEIGHTS_SCHEMA,
+            "revision": current["revision"] + (1 if changed else 0),
+            "weights": normalized,
+            "weightsSha256": _content_sha256(normalized),
+        }
+        if changed or not path.exists():
+            _atomic_write_state(path, state)
     receipt = {
         "schema": L0_WEIGHTS_RECEIPT_SCHEMA,
         "revision": state["revision"],

@@ -22,6 +22,7 @@ from hwpx.practice import (
 
 from .dispatch import (
     PracticeDispatchError,
+    PracticeDispatchResult,
     PracticeWorkflowDispatcher,
     ResolvedPracticeTask,
 )
@@ -29,6 +30,7 @@ from .dispatch import (
 
 _CAMPAIGN_ID = re.compile(r"^PCMP-[A-F0-9]{20}$")
 _RUN_ID = re.compile(r"^PRUN-[A-F0-9]{20}$")
+_REASON_CODE = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
 
 
 def _canonical(value: object) -> bytes:
@@ -64,10 +66,30 @@ class CampaignQueue(Protocol):
         now: Any = None,
     ) -> Any: ...
 
+    def claim_run(
+        self,
+        run_id: str,
+        worker_id: str,
+        *,
+        lease_seconds: int = 60,
+        now: Any = None,
+    ) -> Any | None: ...
+
     def account(self, lease: Any, **usage: int) -> dict[str, Any]: ...
+
+    def authorize(self, lease: Any, now: Any = None) -> dict[str, Any]: ...
 
     def terminalize(
         self, lease: Any, receipt: Mapping[str, Any], now: Any = None
+    ) -> dict[str, Any]: ...
+
+    def fail(
+        self,
+        lease: Any,
+        reason: str,
+        *,
+        state: str = "failed",
+        now: Any = None,
     ) -> dict[str, Any]: ...
 
     def cancel(self, campaign_id: str, now: Any = None) -> dict[str, Any]: ...
@@ -82,9 +104,24 @@ class CampaignQueue(Protocol):
 
     def receipts(self, campaign_id: str) -> list[dict[str, Any]]: ...
 
+    def terminal_cleanup_candidates(
+        self, *, limit: int = 64
+    ) -> tuple[dict[str, str], ...]: ...
+
+    def ack_terminal_cleanup(
+        self,
+        run_id: str,
+        start_artifact_sha256: str,
+        *,
+        now: Any = None,
+    ) -> dict[str, Any]: ...
+
 
 ManifestResolver = Callable[[str], Mapping[str, Any]]
 TaskResolver = Callable[[Mapping[str, Any], Any], ResolvedPracticeTask]
+TerminalArtifactHook = Callable[
+    [ResolvedPracticeTask, PracticeDispatchResult], Mapping[str, Any] | None
+]
 
 
 class PracticeCampaignError(RuntimeError):
@@ -171,6 +208,7 @@ class PracticeCampaignService:
         *,
         manifest_resolver: ManifestResolver,
         task_resolver: TaskResolver,
+        terminal_artifact_hook: TerminalArtifactHook | None = None,
         worker_id: str = "practice-local-worker",
         lease_seconds: int = 60,
     ) -> None:
@@ -180,6 +218,7 @@ class PracticeCampaignService:
         self.dispatcher = dispatcher
         self.manifest_resolver = manifest_resolver
         self.task_resolver = task_resolver
+        self.terminal_artifact_hook = terminal_artifact_hook
         self.worker_id = worker_id
         self.lease_seconds = lease_seconds
 
@@ -241,6 +280,261 @@ class PracticeCampaignService:
             raise PracticeCampaignError("TASK_BINDING_INVALID")
         return run_ref
 
+    def _existing_terminal(
+        self, campaign_id: str, run_id: str
+    ) -> dict[str, Any] | None:
+        try:
+            matches = [
+                validate_run_receipt(receipt)
+                for receipt in self.queue.receipts(campaign_id)
+                if receipt.get("runId") == run_id
+            ]
+        except Exception as exc:
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE") from exc
+        if len(matches) > 1:
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE")
+        return matches[0] if matches else None
+
+    @staticmethod
+    def _failure_state(reason: str) -> str:
+        if reason in {"CAPABILITY_SKEW", "TOOL_SPEC_SKEW"}:
+            return "provenance_mismatch"
+        if reason == "PRIVACY_BOUNDARY_FAILED":
+            return "privacy_blocked"
+        if reason in {"STALE_DOCUMENT_REVISION", "SOURCE_CHANGED"}:
+            return "source_write_refused"
+        if reason in {
+            "TASK_BINDING_INVALID",
+            "CAMPAIGN_CONTRACT_INVALID",
+            "UNSUPPORTED_INTENT",
+        }:
+            return "refused"
+        return "failed"
+
+    @staticmethod
+    def _authorization(
+        value: Mapping[str, Any], lease: Any
+    ) -> tuple[dict[str, int], dict[str, int], bool]:
+        expected_keys = {
+            "schema",
+            "campaignId",
+            "runId",
+            "authorized",
+            "recoveryOnly",
+            "mutationAllowed",
+            "runRemaining",
+            "campaignRemaining",
+            "effectiveRemaining",
+            "privateStorageCoordinatesExposed",
+        }
+        run_keys = {
+            "toolCalls",
+            "attempts",
+            "repairRounds",
+            "elapsedSeconds",
+            "costMicrounits",
+            "artifactBytes",
+        }
+        campaign_keys = {
+            "toolCalls",
+            "elapsedSeconds",
+            "costMicrounits",
+            "artifactBytes",
+        }
+        if set(value) != expected_keys or (
+            value.get("schema")
+            != "hwpx.practice-campaign-queue-authorization/v1"
+            or value.get("campaignId") != getattr(lease, "campaign_id", None)
+            or value.get("runId") != getattr(lease, "run_id", None)
+            or value.get("authorized") is not True
+            or value.get("privateStorageCoordinatesExposed") is not False
+        ):
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE")
+        recovery_only = value.get("recoveryOnly")
+        mutation_allowed = value.get("mutationAllowed")
+        if (
+            not isinstance(recovery_only, bool)
+            or recovery_only is not bool(getattr(lease, "recovery_only", False))
+            or mutation_allowed is not (not recovery_only)
+        ):
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE")
+        budgets: dict[str, dict[str, int]] = {}
+        for name, keys in (
+            ("runRemaining", run_keys),
+            ("campaignRemaining", campaign_keys),
+            ("effectiveRemaining", run_keys),
+        ):
+            raw = value.get(name)
+            if not isinstance(raw, Mapping) or set(raw) != keys:
+                raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE")
+            normalized: dict[str, int] = {}
+            for key, amount in raw.items():
+                if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
+                    raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE")
+                normalized[str(key)] = amount
+            budgets[name] = normalized
+        effective = budgets["effectiveRemaining"]
+        if any(effective[key] > budgets["runRemaining"][key] for key in run_keys):
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE")
+        if any(
+            effective[key] > budgets["campaignRemaining"][key]
+            for key in campaign_keys
+        ):
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE")
+        return effective, budgets["runRemaining"], recovery_only
+
+    def _cleanup_terminal_candidates(self) -> dict[str, Any] | None:
+        try:
+            candidates = self.queue.terminal_cleanup_candidates(limit=64)
+            if not candidates:
+                return None
+            if not isinstance(candidates, tuple) or len(candidates) > 64:
+                raise TypeError("terminal cleanup candidates must be a tuple")
+            cleanup = self.dispatcher.cleanup_terminal_candidates(list(candidates))
+            raw_rows = cleanup.get("candidates")
+            if not isinstance(raw_rows, list) or len(raw_rows) != len(candidates):
+                raise TypeError("terminal cleanup rows do not match candidates")
+            ack_hashes: list[str] = []
+            failure_codes = {
+                str(code)
+                for code in cleanup.get("failureCodes", [])
+                if isinstance(code, str) and _REASON_CODE.fullmatch(code)
+            }
+            rows: list[dict[str, Any]] = []
+            for candidate, raw_row in zip(candidates, raw_rows, strict=True):
+                if not isinstance(raw_row, Mapping):
+                    raise TypeError("terminal cleanup row must be an object")
+                row = dict(raw_row)
+                row["acknowledged"] = False
+                row["ackFailureCode"] = None
+                safe = row.get("failed") is False and (
+                    row.get("removed") is True
+                    or row.get("alreadyAbsent") is True
+                )
+                if not safe:
+                    code = row.get("failureCode")
+                    failure_codes.add(
+                        code
+                        if isinstance(code, str) and _REASON_CODE.fullmatch(code)
+                        else "SANDBOX_CONFLICT"
+                    )
+                    rows.append(row)
+                    continue
+                try:
+                    if set(candidate) != {"runId", "startArtifactSha256"}:
+                        raise TypeError("terminal cleanup candidate is malformed")
+                    ack = self.queue.ack_terminal_cleanup(
+                        candidate["runId"], candidate["startArtifactSha256"]
+                    )
+                    if (
+                        not isinstance(ack, Mapping)
+                        or ack.get("schema")
+                        != "hwpx.practice-campaign-queue-cleanup-ack/v1"
+                        or ack.get("runId") != candidate["runId"]
+                        or ack.get("startArtifactSha256")
+                        != candidate["startArtifactSha256"]
+                        or ack.get("acknowledged") is not True
+                        or ack.get("privateStorageCoordinatesExposed") is not False
+                    ):
+                        raise TypeError(
+                            "terminal cleanup acknowledgement is invalid"
+                        )
+                    ack_hashes.append(_digest(ack))
+                    row["acknowledged"] = True
+                except Exception:
+                    row["ackFailureCode"] = "CLEANUP_ACK_FAILED"
+                    failure_codes.add("CLEANUP_ACK_FAILED")
+                rows.append(row)
+            result = dict(cleanup)
+            result["candidates"] = rows
+            result["acknowledgedCount"] = len(ack_hashes)
+            result["ackReceiptSha256"] = ack_hashes
+            result["failureCount"] = len(rows) - len(ack_hashes)
+            result["failureCodes"] = sorted(failure_codes)
+            return result
+        except PracticeCampaignError:
+            raise
+        except Exception as exc:
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE") from exc
+
+    def _fail_lease(
+        self,
+        lease: Any,
+        reason: str,
+        *,
+        sandbox: Any = None,
+    ) -> dict[str, Any]:
+        """Close an owned lease with a named receipt and bounded cleanup."""
+
+        if not _REASON_CODE.fullmatch(reason):
+            reason = "WORKFLOW_FAILED"
+        try:
+            terminal = self.queue.fail(
+                lease, reason, state=self._failure_state(reason)
+            )
+        except PracticeCampaignError:
+            raise
+        except Exception as exc:
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE") from exc
+        cleanup = None
+        post_terminal_error = None
+        try:
+            cleanup = self.dispatcher.cleanup_sandbox(sandbox)
+        except PracticeDispatchError:
+            post_terminal_error = "SANDBOX_CLEANUP_FAILED"
+        try:
+            response = {
+                "advanced": True,
+                "terminal": self._public(terminal),
+                "status": self.status(getattr(lease, "campaign_id", "")),
+                "sandboxCleanup": self._public(cleanup) if cleanup else None,
+                "postTerminalErrorCode": post_terminal_error,
+                "privateStorageCoordinatesExposed": False,
+            }
+            return self._public(response)
+        except PracticeCampaignError:
+            raise
+        except Exception as exc:
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE") from exc
+
+    def _retain_terminal_artifact(
+        self,
+        task: ResolvedPracticeTask,
+        outcome: PracticeDispatchResult,
+    ) -> tuple[str | None, str | None]:
+        """Run the optional hook with a stable replay key before terminalization."""
+
+        hook_receipt_sha256 = None
+        failure_reason = None
+        if self.terminal_artifact_hook is not None and outcome.run_receipt is not None:
+            try:
+                if outcome.artifact_hook_idempotency_key is None:
+                    raise TypeError("terminal artifact hook requires an idempotency key")
+                hook_receipt = self.terminal_artifact_hook(task, outcome)
+                if hook_receipt is not None:
+                    if not isinstance(hook_receipt, Mapping):
+                        raise TypeError("terminal artifact hook receipt must be an object")
+                    assert_receipt_safe(_receipt_safety_projection(hook_receipt))
+                    hook_receipt_sha256 = _digest(hook_receipt)
+            except Exception:
+                failure_reason = "TERMINAL_ARTIFACT_HOOK_FAILED"
+        return hook_receipt_sha256, failure_reason
+
+    @staticmethod
+    def _assert_resource_accounting(outcome: PracticeDispatchResult) -> None:
+        expected = {
+            "artifactBytes": "retained-output-bytes/v1",
+            "costMicrounits": "local-zero/v1",
+            "costMeasured": False,
+        }
+        if (
+            outcome.boundary.get("resourceAccounting") != expected
+            or outcome.usage_delta.get("costMicrounits") != 0
+        ):
+            raise PracticeDispatchError(
+                "WORKFLOW_FAILED", sandbox=outcome.sandbox
+            )
+
     def start(
         self,
         campaign_id: str,
@@ -255,7 +549,7 @@ class PracticeCampaignService:
         ):
             raise PracticeCampaignError("IDEMPOTENCY_KEY_INVALID")
         self.dispatcher.assert_runtime_provenance(manifest)
-        if not confirm:
+        if confirm is not True:
             return {
                 "schema": "hwpx.practice-campaign-start-preview/v1",
                 "campaignId": campaign_id,
@@ -301,22 +595,49 @@ class PracticeCampaignService:
             raise PracticeCampaignError("TASK_BINDING_INVALID")
         if approved is not None and run_id is None:
             raise PracticeCampaignError("RUN_ID_INVALID")
+        recovery_cleanup = None
         try:
             self.queue.recover(campaign_id=campaign_id)
             self.queue.resume(campaign_id)
-            lease = (
-                self.queue.resume_lease(
-                    run_id,
-                    self.worker_id,
-                    lease_seconds=self.lease_seconds,
-                )
-                if run_id is not None
-                else self.queue.claim(
+            recovery_cleanup = self._cleanup_terminal_candidates()
+            if run_id is not None:
+                existing = self._existing_terminal(campaign_id, run_id)
+                if existing is not None:
+                    return self._public(
+                        {
+                            "advanced": False,
+                            "terminal": existing,
+                            "status": self.status(campaign_id),
+                            "sandboxCleanup": (
+                                self._public(recovery_cleanup)
+                                if recovery_cleanup
+                                else None
+                            ),
+                            "idempotentReplay": True,
+                            "privateStorageCoordinatesExposed": False,
+                        }
+                    )
+            if run_id is not None:
+                try:
+                    lease = self.queue.resume_lease(
+                        run_id,
+                        self.worker_id,
+                        lease_seconds=self.lease_seconds,
+                    )
+                except Exception as exc:
+                    if getattr(exc, "code", None) != "LEASE_NOT_OWNED":
+                        raise
+                    lease = self.queue.claim_run(
+                        run_id,
+                        self.worker_id,
+                        lease_seconds=self.lease_seconds,
+                    )
+            else:
+                lease = self.queue.claim(
                     self.worker_id,
                     campaign_id=campaign_id,
                     lease_seconds=self.lease_seconds,
                 )
-            )
         except Exception as exc:
             raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE") from exc
         if lease is None:
@@ -325,7 +646,56 @@ class PracticeCampaignService:
                 "status": self.status(campaign_id),
                 "privateStorageCoordinatesExposed": False,
             }
-        run_ref = self._run_ref(manifest, lease)
+        try:
+            run_ref = self._run_ref(manifest, lease)
+        except PracticeCampaignError as exc:
+            return self._fail_lease(
+                lease,
+                exc.code,
+                sandbox=self.dispatcher.known_sandbox(
+                    str(getattr(lease, "run_id", ""))
+                ),
+            )
+        try:
+            authorization_raw = self.queue.authorize(lease)
+            if not isinstance(authorization_raw, Mapping):
+                raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE")
+            execution_limits, run_remaining, recovery_only = self._authorization(
+                authorization_raw, lease
+            )
+        except PracticeCampaignError:
+            raise
+        except Exception as exc:
+            if getattr(exc, "code", None) in {
+                "BUDGET_EXHAUSTED",
+                "CANCEL_REQUESTED",
+            }:
+                existing = self._existing_terminal(campaign_id, run_ref["runId"])
+                if existing is not None:
+                    cleanup = self._cleanup_terminal_candidates()
+                    return self._public(
+                        {
+                            "advanced": True,
+                            "terminal": existing,
+                            "status": self.status(campaign_id),
+                            "sandboxCleanup": (
+                                self._public(cleanup) if cleanup else None
+                            ),
+                            "privateStorageCoordinatesExposed": False,
+                        }
+                    )
+            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE") from exc
+        task: ResolvedPracticeTask
+        durable_usage = {
+            key: int(run_ref["budgets"][key]) - run_remaining[key]
+            for key in run_remaining
+        }
+        if durable_usage["costMicrounits"] != 0:
+            return self._fail_lease(
+                lease,
+                "COST_MODEL_MISMATCH",
+                sandbox=self.dispatcher.known_sandbox(run_ref["runId"]),
+            )
         try:
             task = self.task_resolver(manifest, lease)
             if not isinstance(task, ResolvedPracticeTask):
@@ -338,17 +708,39 @@ class PracticeCampaignService:
                 approved=approved,
                 decision_receipt_sha256=decision_receipt_sha256,
                 run_attempt=getattr(lease, "attempt", 0),
+                execution_limits=execution_limits,
+                durable_usage=durable_usage,
+                recovery_only=recovery_only,
             )
-        except PracticeDispatchError:
-            raise
-        except Exception as exc:
-            raise PracticeCampaignError("TASK_BINDING_INVALID") from exc
+        except PracticeDispatchError as exc:
+            return self._fail_lease(lease, exc.code, sandbox=exc.sandbox)
+        except Exception:
+            return self._fail_lease(
+                lease,
+                "TASK_BINDING_INVALID",
+                sandbox=self.dispatcher.known_sandbox(run_ref["runId"]),
+            )
+        try:
+            self._assert_resource_accounting(outcome)
+        except PracticeDispatchError as exc:
+            return self._fail_lease(lease, exc.code, sandbox=exc.sandbox)
+        hook_receipt_sha256 = None
+        if outcome.terminal:
+            hook_receipt_sha256, retention_error = self._retain_terminal_artifact(
+                task, outcome
+            )
+            if retention_error is not None:
+                return self._fail_lease(
+                    lease, retention_error, sandbox=outcome.sandbox
+                )
         try:
             account = self.queue.account(
                 lease,
                 tool_calls=outcome.usage_delta["toolCalls"],
                 repair_rounds=outcome.usage_delta["repairRounds"],
-                elapsed_seconds=outcome.usage_delta["elapsedSeconds"],
+                # The durable queue owns lease wall-time accounting.  Workflow
+                # elapsed time remains evidence in the final receipt only.
+                elapsed_seconds=0,
                 cost_microunits=outcome.usage_delta["costMicrounits"],
                 artifact_bytes=outcome.usage_delta["artifactBytes"],
             )
@@ -359,26 +751,89 @@ class PracticeCampaignService:
                 if isinstance(queue_usage, Mapping)
                 else outcome.run_receipt
             )
+        except PracticeDispatchError as exc:
+            return self._fail_lease(lease, exc.code, sandbox=outcome.sandbox)
+        except Exception as exc:
+            if (
+                getattr(exc, "code", None) == "LEASE_NOT_OWNED"
+                and outcome.terminal
+                and outcome.run_receipt is not None
+            ):
+                try:
+                    durable_receipt = self.dispatcher.bind_accounted_usage(
+                        outcome, durable_usage
+                    )
+                    reconciled = validate_run_receipt(
+                        durable_receipt or outcome.run_receipt
+                    )
+                    terminal = self.queue.terminalize(lease, reconciled)
+                    account = {
+                        "schema": "hwpx.practice-terminal-reconciliation/v1",
+                        "runId": reconciled["runId"],
+                        "usage": reconciled["usage"],
+                        "terminalReceipt": terminal,
+                        "expiredLeaseReconciled": True,
+                        "privateStorageCoordinatesExposed": False,
+                    }
+                    account_terminal = terminal
+                    queue_usage = reconciled["usage"]
+                    bound_receipt = reconciled
+                except Exception as reconciliation_error:
+                    # A re-leased identity must never be overwritten with a
+                    # generic accounting failure after workflow success.
+                    raise PracticeCampaignError(
+                        "CAMPAIGN_QUEUE_UNAVAILABLE"
+                    ) from reconciliation_error
+            else:
+                return self._fail_lease(
+                    lease, "CAMPAIGN_ACCOUNTING_FAILED", sandbox=outcome.sandbox
+                )
+
+        cleanup = None
+        post_terminal_error = None
+        terminal_path = outcome.terminal or isinstance(account_terminal, Mapping)
+        if terminal_path:
             if isinstance(account_terminal, Mapping):
                 terminal = account_terminal
             elif bound_receipt is not None:
-                terminal = self.queue.terminalize(lease, bound_receipt)
+                try:
+                    terminal = self.queue.terminalize(lease, bound_receipt)
+                except Exception:
+                    return self._fail_lease(
+                        lease,
+                        "TERMINAL_RECONCILIATION_FAILED",
+                        sandbox=outcome.sandbox,
+                    )
             else:
-                terminal = None
-        except PracticeDispatchError:
+                return self._fail_lease(
+                    lease, "TERMINAL_RECEIPT_MISSING", sandbox=outcome.sandbox
+                )
+            try:
+                cleanup = self.dispatcher.cleanup_sandbox(outcome.sandbox)
+            except PracticeDispatchError:
+                post_terminal_error = "SANDBOX_CLEANUP_FAILED"
+        else:
+            terminal = None
+        try:
+            response = {
+                "advanced": True,
+                "boundary": outcome.boundary,
+                "sandbox": outcome.sandbox_receipt,
+                "accounting": self._public(account),
+                "terminal": self._public(terminal) if terminal is not None else None,
+                "status": self.status(campaign_id),
+                "sandboxCleanup": self._public(cleanup) if cleanup else None,
+                "artifactHookReceiptSha256": hook_receipt_sha256,
+                "postTerminalErrorCode": post_terminal_error,
+                "privateStorageCoordinatesExposed": False,
+            }
+            return self._public(response)
+        except PracticeCampaignError:
+            if terminal is None:
+                return self._fail_lease(
+                    lease, "PRIVACY_BOUNDARY_FAILED", sandbox=outcome.sandbox
+                )
             raise
-        except Exception as exc:
-            raise PracticeCampaignError("CAMPAIGN_QUEUE_UNAVAILABLE") from exc
-        response = {
-            "advanced": True,
-            "boundary": outcome.boundary,
-            "sandbox": outcome.sandbox_receipt,
-            "accounting": self._public(account),
-            "terminal": self._public(terminal) if terminal is not None else None,
-            "status": self.status(campaign_id),
-            "privateStorageCoordinatesExposed": False,
-        }
-        return self._public(response)
 
     def cancel(self, campaign_id: str) -> dict[str, Any]:
         campaign_id = self._campaign_id(campaign_id)
@@ -394,11 +849,21 @@ class PracticeCampaignService:
         try:
             receipts_value: Sequence[Mapping[str, Any]] = self.queue.receipts(campaign_id)
             receipts = [validate_run_receipt(item) for item in receipts_value]
-            if any(
-                receipt["runId"] not in {item["runId"] for item in manifest["runs"]}
-                for receipt in receipts
+            expected_pairs = [
+                (item["runId"], item["scenarioId"]) for item in manifest["runs"]
+            ]
+            actual_pairs = [
+                (receipt["runId"], receipt["scenarioId"]) for receipt in receipts
+            ]
+            if (
+                len(receipts) != manifest["expectedRunCount"]
+                or len(set(actual_pairs)) != len(actual_pairs)
+                or len({receipt["runId"] for receipt in receipts}) != len(receipts)
+                or len({receipt["scenarioId"] for receipt in receipts})
+                != len(receipts)
+                or set(actual_pairs) != set(expected_pairs)
             ):
-                raise ValueError("receipt is outside the campaign")
+                raise ValueError("terminal receipts do not bijectively match the campaign")
             result = {
                 "schema": "hwpx.practice-campaign-export/v1",
                 "campaignId": campaign_id,
@@ -424,4 +889,5 @@ __all__ = [
     "PracticeCampaignError",
     "PracticeCampaignService",
     "TaskResolver",
+    "TerminalArtifactHook",
 ]

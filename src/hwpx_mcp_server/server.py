@@ -114,9 +114,14 @@ from .tool_contract import (
 )
 from .workflow.service import WorkflowService
 from .practice import PracticeScenarioError, PracticeScenarioService
+
+_PRACTICE_CAMPAIGN_RUNTIME_FACTORY: Any = None
 try:  # Leap B requires python-hwpx with the practice contract package.
     from .practice.campaign_service import PracticeCampaignError, PracticeCampaignService
     from .practice.dispatch import PracticeDispatchError
+    from .practice.runtime import get_practice_campaign_service
+
+    _PRACTICE_CAMPAIGN_RUNTIME_FACTORY = get_practice_campaign_service
 except ImportError:
     # Keep the established MCP surface importable during package-version skew.
     # The new campaign tools remain registered, but fail closed until the Leap B
@@ -5723,9 +5728,16 @@ _PRACTICE_CAMPAIGN_SERVICE_OVERRIDE: PracticeCampaignService | None = None
 def _practice_campaign_service() -> PracticeCampaignService:
     """Return the privately wired Leap B service, never public path material."""
 
-    if _PRACTICE_CAMPAIGN_SERVICE_OVERRIDE is None:
+    if _PRACTICE_CAMPAIGN_SERVICE_OVERRIDE is not None:
+        return _PRACTICE_CAMPAIGN_SERVICE_OVERRIDE
+    if _PRACTICE_CAMPAIGN_RUNTIME_FACTORY is None:
         raise PracticeCampaignError("CAMPAIGN_UNAVAILABLE")
-    return _PRACTICE_CAMPAIGN_SERVICE_OVERRIDE
+    try:
+        return _PRACTICE_CAMPAIGN_RUNTIME_FACTORY(globals())
+    except Exception as exc:
+        # Configuration, package skew, and private lookup details never cross
+        # the public campaign boundary.
+        raise PracticeCampaignError("CAMPAIGN_UNAVAILABLE") from exc
 
 
 def _practice_campaign_failure(exc: Exception) -> dict[str, Any]:
