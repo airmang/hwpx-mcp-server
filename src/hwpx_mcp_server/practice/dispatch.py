@@ -78,6 +78,7 @@ class PracticeDispatchError(RuntimeError):
         "CAPABILITY_SKEW": "installed workflow capability does not match campaign provenance",
         "TOOL_SPEC_SKEW": "installed ToolSpec does not match campaign provenance",
         "SANDBOX_UNAVAILABLE": "isolated practice sandbox is unavailable",
+        "SOURCE_WRITE_REFUSED": "attempted source mutation was refused",
         "STALE_DOCUMENT_REVISION": "sandbox input revision changed before dispatch",
         "DECISION_REQUIRED": "workflow is waiting for an explicit bound decision",
         "DECISION_RECEIPT_MISMATCH": "decision does not bind to the current workflow boundary",
@@ -110,6 +111,7 @@ class ResolvedPracticeTask:
     source_artifact: Path
     workflow_family: str
     parameters: Mapping[str, Any]
+    evaluation_policy_sha256: str
 
     def __post_init__(self) -> None:
         if self.workflow_family not in _WORKFLOW_FAMILIES:
@@ -119,6 +121,8 @@ class ResolvedPracticeTask:
         ):
             raise PracticeDispatchError("TASK_BINDING_INVALID")
         if not isinstance(self.parameters, Mapping):
+            raise PracticeDispatchError("TASK_BINDING_INVALID")
+        if not re.fullmatch(r"[a-f0-9]{64}", self.evaluation_policy_sha256):
             raise PracticeDispatchError("TASK_BINDING_INVALID")
 
 
@@ -134,6 +138,10 @@ class PracticeDispatchResult:
     sandbox: PracticeSandbox | None = field(default=None, repr=False)
     output_path: Path | None = field(default=None, repr=False)
     artifact_hook_idempotency_key: str | None = None
+    evaluation_policy_sha256: str | None = None
+    evaluator_provenance: Mapping[str, Any] | None = field(
+        default=None, repr=False
+    )
 
     @property
     def terminal(self) -> bool:
@@ -393,8 +401,8 @@ class PracticeWorkflowDispatcher:
             output = sandbox.writable_path("output/result.hwpx", create_parents=True)
         except PracticeSandboxError as exc:
             code = (
-                "STALE_DOCUMENT_REVISION"
-                if exc.code == "SOURCE_CHANGED"
+                "SOURCE_WRITE_REFUSED"
+                if exc.code in {"SOURCE_CHANGED", "SOURCE_REFUSED", "SANDBOX_ESCAPE"}
                 else "SANDBOX_UNAVAILABLE"
             )
             raise PracticeDispatchError(code, sandbox=known or sandbox) from exc
@@ -689,7 +697,14 @@ class PracticeWorkflowDispatcher:
             self.sandbox_manager.assert_source_unchanged(sandbox)
             validated = validate_practice_run(run)
             return redact_run_receipt(validated), validated
-        except (PracticeSandboxError, TypeError, ValueError) as exc:
+        except PracticeSandboxError as exc:
+            code = (
+                "SOURCE_WRITE_REFUSED"
+                if exc.code in {"SOURCE_CHANGED", "SOURCE_REFUSED", "SANDBOX_ESCAPE"}
+                else "SANDBOX_UNAVAILABLE"
+            )
+            raise PracticeDispatchError(code, sandbox=sandbox) from exc
+        except (TypeError, ValueError) as exc:
             raise PracticeDispatchError("WORKFLOW_FAILED") from exc
 
     @staticmethod
@@ -725,6 +740,34 @@ class PracticeWorkflowDispatcher:
             return redact_run_receipt(validate_practice_run(record))
         except (TypeError, ValueError) as exc:
             raise PracticeDispatchError("WORKFLOW_FAILED") from exc
+
+    @staticmethod
+    def verifier_failure_receipt(
+        outcome: PracticeDispatchResult,
+        usage: Mapping[str, Any],
+        *,
+        reason: str,
+    ) -> dict[str, Any]:
+        """Re-address a measured terminal candidate as explicit needs-review."""
+
+        accounted = PracticeWorkflowDispatcher.bind_accounted_usage(outcome, usage)
+        if accounted is None or outcome.terminal_record is None:
+            raise PracticeDispatchError("WORKFLOW_FAILED", sandbox=outcome.sandbox)
+        record = dict(outcome.terminal_record)
+        record["usage"] = dict(accounted["usage"])
+        record["state"] = "needs_review"
+        record["terminalReason"] = reason
+        evidence = dict(record["evidence"])
+        unresolved = {
+            str(code) for code in evidence.get("unresolvedReasonCodes", [])
+        }
+        unresolved.add(reason)
+        evidence["unresolvedReasonCodes"] = sorted(unresolved)
+        record["evidence"] = evidence
+        try:
+            return redact_run_receipt(validate_practice_run(record))
+        except (TypeError, ValueError) as exc:
+            raise PracticeDispatchError("WORKFLOW_FAILED", sandbox=outcome.sandbox) from exc
 
     def _boundary(
         self,
@@ -783,6 +826,7 @@ class PracticeWorkflowDispatcher:
         execution_limits: Mapping[str, Any] | None,
         durable_usage: Mapping[str, Any] | None,
         recovery_only: bool,
+        evaluation_policy_sha256: str,
     ) -> PracticeDispatchResult:
         output = sandbox.writable_path("output/result.hwpx", create_parents=True)
         usage_before = self._usage(receipt.get("workflowId"), output)
@@ -888,6 +932,8 @@ class PracticeWorkflowDispatcher:
             sandbox=sandbox,
             output_path=output,
             artifact_hook_idempotency_key=hook_key,
+            evaluation_policy_sha256=evaluation_policy_sha256,
+            evaluator_provenance=dict(campaign["provenance"]["evaluator"]),
         )
 
     def advance(
@@ -944,6 +990,7 @@ class PracticeWorkflowDispatcher:
                 execution_limits=execution_limits,
                 durable_usage=durable_usage,
                 recovery_only=recovery_only,
+                evaluation_policy_sha256=str(run_ref["evaluationPolicySha256"]),
             )
         except PracticeDispatchError as exc:
             if exc.sandbox is None:

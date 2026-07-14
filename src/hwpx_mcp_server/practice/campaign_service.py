@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from typing import Any, Protocol
 
 from hwpx.practice import (
@@ -301,7 +302,13 @@ class PracticeCampaignService:
             return "provenance_mismatch"
         if reason == "PRIVACY_BOUNDARY_FAILED":
             return "privacy_blocked"
-        if reason in {"STALE_DOCUMENT_REVISION", "SOURCE_CHANGED"}:
+        if reason in {"DOMAIN_VERIFIER_MISSING", "DOMAIN_VERIFIER_FAILED"}:
+            return "needs_review"
+        if reason in {
+            "SOURCE_WRITE_REFUSED",
+            "STALE_DOCUMENT_REVISION",
+            "SOURCE_CHANGED",
+        }:
             return "source_write_refused"
         if reason in {
             "TASK_BINDING_INVALID",
@@ -501,24 +508,52 @@ class PracticeCampaignService:
         self,
         task: ResolvedPracticeTask,
         outcome: PracticeDispatchResult,
+        manifest: Mapping[str, Any],
+        run_ref: Mapping[str, Any],
     ) -> tuple[str | None, str | None]:
-        """Run the optional hook with a stable replay key before terminalization."""
+        """Require one exact verifier verdict over the final accounted receipt."""
 
-        hook_receipt_sha256 = None
-        failure_reason = None
-        if self.terminal_artifact_hook is not None and outcome.run_receipt is not None:
-            try:
-                if outcome.artifact_hook_idempotency_key is None:
-                    raise TypeError("terminal artifact hook requires an idempotency key")
-                hook_receipt = self.terminal_artifact_hook(task, outcome)
-                if hook_receipt is not None:
-                    if not isinstance(hook_receipt, Mapping):
-                        raise TypeError("terminal artifact hook receipt must be an object")
-                    assert_receipt_safe(_receipt_safety_projection(hook_receipt))
-                    hook_receipt_sha256 = _digest(hook_receipt)
-            except Exception:
-                failure_reason = "TERMINAL_ARTIFACT_HOOK_FAILED"
-        return hook_receipt_sha256, failure_reason
+        if outcome.run_receipt is None or outcome.run_receipt.get("state") != "completed":
+            return None, None
+        if self.terminal_artifact_hook is None:
+            return None, "DOMAIN_VERIFIER_MISSING"
+        try:
+            receipt = validate_run_receipt(outcome.run_receipt)
+            outputs = [
+                item for item in receipt["artifacts"] if item["role"] == "output"
+            ]
+            if len(outputs) != 1:
+                raise TypeError("completed verifier hook requires one output")
+            idempotency_key = outcome.artifact_hook_idempotency_key
+            if not isinstance(idempotency_key, str) or not re.fullmatch(
+                r"IDEM-[A-F0-9]{20}", idempotency_key
+            ):
+                raise TypeError("terminal verifier requires a stable idempotency key")
+            evaluator = dict(manifest["provenance"]["evaluator"])
+            expected = {
+                "schema": "hwpx.practice-terminal-verifier/v1",
+                "runId": receipt["runId"],
+                "scenarioId": receipt["scenarioId"],
+                "terminalReceiptSha256": receipt["receiptSha256"],
+                "outputArtifact": {
+                    "sha256": outputs[0]["sha256"],
+                    "bytes": outputs[0]["bytes"],
+                },
+                "evaluationPolicySha256": run_ref["evaluationPolicySha256"],
+                "evaluator": evaluator,
+                "idempotencyKey": idempotency_key,
+                "eligibleForSuccess": True,
+                "privateStorageCoordinatesExposed": False,
+            }
+            hook_receipt = self.terminal_artifact_hook(task, outcome)
+            if hook_receipt is None:
+                return None, "DOMAIN_VERIFIER_MISSING"
+            if not isinstance(hook_receipt, Mapping) or dict(hook_receipt) != expected:
+                raise TypeError("terminal verifier verdict binding mismatch")
+            assert_receipt_safe(_receipt_safety_projection(hook_receipt))
+            return _digest(hook_receipt), None
+        except Exception:
+            return None, "DOMAIN_VERIFIER_FAILED"
 
     @staticmethod
     def _assert_resource_accounting(outcome: PracticeDispatchResult) -> None:
@@ -725,14 +760,8 @@ class PracticeCampaignService:
         except PracticeDispatchError as exc:
             return self._fail_lease(lease, exc.code, sandbox=exc.sandbox)
         hook_receipt_sha256 = None
-        if outcome.terminal:
-            hook_receipt_sha256, retention_error = self._retain_terminal_artifact(
-                task, outcome
-            )
-            if retention_error is not None:
-                return self._fail_lease(
-                    lease, retention_error, sandbox=outcome.sandbox
-                )
+        hook_checked = False
+        verifier_failure_reason = None
         try:
             account = self.queue.account(
                 lease,
@@ -766,6 +795,22 @@ class PracticeCampaignService:
                     reconciled = validate_run_receipt(
                         durable_receipt or outcome.run_receipt
                     )
+                    reconciled_outcome = replace(
+                        outcome, run_receipt=reconciled
+                    )
+                    hook_receipt_sha256, retention_error = (
+                        self._retain_terminal_artifact(
+                            task, reconciled_outcome, manifest, run_ref
+                        )
+                    )
+                    hook_checked = True
+                    if retention_error is not None:
+                        verifier_failure_reason = retention_error
+                        reconciled = self.dispatcher.verifier_failure_receipt(
+                            outcome,
+                            reconciled["usage"],
+                            reason=retention_error,
+                        )
                     terminal = self.queue.terminalize(lease, reconciled)
                     account = {
                         "schema": "hwpx.practice-terminal-reconciliation/v1",
@@ -787,6 +832,27 @@ class PracticeCampaignService:
             else:
                 return self._fail_lease(
                     lease, "CAMPAIGN_ACCOUNTING_FAILED", sandbox=outcome.sandbox
+                )
+
+        if (
+            outcome.terminal
+            and not hook_checked
+            and not isinstance(account_terminal, Mapping)
+        ):
+            if bound_receipt is None:
+                return self._fail_lease(
+                    lease, "TERMINAL_RECEIPT_MISSING", sandbox=outcome.sandbox
+                )
+            accounted_outcome = replace(outcome, run_receipt=bound_receipt)
+            hook_receipt_sha256, retention_error = self._retain_terminal_artifact(
+                task, accounted_outcome, manifest, run_ref
+            )
+            if retention_error is not None:
+                verifier_failure_reason = retention_error
+                bound_receipt = self.dispatcher.verifier_failure_receipt(
+                    outcome,
+                    bound_receipt["usage"],
+                    reason=retention_error,
                 )
 
         cleanup = None
@@ -815,9 +881,19 @@ class PracticeCampaignService:
         else:
             terminal = None
         try:
+            response_boundary = dict(outcome.boundary)
+            if verifier_failure_reason is not None:
+                response_boundary.update(
+                    {
+                        "state": "needs_review",
+                        "terminal": True,
+                        "decisionRequired": False,
+                        "decisionReceiptSha256": None,
+                    }
+                )
             response = {
                 "advanced": True,
-                "boundary": outcome.boundary,
+                "boundary": response_boundary,
                 "sandbox": outcome.sandbox_receipt,
                 "accounting": self._public(account),
                 "terminal": self._public(terminal) if terminal is not None else None,

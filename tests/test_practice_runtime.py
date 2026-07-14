@@ -637,6 +637,7 @@ def test_terminal_artifact_store_is_atomic_content_addressed_and_path_free(
         "retained": True,
         "privateStorageCoordinatesExposed": False,
     }
+    assert "eligibleForSuccess" not in first
     encoded = json.dumps(first)
     assert str(results) not in encoded
     assert str(output) not in encoded

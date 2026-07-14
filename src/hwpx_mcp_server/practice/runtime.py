@@ -763,6 +763,7 @@ class _PrivateCampaignResolver:
             source_artifact=source,
             workflow_family=str(payload["workflowFamily"]),
             parameters=dict(payload["parameters"]),
+            evaluation_policy_sha256=str(payload["evaluationPolicySha256"]),
         )
 
 

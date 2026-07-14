@@ -28,7 +28,10 @@ from hwpx_mcp_server.practice.dispatch import (
     ResolvedPracticeTask,
 )
 from hwpx_mcp_server.practice.queue import PracticeCampaignQueue
-from hwpx_mcp_server.practice.sandbox import PracticeSandboxManager
+from hwpx_mcp_server.practice.sandbox import (
+    PracticeSandboxError,
+    PracticeSandboxManager,
+)
 from hwpx_mcp_server.tool_contract import contract_hash
 from hwpx_mcp_server.workflow.service import WorkflowService
 from hwpx_mcp_server.workflow.store import WorkflowStore
@@ -42,6 +45,25 @@ def _digest(value: object) -> str:
             value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _terminal_verifier(
+    task: ResolvedPracticeTask, outcome: Any
+) -> dict[str, Any]:
+    receipt = validate_run_receipt(outcome.run_receipt)
+    output = next(item for item in receipt["artifacts"] if item["role"] == "output")
+    return {
+        "schema": "hwpx.practice-terminal-verifier/v1",
+        "runId": receipt["runId"],
+        "scenarioId": receipt["scenarioId"],
+        "terminalReceiptSha256": receipt["receiptSha256"],
+        "outputArtifact": {"sha256": output["sha256"], "bytes": output["bytes"]},
+        "evaluationPolicySha256": task.evaluation_policy_sha256,
+        "evaluator": dict(outcome.evaluator_provenance),
+        "idempotencyKey": outcome.artifact_hook_idempotency_key,
+        "eligibleForSuccess": True,
+        "privateStorageCoordinatesExposed": False,
+    }
 
 
 def _provenance(*, tool_spec_hash: str | None = None) -> dict[str, Any]:
@@ -146,6 +168,7 @@ def _fixture_contract(
         source_artifact=source,
         workflow_family="unknown_form_fill",
         parameters={"operationKind": "table", "operations": []},
+        evaluation_policy_sha256=run_ref["evaluationPolicySha256"],
     )
     return manifest, run_ref, task
 
@@ -417,6 +440,7 @@ def campaign_fixture(tmp_path: Path, monkeypatch):
         dispatcher,
         manifest_resolver=lambda campaign_id: manifest,
         task_resolver=lambda selected_manifest, lease: task,
+        terminal_artifact_hook=_terminal_verifier,
     )
     return {
         "source": source,
@@ -655,10 +679,38 @@ def test_stale_source_revision_fails_closed_before_decision_execution(
         approved=True,
         decision_receipt_sha256=first["boundary"]["decisionReceiptSha256"],
     )
-    assert failed["terminal"]["terminalReason"] == "STALE_DOCUMENT_REVISION"
+    assert failed["terminal"]["terminalReason"] == "SOURCE_WRITE_REFUSED"
     assert failed["terminal"]["state"] == "source_write_refused"
     assert failed["sandboxCleanup"]["removed"] is True
     assert "apply_table_ops" not in fixture["calls"]
+
+
+def test_terminal_source_change_signal_maps_to_source_write_refused(
+    campaign_fixture, monkeypatch
+) -> None:
+    fixture = campaign_fixture
+    campaign_id = fixture["manifest"]["campaignId"]
+    decision = fixture["service"].continue_campaign(campaign_id)
+
+    def changed(_sandbox: Any) -> None:
+        raise PracticeSandboxError("SOURCE_CHANGED")
+
+    monkeypatch.setattr(
+        fixture["dispatcher"].sandbox_manager,
+        "assert_source_unchanged",
+        changed,
+    )
+    failed = fixture["service"].continue_campaign(
+        campaign_id,
+        run_id=fixture["runRef"]["runId"],
+        approved=True,
+        decision_receipt_sha256=decision["boundary"]["decisionReceiptSha256"],
+    )
+
+    assert failed["terminal"]["state"] == "source_write_refused"
+    assert failed["terminal"]["terminalReason"] == "SOURCE_WRITE_REFUSED"
+    assert fixture["calls"].count("apply_table_ops") == 1
+    assert fixture["source"].read_bytes() == b"synthetic leap-b fixture"
 
 
 def test_campaign_budget_maps_exactly_and_caps_repairs(campaign_fixture) -> None:
@@ -682,6 +734,7 @@ def test_must_abstain_closes_without_workflow_record(campaign_fixture) -> None:
         source_artifact=fixture["source"],
         workflow_family="must_abstain",
         parameters={},
+        evaluation_policy_sha256=fixture["runRef"]["evaluationPolicySha256"],
     )
     service = PracticeCampaignService(
         fixture["queue"],
@@ -731,11 +784,7 @@ def test_terminal_hook_runs_before_cleanup_and_hook_failure_closes_run(
         ordering.append("hook")
         observed.append(bool(outcome.output_path and outcome.output_path.is_file()))
         assert outcome.artifact_hook_idempotency_key.startswith("IDEM-")
-        return {
-            "schema": "hwpx.practice-terminal-hook/v1",
-            "runId": outcome.run_receipt["runId"],
-            "artifactSha256": _digest(outcome.output_path.read_bytes()),
-        }
+        return _terminal_verifier(task, outcome)
 
     original_terminalize = fixture["queue"].terminalize
     original_cleanup = fixture["dispatcher"].cleanup_sandbox
@@ -801,7 +850,110 @@ def test_terminal_hook_runs_before_cleanup_and_hook_failure_closes_run(
         approved=True,
         decision_receipt_sha256=failed_decision["boundary"]["decisionReceiptSha256"],
     )
-    assert failed["terminal"]["terminalReason"] == "TERMINAL_ARTIFACT_HOOK_FAILED"
+    assert failed["terminal"]["terminalReason"] == "DOMAIN_VERIFIER_FAILED"
+    assert failed["terminal"]["state"] == "needs_review"
+
+
+@pytest.mark.parametrize(
+    "attack",
+    [
+        "schema",
+        "extra",
+        "run",
+        "scenario",
+        "terminal_hash",
+        "output_hash",
+        "output_bytes",
+        "policy",
+        "evaluator_hash",
+        "evaluator_key",
+        "idempotency",
+        "ineligible",
+        "private_coordinate",
+    ],
+)
+def test_terminal_verifier_rejects_every_binding_attack(
+    campaign_fixture, attack: str
+) -> None:
+    fixture = campaign_fixture
+
+    def poisoned(task: ResolvedPracticeTask, outcome: Any) -> Mapping[str, Any]:
+        verdict = _terminal_verifier(task, outcome)
+        if attack == "schema":
+            verdict["schema"] = "hwpx.practice-terminal-verifier/v2"
+        elif attack == "extra":
+            verdict["unexpected"] = False
+        elif attack == "run":
+            verdict["runId"] = "PRUN-FFFFFFFFFFFFFFFFFFFF"
+        elif attack == "scenario":
+            verdict["scenarioId"] = "SCN-FFFFFFFFFFFFFFFFFFFF"
+        elif attack == "terminal_hash":
+            verdict["terminalReceiptSha256"] = "f" * 64
+        elif attack == "output_hash":
+            verdict["outputArtifact"]["sha256"] = "f" * 64
+        elif attack == "output_bytes":
+            verdict["outputArtifact"]["bytes"] += 1
+        elif attack == "policy":
+            verdict["evaluationPolicySha256"] = "f" * 64
+        elif attack == "evaluator_hash":
+            verdict["evaluator"]["sha256"] = "f" * 64
+        elif attack == "evaluator_key":
+            verdict["evaluator"]["authenticationKeyId"] = (
+                "EVK-FFFFFFFFFFFFFFFFFFFF"
+            )
+        elif attack == "idempotency":
+            verdict["idempotencyKey"] = "IDEM-FFFFFFFFFFFFFFFFFFFF"
+        elif attack == "ineligible":
+            verdict["eligibleForSuccess"] = False
+        else:
+            verdict["privateStorageCoordinatesExposed"] = True
+        return verdict
+
+    service = PracticeCampaignService(
+        fixture["queue"],
+        fixture["dispatcher"],
+        manifest_resolver=lambda selected_id: fixture["manifest"],
+        task_resolver=lambda manifest, lease: fixture["task"],
+        terminal_artifact_hook=poisoned,
+    )
+    decision = service.continue_campaign(fixture["manifest"]["campaignId"])
+    failed = service.continue_campaign(
+        fixture["manifest"]["campaignId"],
+        run_id=fixture["runRef"]["runId"],
+        approved=True,
+        decision_receipt_sha256=decision["boundary"]["decisionReceiptSha256"],
+    )
+
+    assert failed["terminal"]["state"] == "needs_review"
+    assert failed["terminal"]["terminalReason"] == "DOMAIN_VERIFIER_FAILED"
+    assert fixture["calls"].count("apply_table_ops") == 1
+    assert fixture["source"].read_bytes() == b"synthetic leap-b fixture"
+
+
+@pytest.mark.parametrize("missing_mode", ["absent", "none"])
+def test_completed_run_requires_a_terminal_verifier(
+    campaign_fixture, missing_mode: str
+) -> None:
+    fixture = campaign_fixture
+    hook = None if missing_mode == "absent" else lambda task, outcome: None
+    service = PracticeCampaignService(
+        fixture["queue"],
+        fixture["dispatcher"],
+        manifest_resolver=lambda selected_id: fixture["manifest"],
+        task_resolver=lambda manifest, lease: fixture["task"],
+        terminal_artifact_hook=hook,
+    )
+    decision = service.continue_campaign(fixture["manifest"]["campaignId"])
+    failed = service.continue_campaign(
+        fixture["manifest"]["campaignId"],
+        run_id=fixture["runRef"]["runId"],
+        approved=True,
+        decision_receipt_sha256=decision["boundary"]["decisionReceiptSha256"],
+    )
+
+    assert failed["terminal"]["state"] == "needs_review"
+    assert failed["terminal"]["terminalReason"] == "DOMAIN_VERIFIER_MISSING"
+    assert fixture["calls"].count("apply_table_ops") == 1
 
 
 def test_authorization_precedes_dispatch_and_min_caps_workflow_budget(
@@ -1056,19 +1208,69 @@ def test_expired_accounting_terminalizes_success_instead_of_overwriting_failure(
     assert fixture["calls"].count("apply_table_ops") == 1
 
 
+def test_expired_accounting_and_missing_verifier_preserve_measured_usage(
+    campaign_fixture, monkeypatch
+) -> None:
+    fixture = campaign_fixture
+    campaign_id = fixture["manifest"]["campaignId"]
+    service = PracticeCampaignService(
+        fixture["queue"],
+        fixture["dispatcher"],
+        manifest_resolver=lambda selected_id: fixture["manifest"],
+        task_resolver=lambda manifest, lease: fixture["task"],
+        terminal_artifact_hook=None,
+    )
+    decision = service.continue_campaign(campaign_id)
+
+    class LeaseExpired(RuntimeError):
+        code = "LEASE_NOT_OWNED"
+
+    original_account = fixture["queue"].account
+
+    def expire_terminal_account(lease, **usage):
+        if usage["artifact_bytes"] > 0:
+            raise LeaseExpired("lease expired after workflow success")
+        return original_account(lease, **usage)
+
+    monkeypatch.setattr(fixture["queue"], "account", expire_terminal_account)
+    terminal = service.continue_campaign(
+        campaign_id,
+        run_id=fixture["runRef"]["runId"],
+        approved=True,
+        decision_receipt_sha256=decision["boundary"]["decisionReceiptSha256"],
+    )
+
+    receipt = validate_run_receipt(terminal["terminal"])
+    outputs = [item for item in receipt["artifacts"] if item["role"] == "output"]
+    assert receipt["state"] == "needs_review"
+    assert receipt["terminalReason"] == "DOMAIN_VERIFIER_MISSING"
+    assert "DOMAIN_VERIFIER_MISSING" in receipt["evidence"][
+        "unresolvedReasonCodes"
+    ]
+    assert receipt["usage"]["toolCalls"] > 0
+    assert len(outputs) == 1
+    assert receipt["usage"]["artifactBytes"] == outputs[0]["bytes"] > 0
+    assert fixture["calls"].count("apply_table_ops") == 1
+    assert fixture["queue"].receipts(campaign_id) == [receipt]
+    assert fixture["source"].read_bytes() == b"synthetic leap-b fixture"
+
+
 def test_terminal_hook_replay_uses_one_stable_idempotency_key(
     campaign_fixture, monkeypatch
 ) -> None:
     fixture = campaign_fixture
     keys: list[str] = []
     effects: set[str] = set()
+    verdicts: list[dict[str, Any]] = []
 
     def retain(task, outcome):
         key = outcome.artifact_hook_idempotency_key
         assert key is not None
         keys.append(key)
         effects.add(key)
-        return {"schema": "hook/v1", "idempotencyKey": key}
+        verdict = _terminal_verifier(task, outcome)
+        verdicts.append(verdict)
+        return verdict
 
     service = PracticeCampaignService(
         fixture["queue"],
@@ -1103,6 +1305,7 @@ def test_terminal_hook_replay_uses_one_stable_idempotency_key(
     assert len(keys) == 2
     assert keys[0] == keys[1]
     assert len(effects) == 1
+    assert verdicts[0] == verdicts[1]
     assert fixture["calls"].count("apply_table_ops") == 1
 
 
@@ -1258,6 +1461,7 @@ def test_service_integrates_with_durable_queue(
         fixture["dispatcher"],
         manifest_resolver=lambda campaign_id: fixture["manifest"],
         task_resolver=lambda selected_manifest, lease: fixture["task"],
+        terminal_artifact_hook=_terminal_verifier,
     )
     campaign_id = fixture["manifest"]["campaignId"]
     service.start(campaign_id, idempotency_key="durable-queue-start", confirm=True)
@@ -1319,6 +1523,7 @@ def test_durable_queue_expiry_exact_claim_reconciles_original_success(
         dispatcher,
         manifest_resolver=lambda campaign_id: manifest,
         task_resolver=lambda selected_manifest, lease: task,
+        terminal_artifact_hook=_terminal_verifier,
         lease_seconds=10,
     )
     clock = [datetime(2026, 7, 14, tzinfo=timezone.utc)]
