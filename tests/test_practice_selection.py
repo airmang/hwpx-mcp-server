@@ -463,7 +463,7 @@ def test_experiment_identity_and_symlink_workspace_are_rejected_without_path_lea
         {"sourcePath": "/Volumes/private/corpus"},
         {"sourceFilename": "private-student.hwpx"},
         {"operatorNote": "010-1234-5678"},
-        {"operatorNote": "read /Users/private/student.hwpx"},
+        {"operatorNote": "read /workspace/private/student.hwpx"},
     ],
 )
 def test_runner_input_refuses_evaluator_private_coordinate_and_pii_leaks(

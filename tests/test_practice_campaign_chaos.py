@@ -18,7 +18,6 @@ from hwpx.practice import (
 from hwpx_mcp_server.practice import dispatch as dispatch_module
 from hwpx_mcp_server.practice.campaign_service import PracticeCampaignService
 from hwpx_mcp_server.practice.dispatch import (
-    PracticeDispatchError,
     PracticeWorkflowDispatcher,
     ResolvedPracticeTask,
 )

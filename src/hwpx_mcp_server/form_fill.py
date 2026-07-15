@@ -45,7 +45,7 @@ from .core.document import open_doc
 from .core.formatting import list_styles_in_doc
 from .hwpx_ops import HwpxOps
 from .storage import build_hwpx_open_safety_report
-from .upstream import HP_NS, repair_pathological_text_spacing, validate_document_path
+from .upstream import repair_pathological_text_spacing, validate_document_path
 from .utils.helpers import resolve_path
 
 _FORM_FILL_SCHEMA_VERSION = "hwpx.formfill.v1"

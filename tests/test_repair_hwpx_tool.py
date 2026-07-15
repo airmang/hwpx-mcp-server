@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shutil
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
@@ -13,16 +15,20 @@ from hwpx_mcp_server.tools import build_tool_definitions
 
 
 def _sample_hwpx() -> Path:
-    return Path(__file__).resolve().parents[1].parent / "python-hwpx" / "examples" / "Skeleton.hwpx"
+    core_repo = Path(
+        os.environ.get(
+            "PYTHON_HWPX_REPO",
+            Path(__file__).resolve().parents[1].parent / "python-hwpx",
+        )
+    )
+    return core_repo / "examples" / "Skeleton.hwpx"
 
 
+_THINKFIRST_REGRESSION_RAW = os.environ.get("HWPX_STALE_LINESEG_REGRESSION_FIXTURE")
 _THINKFIRST_REGRESSION = (
-    Path.home()
-    / "Code"
-    / "projects"
-    / "ThinkFirst-Studio"
-    / "docs"
-    / "생각먼저_윤문.hwpx"
+    Path(_THINKFIRST_REGRESSION_RAW).expanduser().resolve()
+    if _THINKFIRST_REGRESSION_RAW
+    else None
 )
 
 
@@ -39,7 +45,8 @@ def test_repair_hwpx_tool_definition_is_exposed() -> None:
 
 
 def test_repair_hwpx_repack_produces_valid_package(tmp_path: Path) -> None:
-    source = _sample_hwpx()
+    source = tmp_path / "source.hwpx"
+    shutil.copy2(_sample_hwpx(), source)
     output = tmp_path / "repaired.hwpx"
     ops = HwpxOps(base_directory=tmp_path)
 
@@ -54,20 +61,23 @@ def test_repair_hwpx_repack_produces_valid_package(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
-    not _THINKFIRST_REGRESSION.exists(),
-    reason="ThinkFirst-Studio regression fixture is local to the release workspace",
+    _THINKFIRST_REGRESSION is None or not _THINKFIRST_REGRESSION.exists(),
+    reason="set HWPX_STALE_LINESEG_REGRESSION_FIXTURE for the private regression fixture",
 )
 def test_repair_hwpx_repack_fixes_thinkfirst_stale_lineseg_regression(
     tmp_path: Path,
 ) -> None:
+    assert _THINKFIRST_REGRESSION is not None
     initial = validate_editor_open_safety(_THINKFIRST_REGRESSION)
     assert not initial.ok
     assert "stale lineseg textpos" in initial.summary
 
-    output = tmp_path / "thinkfirst-repaired.hwpx"
+    source = tmp_path / "stale-lineseg-source.hwpx"
+    shutil.copy2(_THINKFIRST_REGRESSION, source)
+    output = tmp_path / "stale-lineseg-repaired.hwpx"
     ops = HwpxOps(base_directory=tmp_path)
 
-    result = ops.repair_hwpx(str(_THINKFIRST_REGRESSION), str(output))
+    result = ops.repair_hwpx(str(source), str(output))
 
     assert result["recovered"] is False
     assert result["crcOk"] is True
@@ -91,7 +101,9 @@ def test_repair_hwpx_fastmcp_function_accepts_new_output_path(tmp_path: Path) ->
     assert output.is_file()
 
 
-def test_repair_hwpx_recover_rebuilds_truncated_central_directory(tmp_path: Path) -> None:
+def test_repair_hwpx_recover_rebuilds_truncated_central_directory(
+    tmp_path: Path,
+) -> None:
     source = _sample_hwpx()
     broken = tmp_path / "broken.hwpx"
     output = tmp_path / "recovered.hwpx"

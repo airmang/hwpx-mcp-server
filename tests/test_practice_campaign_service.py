@@ -548,7 +548,7 @@ def test_wrong_decision_terminalizes_and_cleans_sandbox(campaign_fixture) -> Non
     fixture = campaign_fixture
     service = fixture["service"]
     campaign_id = fixture["manifest"]["campaignId"]
-    decision = service.continue_campaign(campaign_id, max_steps=8)
+    service.continue_campaign(campaign_id, max_steps=8)
 
     failed = service.continue_campaign(
         campaign_id,
@@ -1123,7 +1123,7 @@ def test_failure_terminal_is_durable_before_cleanup(
 
     monkeypatch.setattr(fixture["queue"], "fail", fail)
     monkeypatch.setattr(fixture["dispatcher"], "cleanup_sandbox", cleanup)
-    decision = fixture["service"].continue_campaign(
+    fixture["service"].continue_campaign(
         fixture["manifest"]["campaignId"]
     )
     fixture["service"].continue_campaign(

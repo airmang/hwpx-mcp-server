@@ -4,20 +4,29 @@
 Skips until the installed python-hwpx provides hwpx.evalplan_fill. Uses the
 in-repo public blank form fixture (no owner PII) + a synthetic review markdown.
 """
+
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
 import pytest
 
-pytest.importorskip("hwpx.evalplan_fill", reason="requires python-hwpx with evalplan_fill recipe")
+pytest.importorskip(
+    "hwpx.evalplan_fill", reason="requires python-hwpx with evalplan_fill recipe"
+)
 
 from hwpx_mcp_server.hwpx_ops import HwpxOps
 from hwpx_mcp_server.tools import build_tool_definitions
 
-BLANK = (Path(__file__).parent.parent.parent / "python-hwpx" / "tests"
-         / "fixtures" / "m105_evalplan" / "blank_form_3hak.hwpx")
+CORE_REPO = Path(
+    os.environ.get(
+        "PYTHON_HWPX_REPO",
+        Path(__file__).parent.parent.parent / "python-hwpx",
+    )
+)
+BLANK = CORE_REPO / "tests" / "fixtures" / "m105_evalplan" / "blank_form_3hak.hwpx"
 
 SYNTHETIC_MD = """# 2026학년도 2학기 3학년 「합성 과목」 교수학습운영 및 평가계획 (검토용)
 
@@ -93,7 +102,9 @@ def test_apply_evalplan_fill_registered():
     assert "apply_evalplan_fill" in {t.name for t in build_tool_definitions()}
 
 
-@pytest.mark.skipif(not BLANK.exists(), reason="public blank-form fixture not available")
+@pytest.mark.skipif(
+    not BLANK.exists(), reason="public blank-form fixture not available"
+)
 def test_apply_evalplan_fill_one_shot(tmp_path):
     shutil.copy(BLANK, tmp_path / "blank.hwpx")
     (tmp_path / "review.md").write_text(SYNTHETIC_MD, encoding="utf-8")
@@ -101,10 +112,11 @@ def test_apply_evalplan_fill_one_shot(tmp_path):
     out = ops.apply_evalplan_fill("blank.hwpx", "review.md", output="filled.hwpx")
 
     assert out["ok"] is True
-    assert (out.get("openSafety") or {}).get("ok") is True         # opens in Hancom
-    assert out["byteIdentical"] is False                           # it was edited
+    assert (out.get("openSafety") or {}).get("ok") is True  # opens in Hancom
+    assert out["byteIdentical"] is False  # it was edited
     assert set(out["contentReport"]).issuperset(
-        {"schedule", "achievement", "levels", "rubrics", "ratio", "sections"})
+        {"schedule", "achievement", "levels", "rubrics", "ratio", "sections"}
+    )
     # honest-defer count is surfaced (never silent), int and consistent with notes
     assert out["rubricNeedsReview"] == len(out["needsReviewNotes"])
     assert (tmp_path / "filled.hwpx").exists()

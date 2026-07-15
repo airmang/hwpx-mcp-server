@@ -18,8 +18,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
@@ -85,10 +84,59 @@ from .agent_document import (
 )
 from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
 from . import quality as quality_contract
-from .hwpx_ops import HwpxOps
-from .upstream import repair_pathological_text_spacing
-from hwpx.tools.pii import DEFAULT_POLICY, detect_pii, mask_pii, mask_value
+from .blind_eval import (
+    export_fixture_benchmark as export_fixture_benchmark_bundle,
+    run_fixture_benchmark as run_fixture_benchmark_manifest,
+)
+from .errors import build_error_payload, mcp_code_for_error
+from .hwpx_ops import HwpxOperationError, HwpxOps
+from .network_policy import NetworkPolicy, NetworkPolicyError, open_url
+from .practice import PracticeScenarioError, PracticeScenarioService
+from .quality_generation import (
+    analyze_quality_generation_workflow,
+    apply_quality_generation_workflow,
+    create_quality_document_fallback,
+    inspect_quality_fallback,
+)
+from .storage import (
+    LocalDocumentStorage,
+    build_hwpx_open_safety_report,
+    build_hwpx_verification_report,
+)
+from .tool_contract import (
+    contract_hash as tool_contract_hash,
+    expected_tool_names,
+    register_fastmcp_tools,
+    skill_required_tool_names,
+)
+from .upstream import (
+    HP_NS,
+    create_text_extractor,
+    open_document,
+    repair_pathological_text_spacing,
+)
+from .utils.helpers import default_max_chars, resolve_path, truncate_response
+from .visual_qa import repair_fixture, review_fixture_evidence, write_review_artifact
+from .workflow.render_queue import DurableRenderQueue, RenderQueueError
+from .workflow.render_security import RenderSecurityPolicy
+from .workflow.render_transport import RemoteRenderClientV2
+from .workflow.rendering import NullRenderClientV2, QueueRenderClientV2, RenderJobV2
+from .workflow.service import WorkflowService
+from .workspace import (
+    WORKSPACE_ROOTS_ENV,
+    WorkspaceConfigurationError,
+    WorkspacePathError,
+    WorkspaceResolver,
+)
+from hwpx.form_fit import seal as seal_ops
+from hwpx.form_fit.wordbox import (
+    OracleUnavailable,
+    extract_image_boxes,
+    render_glyph_boxes,
+)
 from hwpx.tools import read_fidelity as _read_fidelity
+from hwpx.tools.id_integrity import check_id_integrity
+from hwpx.tools.pii import DEFAULT_POLICY, detect_pii, mask_pii, mask_value
 
 
 def _mask_pii_text(value: str, mask: bool = True) -> str:
@@ -117,25 +165,6 @@ def _deep_mask_pii(obj: Any, mask: bool = True) -> Any:
     if isinstance(obj, dict):
         return {key: _deep_mask_pii(val, True) for key, val in obj.items()}
     return obj
-from .quality_generation import (
-    analyze_quality_generation_workflow,
-    apply_quality_generation_workflow,
-    create_quality_document_fallback,
-    inspect_quality_fallback,
-)
-from .storage import build_hwpx_open_safety_report, build_hwpx_verification_report
-from .blind_eval import (
-    export_fixture_benchmark as export_fixture_benchmark_bundle,
-    run_fixture_benchmark as run_fixture_benchmark_manifest,
-)
-from .tool_contract import (
-    contract_hash as tool_contract_hash,
-    expected_tool_names,
-    register_fastmcp_tools,
-    skill_required_tool_names,
-)
-from .workflow.service import WorkflowService
-from .practice import PracticeScenarioError, PracticeScenarioService
 
 _PRACTICE_CAMPAIGN_RUNTIME_FACTORY: Any = None
 try:  # Leap B requires python-hwpx with the practice contract package.
@@ -159,21 +188,6 @@ except ImportError:
         def __init__(self, code: str = "CAMPAIGN_UNAVAILABLE") -> None:
             self.code = code
             super().__init__(code)
-from .workflow.rendering import NullRenderClientV2, QueueRenderClientV2, RenderJobV2
-from .workflow.render_queue import DurableRenderQueue, RenderQueueError
-from .workflow.render_security import RenderSecurityPolicy
-from .workflow.render_transport import RemoteRenderClientV2
-from .visual_qa import repair_fixture, review_fixture_evidence, write_review_artifact
-from .upstream import HP_NS, create_text_extractor, open_document
-from .utils.helpers import default_max_chars, resolve_path, truncate_response
-
-from hwpx.tools.id_integrity import check_id_integrity
-from hwpx.form_fit import seal as seal_ops
-from hwpx.form_fit.wordbox import (
-    OracleUnavailable,
-    extract_image_boxes,
-    render_glyph_boxes,
-)
 
 try:  # python-hwpx >= proposal preset feature
     from hwpx.presets import (
@@ -319,21 +333,25 @@ mcp._mcp_server.version = __version__
 
 
 def _error_data(
-    message: str,
+    payload: dict[str, Any],
     *,
     tool_name: str | None = None,
-    arguments: dict | None = None,
-    code: int = -32000,
     extra_data: dict | None = None,
 ) -> mcp_types.ErrorData:
-    data: dict[str, object] = {}
+    error_code = str(payload["code"])
+    data: dict[str, object] = {
+        "errorCode": error_code,
+        "error": payload,
+    }
     if tool_name is not None:
         data["tool"] = tool_name
-    if arguments is not None:
-        data["arguments"] = arguments
     if extra_data:
         data.update(extra_data)
-    return mcp_types.ErrorData(code=code, message=message, data=data)
+    return mcp_types.ErrorData(
+        code=mcp_code_for_error(error_code),
+        message=f"{error_code}: {payload['message']}",
+        data=data,
+    )
 
 
 def _first_text_content(content: object) -> str | None:
@@ -354,25 +372,130 @@ def _first_text_content(content: object) -> str | None:
     return None
 
 
-def _gate_or_plain_error(text: str, tool_name: str, arguments: dict) -> mcp_types.ErrorData:
+def _exception_chain(exc: BaseException) -> list[BaseException]:
+    chain: list[BaseException] = []
+    current: BaseException | None = exc
+    while current is not None and current not in chain:
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    return chain
+
+
+def _classified_error_payload(exc: BaseException | None) -> dict[str, Any]:
+    if exc is not None:
+        for item in _exception_chain(exc):
+            if isinstance(item, HwpxOperationError):
+                return item.to_payload()
+            if isinstance(item, WorkspacePathError):
+                return build_error_payload(
+                    code=item.code,
+                    message="요청한 경로가 허용된 HWPX 작업공간 경계를 벗어났습니다.",
+                    details=item.safe_details(),
+                )
+            if isinstance(item, WorkspaceConfigurationError):
+                return build_error_payload(
+                    code=item.code,
+                    message="HWPX 작업공간 루트 구성이 유효하지 않습니다.",
+                )
+            if isinstance(item, NetworkPolicyError):
+                return build_error_payload(
+                    code=item.code,
+                    message="기본 네트워크 정책이 요청한 대상을 차단했습니다.",
+                    details=item.safe_details(),
+                )
+            if isinstance(item, FileNotFoundError):
+                return build_error_payload(
+                    code="DOCUMENT_NOT_FOUND",
+                    message="요청한 문서를 허용된 작업공간에서 찾을 수 없습니다.",
+                )
+            if isinstance(item, PermissionError):
+                return build_error_payload(
+                    code="PERMISSION_DENIED",
+                    message="요청한 문서에 접근할 권한이 없습니다.",
+                )
+            if isinstance(item, ValueError):
+                return build_error_payload(
+                    code="INVALID_ARGUMENT",
+                    message="도구 인자가 스키마 또는 값 제약을 만족하지 않습니다.",
+                )
+    return build_error_payload(
+        code="TOOL_EXECUTION_FAILED",
+        message="도구 실행이 안전하게 완료되지 않았습니다.",
+    )
+
+
+def _gate_or_plain_error(
+    tool_name: str,
+    *,
+    exc: BaseException | None = None,
+) -> mcp_types.ErrorData:
     """Rebuild a structured gate/skew error from the stash, else a plain error."""
 
     gate = quality_contract.take_last_gate_error()
     if isinstance(gate, quality_contract.CapabilitySkewError):
         return _error_data(
-            f"CAPABILITY_SKEW: {text}", tool_name=tool_name, arguments=arguments,
+            build_error_payload(
+                code=gate.code,
+                message="설치된 core/MCP/plugin 기능 계약이 일치하지 않아 쓰기를 차단했습니다.",
+                details={"capability": gate.state},
+            ),
+            tool_name=tool_name,
             extra_data={"errorCode": gate.code, "capability": gate.state},
         )
     if isinstance(gate, quality_contract.QualityGateError):
         return _error_data(
-            f"{gate.code}: {text}", tool_name=tool_name, arguments=arguments,
+            build_error_payload(
+                code=gate.code,
+                message="문서 품질 게이트가 출력을 거부했습니다.",
+                details={"visualComplete": gate.block},
+                retryable=True,
+            ),
+            tool_name=tool_name,
             extra_data={
                 "errorCode": gate.code,
                 "visualComplete": gate.block,
                 "suggestedRetry": gate.block.get("suggestedRetry"),
             },
         )
-    return _error_data(text, tool_name=tool_name, arguments=arguments)
+    return _error_data(_classified_error_payload(exc), tool_name=tool_name)
+
+
+def _failure_code_from_payload(payload: object) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    failed = payload.get("ok") is False or payload.get("success") is False
+    failed = failed or payload.get("isError") is True
+    if not failed:
+        return None
+    candidates: list[object] = [payload.get("errorCode"), payload.get("code")]
+    nested_error = payload.get("error")
+    if isinstance(nested_error, dict):
+        candidates.extend([nested_error.get("errorCode"), nested_error.get("code")])
+    nested_errors = payload.get("errors")
+    if isinstance(nested_errors, list) and nested_errors and isinstance(nested_errors[0], dict):
+        candidates.extend(
+            [nested_errors[0].get("errorCode"), nested_errors[0].get("code")]
+        )
+    for candidate in candidates:
+        if isinstance(candidate, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", candidate):
+            return candidate
+    return "TOOL_EXECUTION_FAILED"
+
+
+def _result_failure_error(tool_name: str, payload: object) -> mcp_types.ErrorData | None:
+    error_code = _failure_code_from_payload(payload)
+    if error_code is None:
+        return None
+    gate_error = _gate_or_plain_error(tool_name)
+    if gate_error.data.get("errorCode") != "TOOL_EXECUTION_FAILED":
+        return gate_error
+    return _error_data(
+        build_error_payload(
+            code=error_code,
+            message="도구가 요청을 안전하게 완료하지 못했습니다.",
+        ),
+        tool_name=tool_name,
+    )
 
 
 async def _strict_call_tool_handler(req: mcp_types.CallToolRequest):
@@ -385,15 +508,17 @@ async def _strict_call_tool_handler(req: mcp_types.CallToolRequest):
         # FastMCP wraps a tool's exception in ToolError, so the structured gate/
         # skew error never matches a specific `except` here — recover it from the
         # stash the exception left on construction (plan §2 Phase F).
-        return _gate_or_plain_error(str(exc), tool_name, arguments)
+        return _gate_or_plain_error(tool_name, exc=exc)
 
     if isinstance(result, mcp_types.CreateTaskResult):
         return mcp_types.ServerResult(result)
 
     if isinstance(result, mcp_types.CallToolResult):
         if bool(result.isError):
-            text = _first_text_content(result.content) or f"Tool '{tool_name}' returned an error"
-            return _gate_or_plain_error(text, tool_name, arguments)
+            return _gate_or_plain_error(tool_name)
+        embedded_failure = _result_failure_error(tool_name, result.structuredContent)
+        if embedded_failure is not None:
+            return embedded_failure
         return mcp_types.ServerResult(result)
 
     if isinstance(result, tuple) and len(result) == 2:
@@ -412,10 +537,17 @@ async def _strict_call_tool_handler(req: mcp_types.CallToolRequest):
         unstructured_content = list(result)
     else:
         return _error_data(
-            f"Unexpected return type from tool '{tool_name}': {type(result).__name__}",
+            build_error_payload(
+                code="TOOL_EXECUTION_FAILED",
+                message="도구가 지원되지 않는 결과 형식을 반환했습니다.",
+                details={"resultType": type(result).__name__},
+            ),
             tool_name=tool_name,
-            arguments=arguments,
         )
+
+    embedded_failure = _result_failure_error(tool_name, structured_content)
+    if embedded_failure is not None:
+        return embedded_failure
 
     return mcp_types.ServerResult(
         mcp_types.CallToolResult(
@@ -684,15 +816,17 @@ def _build_verification_plan_operation(path: str, instruction: str) -> dict[str,
 
 
 def _download_hwpx_from_url(url: str, *, max_input_bytes: int) -> bytes:
-    parsed = urlsplit(url)
-    if parsed.scheme.lower() != "https":
-        raise ValueError("url must use https://")
-
     request = Request(url, headers={"User-Agent": "hwpx-mcp-server/2"})
     timeout = _env_float("HWPX_MCP_FETCH_TIMEOUT_SECONDS", _DEFAULT_FETCH_TIMEOUT_SECONDS)
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with open_url(
+            request,
+            policy=NetworkPolicy.from_environment(),
+            timeout=timeout,
+        ) as response:
             payload = response.read(max_input_bytes + 1)
+    except NetworkPolicyError:
+        raise
     except HTTPError as exc:
         raise ValueError(f"failed to download url: HTTP {exc.code}") from exc
     except URLError as exc:
@@ -4464,7 +4598,17 @@ def describe_capabilities(domain: str | None = None) -> dict:
 def mcp_server_health() -> dict:
     """MCP 서버 transport와 timeout/keepalive 점검 정보를 반환합니다."""
     transport = os.environ.get("HWPX_MCP_TRANSPORT", "stdio")
-    sandbox_root = os.environ.get("HWPX_MCP_SANDBOX_ROOT")
+    try:
+        workspace = WorkspaceResolver.from_environment().describe()
+    except WorkspaceConfigurationError as exc:
+        workspace = {
+            "source": "invalid",
+            "roots": [],
+            "rootCount": 0,
+            "relativePathRoot": None,
+            "failClosed": True,
+            "configurationError": str(exc),
+        }
     advanced = _ACTIVE_ADVANCED
     fastmcp_tool_names = set(_fastmcp_tool_names())
     legacy_tool_names = _legacy_tool_names()
@@ -4519,20 +4663,21 @@ def mcp_server_health() -> dict:
             "borderWidth": "human value: number/string accepted; prefer pt or mm suffix when supported",
             "fileSizeLimits": "bytes",
             "pageAndTableInternals": "HWP units are internal implementation details; MCP tools should prefer mm/pt/% labels.",
-            "auditReport": "tests/unit_audit_report.md",
+            "verification": "public unit conversions are enforced by the automated test suite",
         },
         "fetch_timeout_seconds": _env_float(
             "HWPX_MCP_FETCH_TIMEOUT_SECONDS",
             _DEFAULT_FETCH_TIMEOUT_SECONDS,
         ),
         "max_chars": default_max_chars(),
+        "workspace": workspace,
         "sandbox": {
-            "root": sandbox_root,
-            "absolute_paths_inside_root_allowed": bool(sandbox_root),
+            "root": workspace["relativePathRoot"],
+            "roots": workspace["roots"],
+            "absolute_paths_inside_root_allowed": bool(workspace["rootCount"]),
             "path_guidance": (
-                "Use relative paths under HWPX_MCP_SANDBOX_ROOT or absolute paths inside that root."
-                if sandbox_root
-                else "No HWPX_MCP_SANDBOX_ROOT is configured; paths resolve from the current working directory."
+                "Use a relative path under the primary workspace or an absolute path inside an authorized root. "
+                f"Set {WORKSPACE_ROOTS_ENV} to a JSON array for deterministic multi-root launches."
             ),
         },
         "disconnect_diagnostics": {
@@ -6379,6 +6524,8 @@ register_fastmcp_tools(mcp, globals(), advanced=_ACTIVE_ADVANCED)
 
 
 def main(argv: list[str] | None = None) -> None:
+    global _OPS
+
     parser = argparse.ArgumentParser(prog="hwpx-mcp-server")
     parser.add_argument(
         "--transport",
@@ -6397,9 +6544,29 @@ def main(argv: list[str] | None = None) -> None:
         default=_env_int("HWPX_MCP_PORT", 8000),
         help="TCP port for streamable HTTP transport",
     )
+    parser.add_argument(
+        "--workspace-root",
+        action="append",
+        default=None,
+        help=(
+            "Authorized local workspace root. Repeat for multiple roots; relative paths use the first. "
+            f"Equivalent to {WORKSPACE_ROOTS_ENV}."
+        ),
+    )
     args = parser.parse_args(argv)
 
-    os.environ.setdefault("HWPX_MCP_SANDBOX_ROOT", str(Path.cwd()))
+    if args.workspace_root:
+        os.environ[WORKSPACE_ROOTS_ENV] = json.dumps(args.workspace_root)
+    try:
+        resolver = WorkspaceResolver.from_environment()
+    except WorkspaceConfigurationError as exc:
+        parser.error(
+            f"invalid HWPX workspace configuration: {exc}. "
+            f"Set {WORKSPACE_ROOTS_ENV} to existing project directories or launch from the project workspace."
+        )
+    _OPS = HwpxOps(
+        storage=LocalDocumentStorage(workspace_resolver=resolver, auto_backup=False)
+    )
 
     selected_transport = args.transport
     if selected_transport == "http":

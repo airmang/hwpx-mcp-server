@@ -9,7 +9,6 @@ from hwpx_mcp_server.core.document import open_doc, save_doc
 from hwpx_mcp_server.server import (
     add_heading,
     add_memo,
-    add_memo_by_anchor,
     add_page_break,
     add_paragraph,
     add_table,
@@ -102,7 +101,9 @@ def test_insert_and_replace_picture_tools_preserve_safe_asset_graph(tmp_path: Pa
 
     document = open_doc(str(target))
     assert document.package.has_part("BinData/BIN0001.png")
-    assert any(item.get("id") == "BIN0001" for item in document.package._manifest_items())
+    assert any(
+        item.get("id") == "BIN0001" for item in document.package._manifest_items()
+    )
 
     replaced = replace_picture(str(target), PNG_1X1_ALT_B64, image_format="png")
 
@@ -266,10 +267,17 @@ def test_set_table_cell_text_preserves_char_pr_and_can_split_paragraphs(tmp_path
     assert refreshed_paragraph.runs[1].char_pr_id_ref == "21"
     assert refreshed_paragraph.runs[1].text == ""
 
-    set_table_cell_text(str(target), 0, 0, 0, "line one\nline two", split_paragraphs=True)
+    set_table_cell_text(
+        str(target), 0, 0, 0, "line one\nline two", split_paragraphs=True
+    )
     split_cell = open_doc(str(target)).paragraphs[1].tables[0].cell(0, 0)
-    assert [paragraph.text for paragraph in split_cell.paragraphs] == ["line one", "line two"]
-    assert [paragraph.runs[0].char_pr_id_ref for paragraph in split_cell.paragraphs] == ["13", "13"]
+    assert [paragraph.text for paragraph in split_cell.paragraphs] == [
+        "line one",
+        "line two",
+    ]
+    assert [
+        paragraph.runs[0].char_pr_id_ref for paragraph in split_cell.paragraphs
+    ] == ["13", "13"]
 
 
 def test_get_table_map_returns_stable_json_shape(tmp_path: Path):
@@ -320,7 +328,9 @@ def test_table_map_location_can_drive_text_lookup_and_memo(tmp_path: Path):
     target = tmp_path / "form.hwpx"
     _create_form_document(target)
 
-    cell_location = get_table_map(str(target))["tables"][0]["cells"][0]["paragraphs"][0]["location"]
+    cell_location = get_table_map(str(target))["tables"][0]["cells"][0]["paragraphs"][
+        0
+    ]["location"]
     text_result = get_paragraph_text(str(target), location=cell_location)
     memo_result = add_memo(str(target), text="라벨 확인", location=cell_location)
 
@@ -336,7 +346,9 @@ def test_replace_in_paragraph_uses_location_and_preserves_run_char_pr(tmp_path: 
     create_document(str(target))
     add_table(str(target), 1, 1, [["REQUIRED_DATA_FILES = []"]])
 
-    cell_location = get_table_map(str(target))["tables"][0]["cells"][0]["paragraphs"][0]["location"]
+    cell_location = get_table_map(str(target))["tables"][0]["cells"][0]["paragraphs"][
+        0
+    ]["location"]
     doc = open_doc(str(target))
     run = doc.paragraphs[1].tables[0].cell(0, 0).paragraphs[0].runs[0]
     run.char_pr_id_ref = "31"
@@ -368,7 +380,9 @@ def test_replace_by_anchor_targets_exact_match_position(tmp_path: Path):
     server_module.save_doc(doc, str(target))
 
     matches = find_text(str(target), "TOKEN")
-    result = replace_by_anchor(str(target), matches["matches"][1]["anchor"], "TOKEN", "VALUE")
+    result = replace_by_anchor(
+        str(target), matches["matches"][1]["anchor"], "TOKEN", "VALUE"
+    )
     refreshed = open_doc(str(target))
 
     assert result["replaced_count"] == 1
@@ -406,10 +420,11 @@ def test_resolve_path_allows_absolute_paths_inside_sandbox_and_guides_outside(
     sandbox.mkdir()
     inside = sandbox / "doc.hwpx"
     outside = tmp_path / "outside.hwpx"
+    monkeypatch.delenv("HWPX_MCP_WORKSPACE_ROOTS", raising=False)
     monkeypatch.setenv("HWPX_MCP_SANDBOX_ROOT", str(sandbox))
 
     assert resolve_path(str(inside)) == str(inside)
-    with pytest.raises(PermissionError, match="Use a relative path under"):
+    with pytest.raises(PermissionError, match="outside the authorized"):
         resolve_path(str(outside))
 
 
@@ -479,10 +494,14 @@ def test_fill_by_path_reports_out_of_bounds_path_as_failed_entry(tmp_path: Path)
     assert result["applied"] == []
     assert result["applied_count"] == 0
     assert result["failed_count"] == 1
-    assert result["failed"] == [{"path": "합계 > down > right", "reason": "navigation out of bounds"}]
+    assert result["failed"] == [
+        {"path": "합계 > down > right", "reason": "navigation out of bounds"}
+    ]
 
 
-def test_fill_by_path_saves_after_successful_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_fill_by_path_saves_after_successful_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     target = tmp_path / "saved_form.hwpx"
     _create_form_document(target)
 

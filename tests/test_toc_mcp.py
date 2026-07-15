@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 from hwpx.authoring import _outline_style_refs
 from hwpx.document import HwpxDocument

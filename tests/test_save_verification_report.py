@@ -38,7 +38,6 @@ def _write_minimal_hwpx(path: Path, section_xml: str) -> None:
 
 
 def _replace_zip_part(path: Path, part_name: str, payload: bytes) -> None:
-    source_bytes = path.read_bytes()
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     with zipfile.ZipFile(path, "r") as source:
         with zipfile.ZipFile(tmp_path, "w") as target:

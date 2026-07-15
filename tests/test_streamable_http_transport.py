@@ -29,13 +29,17 @@ def test_mcp_server_health_reports_disconnect_and_path_diagnostics(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("HWPX_MCP_WORKSPACE_ROOTS", raising=False)
     monkeypatch.setenv("HWPX_MCP_SANDBOX_ROOT", str(tmp_path))
     health = mcp_server_health()
 
     assert health["streamable_http_available"] is True
     assert health["pythonHwpxVersion"] != "unknown"
     assert health["toolSurface"]["status"] == "ok"
-    assert health["toolSurface"]["actualFastMcpToolCount"] == health["toolSurface"]["expectedFastMcpToolCount"]
+    assert (
+        health["toolSurface"]["actualFastMcpToolCount"]
+        == health["toolSurface"]["expectedFastMcpToolCount"]
+    )
     assert health["toolSurface"]["missingExpectedTools"] == []
     assert health["toolSurface"]["unexpectedRegisteredTools"] == []
     assert health["toolSurface"]["missingSkillRequiredTools"] == []
@@ -45,6 +49,12 @@ def test_mcp_server_health_reports_disconnect_and_path_diagnostics(
     assert health["unitPolicy"]["fileSizeLimits"] == "bytes"
     assert health["sandbox"]["root"] == str(tmp_path)
     assert health["sandbox"]["absolute_paths_inside_root_allowed"] is True
-    assert "absolute paths inside" in health["sandbox"]["path_guidance"]
-    assert "large document extraction exceeding client/tool timeout" in health["disconnect_diagnostics"]["likely_conditions"]
-    assert "stdio keepalive is client-controlled" in health["disconnect_diagnostics"]["keepalive_check"]
+    assert "absolute path inside" in health["sandbox"]["path_guidance"]
+    assert (
+        "large document extraction exceeding client/tool timeout"
+        in health["disconnect_diagnostics"]["likely_conditions"]
+    )
+    assert (
+        "stdio keepalive is client-controlled"
+        in health["disconnect_diagnostics"]["keepalive_check"]
+    )

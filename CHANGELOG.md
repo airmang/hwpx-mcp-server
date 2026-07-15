@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [2.23.1] - 2026-07-15
+
+### Security
+- Adds one fail-closed multi-root workspace resolver for relative, absolute, missing-output-parent,
+  traversal, and symlink-escape cases. Hosts may provide `HWPX_MCP_WORKSPACE_ROOTS` as a JSON array;
+  otherwise the intentional process working directory is the bounded single-root fallback.
+- Promotes tool failures to redacted `hwpx.mcp-error/v1` JSON-RPC errors instead of successful results
+  containing error text. Validation, permission, not-found, capability, document, network, and internal
+  categories have stable MCP codes and retry guidance.
+- Blocks outbound loopback, private, link-local, reserved, metadata, and redirect destinations by default.
+  Intentional private render/storage networks require an explicit opt-in and link-local metadata stays denied.
+
+### Changed
+- Removes the unused `modelcontextprotocol` dependency and narrows ingest to
+  `markitdown[pdf,docx,xlsx]>=0.1.6,<0.2`, matching the advertised input formats.
+- Adds clean base/all-extra installation checks, public text/HWPX/wheel hygiene, Ruff `E9,F`, CodeQL,
+  dependency review, Dependabot, immutable Action pins, and CycloneDX release SBOM generation.
+- Requires `python-hwpx>=2.29.2` while preserving the exact 133 default / 143 advanced tool names.
+
 ## [2.23.0] - 2026-07-15
 
 ### Added

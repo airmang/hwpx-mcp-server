@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "2.23.0"
+version = "2.23.1"
 description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
@@ -19,14 +19,13 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "python-hwpx>=2.29.1", # typed blueprint dump/replay, release-test fix, SQUEEZE-to-BREAK safety, and prior capabilities
+    "python-hwpx>=2.29.2", # workspace hardening/public hygiene plus prior typed blueprint and document safety
 
     "pydantic>=2.7",
     "cryptography>=42.0",
     "anyio>=4.0",
     # mcp 2.x moved the public type surface; this server targets the 1.x API.
     "mcp>=1.14.1,<2",
-    "modelcontextprotocol>=0.1.0",
     "tomli>=2.0; python_version < '3.11'",
 ]
 
@@ -35,12 +34,13 @@ dependencies = [
 hwp = ["olefile>=0.47"]
 # HTTP/streamable transport. The default stdio transport needs no extra.
 http = ["uvicorn>=0.30"]
-# General non-HWPX document ingest through Microsoft's MarkItDown. Lazy-imported.
-ingest = ["markitdown[all]>=0.1.6"]
+# Advertised non-HWPX ingest formats only. Avoid cloud/audio/mail extras and their
+# unrelated dependency trees; HTML and text formats are supported by the base.
+ingest = ["markitdown[pdf,docx,xlsx]>=0.1.6,<0.2"]
 # 직인 날인/검증의 한컴 렌더 오라클 경로(렌더→fitz word/image bbox). macOS+Hancom 필요;
 # 없으면 place_seal/check_seal_compliance가 renderChecked=false로 정직하게 degrade한다.
-oracle = ["python-hwpx[visual]>=2.29.1"]
-vision = ["python-hwpx[visual]>=2.29.1"]
+oracle = ["python-hwpx[visual]>=2.29.2"]
+vision = ["python-hwpx[visual]>=2.29.2"]
 test = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
@@ -48,6 +48,7 @@ test = [
     "uvicorn>=0.30",
     "numpy>=1.26",
     "pillow>=10.0",
+    "ruff>=0.12",
 ]
 
 [project.urls]
@@ -58,7 +59,7 @@ Issues = "https://github.com/airmang/hwpx-mcp-server/issues"
 "hwpx-mcp-server" = "hwpx_mcp_server.server:main"
 
 # Co-located development: resolve python-hwpx from the sibling checkout.
-# This affects local `uv` resolution only; published metadata keeps `python-hwpx>=2.29.1`.
+# This affects local `uv` resolution only; published metadata keeps `python-hwpx>=2.29.2`.
 [tool.uv.sources]
 python-hwpx = { path = "../python-hwpx", editable = true }
 

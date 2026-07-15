@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+
+from ..workspace import WorkspaceResolver
 
 
 def default_max_chars() -> int:
@@ -17,34 +18,8 @@ def default_max_chars() -> int:
 MAX_CHARS = default_max_chars()
 
 
-def _sandbox_root() -> Path | None:
-    raw = os.environ.get("HWPX_MCP_SANDBOX_ROOT")
-    if raw is None:
-        return None
-    value = raw.strip()
-    if not value:
-        return None
-    return Path(value).expanduser().resolve(strict=False)
-
-
 def resolve_path(filename: str) -> str:
-    candidate = Path(filename).expanduser()
-    if candidate.is_absolute():
-        resolved = candidate.resolve(strict=False)
-    else:
-        resolved = (Path.cwd() / candidate).resolve(strict=False)
-
-    sandbox_root = _sandbox_root()
-    if sandbox_root is not None:
-        try:
-            resolved.relative_to(sandbox_root)
-        except ValueError as exc:
-            raise PermissionError(
-                "path is outside the configured sandbox root. "
-                f"Use a relative path under '{sandbox_root}' or an absolute path inside that root: {filename}"
-            ) from exc
-
-    return str(resolved)
+    return str(WorkspaceResolver.from_environment().resolve(filename, must_exist=False))
 
 
 def truncate_response(text: str, max_chars: int = None) -> dict:

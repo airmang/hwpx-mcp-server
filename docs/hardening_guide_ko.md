@@ -5,6 +5,21 @@
 - `HWPX_MCP_HARDENING=1` 플래그를 사용하면 plan → preview → apply 편집 파이프라인과 보조 검색 도구가 활성화됩니다.
 - 플래그를 끄면 기존 동작을 그대로 유지하면서도 스키마 Sanitizer는 항상 적용됩니다.
 
+## 작업공간·네트워크 경계
+
+- `HWPX_MCP_WORKSPACE_ROOTS`에는 허용할 절대 디렉터리를 JSON 배열로 지정합니다.
+  상대경로는 첫 root를 기준으로 해석되고, 절대경로는 나열된 root 중 하나에 속해야
+  합니다. traversal, workspace 밖 경로, symlink escape는 정형 MCP 오류로 거부됩니다.
+- 변수를 생략하면 서버 프로세스의 시작 cwd 하나만 workspace로 사용합니다. 호스트가
+  cwd를 명확히 보장하지 못한다면 환경 변수를 명시하세요. filesystem root(`/`) 자체는
+  허용할 수 없습니다.
+- URL 입력, HTTP document storage, 원격 render transport는 기본적으로 HTTPS와 공개
+  주소만 허용합니다. DNS 결과 전체, redirect 대상, 실제 연결 피어를 각각 검사합니다.
+  `HWPX_MCP_ALLOW_PRIVATE_NETWORK=1`은 신뢰된 사설/루프백 HTTPS 서비스가 반드시
+  필요한 경우에만 사용하며 링크로컬·metadata·예약 주소는 여전히 차단됩니다.
+- 실패 응답은 `hwpx.mcp-error/v1` 계약의 `code`, `category`, `retryable`, `suggestion`을
+  사용하며 원래 인자나 로컬 절대경로를 되돌려 보내지 않습니다.
+
 ## 활성화 방법
 1. 서버를 시작하기 전에 환경 변수 `HWPX_MCP_HARDENING=1`을 설정합니다.
 2. MCP 클라이언트에서 `ListTools` 응답을 확인하면 하드닝 전용 도구(`hwpx.plan_edit`, `hwpx.preview_edit`, `hwpx.apply_edit`, `hwpx.search`, `hwpx.get_context`)가 함께 나열됩니다.

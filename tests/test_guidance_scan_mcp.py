@@ -4,19 +4,28 @@
 Uses the in-repo public blank evaluation-plan form fixture (no owner PII).
 Skips until the installed python-hwpx provides hwpx.guidance_scan.
 """
+
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
 
-pytest.importorskip("hwpx.guidance_scan", reason="requires python-hwpx with guidance_scan")
+pytest.importorskip(
+    "hwpx.guidance_scan", reason="requires python-hwpx with guidance_scan"
+)
 
 from hwpx_mcp_server.hwpx_ops import HwpxOps
 from hwpx_mcp_server.tools import build_tool_definitions
 
-BLANK = (Path(__file__).parent.parent.parent / "python-hwpx" / "tests"
-         / "fixtures" / "m105_evalplan" / "blank_form_3hak.hwpx")
+CORE_REPO = Path(
+    os.environ.get(
+        "PYTHON_HWPX_REPO",
+        Path(__file__).parent.parent.parent / "python-hwpx",
+    )
+)
+BLANK = CORE_REPO / "tests" / "fixtures" / "m105_evalplan" / "blank_form_3hak.hwpx"
 
 
 @pytest.fixture()
@@ -39,9 +48,7 @@ def test_scan_reports_legend_and_candidates(ops):
     assert actions.get("blue") == "modify"
     assert out["deleteCandidatesTotal"] >= 20
     assert out["emptyCellTotal"] >= 50
-    assert any(
-        "**과목" in c["textPreview"] for c in out["placeholderCandidates"]
-    )
+    assert any("**과목" in c["textPreview"] for c in out["placeholderCandidates"])
     assert out["conditionalChoices"], "조건부 선택 블록 미탐지"
     assert "지울 것" in out["markdownReport"]
 
@@ -63,8 +70,16 @@ def test_apply_table_ops_dry_run_writes_nothing(ops, tmp_path):
     before = (tmp_path / "blank.hwpx").read_bytes()
     out = ops.apply_table_ops(
         "blank.hwpx",
-        [{"op": "delete_table", "tableIndex": 5},
-         {"op": "fill_cell", "tableIndex": 2, "row": 5, "col": 3, "text": "미리보기"}],
+        [
+            {"op": "delete_table", "tableIndex": 5},
+            {
+                "op": "fill_cell",
+                "tableIndex": 2,
+                "row": 5,
+                "col": 3,
+                "text": "미리보기",
+            },
+        ],
         output="would_be.hwpx",
         dry_run=True,
     )
@@ -79,15 +94,30 @@ def test_apply_body_ops_replace_and_dry_run(ops, tmp_path):
     before = (tmp_path / "blank.hwpx").read_bytes()
     out = ops.apply_body_ops(
         "blank.hwpx",
-        [{"op": "replace_text", "find": "성취수준별 고정분할점수(5단계)", "replace": "[1] 성취수준별 고정분할점수(5단계)"}],
+        [
+            {
+                "op": "replace_text",
+                "find": "성취수준별 고정분할점수(5단계)",
+                "replace": "[1] 성취수준별 고정분할점수(5단계)",
+            }
+        ],
         dry_run=True,
     )
     assert out["dryRun"] is True and out["outputPath"] is None
-    assert out["transcript"][0]["status"] == "would_apply" and out["transcript"][0]["hits"] == 1
+    assert (
+        out["transcript"][0]["status"] == "would_apply"
+        and out["transcript"][0]["hits"] == 1
+    )
     assert (tmp_path / "blank.hwpx").read_bytes() == before
     wet = ops.apply_body_ops(
         "blank.hwpx",
-        [{"op": "replace_text", "find": "성취수준별 고정분할점수(5단계)", "replace": "X단계"}],
+        [
+            {
+                "op": "replace_text",
+                "find": "성취수준별 고정분할점수(5단계)",
+                "replace": "X단계",
+            }
+        ],
         output="body_out.hwpx",
     )
     assert wet["ok"] and (tmp_path / "body_out.hwpx").exists()
@@ -98,5 +128,10 @@ def test_inspect_fill_residue_gate(ops):
     assert out["ok"] is False  # blank 그대로 = 최악의 채움본
     kinds = {e["kind"] for e in out["errors"]}
     assert {"delete_color_residue", "unmodified_sample"} <= kinds
-    names = {d.name for d in __import__("hwpx_mcp_server.tools", fromlist=["build_tool_definitions"]).build_tool_definitions()}
+    names = {
+        d.name
+        for d in __import__(
+            "hwpx_mcp_server.tools", fromlist=["build_tool_definitions"]
+        ).build_tool_definitions()
+    }
     assert "inspect_fill_residue" in names

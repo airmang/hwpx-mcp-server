@@ -110,7 +110,7 @@ def test_mtls_requires_ca_and_client_identity_on_both_ends(tmp_path):
             certfile=tls["server_cert"], keyfile=tls["server_key"],
         )
     with pytest.raises(ValueError, match="client certificate"):
-        RemoteRenderClientV2(f"https://127.0.0.1:1", secret=SECRET, ca_file=tls["ca"])
+        RemoteRenderClientV2("https://127.0.0.1:1", secret=SECRET, ca_file=tls["ca"])
 
     server = serve_private_queue(
         queue, secret=SECRET, host="127.0.0.1", port=0,
@@ -120,7 +120,7 @@ def test_mtls_requires_ca_and_client_identity_on_both_ends(tmp_path):
     try:
         unsigned_client_identity = RemoteRenderClientV2(
             f"https://127.0.0.1:{server.server_port}", secret=SECRET,
-            transport_auth="signed_https", ca_file=tls["ca"],
+            transport_auth="signed_https", ca_file=tls["ca"], allow_private_network=True,
         )
         with pytest.raises(Exception):
             unsigned_client_identity.capabilities()
@@ -128,6 +128,7 @@ def test_mtls_requires_ca_and_client_identity_on_both_ends(tmp_path):
             f"https://127.0.0.1:{server.server_port}", secret=SECRET,
             transport_auth="mtls", ca_file=tls["ca"],
             client_certfile=tls["client_cert"], client_keyfile=tls["client_key"],
+            allow_private_network=True,
         )
         assert client.capabilities()["degradedReason"] == "NO_WORKER_HEARTBEAT"
     finally:
@@ -152,11 +153,12 @@ def test_signed_https_is_explicit_and_preserves_hmac_auth(tmp_path):
     try:
         client = RemoteRenderClientV2(
             f"https://127.0.0.1:{server.server_port}", secret=SECRET,
-            transport_auth="signed_https", ca_file=tls["ca"],
+            transport_auth="signed_https", ca_file=tls["ca"], allow_private_network=True,
         )
         assert client.capabilities()["degradedReason"] == "NO_WORKER_HEARTBEAT"
         wrong_hmac = RemoteRenderClientV2(
             client.base_url, secret=b"wrong", transport_auth="signed_https", ca_file=tls["ca"],
+            allow_private_network=True,
         )
         with pytest.raises(Exception):
             wrong_hmac.capabilities()

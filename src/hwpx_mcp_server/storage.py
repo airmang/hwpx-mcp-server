@@ -9,7 +9,7 @@ import re
 import shutil
 import tempfile
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Protocol, Tuple
 from urllib import error, parse, request
@@ -32,6 +32,8 @@ else:
 
 from . import quality as quality_contract
 from .upstream import HwpxDocument, open_document, validate_document_path
+from .workspace import WorkspaceResolver
+from .network_policy import NetworkPolicy, build_policy_opener
 
 _REQUIRED_HWPX_FILES = [
     "mimetype",
@@ -87,31 +89,27 @@ class LocalDocumentStorage:
         base_directory: Path | None = None,
         auto_backup: bool = False,
         logger: logging.Logger | None = None,
+        workspace_resolver: WorkspaceResolver | None = None,
     ) -> None:
-        self.base_directory = (base_directory or Path.cwd()).expanduser().resolve()
+        if workspace_resolver is not None and base_directory is not None:
+            raise ValueError("base_directory and workspace_resolver are mutually exclusive")
+        self.workspace = workspace_resolver or (
+            WorkspaceResolver.from_roots([base_directory])
+            if base_directory is not None
+            else WorkspaceResolver.from_environment()
+        )
+        self.base_directory = self.workspace.primary_root
         self._auto_backup = auto_backup
         self._logger = logger or logging.getLogger(__name__)
 
     def resolve_path(self, path: str, *, must_exist: bool = True) -> Path:
-        candidate = Path(path).expanduser()
-        if not candidate.is_absolute():
-            candidate = (self.base_directory / candidate).resolve(strict=False)
-        else:
-            candidate = candidate.resolve(strict=False)
-        if must_exist and not candidate.exists():
-            raise FileNotFoundError(f"Path '{candidate}' does not exist")
-        return candidate
+        return self.workspace.resolve(path, must_exist=must_exist)
 
     def resolve_output_path(self, path: str) -> Path:
-        resolved = self.resolve_path(path, must_exist=False)
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-        return resolved
+        return self.workspace.resolve_output(path)
 
     def relative_path(self, path: Path) -> str:
-        try:
-            return str(path.relative_to(self.base_directory))
-        except ValueError:
-            return str(path)
+        return self.workspace.display_path(path)
 
     def ensure_backup(self, path: Path) -> Optional[Path]:
         if not path.exists():
@@ -215,11 +213,19 @@ class _RestDocumentClient:
     base_url: str
     timeout: float | None
     headers: Mapping[str, str]
+    allow_private_network: bool | None = None
+    _network_policy: NetworkPolicy = field(init=False, repr=False)
+    _opener: Any = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if not self.base_url:
             raise ValueError("HTTP storage requires a base URL")
-        self._opener = request.build_opener()
+        self._network_policy = (
+            NetworkPolicy.from_environment()
+            if self.allow_private_network is None
+            else NetworkPolicy(allow_private_network=self.allow_private_network)
+        )
+        self._opener = build_policy_opener(self._network_policy)
 
     def download(self, path: str) -> bytes:
         url = self._build_url(path)
@@ -252,7 +258,8 @@ class _RestDocumentClient:
 
     def _build_url(self, path: str) -> str:
         query = parse.urlencode({"path": path})
-        return f"{self.base_url.rstrip('/')}/documents?{query}"
+        url = f"{self.base_url.rstrip('/')}/documents?{query}"
+        return self._network_policy.validate_url(url)
 
 
 class HttpDocumentStorage:
@@ -266,6 +273,7 @@ class HttpDocumentStorage:
         headers: Mapping[str, str] | None = None,
         client: RemoteDocumentClient | None = None,
         logger: logging.Logger | None = None,
+        allow_private_network: bool | None = None,
     ) -> None:
         if client is None and not base_url:
             raise ValueError("HTTP storage requires either a base URL or a client")
@@ -273,7 +281,12 @@ class HttpDocumentStorage:
         self.base_directory = Path("/")
         self._logger = logger or logging.getLogger(__name__)
         self._headers = dict(headers or {})
-        self._client = client or _RestDocumentClient(base_url=base_url or "", timeout=timeout, headers=self._headers)
+        self._client = client or _RestDocumentClient(
+            base_url=base_url or "",
+            timeout=timeout,
+            headers=self._headers,
+            allow_private_network=allow_private_network,
+        )
         self._cache_dir = Path(tempfile.mkdtemp(prefix="hwpx_http_cache_"))
         self._cache: Dict[str, Path] = {}
 

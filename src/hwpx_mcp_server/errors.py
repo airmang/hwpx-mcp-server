@@ -3,9 +3,19 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+ErrorCategory = Literal[
+    "validation",
+    "permission",
+    "not_found",
+    "capability",
+    "document",
+    "network",
+    "internal",
+]
 
 
 class CommonErrorModel(BaseModel):
@@ -13,8 +23,13 @@ class CommonErrorModel(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
+    schema_version: Literal["hwpx.mcp-error/v1"] = Field(
+        default="hwpx.mcp-error/v1", alias="schemaVersion"
+    )
     code: str
+    category: ErrorCategory
     message: str
+    retryable: bool = False
     details: Optional[Dict[str, Any]] = None
     hint: Optional[str] = None
     suggestion: Optional[str] = None
@@ -26,6 +41,12 @@ ERROR_CODE_TO_MCP_CODE: dict[str, int] = {
     "TABLE_INDEX_OUT_OF_RANGE": -32042,
     "PARAGRAPH_INDEX_OUT_OF_RANGE": -32042,
     "PIPELINE_ERROR": -32041,
+    "WORKSPACE_OUTSIDE_ROOT": -32043,
+    "WORKSPACE_SYMLINK_ESCAPE": -32043,
+    "WORKSPACE_ROOT_INVALID": -32043,
+    "WORKSPACE_PATH_INVALID": -32602,
+    "INVALID_ARGUMENT": -32602,
+    "NETWORK_DESTINATION_DENIED": -32040,
 }
 
 
@@ -44,7 +65,7 @@ DEFAULT_ERROR_SUGGESTIONS: dict[str, str] = {
     "BYTE_PATCH_UNAVAILABLE": "설치된 python-hwpx 버전을 확인한 뒤 플러그인을 다시 설치하거나 일반 편집 도구를 사용하세요.",
     "CONFLICTING_TARGETS": "동일 범위를 겹쳐 수정하지 않도록 edit 목록을 분리해 다시 실행하세요.",
     "DOCUMENT_LOCATOR_REQUIRED": "path 또는 handleId 중 하나를 지정한 뒤 같은 작업을 다시 호출하세요.",
-    "DOCUMENT_NOT_FOUND": "문서 경로가 샌드박스 루트 안에 존재하는지 확인하고 절대/상대 경로를 다시 전달하세요.",
+    "DOCUMENT_NOT_FOUND": "문서 경로가 허용된 workspace root 안에 존재하는지 확인하고 절대/상대 경로를 다시 전달하세요.",
     "DOCUMENT_OPEN_FAILED": "파일이 유효한 HWPX인지 확인하고 repair_hwpx로 복구한 뒤 다시 여세요.",
     "DOCUMENT_SAVE_FAILED": "출력 경로의 쓰기 권한과 남은 디스크 공간을 확인한 뒤 다시 저장하세요.",
     "EMPTY_MATCH": "찾을 텍스트나 앵커 조건을 실제 문서 내용에 맞게 수정하세요.",
@@ -54,7 +75,7 @@ DEFAULT_ERROR_SUGGESTIONS: dict[str, str] = {
     "MEMO_NOT_FOUND": "list_memos 또는 문서 리소스에서 memoId를 다시 확인한 뒤 호출하세요.",
     "MISSING_NODE": "대상 섹션, 문단, 표, 셀이 아직 존재하는지 조회한 뒤 새 앵커로 다시 실행하세요.",
     "PARAGRAPH_INDEX_OUT_OF_RANGE": "list_paragraphs 결과의 paragraphIndex 범위 안에서 다시 선택하세요.",
-    "PERMISSION_DENIED": "샌드박스 루트와 파일 권한을 확인하고 쓰기 가능한 위치를 사용하세요.",
+    "PERMISSION_DENIED": "허용된 workspace root와 파일 권한을 확인하고 쓰기 가능한 위치를 사용하세요.",
     "PIPELINE_ERROR": "details.pipelineCode와 hint를 확인한 뒤 preview부터 다시 생성하세요.",
     "PLAN_RECORD_MISSING": "preview_edit 또는 plan_edit으로 planId를 새로 발급받은 뒤 apply를 다시 호출하세요.",
     "PREVIEW_REQUIRED": "preview_edit으로 변경 내용을 확인한 뒤 반환된 planId로 apply_edit을 호출하세요.",
@@ -74,7 +95,42 @@ DEFAULT_ERROR_SUGGESTIONS: dict[str, str] = {
     "TABLE_EMPTY": "표에 행과 셀이 있는지 확인하고 비어 있으면 표를 다시 생성하세요.",
     "TABLE_INDEX_OUT_OF_RANGE": "list_tables 결과의 tableIndex 범위 안에서 다시 선택하세요.",
     "UNSAFE_WILDCARD": "와일드카드 범위를 줄이거나 정확한 문자열 매칭으로 preview를 다시 생성하세요.",
+    "WORKSPACE_OUTSIDE_ROOT": "mcp_server_health의 workspace.roots 안에 있는 경로를 사용하거나 호스트의 HWPX_MCP_WORKSPACE_ROOTS 설정을 갱신하세요.",
+    "WORKSPACE_SYMLINK_ESCAPE": "작업공간 밖을 가리키는 심볼릭 링크를 제거하고 허용된 루트 안의 실제 경로를 사용하세요.",
+    "WORKSPACE_ROOT_INVALID": "기존 디렉터리를 HWPX_MCP_WORKSPACE_ROOTS JSON 배열로 지정한 뒤 호스트를 다시 시작하세요.",
+    "WORKSPACE_PATH_INVALID": "비어 있지 않은 파일 경로를 지정하고 출력에는 디렉터리가 아닌 파일명을 사용하세요.",
+    "INVALID_ARGUMENT": "도구 스키마에 맞는 인자 형식과 값을 확인한 뒤 다시 호출하세요.",
+    "NETWORK_DESTINATION_DENIED": "기본 정책은 사설·루프백·링크로컬·예약 주소를 차단합니다. 신뢰된 사설 서비스가 꼭 필요할 때만 명시적 private-network opt-in을 사용하세요.",
+    "TOOL_EXECUTION_FAILED": "같은 입력을 반복하기 전에 오류 범주와 서버 상태를 확인하세요. 재현되면 민감정보를 제거한 최소 사례로 보고하세요.",
 }
+
+
+def category_for_error(error_code: str) -> ErrorCategory:
+    if error_code in {
+        "WORKSPACE_OUTSIDE_ROOT",
+        "WORKSPACE_SYMLINK_ESCAPE",
+        "WORKSPACE_ROOT_INVALID",
+        "PERMISSION_DENIED",
+    }:
+        return "permission"
+    if error_code in {"DOCUMENT_NOT_FOUND", "PLAN_RECORD_MISSING", "MEMO_NOT_FOUND"}:
+        return "not_found"
+    if error_code in {"CAPABILITY_SKEW", "REPAIR_UNAVAILABLE", "BYTE_PATCH_UNAVAILABLE"}:
+        return "capability"
+    if error_code.startswith("NETWORK_"):
+        return "network"
+    if error_code in {
+        "INVALID_ARGUMENT",
+        "WORKSPACE_PATH_INVALID",
+        "DOCUMENT_LOCATOR_REQUIRED",
+        "RANGE_OUT_OF_BOUNDS",
+        "TABLE_INDEX_OUT_OF_RANGE",
+        "PARAGRAPH_INDEX_OUT_OF_RANGE",
+    }:
+        return "validation"
+    if error_code in {"TOOL_EXECUTION_FAILED", "INTERNAL_ERROR"}:
+        return "internal"
+    return "document"
 
 
 def mcp_code_for_error(error_code: str) -> int:
@@ -103,12 +159,16 @@ def build_error_payload(
     details: Optional[Dict[str, Any]] = None,
     hint: Optional[str] = None,
     suggestion: Optional[str] = None,
+    category: Optional[ErrorCategory] = None,
+    retryable: bool = False,
 ) -> Dict[str, Any]:
     return CommonErrorModel(
         code=code,
+        category=category or category_for_error(code),
         message=message,
+        retryable=retryable,
         details=details,
         hint=hint,
         suggestion=suggestion
         or suggestion_for_error(code, details=details, hint=hint),
-    ).model_dump(exclude_none=True)
+    ).model_dump(exclude_none=True, by_alias=True)

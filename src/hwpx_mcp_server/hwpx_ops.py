@@ -18,22 +18,19 @@ import shutil
 import subprocess
 import tempfile
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 from .core.plan import (
-    ApplyData,
     ApplyEditInput,
-    ContextOutput,
     GetContextInput,
     PipelineError,
     PlanEditInput,
     PlanManager,
     PreviewEditInput,
-    ReplaceTextArgs,
     SearchHitModel,
     SearchInput,
     SearchOutput,
@@ -62,6 +59,7 @@ from .core.content import (
 from . import quality as quality_contract
 from .errors import build_error_payload
 from .storage import DocumentStorage, LocalDocumentStorage, build_hwpx_verification_report
+from .workspace import WorkspacePathError
 from .core.search import batch_replace_in_doc, replace_in_doc
 from .core.transactions import rotate_and_backup, save_dry_run, semantic_diff, undo_last_backup
 from .upstream import (
@@ -253,14 +251,20 @@ class HwpxOps:
         except FileNotFoundError as exc:
             raise self._new_error(
                 "DOCUMENT_NOT_FOUND",
-                f"문서를 찾을 수 없습니다: {path}",
-                details={"path": path},
+                "요청한 문서를 허용된 작업공간에서 찾을 수 없습니다.",
+                details={"requestedName": Path(path).name},
+            ) from exc
+        except WorkspacePathError as exc:
+            raise self._new_error(
+                exc.code,
+                "요청한 경로가 허용된 HWPX 작업공간 경계를 벗어났습니다.",
+                details=exc.safe_details(),
             ) from exc
         except PermissionError as exc:
             raise self._new_error(
                 "PERMISSION_DENIED",
-                f"문서 접근 권한이 없습니다: {path}",
-                details={"path": path},
+                "요청한 문서에 접근할 권한이 없습니다.",
+                details={"requestedName": Path(path).name},
             ) from exc
         self._register_handle(path, resolved)
         return resolved
@@ -401,14 +405,20 @@ class HwpxOps:
         except FileNotFoundError as exc:
             raise self._new_error(
                 "DOCUMENT_NOT_FOUND",
-                f"문서를 찾을 수 없습니다: {path}",
-                details={"path": path},
+                "요청한 문서를 허용된 작업공간에서 찾을 수 없습니다.",
+                details={"requestedName": Path(path).name},
+            ) from exc
+        except WorkspacePathError as exc:
+            raise self._new_error(
+                exc.code,
+                "요청한 경로가 허용된 HWPX 작업공간 경계를 벗어났습니다.",
+                details=exc.safe_details(),
             ) from exc
         except PermissionError as exc:
             raise self._new_error(
                 "PERMISSION_DENIED",
-                f"문서 접근 권한이 없습니다: {path}",
-                details={"path": path},
+                "요청한 문서에 접근할 권한이 없습니다.",
+                details={"requestedName": Path(path).name},
             ) from exc
         except Exception as exc:  # pragma: no cover - delegated to backend
             raise self._new_error(
@@ -3394,7 +3404,7 @@ class HwpxOps:
             if screenshot_item is not None:
                 page["screenshotPath"] = screenshot_item["path"]
 
-        generated_at = datetime.utcnow().isoformat() + "Z"
+        generated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         suggestion = None
         if status in {"blocked", "partial"}:
             suggestion = (

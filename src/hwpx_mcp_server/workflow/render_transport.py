@@ -11,14 +11,14 @@ import json
 import socket
 import ssl
 import time
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Literal
 from urllib.error import HTTPError
 from urllib.parse import quote, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
+from ..network_policy import NetworkPolicy, open_url
 from .render_queue import DurableRenderQueue, RenderQueueError, sign_submission
 from .rendering import RenderJobV2, RenderReceiptV2
 
@@ -41,6 +41,7 @@ class RemoteRenderClientV2:
         client_keyfile: Path | None = None,
         timeout: float = 30,
         allow_insecure_loopback: bool = False,
+        allow_private_network: bool = False,
     ) -> None:
         parsed = urlparse(base_url)
         if transport_auth not in {"mtls", "signed_https"}:
@@ -68,6 +69,11 @@ class RemoteRenderClientV2:
         self.transport_auth = transport_auth
         self._ssl_context = context
         self.timeout = timeout
+        self._network_policy = NetworkPolicy(
+            allow_private_network=allow_private_network or allow_insecure_loopback,
+            allow_http=insecure_loopback,
+        )
+        self._network_policy.validate_url(self.base_url)
 
     def _request(self, method: str, path: str, payload: dict[str, Any] | None = None, *, raw: bool = False):
         body = json.dumps(payload, separators=(",", ":")).encode() if payload is not None else b""
@@ -80,7 +86,12 @@ class RemoteRenderClientV2:
             },
         )
         try:
-            with urlopen(request, timeout=self.timeout, context=self._ssl_context) as response:
+            with open_url(
+                request,
+                policy=self._network_policy,
+                timeout=self.timeout,
+                context=self._ssl_context,
+            ) as response:
                 data = response.read()
         except HTTPError as exc:
             raise RenderQueueError(f"REMOTE_HTTP_{exc.code}", "remote render queue request failed") from exc

@@ -10,7 +10,6 @@ from ..upstream import HwpxDocument, blank_document_template_bytes, open_documen
 
 def _local_storage() -> LocalDocumentStorage:
     return LocalDocumentStorage(
-        base_directory=Path.cwd(),
         auto_backup=os.environ.get("HWPX_MCP_AUTOBACKUP", "1") == "1",
     )
 

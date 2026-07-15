@@ -220,7 +220,7 @@ def test_resolve_path_permission_error_maps_code(tmp_path, monkeypatch):
         ops.open_info("secret.hwpx")
 
     assert exc_info.value.code == "PERMISSION_DENIED"
-    assert exc_info.value.details == {"path": "secret.hwpx"}
+    assert exc_info.value.details == {"requestedName": "secret.hwpx"}
 
 def test_find_returns_matches(ops_with_sample):
     ops, path = ops_with_sample

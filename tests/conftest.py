@@ -22,9 +22,11 @@ import pytest
 builtins.ET = _ET
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_LOCAL_PYTHON_HWPX_REPO = Path(
-    os.environ.get("PYTHON_HWPX_REPO", _REPO_ROOT.parent / "python-hwpx")
-).expanduser().resolve()
+_LOCAL_PYTHON_HWPX_REPO = (
+    Path(os.environ.get("PYTHON_HWPX_REPO", _REPO_ROOT.parent / "python-hwpx"))
+    .expanduser()
+    .resolve()
+)
 _LOCAL_PYTHON_HWPX_SRC = _LOCAL_PYTHON_HWPX_REPO / "src"
 
 if _LOCAL_PYTHON_HWPX_SRC.exists():
@@ -34,8 +36,11 @@ if _LOCAL_PYTHON_HWPX_SRC.exists():
 
 
 @pytest.fixture(autouse=True)
-def _clear_path_sandbox_for_inprocess_tests(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure local/in-process tests aren't affected by an inherited sandbox.
+def _clear_path_sandbox_for_inprocess_tests(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Give each test explicit repository and temporary workspace roots.
 
     The MCP server CLI (`python -m hwpx_mcp_server.server`) enables sandboxing in
     `main()` via `os.environ.setdefault("HWPX_MCP_SANDBOX_ROOT", cwd)`.
@@ -44,13 +49,32 @@ def _clear_path_sandbox_for_inprocess_tests(monkeypatch: pytest.MonkeyPatch) -> 
     directly in-process. If the environment variable is already set in the
     parent shell, those tests would fail.
 
-    We *remove* the variable here so:
-    - in-process tests run without sandbox restrictions
-    - subprocess-based traversal/security tests still get sandboxing via
-      `server.main()` (because the var is absent, setdefault will apply).
+    Product code never opens the whole filesystem. Tests authorize their public
+    fixtures and their one pytest temporary directory; individual security tests
+    may replace this value with a narrower root.
     """
 
     monkeypatch.delenv("HWPX_MCP_SANDBOX_ROOT", raising=False)
+    monkeypatch.setenv(
+        "HWPX_MCP_WORKSPACE_ROOTS",
+        json.dumps([str(_REPO_ROOT), str(tmp_path), str(_LOCAL_PYTHON_HWPX_REPO)]),
+    )
+    from hwpx_mcp_server import server as server_module
+    from hwpx_mcp_server.hwpx_ops import HwpxOps
+    from hwpx_mcp_server.storage import LocalDocumentStorage
+    from hwpx_mcp_server.workspace import WorkspaceResolver
+
+    monkeypatch.setattr(
+        server_module,
+        "_OPS",
+        HwpxOps(
+            storage=LocalDocumentStorage(
+                workspace_resolver=WorkspaceResolver.from_environment(),
+                auto_backup=False,
+            )
+        ),
+    )
+
 
 EMBEDDED_ERROR_RE = re.compile(
     r"traceback \(most recent call last\)|\bexception\b|error executing tool",
@@ -223,29 +247,43 @@ class StdioMCPClient:
     def _validate_request_payload(payload: dict[str, Any]) -> None:
         assert payload.get("jsonrpc") == "2.0", f"invalid request jsonrpc: {payload}"
         assert "id" in payload, f"missing request id: {payload}"
-        assert isinstance(payload.get("method"), str) and payload["method"], f"invalid request method: {payload}"
-        assert "params" in payload and isinstance(payload["params"], dict), f"invalid request params: {payload}"
+        assert isinstance(payload.get("method"), str) and payload["method"], (
+            f"invalid request method: {payload}"
+        )
+        assert "params" in payload and isinstance(payload["params"], dict), (
+            f"invalid request params: {payload}"
+        )
 
     @staticmethod
     def assert_error_object(error_obj: Any, *, require_data: bool) -> None:
-        assert isinstance(error_obj, dict), f"error must be an object, got {type(error_obj)!r}"
-        assert isinstance(error_obj.get("code"), int), f"error.code must be int: {error_obj}"
+        assert isinstance(error_obj, dict), (
+            f"error must be an object, got {type(error_obj)!r}"
+        )
+        assert isinstance(error_obj.get("code"), int), (
+            f"error.code must be int: {error_obj}"
+        )
         assert isinstance(error_obj.get("message"), str) and error_obj["message"], (
             f"error.message must be non-empty string: {error_obj}"
         )
         if require_data:
-            assert "data" in error_obj, f"error.data missing in strict mode: {error_obj}"
+            assert "data" in error_obj, (
+                f"error.data missing in strict mode: {error_obj}"
+            )
 
     @staticmethod
     def _assert_response_envelope(message: Any, *, expected_id: Any) -> None:
         assert isinstance(message, dict), f"response must be object: {message!r}"
-        assert message.get("jsonrpc") == "2.0", f"response jsonrpc must be 2.0: {message}"
+        assert message.get("jsonrpc") == "2.0", (
+            f"response jsonrpc must be 2.0: {message}"
+        )
         assert message.get("id") == expected_id, (
             f"response id mismatch: expected={expected_id!r}, got={message.get('id')!r}, payload={message}"
         )
         has_result = "result" in message
         has_error = "error" in message
-        assert has_result ^ has_error, f"response must have exactly one of result/error: {message}"
+        assert has_result ^ has_error, (
+            f"response must have exactly one of result/error: {message}"
+        )
 
     @staticmethod
     def _iter_text_fragments(tool_result: dict[str, Any]) -> Iterable[str]:
@@ -261,7 +299,9 @@ class StdioMCPClient:
         return chunks
 
     @staticmethod
-    def parse_tool_result_payload(tool_result: dict[str, Any]) -> dict[str, Any] | list[Any] | None:
+    def parse_tool_result_payload(
+        tool_result: dict[str, Any],
+    ) -> dict[str, Any] | list[Any] | None:
         if not isinstance(tool_result, dict):
             return None
         structured = tool_result.get("structuredContent")
@@ -297,14 +337,18 @@ class StdioMCPClient:
         return types
 
     @classmethod
-    def _value_for_property(cls, prop_name: str, prop_schema: dict[str, Any], ctx: ToolCallContext) -> Any:
+    def _value_for_property(
+        cls, prop_name: str, prop_schema: dict[str, Any], ctx: ToolCallContext
+    ) -> Any:
         key = prop_name.lower()
 
         if "source" in key and ("file" in key or "path" in key):
             return str(ctx.target_path)
         if "destination" in key and ("file" in key or "path" in key):
             return str(ctx.secondary_path)
-        if any(token in key for token in ("filename", "file", "path", "uri", "document")):
+        if any(
+            token in key for token in ("filename", "file", "path", "uri", "document")
+        ):
             return str(ctx.target_path)
         if key == "replacements":
             return [{"find": ctx.find_text, "replace": ctx.replace_text}]
@@ -352,7 +396,9 @@ class StdioMCPClient:
         return "mcp-test"
 
     @classmethod
-    def build_tool_arguments(cls, tool: dict[str, Any], ctx: ToolCallContext) -> dict[str, Any]:
+    def build_tool_arguments(
+        cls, tool: dict[str, Any], ctx: ToolCallContext
+    ) -> dict[str, Any]:
         schema = tool.get("inputSchema")
         if not isinstance(schema, dict):
             return {}
@@ -408,6 +454,12 @@ class StdioMCPClient:
     def _build_env(self) -> dict[str, str]:
         env = os.environ.copy()
         env.update(self.extra_env)
+        if not {
+            "HWPX_MCP_WORKSPACE_ROOTS",
+            "HWPX_MCP_SANDBOX_ROOT",
+        }.intersection(self.extra_env):
+            env["HWPX_MCP_WORKSPACE_ROOTS"] = json.dumps([str(self.cwd)])
+            env.pop("HWPX_MCP_SANDBOX_ROOT", None)
         env["PYTHONPATH"] = _pythonpath_with_local_sources(env.get("PYTHONPATH", ""))
         return env
 
@@ -428,8 +480,12 @@ class StdioMCPClient:
             errors="replace",
             bufsize=1,
         )
-        self._stdout_thread = threading.Thread(target=self._stdout_reader_loop, daemon=True)
-        self._stderr_thread = threading.Thread(target=self._stderr_reader_loop, daemon=True)
+        self._stdout_thread = threading.Thread(
+            target=self._stdout_reader_loop, daemon=True
+        )
+        self._stderr_thread = threading.Thread(
+            target=self._stderr_reader_loop, daemon=True
+        )
         self._stdout_thread.start()
         self._stderr_thread.start()
 
@@ -455,10 +511,16 @@ class StdioMCPClient:
                     self._cv.notify_all()
                 continue
             with self._cv:
-                if isinstance(message, dict) and "id" in message and ("result" in message or "error" in message):
+                if (
+                    isinstance(message, dict)
+                    and "id" in message
+                    and ("result" in message or "error" in message)
+                ):
                     self._responses[message["id"]] = message
                 else:
-                    self.notifications.append(message if isinstance(message, dict) else {"raw": message})
+                    self.notifications.append(
+                        message if isinstance(message, dict) else {"raw": message}
+                    )
                 self._cv.notify_all()
 
     def _stderr_reader_loop(self) -> None:
@@ -474,14 +536,20 @@ class StdioMCPClient:
             raise MCPHarnessError("cannot write request: MCP subprocess is not running")
         line = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         if "\n" in line or "\r" in line:
-            raise AssertionError(f"embedded newline is forbidden in JSON-RPC payload: {line!r}")
+            raise AssertionError(
+                f"embedded newline is forbidden in JSON-RPC payload: {line!r}"
+            )
         try:
             proc.stdin.write(f"{line}\n")
             proc.stdin.flush()
         except BrokenPipeError as exc:
-            raise MCPHarnessError(f"broken pipe while writing request\n{self.debug_report()}") from exc
+            raise MCPHarnessError(
+                f"broken pipe while writing request\n{self.debug_report()}"
+            ) from exc
 
-    def build_request_payload(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+    def build_request_payload(
+        self, method: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
         payload = {
             "jsonrpc": "2.0",
             "id": next(self._id_counter),
@@ -496,10 +564,14 @@ class StdioMCPClient:
         self._write_json_line(payload)
         return payload["id"]
 
-    def wait_for_response(self, request_id: Any, *, timeout: float | None = None) -> dict[str, Any]:
+    def wait_for_response(
+        self, request_id: Any, *, timeout: float | None = None
+    ) -> dict[str, Any]:
         proc = self._proc
         if proc is None:
-            raise MCPHarnessError("cannot wait for response: MCP subprocess is not running")
+            raise MCPHarnessError(
+                "cannot wait for response: MCP subprocess is not running"
+            )
 
         timeout_sec = timeout if timeout is not None else self.config.request_timeout
         deadline = time.monotonic() + timeout_sec
@@ -540,26 +612,42 @@ class StdioMCPClient:
         }
         line = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         if "\n" in line or "\r" in line:
-            raise AssertionError(f"embedded newline is forbidden in JSON-RPC payload: {line!r}")
+            raise AssertionError(
+                f"embedded newline is forbidden in JSON-RPC payload: {line!r}"
+            )
         proc = self._proc
         if proc is None or proc.stdin is None:
-            raise MCPHarnessError("cannot write notification: MCP subprocess is not running")
+            raise MCPHarnessError(
+                "cannot write notification: MCP subprocess is not running"
+            )
         try:
             proc.stdin.write(f"{line}\n")
             proc.stdin.flush()
         except BrokenPipeError as exc:
-            raise MCPHarnessError(f"broken pipe while writing notification\n{self.debug_report()}") from exc
+            raise MCPHarnessError(
+                f"broken pipe while writing notification\n{self.debug_report()}"
+            ) from exc
 
     def initialize(self) -> dict[str, Any]:
         response = self.request("initialize", self.default_initialize_params())
         if "error" in response:
-            self.assert_error_object(response["error"], require_data=self.config.require_error_data)
-            pytest.fail(f"initialize returned JSON-RPC error: {response['error']}\n{self.debug_report()}")
+            self.assert_error_object(
+                response["error"], require_data=self.config.require_error_data
+            )
+            pytest.fail(
+                f"initialize returned JSON-RPC error: {response['error']}\n{self.debug_report()}"
+            )
         result = response["result"]
         assert isinstance(result, dict), f"initialize result must be object: {result!r}"
-        assert "protocolVersion" in result, f"missing protocolVersion in initialize result: {result}"
-        assert "capabilities" in result, f"missing capabilities in initialize result: {result}"
-        assert "serverInfo" in result, f"missing serverInfo in initialize result: {result}"
+        assert "protocolVersion" in result, (
+            f"missing protocolVersion in initialize result: {result}"
+        )
+        assert "capabilities" in result, (
+            f"missing capabilities in initialize result: {result}"
+        )
+        assert "serverInfo" in result, (
+            f"missing serverInfo in initialize result: {result}"
+        )
         if self.config.send_initialized_notification:
             self.notify("notifications/initialized", {})
         return result
@@ -567,12 +655,18 @@ class StdioMCPClient:
     def list_tools(self) -> list[dict[str, Any]]:
         response = self.request("tools/list", {})
         if "error" in response:
-            self.assert_error_object(response["error"], require_data=self.config.require_error_data)
-            pytest.fail(f"tools/list returned JSON-RPC error: {response['error']}\n{self.debug_report()}")
+            self.assert_error_object(
+                response["error"], require_data=self.config.require_error_data
+            )
+            pytest.fail(
+                f"tools/list returned JSON-RPC error: {response['error']}\n{self.debug_report()}"
+            )
         result = response["result"]
         assert isinstance(result, dict), f"tools/list result must be object: {result!r}"
         tools = result.get("tools")
-        assert isinstance(tools, list), f"tools/list result.tools must be a list: {result}"
+        assert isinstance(tools, list), (
+            f"tools/list result.tools must be a list: {result}"
+        )
         normalized: list[dict[str, Any]] = []
         for tool in tools:
             if isinstance(tool, dict):
@@ -605,21 +699,31 @@ class StdioMCPClient:
     def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         response = self.call_tool_raw(name, arguments)
         if "error" in response:
-            self.assert_error_object(response["error"], require_data=self.config.require_error_data)
-            pytest.fail(f"tools/call({name}) returned JSON-RPC error: {response['error']}\n{self.debug_report()}")
+            self.assert_error_object(
+                response["error"], require_data=self.config.require_error_data
+            )
+            pytest.fail(
+                f"tools/call({name}) returned JSON-RPC error: {response['error']}\n{self.debug_report()}"
+            )
         result = response["result"]
-        assert isinstance(result, dict), f"tools/call({name}) result must be object: {result!r}"
+        assert isinstance(result, dict), (
+            f"tools/call({name}) result must be object: {result!r}"
+        )
         self._assert_no_embedded_error(name, result)
         return result
 
     def assert_tool_error(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         response = self.call_tool_raw(name, arguments)
         if "error" in response:
-            self.assert_error_object(response["error"], require_data=self.config.require_error_data)
+            self.assert_error_object(
+                response["error"], require_data=self.config.require_error_data
+            )
             return response["error"]
 
         result = response.get("result")
-        assert isinstance(result, dict), f"unexpected tools/call({name}) envelope: {response}"
+        assert isinstance(result, dict), (
+            f"unexpected tools/call({name}) envelope: {response}"
+        )
         if self.config.strict_error_mode:
             raise AssertionError(
                 "tools/call failure did not return JSON-RPC error object in strict mode: "
@@ -636,7 +740,13 @@ class StdioMCPClient:
         return_code = None if proc is None else proc.poll()
         stdout_tail = "\n".join(self._stdout_tail) or "<empty>"
         stderr_tail = "\n".join(self._stderr_tail) or "<empty>"
-        notifications = "\n".join(json.dumps(item, ensure_ascii=False) for item in list(self.notifications)[-20:]) or "<none>"
+        notifications = (
+            "\n".join(
+                json.dumps(item, ensure_ascii=False)
+                for item in list(self.notifications)[-20:]
+            )
+            or "<none>"
+        )
         return (
             f"[mcp-debug] cwd={self.cwd}\n"
             f"[mcp-debug] returncode={return_code}\n"

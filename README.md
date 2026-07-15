@@ -61,7 +61,7 @@ hwpx-mcp-server
 pip install "hwpx-mcp-server[ingest]"
 ```
 
-요구 사항: `Python >= 3.10` · `python-hwpx >= 2.29.1`
+요구 사항: `Python >= 3.10` · `python-hwpx >= 2.29.2`
 
 ### MCP 클라이언트 설정
 
@@ -94,6 +94,7 @@ pip install "hwpx-mcp-server[ingest]"
       "env": {
         "HWPX_MCP_MAX_CHARS": "12000",
         "HWPX_MCP_ADVANCED": "0",
+        "HWPX_MCP_WORKSPACE_ROOTS": "[\"/absolute/path/to/workspace\"]",
         "LOG_LEVEL": "INFO"
       }
     }
@@ -158,18 +159,25 @@ pip install "hwpx-mcp-server[ingest]"
 | `HWPX_MCP_MAX_CHARS` | 텍스트 반환 도구 기본 최대 길이 | `10000` |
 | `HWPX_MCP_AUTOBACKUP` | `1`이면 저장 전 `.bak` 백업 생성 | `1` |
 | `HWPX_MCP_ADVANCED` | `1`이면 고급 도구 활성화 | `0` |
-| `HWPX_MCP_SANDBOX_ROOT` | 설정 시 이 root 내부 상대/절대경로만 허용 | unset |
+| `HWPX_MCP_WORKSPACE_ROOTS` | 허용할 workspace 절대경로의 JSON 배열(복수 root 지원). 상대경로는 첫 root 기준 | unset(프로세스 cwd) |
+| `HWPX_MCP_SANDBOX_ROOT` | 단일 root 구버전 호환 변수. 새 설정에서는 `HWPX_MCP_WORKSPACE_ROOTS` 사용 | unset |
 | `HWPX_MCP_FETCH_TIMEOUT_SECONDS` | URL 기반 HWPX fetch timeout | `20.0` |
+| `HWPX_MCP_ALLOW_PRIVATE_NETWORK` | `1`이면 신뢰된 사설/루프백 HTTPS 대상 허용. 링크로컬·metadata·예약 주소는 계속 차단 | `0` |
 | `HWPX_MCP_QUALITY` | 전역 기본 저장 게이트 정책(`transparent`/`strict`). 도구별 `quality`가 우선 | `transparent` |
 | `HWPX_MCP_REQUIRE_CAPABILITY` | `0`이면 capability skew fail-closed를 끔(진단/전문가용) | `1` |
 | `LOG_LEVEL` | 로그 레벨 | `INFO` |
+
+경로는 기본적으로 workspace 밖 traversal과 symlink escape를 거부합니다. URL 입력과
+HTTP storage/render transport는 HTTPS 및 공개 IP만 허용하고, 리다이렉트와 실제 연결
+피어를 다시 검사합니다. 사설망 opt-in은 운영자가 대상을 신뢰하고 네트워크 경계를
+별도로 통제할 때만 사용하세요.
 
 ## 더 보기
 
 - 실전 사용 사례: [`docs/use-cases.md`](docs/use-cases.md)
 - 스킬 기반 워크플로: [`docs/skill-first-workflows.md`](docs/skill-first-workflows.md)
 - 보안·하드닝 가이드: [`docs/hardening_guide_ko.md`](docs/hardening_guide_ko.md)
-- 종합 테스트 리포트: [`tests/hwpx_mcp_report_updated.md`](tests/hwpx_mcp_report_updated.md)
+- 도구 계약: [`docs/tool-contract.md`](docs/tool-contract.md)
 - 변경 이력: [`CHANGELOG.md`](CHANGELOG.md)
 
 ### 테스트
