@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "python-hwpx>=2.29.0", # typed blueprint dump/replay plus SQUEEZE-to-BREAK safety and prior capabilities
+    "python-hwpx>=2.29.1", # typed blueprint dump/replay, release-test fix, SQUEEZE-to-BREAK safety, and prior capabilities
 
     "pydantic>=2.7",
     "cryptography>=42.0",
@@ -39,9 +39,16 @@ http = ["uvicorn>=0.30"]
 ingest = ["markitdown[all]>=0.1.6"]
 # 직인 날인/검증의 한컴 렌더 오라클 경로(렌더→fitz word/image bbox). macOS+Hancom 필요;
 # 없으면 place_seal/check_seal_compliance가 renderChecked=false로 정직하게 degrade한다.
-oracle = ["python-hwpx[visual]>=2.29.0"]
-vision = ["python-hwpx[visual]>=2.29.0"]
-test = ["pytest>=8.0", "pytest-cov>=5.0", "olefile>=0.47", "uvicorn>=0.30"]
+oracle = ["python-hwpx[visual]>=2.29.1"]
+vision = ["python-hwpx[visual]>=2.29.1"]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "olefile>=0.47",
+    "uvicorn>=0.30",
+    "numpy>=1.26",
+    "pillow>=10.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/airmang/hwpx-mcp-server"
@@ -51,7 +58,7 @@ Issues = "https://github.com/airmang/hwpx-mcp-server/issues"
 "hwpx-mcp-server" = "hwpx_mcp_server.server:main"
 
 # Co-located development: resolve python-hwpx from the sibling checkout.
-# This affects local `uv` resolution only; published metadata keeps `python-hwpx>=2.29.0`.
+# This affects local `uv` resolution only; published metadata keeps `python-hwpx>=2.29.1`.
 [tool.uv.sources]
 python-hwpx = { path = "../python-hwpx", editable = true }
 

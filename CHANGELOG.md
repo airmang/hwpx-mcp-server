@@ -16,10 +16,13 @@
 ### Fixed
 - Retains the public 2.18.2 pathological-spacing repair for every touched replacement, paragraph insertion,
   addition, form fill, and table path while preserving legitimate compressed spacing and untouched source styles.
-- Retains the public 2.18.3 SQUEEZE-cell safety through `python-hwpx>=2.29.0`; changed non-empty cells wrap with
+- Retains the public 2.18.3 SQUEEZE-cell safety through `python-hwpx>=2.29.1`; changed non-empty cells wrap with
   `BREAK`, while no-op, clear, and untouched cells preserve their original mode.
+- Makes the release-facing `test` extra self-contained for visual fixture tests by installing Pillow and NumPy.
 
 ### Note
+- Binds to the corrected public core release `2.29.1`; core `v2.29.0` was an immutable failed prepublish tag
+  and did not produce a PyPI package or GitHub Release.
 - 2.19.0–2.22.0 were staged local candidates rather than public releases; their accumulated changes are
   consolidated into this 2.23.0 public entry.
 

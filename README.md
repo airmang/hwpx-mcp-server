@@ -61,7 +61,7 @@ hwpx-mcp-server
 pip install "hwpx-mcp-server[ingest]"
 ```
 
-요구 사항: `Python >= 3.10` · `python-hwpx >= 2.29.0`
+요구 사항: `Python >= 3.10` · `python-hwpx >= 2.29.1`
 
 ### MCP 클라이언트 설정
 
