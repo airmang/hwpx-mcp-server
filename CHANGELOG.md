@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-07-16
+
+### Removed
+- Removes seven non-product QA tools and their bundled runtime from the public wheel. Supported
+  exam, evaluation-plan, form-fill, authoring, editing, verification, workflow, and real-Hancom
+  render surfaces remain public.
+
+### Changed
+- Requires `python-hwpx>=3.0.0` and exposes 126 default / 136 advanced product tools.
+- Raises the matching skill floor to `0.2.0`; the intentional breaking delta, replacements,
+  and zero-alias policy are recorded in [`docs/tool-contract-delta-3.0.0.json`](docs/tool-contract-delta-3.0.0.json)
+  and [`docs/product-boundary-migration-3.0.0.md`](docs/product-boundary-migration-3.0.0.md).
+
 ## [2.23.1] - 2026-07-15
 
 ### Security
@@ -30,8 +43,8 @@
   `.hwpxbp` dump and strict atomic replay facades, sharing the core catalog, revision, fidelity, dependency,
   idempotency, rollback, lossless, and open-safety contracts.
 - **Durable document workflows and rendering**: server-enforced workflow policy, authenticated durable Hancom
-  render queue/transport, fixture visual-QA and guarded repair, blind benchmark receipts, and privacy-preserving
-  practice scenario/campaign execution with independent evaluator provenance and chaos gates.
+  render queue/transport, fixture visual-QA and guarded repair, blind benchmark receipts, and hardened
+  non-product QA infrastructure.
 - The exact release-facing ToolSpec expands to 133 default / 143 advanced tools.
 
 ### Fixed

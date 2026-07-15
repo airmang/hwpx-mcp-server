@@ -12,6 +12,9 @@ from hwpx_mcp_server import __version__
 from hwpx_mcp_server import server
 from hwpx_mcp_server.tool_contract import (
     DOMAIN_SPECS,
+    MIN_MCP_VERSION,
+    MIN_PYTHON_HWPX,
+    MIN_SKILL_VERSION,
     contract_hash,
     expected_tool_names,
     skill_required_tool_names,
@@ -35,7 +38,14 @@ RENDER_TOOLS = {
     "render_health",
 }
 BLIND_EVAL_TOOLS = {"run_fixture_benchmark", "export_fixture_benchmark"}
-PRACTICE_TOOLS = {
+AGENT_DOCUMENT_TOOLS = {
+    "get_document_node",
+    "query_document_nodes",
+    "apply_document_commands",
+    "dump_document_blueprint",
+    "replay_document_blueprint",
+}
+REMOVED_PRACTICE_TOOLS = {
     "start_practice_scenario",
     "apply_practice_scenario",
     "start_practice_campaign",
@@ -43,13 +53,6 @@ PRACTICE_TOOLS = {
     "continue_practice_campaign",
     "cancel_practice_campaign",
     "export_practice_campaign",
-}
-AGENT_DOCUMENT_TOOLS = {
-    "get_document_node",
-    "query_document_nodes",
-    "apply_document_commands",
-    "dump_document_blueprint",
-    "replay_document_blueprint",
 }
 
 
@@ -62,15 +65,13 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert WORKFLOW_TOOLS <= set(server._fastmcp_tool_names())
     assert RENDER_TOOLS <= set(server._fastmcp_tool_names())
     assert BLIND_EVAL_TOOLS <= set(server._fastmcp_tool_names())
-    assert PRACTICE_TOOLS <= set(server._fastmcp_tool_names())
     assert AGENT_DOCUMENT_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False)) == 133
+    assert len(expected_tool_names(advanced=False)) == 126
     assert len(
         expected_tool_names(advanced=False)
         - WORKFLOW_TOOLS
         - RENDER_TOOLS
         - BLIND_EVAL_TOOLS
-        - PRACTICE_TOOLS
         - AGENT_DOCUMENT_TOOLS
     ) == 108
     workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
@@ -84,14 +85,24 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert len(blind_domains) == 1
     assert set(blind_domains[0].tools) == BLIND_EVAL_TOOLS
     assert "승격" in blind_domains[0].when_to_use
-    practice_domains = [domain for domain in DOMAIN_SPECS if domain.key == "private_practice"]
-    assert len(practice_domains) == 1
-    assert set(practice_domains[0].tools) == PRACTICE_TOOLS
-    assert "경로" in practice_domains[0].intent
+    assert all(domain.key != "private_practice" for domain in DOMAIN_SPECS)
     agent_domains = [domain for domain in DOMAIN_SPECS if domain.key == "agent_document"]
     assert len(agent_domains) == 1
     assert set(agent_domains[0].tools) == AGENT_DOCUMENT_TOOLS
     assert "전문 도구" in agent_domains[0].when_to_use
+
+
+def test_release_contract_versions_counts_and_hash_are_exact() -> None:
+    assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
+        "3.0.0",
+        "3.0.0",
+        "0.2.0",
+    )
+    assert len(expected_tool_names(advanced=False)) == 126
+    assert len(expected_tool_names(advanced=True)) == 136
+    assert len(skill_required_tool_names()) == 30
+    assert contract_hash() == "76d143ccc0787828"
+    assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 
 def test_advanced_registry_exactly_matches_contract_in_fresh_process() -> None:
@@ -115,33 +126,6 @@ print(json.dumps({
     )
     payload = json.loads(result.stdout)
     assert payload["actual"] == payload["expected"]
-
-
-def test_campaign_tools_fail_closed_during_python_hwpx_package_skew() -> None:
-    code = """
-import json
-from hwpx_mcp_server import server
-print(json.dumps(server.start_practice_campaign(
-    'PCMP-0123456789ABCDEFFEDC',
-    'package-skew-check',
-    True,
-)))
-"""
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=ROOT,
-        env={key: value for key, value in os.environ.items() if key != "PYTHONPATH"},
-        text=True,
-        capture_output=True,
-        check=True,
-    )
-    payload = json.loads(result.stdout)
-    assert payload == {
-        "ok": False,
-        "state": "needs_review",
-        "errorCode": "CAMPAIGN_UNAVAILABLE",
-        "privateStorageCoordinatesExposed": False,
-    }
 
 
 def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
@@ -178,28 +162,6 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
     } == inputs["start_workflow"]
     assert {"workflow_id", "approved", "action_hash"} == inputs["approve_workflow_decision"]
     assert {"workflow_id", "action_hash"} == inputs["get_workflow_result"]
-    assert {"scenario_id", "idempotency_key"} == inputs["start_practice_scenario"]
-    assert {
-        "run_id",
-        "destination_filename",
-        "operation_kind",
-        "operations",
-        "use_suggested_operations",
-        "confirm",
-    } == inputs["apply_practice_scenario"]
-    assert {"campaign_id", "idempotency_key", "confirm"} == inputs[
-        "start_practice_campaign"
-    ]
-    assert {"campaign_id"} == inputs["get_practice_campaign"]
-    assert {
-        "campaign_id",
-        "run_id",
-        "max_steps",
-        "approved",
-        "decision_receipt_sha256",
-    } == inputs["continue_practice_campaign"]
-    assert {"campaign_id"} == inputs["cancel_practice_campaign"]
-    assert {"campaign_id"} == inputs["export_practice_campaign"]
     assert {
         "filename",
         "path",
@@ -263,40 +225,64 @@ def test_generated_mcp_contract_is_current() -> None:
     assert server.mcp_server_health()["toolSurface"]["contractHash"] == contract_hash()
 
 
-def test_unwired_campaign_tools_fail_closed_without_leaking_detail(monkeypatch) -> None:
-    monkeypatch.setattr(server, "_PRACTICE_CAMPAIGN_SERVICE_OVERRIDE", None)
-    monkeypatch.setattr(server, "_PRACTICE_CAMPAIGN_RUNTIME_FACTORY", None)
-
-    result = server.start_practice_campaign(
-        "PCMP-00000000000000000000", "campaign-start-001", confirm=True
+def test_generated_versioned_contract_delta_is_current() -> None:
+    subprocess.run(
+        [sys.executable, "scripts/render_contract_delta.py", "--check"],
+        cwd=ROOT,
+        check=True,
+    )
+    payload = json.loads(
+        (ROOT / "docs" / "tool-contract-delta-3.0.0.json").read_text(encoding="utf-8")
     )
 
-    assert result == {
-        "ok": False,
-        "state": "needs_review",
-        "errorCode": "CAMPAIGN_UNAVAILABLE",
-        "privateStorageCoordinatesExposed": False,
+    assert payload["baseline"] == {
+        "versions": {
+            "pythonHwpx": "2.29.2",
+            "mcpServer": "2.23.1",
+            "skill": "0.1.31",
+        },
+        "defaultToolCount": 133,
+        "advancedToolCount": 143,
+        "domainCount": 22,
+        "skillRequiredToolCount": 32,
+        "contractHash": "0f9e1dcb7c646202",
     }
-
-
-def test_campaign_runtime_package_skew_keeps_tools_importable_and_fails_closed(
-    monkeypatch,
-) -> None:
-    def skewed_factory(_namespace):
-        raise ImportError("private package location must not escape")
-
-    monkeypatch.setattr(server, "_PRACTICE_CAMPAIGN_SERVICE_OVERRIDE", None)
-    monkeypatch.setattr(server, "_PRACTICE_CAMPAIGN_RUNTIME_FACTORY", skewed_factory)
-
-    result = server.start_practice_campaign(
-        "PCMP-00000000000000000000", "campaign-start-001", confirm=True
+    assert payload["target"] == {
+        "versions": {
+            "pythonHwpx": "3.0.0",
+            "mcpServer": "3.0.0",
+            "skill": "0.2.0",
+        },
+        "defaultToolCount": 126,
+        "advancedToolCount": 136,
+        "domainCount": 21,
+        "skillRequiredToolCount": 30,
+        "contractHash": "76d143ccc0787828",
+    }
+    assert {item["name"] for item in payload["removedTools"]} == REMOVED_PRACTICE_TOOLS
+    assert all(item["alias"] is None for item in payload["removedTools"])
+    assert all(
+        item["replacementKind"] == "none" and item["replacementTools"] == []
+        for item in payload["removedTools"]
     )
-
-    assert "start_practice_campaign" in server._fastmcp_tool_names()
-    assert result == {
-        "ok": False,
-        "state": "needs_review",
-        "errorCode": "CAMPAIGN_UNAVAILABLE",
-        "privateStorageCoordinatesExposed": False,
+    assert payload["compatibility"] == {
+        "aliases": [],
+        "deprecatedStubs": [],
+        "ghostRegistrations": [],
     }
-    assert "location" not in json.dumps(result)
+    assert payload["replacementGuidance"] == {
+        "oneToOnePublicReplacement": False,
+        "internalScenarioCampaignDestination": "workspace-private QA harness",
+        "publicDocumentWorkAlternatives": [
+            "apply_document_commands",
+            "apply_evalplan_fill",
+            "scan_form_guidance",
+            "apply_table_ops",
+            "apply_body_ops",
+            "verify_form_fill",
+        ],
+    }
+    evidence = payload["callSiteRuntimeRemovalEvidence"]
+    assert evidence["runtimePackagePresent"] is False
+    assert evidence["remainingRuntimeReferences"] == []
+    assert evidence["activeRemovedNames"] == []

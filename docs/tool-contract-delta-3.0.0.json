@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "hwpx.tool-contract-delta.v1",
+  "release": "3.0.0",
+  "changeKind": "breaking-removal",
+  "baseline": {
+    "versions": {
+      "pythonHwpx": "2.29.2",
+      "mcpServer": "2.23.1",
+      "skill": "0.1.31"
+    },
+    "defaultToolCount": 133,
+    "advancedToolCount": 143,
+    "domainCount": 22,
+    "skillRequiredToolCount": 32,
+    "contractHash": "0f9e1dcb7c646202"
+  },
+  "target": {
+    "versions": {
+      "pythonHwpx": "3.0.0",
+      "mcpServer": "3.0.0",
+      "skill": "0.2.0"
+    },
+    "defaultToolCount": 126,
+    "advancedToolCount": 136,
+    "domainCount": 21,
+    "skillRequiredToolCount": 30,
+    "contractHash": "76d143ccc0787828"
+  },
+  "delta": {
+    "defaultToolCount": -7,
+    "advancedToolCount": -7,
+    "domainCount": -1,
+    "skillRequiredToolCount": -2
+  },
+  "removedTools": [
+    {
+      "name": "start_practice_scenario",
+      "alias": null,
+      "replacementKind": "none",
+      "replacementTools": []
+    },
+    {
+      "name": "apply_practice_scenario",
+      "alias": null,
+      "replacementKind": "none",
+      "replacementTools": []
+    },
+    {
+      "name": "start_practice_campaign",
+      "alias": null,
+      "replacementKind": "none",
+      "replacementTools": []
+    },
+    {
+      "name": "get_practice_campaign",
+      "alias": null,
+      "replacementKind": "none",
+      "replacementTools": []
+    },
+    {
+      "name": "continue_practice_campaign",
+      "alias": null,
+      "replacementKind": "none",
+      "replacementTools": []
+    },
+    {
+      "name": "cancel_practice_campaign",
+      "alias": null,
+      "replacementKind": "none",
+      "replacementTools": []
+    },
+    {
+      "name": "export_practice_campaign",
+      "alias": null,
+      "replacementKind": "none",
+      "replacementTools": []
+    }
+  ],
+  "compatibility": {
+    "aliases": [],
+    "deprecatedStubs": [],
+    "ghostRegistrations": []
+  },
+  "replacementGuidance": {
+    "oneToOnePublicReplacement": false,
+    "internalScenarioCampaignDestination": "workspace-private QA harness",
+    "publicDocumentWorkAlternatives": [
+      "apply_document_commands",
+      "apply_evalplan_fill",
+      "scan_form_guidance",
+      "apply_table_ops",
+      "apply_body_ops",
+      "verify_form_fill"
+    ]
+  },
+  "callSiteRuntimeRemovalEvidence": {
+    "canonicalToolSpec": "src/hwpx_mcp_server/tool_contract.py",
+    "fastMcpRegistration": "src/hwpx_mcp_server/server.py",
+    "removedRuntimePackage": "src/hwpx_mcp_server/practice",
+    "runtimePackagePresent": false,
+    "remainingRuntimeReferences": [],
+    "activeRemovedNames": []
+  }
+}

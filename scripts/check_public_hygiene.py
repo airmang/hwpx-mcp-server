@@ -12,6 +12,25 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+_MCP_INTERNAL_RUNTIME_MARKERS = (
+    b"hwpx_mcp_server.practice",
+    b"hwpx.practice",
+    b"private_practice",
+    b"HWPX_PRACTICE_ROOT",
+    b"HWPX_PRACTICE_RUNNER_MANIFEST",
+    b"HWPX_PRACTICE_ENCRYPTION_KEY",
+    b"HWPX_CORPUS_SOURCE",
+    b"CAMPAIGN_UNAVAILABLE",
+    b"CAMPAIGN_QUEUE_UNAVAILABLE",
+    b"start_practice_scenario",
+    b"apply_practice_scenario",
+    b"start_practice_campaign",
+    b"get_practice_campaign",
+    b"continue_practice_campaign",
+    b"cancel_practice_campaign",
+    b"export_practice_campaign",
+)
+
 
 def _git_paths(*args: str) -> list[str]:
     result = subprocess.run(
@@ -39,6 +58,8 @@ def _forbidden_path(path: str, kind: str) -> bool:
     if kind == "mcp":
         return (
             path.startswith("docs/superpowers/")
+            or path.startswith("src/hwpx_mcp_server/practice/")
+            or path.startswith("tests/test_practice_")
             or bool(re.fullmatch(r"tests/(?:.*report.*|.*evidence.*)\.md", path))
         )
     generated_s070 = {
@@ -67,13 +88,29 @@ def _text_bytes(path: Path) -> bytes | None:
 
 def _wheel_failures() -> list[str]:
     failures: list[str] = []
-    rejected = ("tests/", "shared/hwpx/", "docs/superpowers/", "examples/out/", ".harness/", ".omx/")
+    rejected = (
+        "tests/",
+        "shared/hwpx/",
+        "docs/superpowers/",
+        "examples/out/",
+        ".harness/",
+        ".omx/",
+        "hwpx_mcp_server/practice/",
+    )
     for wheel in sorted((ROOT / "dist").glob("*.whl")):
         with zipfile.ZipFile(wheel) as archive:
             names = archive.namelist()
             for name in names:
                 if name.startswith(rejected) or any(f"/{part}" in f"/{name}" for part in rejected):
                     failures.append(f"{wheel.relative_to(ROOT)} contains {name}")
+                if name.endswith(".py"):
+                    data = archive.read(name)
+                    for marker in _MCP_INTERNAL_RUNTIME_MARKERS:
+                        if marker in data:
+                            failures.append(
+                                f"{wheel.relative_to(ROOT)} contains internal runtime marker "
+                                f"{marker.decode('ascii')!r} in {name}"
+                            )
             for name in names:
                 if not name.endswith(".dist-info/METADATA"):
                     continue
@@ -84,6 +121,20 @@ def _wheel_failures() -> list[str]:
                 ]
                 if any(line.startswith("requires-dist: modelcontextprotocol") for line in requirements):
                     failures.append(f"{wheel.relative_to(ROOT)} declares modelcontextprotocol")
+    return failures
+
+
+def _mcp_runtime_failures(tracked: list[str]) -> list[str]:
+    failures: list[str] = []
+    for rel in tracked:
+        if not rel.startswith("src/") or not rel.endswith(".py"):
+            continue
+        data = (ROOT / rel).read_bytes()
+        for marker in _MCP_INTERNAL_RUNTIME_MARKERS:
+            if marker in data:
+                failures.append(
+                    f"internal runtime marker {marker.decode('ascii')!r}: {rel}"
+                )
     return failures
 
 
@@ -165,6 +216,8 @@ def main() -> int:
 
     failures.extend(_hwpx_member_failures(tracked, workstation_path, private_markers))
     failures.extend(_action_pin_failures(tracked))
+    if kind == "mcp":
+        failures.extend(_mcp_runtime_failures(tracked))
     failures.extend(_wheel_failures())
     if failures:
         for failure in failures:

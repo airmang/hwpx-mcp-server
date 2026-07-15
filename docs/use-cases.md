@@ -10,13 +10,13 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 
 기존에는 한글 파일을 열어서 일일이 수작업으로 처리해야 했던 일을, 이제 자연어 요청으로 자동화할 수 있습니다.
 
-기본 모드 47개(고급 모드 포함 총 57개)의 도구로 문서 생성,
+기본 모드 126개(고급 모드 포함 총 136개)의 도구로 문서 생성,
 선언형 document-plan 생성, 운영 계획서 품질 프로필, 검색, 치환, 표 편집,
 서식 적용, HWPX repair/recover까지 처리할 수 있습니다.
 
 현재 MCP 표면, document-plan, template-formfit, visual-review handoff
-워크플로의 문서화/테스트 기준 upstream 버전 바닥은
-현재 릴리스 요구 사항은 `python-hwpx >= 2.29.2`입니다.
+워크플로의 문서화·테스트 기준 upstream 버전 바닥은
+`python-hwpx >= 3.0.0`입니다.
 
 선언형 document-plan 생성은 `validate_document_plan`으로 먼저 검증합니다.
 `ok=false`이면 `issues[].path`와 `repairHints[]`를 따라 JSON plan을 고친 뒤
@@ -224,7 +224,7 @@ hwpx-mcp-server
 
 업스트림 버전 참고:
 - `Python >= 3.10`
-- `python-hwpx >= 2.29.2`
+- `python-hwpx >= 3.0.0`
 
 MCP 설정 예시:
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "2.23.1"
+version = "3.0.0"
 description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "python-hwpx>=2.29.2", # workspace hardening/public hygiene plus prior typed blueprint and document safety
+    "python-hwpx>=3.0.0", # public product boundary plus prior typed blueprint and document safety
 
     "pydantic>=2.7",
     "cryptography>=42.0",
@@ -39,8 +39,8 @@ http = ["uvicorn>=0.30"]
 ingest = ["markitdown[pdf,docx,xlsx]>=0.1.6,<0.2"]
 # 직인 날인/검증의 한컴 렌더 오라클 경로(렌더→fitz word/image bbox). macOS+Hancom 필요;
 # 없으면 place_seal/check_seal_compliance가 renderChecked=false로 정직하게 degrade한다.
-oracle = ["python-hwpx[visual]>=2.29.2"]
-vision = ["python-hwpx[visual]>=2.29.2"]
+oracle = ["python-hwpx[visual]>=3.0.0"]
+vision = ["python-hwpx[visual]>=3.0.0"]
 test = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
@@ -59,7 +59,7 @@ Issues = "https://github.com/airmang/hwpx-mcp-server/issues"
 "hwpx-mcp-server" = "hwpx_mcp_server.server:main"
 
 # Co-located development: resolve python-hwpx from the sibling checkout.
-# This affects local `uv` resolution only; published metadata keeps `python-hwpx>=2.29.2`.
+# This affects local `uv` resolution only; published metadata keeps `python-hwpx>=3.0.0`.
 [tool.uv.sources]
 python-hwpx = { path = "../python-hwpx", editable = true }
 

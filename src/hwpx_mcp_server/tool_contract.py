@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 
-MIN_PYTHON_HWPX = "2.29.2"
-MIN_MCP_VERSION = "2.23.1"
-MIN_SKILL_VERSION = "0.1.31"
+MIN_PYTHON_HWPX = "3.0.0"
+MIN_MCP_VERSION = "3.0.0"
+MIN_SKILL_VERSION = "0.2.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,8 +80,6 @@ _SKILL_REQUIRED_TOOLS = {
     "score_form_fill",
     "run_fixture_benchmark",
     "export_fixture_benchmark",
-    "start_practice_scenario",
-    "apply_practice_scenario",
 }
 
 
@@ -99,23 +97,6 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
             "apply_document_commands",
             "dump_document_blueprint",
             "replay_document_blueprint",
-        ),
-    ),
-    DomainSpec(
-        "private_practice",
-        "비공개 코퍼스 합성 연습",
-        "불투명 scenario/campaign ID로 private 경로와 평가 gold를 숨긴 채 합성 HWPX 연습을 준비·실행.",
-        "start_practice_scenario로 합성 work order를 확인하고 decision preview 뒤 "
-        "apply_practice_scenario(confirm=true)로 별도 destination에만 적용한다. Leap B 캠페인은 "
-        "start_practice_campaign(confirm=true) 뒤 bounded continue와 명시적 decision receipt로만 진행한다.",
-        (
-            "start_practice_scenario",
-            "apply_practice_scenario",
-            "start_practice_campaign",
-            "get_practice_campaign",
-            "continue_practice_campaign",
-            "cancel_practice_campaign",
-            "export_practice_campaign",
         ),
     ),
     DomainSpec(

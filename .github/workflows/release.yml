@@ -40,7 +40,9 @@ jobs:
         run: python -m pytest -q
       - name: Verify generated ToolSpec documentation
         working-directory: hwpx-mcp-server
-        run: python scripts/render_tool_contract.py --check --skip-skill
+        run: |
+          python scripts/render_tool_contract.py --check --skip-skill
+          python scripts/render_contract_delta.py --check
 
   release:
     needs: prepublish
