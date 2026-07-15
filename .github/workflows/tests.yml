@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -e ../python-hwpx
+        working-directory: hwpx-mcp-server
       - run: python -m pip install -e ".[test]"
         working-directory: hwpx-mcp-server
       - run: python scripts/check_public_hygiene.py
@@ -62,6 +64,16 @@ jobs:
         run: |
           python -m pip install build
           python -m build --wheel
+      - name: Wait for the released core dependency
+        run: |
+          for attempt in $(seq 1 20); do
+            if python -m pip install --no-cache-dir "python-hwpx>=2.29.2"; then
+              exit 0
+            fi
+            echo "python-hwpx>=2.29.2 is not visible yet (${attempt}/20)"
+            sleep 15
+          done
+          exit 1
       - name: Install wheel in a clean environment
         working-directory: hwpx-mcp-server
         env:

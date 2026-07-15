@@ -19,6 +19,8 @@
   `markitdown[pdf,docx,xlsx]>=0.1.6,<0.2`, matching the advertised input formats.
 - Adds clean base/all-extra installation checks, public text/HWPX/wheel hygiene, Ruff `E9,F`, CodeQL,
   dependency review, Dependabot, immutable Action pins, and CycloneDX release SBOM generation.
+- Makes source CI install the checked-out core explicitly and lets the public-wheel job wait for the newly
+  released core to become visible on PyPI, avoiding a false failure during dependency-ordered releases.
 - Requires `python-hwpx>=2.29.2` while preserving the exact 133 default / 143 advanced tool names.
 
 ## [2.23.0] - 2026-07-15
