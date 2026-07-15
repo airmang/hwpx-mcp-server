@@ -19,6 +19,8 @@
 - Retains the public 2.18.3 SQUEEZE-cell safety through `python-hwpx>=2.29.1`; changed non-empty cells wrap with
   `BREAK`, while no-op, clear, and untouched cells preserve their original mode.
 - Makes the release-facing `test` extra self-contained for visual fixture tests by installing Pillow and NumPy.
+- Resolves the render-worker integration fixture from `PYTHON_HWPX_REPO` or the standard sibling checkout instead
+  of a retired Stage-specific `python-hwpx-s067` worktree name, so GitHub CI exercises the current public core.
 
 ### Note
 - Binds to the corrected public core release `2.29.1`; core `v2.29.0` was an immutable failed prepublish tag

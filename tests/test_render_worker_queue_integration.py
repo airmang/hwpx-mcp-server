@@ -3,13 +3,15 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import io
+import os
 import sys
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKER_MODULE = ROOT / "python-hwpx-s067" / "src" / "hwpx" / "visual" / "hancom_worker.py"
+PYTHON_HWPX_REPO = Path(os.environ.get("PYTHON_HWPX_REPO", ROOT / "python-hwpx")).expanduser().resolve()
+WORKER_MODULE = PYTHON_HWPX_REPO / "src" / "hwpx" / "visual" / "hancom_worker.py"
 worker_spec = importlib.util.spec_from_file_location("hwpx.visual.hancom_worker", WORKER_MODULE)
 worker_module = importlib.util.module_from_spec(worker_spec)
 assert worker_spec and worker_spec.loader
@@ -22,7 +24,7 @@ from hwpx_mcp_server.workflow.render_security import RenderSecurityPolicy
 from hwpx_mcp_server.workflow.rendering import RenderJobV2, RenderStatus
 
 
-SCRIPT = ROOT / "python-hwpx-s067" / "scripts" / "hancom_render_worker.py"
+SCRIPT = PYTHON_HWPX_REPO / "scripts" / "hancom_render_worker.py"
 spec = importlib.util.spec_from_file_location("s068_hancom_render_worker", SCRIPT)
 module = importlib.util.module_from_spec(spec); assert spec and spec.loader; spec.loader.exec_module(module)
 run_queue_once = module.run_queue_once
