@@ -17,7 +17,7 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 현재 MCP 표면, document-plan, template-formfit, visual-review handoff
 워크플로의 문서화·테스트 기준 upstream 버전 바닥은
 `python-hwpx >= 3.1.0`입니다. 설치 표면의 계약 해시는
-`16dd2a477260e7be`이며, 공개 전에는 후보 좌표로만 취급합니다.
+`71661f4118e020c4`이며, 공개 전에는 후보 좌표로만 취급합니다.
 
 선언형 document-plan 생성은 `validate_document_plan`으로 먼저 검증합니다.
 `ok=false`이면 `issues[].path`와 `repairHints[]`를 따라 JSON plan을 고친 뒤
@@ -27,12 +27,12 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 `inspect_document_authoring_quality`의 package/schema issue와
 `quality.profiles.operating_plan.gaps[]`, `repair_hints[]`를 확인합니다.
 
-승인된 HWPX 양식을 보존해야 할 때는 P6 baseline 기반
-`analyze_template_formfit` → `apply_template_formfit` 흐름을 사용합니다.
-분석 단계는 원본을 변경하지 않으며, 적용 단계는 원본과 다른 destination에
-복사한 뒤에만 반영합니다. `source.preserved`, package/schema validation,
-`residual_markers.blocking`, `visual_review_required`를 handoff 증거로
-확인합니다.
+승인된 HWPX 양식을 보존해야 할 때는 `analyze_form_fill(plan=...)` →
+`apply_form_fill(plan=...)` → `verify_form_fill(plan=...)`의 canonical mixed-form
+흐름을 사용합니다. 분석 단계는 원본을 변경하지 않으며, 적용 단계는 원본과 다른
+destination에 한 번만 commit합니다. unified receipt의 rollback/idempotency,
+byte-preservation, reopen, privacy, openSafety와 요구된 실제 렌더 증거를 handoff에서
+확인합니다. template-formfit 쌍은 기존 자동화를 위한 호환 경로입니다.
 
 한컴에서 열리지 않거나 ZIP 오류가 의심되는 HWPX는 원본을 덮어쓰지 않고
 `repair_hwpx`로 새 복구 복사본을 만듭니다. central directory 손상처럼 일반
@@ -275,7 +275,7 @@ Current workflow boundary:
 - There is no active public `fill_template` tool on the FastMCP surface.
 - There is no active public `save` / `save_as` tool on the FastMCP surface; mutating tools persist immediately, so use `copy_document` when you need a reviewable output path.
 - Use `copy_document` first when you need a reviewable or low-risk edit path because mutating tools persist immediately.
-- Use advanced mode for package inspection and validation steps: `package_parts`, `package_get_xml`, `package_get_text`, `plan_edit`, `preview_edit`, `apply_edit`, `validate_structure`.
+- Use advanced mode for package inspection and validation steps: `package_parts`, `package_get_xml`, `package_get_text`, and `validate_structure`. Use `apply_document_commands` for new heterogeneous atomic edit flows; `plan_edit`, `preview_edit`, and `apply_edit` are deprecated transition stubs.
 
 Layer ownership:
 
@@ -285,17 +285,15 @@ Layer ownership:
 
 ## Agent-first proposal document generation
 
-When `python-hwpx` exposes `hwpx.presets`, the MCP server can generate and inspect proposal/planning documents with high-level tools:
-
-- `create_proposal_document(filename, proposal_spec, style_preset="clean_korean_proposal")`
-- `inspect_document_quality(filename, rubric="proposal")`
+The MCP server generates proposal/planning documents through the canonical document-plan path and inspects the result with `inspect_document_quality`.
 
 Recommended flow:
 
-1. Convert the user's natural-language request into `proposal_spec` JSON.
-2. Call `create_proposal_document` to write the HWPX.
-3. Call `inspect_document_quality` to check validation, required sections, tables, asset weight, rubric scores, and the v2 `sample_match` proxy dimensions.
-4. Revise `proposal_spec` if average rubric score is below 4.0, `sample_match.pass` is false, or a required section is missing.
+1. Convert the user's natural-language request into a proposal-shaped `hwpx.document_plan.v1`.
+2. Call `validate_document_plan`, then `analyze_document_plan` without writing a file.
+3. Call `create_document_from_plan` to write and verify the HWPX.
+4. Call `inspect_document_quality` to check validation, required sections, tables, asset weight, rubric scores, and the v2 `sample_match` proxy dimensions.
+5. Revise the plan if average rubric score is below 4.0, `sample_match.pass` is false, or a required section is missing. `create_proposal_document` remains only as a compatibility facade.
 
 This path intentionally benchmarks DOCX-style document principles without implementing a DOCX converter, GUI, model tuning, renderer, or pixel-diff gate. `visual_review_required=True` means rendered parity is not claimed.
 

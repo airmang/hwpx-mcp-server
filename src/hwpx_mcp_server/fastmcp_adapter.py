@@ -18,6 +18,8 @@ from typing import Annotated, Any, Callable, Mapping, get_args, get_origin, get_
 from mcp.server.fastmcp import FastMCP
 from pydantic import TypeAdapter
 
+from .execution_lock import PUBLIC_MUTATION_LOCK
+
 
 class FastMcpAdapterError(RuntimeError):
     """FastMCP cannot provide the registry guarantees required by the server."""
@@ -122,6 +124,9 @@ def _restore_parameter_schema_extras(
         extra = _annotation_schema_extra(annotation)
         if extra and isinstance(properties[name], dict):
             properties[name].update(extra)
+    top_level_extra = getattr(func, "__hwpx_input_schema_extra__", None)
+    if isinstance(top_level_extra, Mapping):
+        restored.update(copy.deepcopy(dict(top_level_extra)))
     return restored
 
 
@@ -160,6 +165,47 @@ def _registration_callable(func: Callable[..., Any]) -> tuple[Callable[..., Any]
     return structured_wrapper, True
 
 
+def _serialize_mutation_callable(
+    func: Callable[..., Any],
+    *,
+    mutates: bool,
+) -> Callable[..., Any]:
+    """Serialize catalog-declared writers without changing their tool schema."""
+
+    if not mutates:
+        return func
+
+    @functools.wraps(func)
+    def serialized(*args: Any, **kwargs: Any) -> Any:
+        with PUBLIC_MUTATION_LOCK:
+            return func(*args, **kwargs)
+
+    # The public server module uses postponed annotations.  A wrapper defined
+    # in this adapter has a different globals namespace, so copying annotation
+    # strings verbatim makes FastMCP try to resolve e.g. ``mcp_types`` here and
+    # can incorrectly treat CallToolResult as structured output.  Bind the
+    # already-resolved objects onto both the signature and annotations.
+    try:
+        resolved_hints = get_type_hints(func, include_extras=True)
+    except (NameError, TypeError):
+        resolved_hints = dict(getattr(func, "__annotations__", {}))
+    original_signature = inspect.signature(func)
+    serialized.__signature__ = original_signature.replace(  # type: ignore[attr-defined]
+        parameters=[
+            parameter.replace(
+                annotation=resolved_hints.get(parameter.name, parameter.annotation)
+            )
+            for parameter in original_signature.parameters.values()
+        ],
+        return_annotation=resolved_hints.get(
+            "return", original_signature.return_annotation
+        ),
+    )
+    serialized.__annotations__ = resolved_hints
+    setattr(serialized, "__hwpx_original_callable__", original_callable(func))
+    return serialized
+
+
 def original_callable(func: Callable[..., Any]) -> Callable[..., Any]:
     """Return the public server function behind an adapter-generated wrapper."""
 
@@ -193,6 +239,10 @@ def _register(
     meta: Mapping[str, Any],
 ) -> FastMcpToolSnapshot:
     adapted, structured_output = _registration_callable(func)
+    adapted = _serialize_mutation_callable(
+        adapted,
+        mutates=bool(meta.get("hwpxMutates")),
+    )
     tool_method = getattr(mcp, "tool", None)
     if not callable(tool_method):
         raise FastMcpAdapterError("FastMCP.tool is unavailable")

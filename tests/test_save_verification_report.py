@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -65,6 +66,56 @@ def test_save_verification_report_tracks_pre_post_diff(tmp_path: Path) -> None:
     assert report["totals"]["paragraphs"] >= 1
     assert report["diffSummary"]["paragraphs"] >= 1
     assert pre_save_snapshot is not None
+
+
+def test_verification_report_accepts_immutable_bytes_without_source_path(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "verification-bytes.hwpx"
+    create_blank(str(target))
+    payload = target.read_bytes()
+    target.unlink()
+
+    report = build_hwpx_verification_report(payload, file_path=target)
+    open_safety = build_hwpx_open_safety_report(payload)
+
+    assert report["ok"] is True
+    assert report["filePath"] == str(target)
+    assert report["fileSizeBytes"] == len(payload)
+    assert report["openSafety"]["ok"] is True
+    assert open_safety["ok"] is True
+
+
+def test_local_storage_success_removes_validation_tempfile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "no-validation-temp-residue.hwpx"
+    create_blank(str(target))
+    storage = LocalDocumentStorage(base_directory=tmp_path, auto_backup=False)
+    doc = open_doc(str(target))
+    doc.add_paragraph("successful save must remove its validation tempfile")
+    created_candidates: list[Path] = []
+    real_mkstemp = storage_module.tempfile.mkstemp
+
+    def tracked_mkstemp(*args: Any, **kwargs: Any) -> tuple[int, str]:
+        kwargs["dir"] = tmp_path
+        fd, name = real_mkstemp(*args, **kwargs)
+        created_candidates.append(Path(name))
+        return fd, name
+
+    class TrackedTempfile:
+        mkstemp = staticmethod(tracked_mkstemp)
+
+    monkeypatch.setattr(storage_module, "tempfile", TrackedTempfile)
+    try:
+        report = storage.save_document(doc, target)
+    finally:
+        doc.close()
+
+    assert report["ok"] is True
+    assert created_candidates
+    assert all(not candidate.exists() for candidate in created_candidates)
 
 
 def test_save_verification_report_flags_placeholders_and_suspicious_patterns(tmp_path: Path) -> None:

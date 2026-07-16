@@ -17,8 +17,14 @@
   registration, callables, signatures, schemas, profiles, health/capabilities,
   generated documentation, and the plugin contract.
 - The transition surface is 121 default / 132 advanced tools with contract hash
-  `16dd2a477260e7be`. Existing `hwpx.formfill.v1`, evalplan, native-field, and exam
+  `71661f4118e020c4`. Existing `hwpx.formfill.v1`, evalplan, native-field, and exam
   behavior remains explicit; five older planner tools are deprecated for one transition.
+
+### Fixed
+- Pre-reserves exact, randomly named recovery sidecars before transactional form and
+  byte-preserving writes. Successful writes remove them after final identity checks;
+  failed or raced writes retain the immutable preimages without overwriting an external
+  winner, including publish-then-claim-loss and sparse backup-rotation cases.
 
 ### Removed
 - Retires the pre-FastMCP 70-tool shadow registry and its unused legacy server,
@@ -194,7 +200,7 @@
 
 ## [2.5.0] - 2026-06-24
 ### Added
-- VisualComplete quality contract (no model can bypass the gate): every write funnels through python-hwpx's single `SavePipeline` and the capability handshake, and write responses carry a `visualComplete` block (`ok`/`status`/`errorCodes`/`warnings`/`suggestedRetry`). (`byte_preserving_patch` is a byte-preserving fast path: open-safety + capability gated, render gate N/A by design.)
+- VisualComplete quality contract for general document saves: these writes use python-hwpx's `SavePipeline` and capability handshake, and their responses carry a `visualComplete` block (`ok`/`status`/`errorCodes`/`warnings`/`suggestedRetry`). (`byte_preserving_patch` is an explicit byte-preserving fast path: open-safety + capability gated, render gate N/A by design.)
 - `quality` block on writes (default `transparent`; `strict` or per-field overrides like `overflowPolicy`/`layoutLint`). On a gate failure the save is withheld (`ok=false`) and the model gets a structured, retry-able error (`FIELD_OVERFLOW`, `STALE_LINESEG_DETECTED`, `VISUAL_COMPLETE_FAILED`, …) with `suggestedRetry`. New `HWPX_MCP_QUALITY` global default.
 - Capability handshake in `mcp_server_health` (core/mcp/plugin versions + fingerprint hash) that **fails closed** on skew — writes are blocked when the installed python-hwpx can't honour the gate. Bypass with `HWPX_MCP_REQUIRE_CAPABILITY=0`.
 - README "no raw XML" quality-contract section.

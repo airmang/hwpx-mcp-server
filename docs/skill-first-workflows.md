@@ -10,17 +10,15 @@ Scope for this pass:
 
 ## Current Tool Coverage
 
-`HWPX_MCP_ADVANCED=1` is required for package inspection, validation, and plan/review tools.
+`HWPX_MCP_ADVANCED=1` is required for package inspection and low-level validation. The canonical heterogeneous edit entry point, `apply_document_commands`, is available in the default profile.
 
 | Workflow need | Existing MCP tools | Notes |
 |---|---|---|
 | Read package parts | `package_parts` | Advanced mode only. |
 | Extract XML/text | `package_get_xml`, `package_get_text`, `get_document_text`, `get_paragraph_text`, `get_paragraphs_text`, `hwpx_extract_json`, `hwpx_to_markdown`, `hwpx_to_html` | Use package-level extraction when exact part shape matters. |
 | Validate structure | `validate_structure`, `lint_text_conventions` | `lint_text_conventions` is optional style/text policy linting. |
-| Plan edits | `plan_edit` | Review/verification planning only. |
-| Preview plans | `preview_edit` | Shows the plan artifact before confirmation. |
-| Apply plans | `apply_edit` | Applies the review pipeline state, not general direct HWPX mutations. |
-| Template fill | `copy_document` + `batch_replace` / `search_and_replace` / `set_table_cell_text` | No public `fill_template` tool on the active FastMCP surface. |
+| Apply heterogeneous edits | `apply_document_commands` | One atomic set/add/remove/move/copy command batch with dry-run, revision, and idempotency guards. |
+| Mixed-form fill | `analyze_form_fill` → `apply_form_fill` → `verify_form_fill` | Canonical atomic route across native fields, labeled cells, canonical paths, and body anchors; narrow replacement/cell tools are compatibility paths. |
 | Save/copy flows | `copy_document` plus the normal mutating tools | Mutating tools persist immediately through the shared atomic save path. Reviewable handoff는 copied working file을 기준으로 잡는다. |
 
 Important boundary:
@@ -45,7 +43,7 @@ Suggested order:
    - `set_table_cell_text` for fixed table locations
    - `insert_paragraph`, `add_paragraph`, `add_heading`, `add_memo` only when structure really must change
 6. Re-read the touched areas and rerun `validate_structure`.
-7. If a review artifact is useful, use `plan_edit` and `preview_edit` to capture the intended change flow before or alongside manual review.
+7. For a heterogeneous change set, run `apply_document_commands` with `dry_run=true`, review the receipt, then apply the same bounded commands with the captured revision and an idempotency key.
 
 Layout drift controls:
 
@@ -56,36 +54,37 @@ Layout drift controls:
 
 Limitations:
 
-- `plan_edit`, `preview_edit`, and `apply_edit` are not a full semantic patch engine for arbitrary HWPX edits.
+- `apply_document_commands` is limited to its typed set/add/remove/move/copy command union; use a domain-specific tool when its evidence or semantics are required.
 - There is no public structure-diff or layout-drift report tool on the active surface.
 - Package inspection is diagnostic; interpretation still belongs to the workflow layer.
 
 ## Workflow 2: Government or Public-Form Filling
 
-Use when a public-sector or administrative form already exists and the main task is controlled field replacement with low drift.
+Use when an existing form mixes native fields, labeled table cells, canonical document paths, and body-text anchors that must commit as one verified transaction.
 
 Suggested order:
 
-1. `copy_document` from the official form or approved reference copy.
-2. Read the visible structure with `get_document_outline`, `get_paragraphs_text`, and `get_table_text`.
-3. If placeholders are unclear, inspect relevant parts with `package_parts` and `package_get_text`.
-4. Fill stable placeholders with `batch_replace`.
-5. Fill one-off labels or small fixed strings with `search_and_replace`.
-6. Fill table cells with `set_table_cell_text`.
-7. Use `format_text` only for clearly localized emphasis changes.
-8. Run `validate_structure` before handing off the filled form.
+1. Keep the approved source immutable and choose a distinct output path.
+2. Read visible structure with `list_form_fields`, `get_document_outline`, `get_paragraphs_text`, and `get_table_map`.
+3. Build one strict `hwpx.mixed-form-plan/v1` covering the required `nativeField`, `labelCell`, `canonicalPath`, and `bodyAnchor` operations.
+4. Call `analyze_form_fill(plan=...)` without modifying the document; review the compiled plan, locator evidence, revisions, and any ambiguity.
+5. Apply the reviewed compiled plan with `apply_form_fill(plan=compiledPlan)`. The output is committed once or rolled back as a whole.
+6. Call `verify_form_fill(plan=compiledPlan, expected_output_revision=...)` and retain the unified open-safety, byte-preservation, reopen, privacy, and optional render receipt.
+7. Use `apply_evalplan_fill` for the preserved evaluation-plan workflow and `compose_exam` for exam composition; do not fold either into the generic mixed-form route.
+8. Use `fill_form_field`, `batch_replace`, or `set_table_cell_text` only for retained single-target compatibility work where the canonical mixed transaction is unnecessary.
 
 Layout drift controls:
 
-- Prefer placeholder replacement over inserting new paragraphs.
+- Prefer existing fields and anchors over inserting new paragraphs.
 - Keep table geometry unchanged unless the form explicitly allows it.
-- Re-read the affected paragraphs or cells after each batch-sized edit.
+- Treat ambiguous or multi-match locators as blocked until the plan is narrowed.
+- Require a successful unified verification receipt before handoff.
 
 Limitations:
 
-- There is no public field-binding API for government forms.
-- Repeated labels can still require human disambiguation.
-- Complex approval seals, drawing objects, or package-level reference comparisons still need upstream or future MCP support.
+- Repeated labels can still require human disambiguation during analysis.
+- The canonical transaction does not replace the dedicated evaluation-plan or exam workflows.
+- Complex approval seals or unsupported drawing-object mutations still require their dedicated tools or manual review.
 
 ## Workflow 3: Template-Based Document Generation
 
@@ -121,7 +120,7 @@ Suggested order:
 
 1. `copy_document` to create a disposable working draft.
 2. Capture the baseline with `get_document_text`, `get_document_outline`, or advanced package reads.
-3. Use `plan_edit` and `preview_edit` when you want an explicit review/verification artifact.
+3. Use `apply_document_commands(..., dry_run=true)` when you want an explicit review/verification receipt for a heterogeneous command batch.
 4. Perform only bounded mutating operations on the working draft.
 5. Re-read the touched areas and rerun `validate_structure`.
 6. Keep or rename the reviewed copy outside the MCP workflow once approved.

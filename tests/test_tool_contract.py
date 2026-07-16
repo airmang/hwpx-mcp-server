@@ -8,6 +8,7 @@ from pathlib import Path
 
 import anyio
 import pytest
+from jsonschema import Draft202012Validator
 
 from hwpx_mcp_server import __version__
 from hwpx_mcp_server import server
@@ -126,6 +127,18 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert "전문 도구" in agent_domains[0].when_to_use
 
 
+def test_artifact_materializing_render_tools_are_marked_mutating() -> None:
+    specs = {spec.name: spec for spec in BASELINE_TOOL_SPECS}
+
+    assert {
+        name: specs[name].mutates
+        for name in ("render_preview", "render_status")
+    } == {
+        "render_preview": True,
+        "render_status": True,
+    }
+
+
 def test_release_contract_versions_counts_and_hash_are_exact() -> None:
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
         "3.1.0",
@@ -200,15 +213,107 @@ def test_canonical_form_fill_tools_use_typed_closed_top_level_schemas() -> None:
     assert analyze["additionalProperties"] is False
     assert apply["additionalProperties"] is False
     assert verify["additionalProperties"] is False
-    assert any("$ref" in option for option in analyze["properties"]["input_json"]["anyOf"])
+    assert len(analyze["oneOf"]) == 2
+    assert len(apply["oneOf"]) == 2
+    assert any(
+        "$ref" in option for option in analyze["properties"]["input_json"]["anyOf"]
+    )
     assert "$ref" in apply["properties"]["analysis"]
-    assert set(verify["properties"]) == {"filename", "before_path", "require", "plan"}
-    assert verify["properties"]["plan"]["$ref"].endswith(
-        "MixedFormCompiledPlanInput"
+    assert set(verify["properties"]) == {
+        "filename",
+        "before_path",
+        "require",
+        "plan",
+        "expected_output_revision",
+    }
+    assert verify["properties"]["plan"]["$ref"].endswith("MixedFormCompiledPlanInput")
+    assert len(verify["oneOf"]) == 2
+    assert verify["oneOf"][0]["required"] == ["plan"]
+    assert verify["oneOf"][1]["required"] == ["filename", "before_path"]
+    validator = Draft202012Validator(verify)
+    assert not list(
+        validator.iter_errors({"filename": "after.hwpx", "before_path": "before.hwpx"})
+    )
+    assert list(validator.iter_errors({}))
+    assert list(validator.iter_errors({"filename": "after.hwpx"}))
+    assert list(validator.iter_errors({"plan": None}))
+    assert list(
+        validator.iter_errors(
+            {
+                "filename": "after.hwpx",
+                "before_path": "before.hwpx",
+                "expected_output_revision": "sha256:" + "0" * 64,
+            }
+        )
     )
 
 
-def test_missing_required_core_symbol_is_startup_fatal_and_never_ghost_registered() -> None:
+def test_form_tool_outputs_publish_typed_receipts_in_live_contract() -> None:
+    outputs = {
+        name: bound_tool_registry().by_name()[name].output_schema
+        for name in (
+            "analyze_form_fill",
+            "apply_form_fill",
+            "verify_form_fill",
+            "apply_table_ops",
+            "apply_body_ops",
+            "apply_evalplan_fill",
+        )
+    }
+    for schema in outputs.values():
+        Draft202012Validator.check_schema(schema)
+        assert not (
+            schema.get("additionalProperties") is True
+            and schema.get("properties") == {}
+        )
+
+    analyze = outputs["analyze_form_fill"]
+    assert len(analyze["anyOf"]) == 2
+    assert analyze["$defs"]["CanonicalMixedFormAnalysisOutput"][
+        "additionalProperties"
+    ] is False
+    assert analyze["$defs"]["LegacyFormFillAnalysisOutput"][
+        "additionalProperties"
+    ] is True
+
+    apply = outputs["apply_form_fill"]
+    assert len(apply["anyOf"]) == 2
+    canonical_apply = apply["$defs"]["CanonicalMixedFormApplyOutput"]
+    assert canonical_apply["additionalProperties"] is False
+    assert canonical_apply["properties"]["verificationReceipt"]["$ref"].endswith(
+        "/FormVerificationReceipt"
+    )
+    assert apply["$defs"]["LegacyFormFillApplyOutput"][
+        "additionalProperties"
+    ] is True
+    assert apply["$defs"]["FormVerificationReceipt"][
+        "additionalProperties"
+    ] is False
+
+    verify = outputs["verify_form_fill"]
+    assert len(verify["anyOf"]) == 2
+    assert verify["$defs"]["FormVerificationReceipt"][
+        "additionalProperties"
+    ] is False
+    assert verify["$defs"]["LegacyFormFillVerifyOutput"][
+        "additionalProperties"
+    ] is True
+
+    for name in ("apply_table_ops", "apply_body_ops", "apply_evalplan_fill"):
+        schema = outputs[name]
+        assert schema["additionalProperties"] is False
+        assert "verificationReceipt" in schema["required"]
+        assert schema["properties"]["verificationReceipt"]["$ref"].endswith(
+            "/FormVerificationReceipt"
+        )
+        assert schema["$defs"]["FormVerificationReceipt"][
+            "additionalProperties"
+        ] is False
+
+
+def test_missing_required_core_symbol_is_startup_fatal_and_never_ghost_registered() -> (
+    None
+):
     code = """
 import hwpx
 delattr(hwpx, 'create_document_from_plan')
@@ -271,18 +376,25 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
     async def schemas() -> dict[str, set[str]]:
         tools = await server.mcp.list_tools()
         return {
-            tool.name: set(tool.inputSchema.get("properties", {}))
-            for tool in tools
+            tool.name: set(tool.inputSchema.get("properties", {})) for tool in tools
         }
 
     inputs = anyio.run(schemas)
     canonical = bound_tool_registry().by_name()
-    assert {"filename", "before_path", "require", "plan"} == inputs[
-        "verify_form_fill"
-    ]
-    assert {"filename", "gold_path", "blank_path", "run_render", "expected_pages"} == set(
-        canonical["score_form_fill"].input_schema["properties"]
-    )
+    assert {
+        "filename",
+        "before_path",
+        "require",
+        "plan",
+        "expected_output_revision",
+    } == inputs["verify_form_fill"]
+    assert {
+        "filename",
+        "gold_path",
+        "blank_path",
+        "run_render",
+        "expected_pages",
+    } == set(canonical["score_form_fill"].input_schema["properties"])
     assert {"filename", "blank_path"} == inputs["inspect_fill_residue"]
     assert {
         "filename",

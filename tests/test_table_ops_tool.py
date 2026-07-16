@@ -13,16 +13,18 @@ import os
 import shutil
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import hwpx
+import hwpx.table_patch as table_patch
 
 pytest.importorskip(
     "hwpx.table_patch", reason="requires python-hwpx with byte-preserving form-fill"
 )
 
 from hwpx.table_patch import _direct_cells, _iter_table_spans, build_grid
-from hwpx_mcp_server.hwpx_ops import HwpxOps
+from hwpx_mcp_server.hwpx_ops import HwpxOperationError, HwpxOps
 from hwpx_mcp_server import server
 
 _CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
@@ -120,3 +122,82 @@ def test_apply_table_ops_failclosed_out_of_range(tmp_path):
     )
     assert out["byteIdentical"] is True
     assert out["skipped"] and "out of range" in out["skipped"][0]["reason"]
+
+
+@pytest.mark.skipif(not FIXT.exists(), reason="corpus fixture not available")
+def test_apply_table_ops_noop_materializes_distinct_output(tmp_path):
+    source = tmp_path / "doc.hwpx"
+    output = tmp_path / "copy.hwpx"
+    shutil.copy(FIXT, source)
+    ops = HwpxOps(base_directory=tmp_path)
+
+    result = ops.apply_table_ops(
+        "doc.hwpx",
+        [],
+        output="copy.hwpx",
+    )
+
+    assert result["byteIdentical"] is True
+    assert result["openSafety"]["ok"] is True
+    assert output.read_bytes() == source.read_bytes()
+
+
+@pytest.mark.skipif(not FIXT.exists(), reason="corpus fixture not available")
+def test_required_render_failure_precedes_destination_publication(
+    tmp_path,
+    monkeypatch,
+):
+    source = tmp_path / "doc.hwpx"
+    output = tmp_path / "out.hwpx"
+    shutil.copy(FIXT, source)
+    source_before = source.read_bytes()
+    ops = HwpxOps(base_directory=tmp_path)
+
+    def fail_render(*args, **kwargs):
+        return SimpleNamespace(
+            render_checked=True,
+            ok=False,
+            overflow_detected=True,
+            overlap_detected=False,
+            page_count_changed=False,
+            warnings=(),
+            errors=("observed overflow",),
+        )
+
+    monkeypatch.setattr(table_patch, "verify_fill", fail_render)
+    with pytest.raises(HwpxOperationError, match="required render detected"):
+        ops.apply_table_ops(
+            "doc.hwpx",
+            [
+                {
+                    "op": "fill_cell",
+                    "table_index": 0,
+                    "row": 0,
+                    "col": 0,
+                    "text": "candidate-only",
+                }
+            ],
+            output="out.hwpx",
+            render_check="required",
+        )
+
+    assert source.read_bytes() == source_before
+    assert not output.exists()
+
+    optional = ops.apply_table_ops(
+        "doc.hwpx",
+        [
+            {
+                "op": "fill_cell",
+                "table_index": 0,
+                "row": 0,
+                "col": 0,
+                "text": "candidate-only",
+            }
+        ],
+        output="out.hwpx",
+        render_check="auto",
+    )
+    assert optional["ok"] is False
+    assert optional["renderVerdict"]["renderChecked"] is True
+    assert not output.exists()

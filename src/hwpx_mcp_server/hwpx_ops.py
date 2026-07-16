@@ -20,7 +20,7 @@ import tempfile
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
@@ -59,9 +59,21 @@ from .core.content import (
 from . import quality as quality_contract
 from .errors import build_error_payload
 from .storage import DocumentStorage, LocalDocumentStorage, build_hwpx_verification_report
-from .workspace import WorkspacePathError
+from .workspace import (
+    WorkspaceMissingParentGuard,
+    WorkspaceOutputGuard,
+    WorkspacePathError,
+)
 from .core.search import batch_replace_in_doc, replace_in_doc
-from .core.transactions import rotate_and_backup, save_dry_run, semantic_diff, undo_last_backup
+from .core.transactions import (
+    BackupReport,
+    backup_path_for,
+    rotate_and_backup,
+    rotated_backup_path,
+    save_dry_run,
+    semantic_diff,
+    undo_last_backup,
+)
 from .upstream import (
     AnnotationOptions,
     HH_NS,
@@ -196,6 +208,35 @@ class HwpxOperationError(RuntimeError):
 
 class HwpxHandleNotFoundError(HwpxOperationError):
     """등록되지 않은 핸들 조회 시 사용하는 예외."""
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _ExactSidecarMutation:
+    """One identity-bound sidecar publication and its exact prestate."""
+
+    before_guard: WorkspaceOutputGuard
+    before_bytes: bytes | None
+    publication: WorkspaceOutputGuard
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _ExactRecoveryPublication:
+    """One randomly named exact recovery publication and its immutable bytes."""
+
+    base_path: Path
+    data: bytes
+    mode: int | None
+    marker: str
+    publication: WorkspaceOutputGuard
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _ExactBackupResult:
+    """Backup receipt plus reversible identity-bound sidecar publications."""
+
+    report: BackupReport
+    mutations: tuple[_ExactSidecarMutation, ...] = ()
+    recoveries: tuple[_ExactRecoveryPublication, ...] = ()
 
 
 class HwpxOps:
@@ -492,7 +533,10 @@ class HwpxOps:
         verification["backup"] = backup.to_dict()
         if backup.backup_path is not None:
             try:
-                verification["semanticDiff"] = semantic_diff(backup.backup_path, target)
+                verification["semanticDiff"] = semantic_diff(
+                    backup.backup_path,
+                    target,
+                )
             except Exception as exc:  # pragma: no cover - diagnostic fallback
                 verification["semanticDiff"] = {
                     "schemaVersion": "hwpx.semantic-diff.v1",
@@ -502,6 +546,356 @@ class HwpxOps:
                     "error": str(exc),
                 }
         return verification
+
+    @staticmethod
+    def _report_for_bytes(data: bytes, *, file_path: Path) -> Dict[str, Any]:
+        return build_hwpx_verification_report(data, file_path=file_path)
+
+    @staticmethod
+    def _semantic_diff_bytes(before: bytes, after: bytes) -> Dict[str, Any]:
+        return semantic_diff(before, after)
+
+    def _capture_exact_sidecar_guard(self, path: Path) -> WorkspaceOutputGuard:
+        """Authorize one derived sidecar name without following a final alias."""
+
+        if not isinstance(self.storage, LocalDocumentStorage):  # pragma: no cover
+            raise TypeError("exact sidecar guards require local storage")
+        lexical_path = path.parent.resolve(strict=True) / path.name
+        guard = self.storage.capture_output_guard(path)
+        if guard.path != lexical_path:
+            raise WorkspacePathError(
+                "derived backup path must not be a symlink or alias",
+                code="WORKSPACE_PATH_INVALID",
+                reason="output_target_alias",
+            )
+        return guard
+
+    @staticmethod
+    def _absent_publication_guard(
+        guard: WorkspaceOutputGuard,
+    ) -> WorkspaceOutputGuard:
+        """Represent the exact absent state produced by a guarded deletion."""
+
+        return dataclasses.replace(
+            guard,
+            target_existed=False,
+            target_device=None,
+            target_inode=None,
+            target_digest=None,
+            target_mode=None,
+        )
+
+    def _assert_exact_sidecar_publication(
+        self,
+        guard: WorkspaceOutputGuard,
+    ) -> None:
+        """Revalidate either an exact file publication or guarded absence."""
+
+        if guard.target_existed:
+            self.storage.read_guarded_bytes(guard)
+            return
+        observed = self._capture_exact_sidecar_guard(guard.path)
+        if (
+            observed.target_existed
+            or observed.path != guard.path
+            or observed.root != guard.root
+            or observed.root_device != guard.root_device
+            or observed.root_inode != guard.root_inode
+            or observed.parent_device != guard.parent_device
+            or observed.parent_inode != guard.parent_inode
+        ):
+            raise WorkspacePathError(
+                "deleted sidecar changed before completion",
+                code="WORKSPACE_PATH_CHANGED",
+                reason="output_target_changed",
+            )
+
+    def _publish_exact_recovery(
+        self,
+        base_path: Path,
+        data: bytes,
+        *,
+        mode: int | None,
+        marker: str,
+        max_candidates: int = 32,
+    ) -> _ExactRecoveryPublication:
+        """Publish recovery bytes without overwriting an existing sidecar."""
+
+        safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", base_path.name)[:48]
+        name_digest = hashlib.sha256(
+            os.fsencode(base_path.name)
+        ).hexdigest()[:12]
+        for _ in range(max_candidates):
+            candidate = base_path.with_name(
+                f".{safe_name}.{marker}.{name_digest}."
+                f"{uuid4().hex}.recovery"
+            )
+            try:
+                guard = self._capture_exact_sidecar_guard(candidate)
+            except WorkspacePathError:
+                continue
+            if guard.target_existed:
+                continue
+            try:
+                publication = self.storage.atomic_publish_bytes(
+                    guard,
+                    data,
+                    mode=mode,
+                )
+                self.storage.read_guarded_bytes(publication)
+                return _ExactRecoveryPublication(
+                    base_path=base_path,
+                    data=data,
+                    mode=mode,
+                    marker=marker,
+                    publication=publication,
+                )
+            except (OSError, RuntimeError):
+                # A publish-then-claim race may have installed and then
+                # replaced this candidate before the returned token could be
+                # verified. Preserve that external winner and retry the same
+                # immutable preimage at a fresh unpredictable name.
+                continue
+        raise RuntimeError(
+            f"no available exact recovery sidecar for {base_path.name}"
+        )
+
+    def _preserve_exact_preimages(
+        self,
+        preimages: Sequence[tuple[Path, bytes, int | None]],
+        *,
+        marker: str,
+    ) -> tuple[_ExactRecoveryPublication, ...] | None:
+        """Preserve every preimage before any destructive mutation begins."""
+
+        publications: list[_ExactRecoveryPublication] = []
+        for path, data, mode in preimages:
+            try:
+                publications.append(
+                    self._publish_exact_recovery(
+                        path,
+                        data,
+                        mode=mode,
+                        marker=marker,
+                    )
+                )
+            except (OSError, RuntimeError):
+                return None
+        return tuple(publications)
+
+    def _cleanup_exact_recoveries(
+        self,
+        recoveries: Sequence[_ExactRecoveryPublication],
+    ) -> tuple[bool, bool]:
+        """Remove proven recoveries, republishing all if any cleanup loses CAS."""
+
+        for recovery in recoveries:
+            try:
+                self.storage.read_guarded_bytes(recovery.publication)
+                self.storage.remove_guarded_output(recovery.publication)
+            except (FileNotFoundError, OSError, RuntimeError):
+                return False, self._republish_exact_recoveries(
+                    recoveries
+                )
+        return True, True
+
+    def _republish_exact_recoveries(
+        self,
+        recoveries: Sequence[_ExactRecoveryPublication],
+    ) -> bool:
+        """Recreate immutable recovery copies after cleanup or claim loss."""
+
+        for item in recoveries:
+            try:
+                self._publish_exact_recovery(
+                    item.base_path,
+                    item.data,
+                    mode=item.mode,
+                    marker=item.marker,
+                )
+            except (OSError, RuntimeError):
+                return False
+        return True
+
+    def _rotate_and_backup_exact(
+        self,
+        target: Path,
+        *,
+        target_guard: WorkspaceOutputGuard | None = None,
+        target_bytes: bytes | None = None,
+        max_backups: int = 5,
+    ) -> _ExactBackupResult:
+        """Rotate local sidecars from no-follow guards and an exact preimage."""
+
+        if not isinstance(self.storage, LocalDocumentStorage):
+            return _ExactBackupResult(
+                rotate_and_backup(target, max_backups=max_backups)
+            )
+        guard = target_guard or self.storage.capture_output_guard(target)
+        if not guard.target_existed:
+            return _ExactBackupResult(BackupReport(None))
+        preimage = (
+            target_bytes
+            if target_bytes is not None
+            else self.storage.read_guarded_bytes(guard)
+        )
+        # Revalidate ownership immediately before mutating any sidecar.
+        if self.storage.read_guarded_bytes(guard) != preimage:
+            raise WorkspacePathError(
+                "backup source changed before snapshot",
+                code="WORKSPACE_PATH_CHANGED",
+                reason="output_target_changed",
+            )
+        source_report = self._report_for_bytes(preimage, file_path=target)
+        if not source_report["openSafety"]["ok"]:
+            raise self._new_error(
+                "BACKUP_SOURCE_OPEN_SAFETY_FAILED",
+                "backup source failed open-safety verification",
+            )
+
+        backup = backup_path_for(target)
+        paths = [backup] + [
+            rotated_backup_path(target, index)
+            for index in range(1, max_backups + 1)
+        ]
+        guards = [self._capture_exact_sidecar_guard(path) for path in paths]
+        states: list[tuple[bytes, int | None] | None] = []
+        for slot_guard in guards:
+            states.append(
+                (
+                    self.storage.read_guarded_bytes(slot_guard),
+                    slot_guard.target_mode,
+                )
+                if slot_guard.target_existed
+                else None
+            )
+
+        recoveries = self._preserve_exact_preimages(
+            [
+                (path, state[0], state[1])
+                for path, state in zip(paths, states)
+                if state is not None
+            ],
+            marker="rollback-recovery",
+        )
+        if recoveries is None:
+            raise RuntimeError(
+                "backup rotation preimages could not be preserved"
+            )
+        rotated: list[Path] = []
+        mutations: list[_ExactSidecarMutation] = []
+        try:
+            for index in range(max_backups, 0, -1):
+                destination_guard = guards[index]
+                desired = states[index - 1]
+                if desired is None:
+                    if not destination_guard.target_existed:
+                        continue
+                    publication = self._absent_publication_guard(
+                        destination_guard
+                    )
+                    mutations.append(
+                        _ExactSidecarMutation(
+                            before_guard=destination_guard,
+                            before_bytes=states[index][0],
+                            publication=publication,
+                        )
+                    )
+                    self.storage.remove_guarded_output(destination_guard)
+                    self._assert_exact_sidecar_publication(publication)
+                    continue
+                publication = self.storage.atomic_publish_bytes(
+                    destination_guard,
+                    desired[0],
+                    mode=desired[1],
+                )
+                mutations.append(
+                    _ExactSidecarMutation(
+                        before_guard=destination_guard,
+                        before_bytes=(
+                            states[index][0]
+                            if states[index] is not None
+                            else None
+                        ),
+                        publication=publication,
+                    )
+                )
+                self.storage.read_guarded_bytes(publication)
+                rotated.append(paths[index])
+
+            backup_publication = self.storage.atomic_publish_bytes(
+                guards[0],
+                preimage,
+                mode=guard.target_mode,
+            )
+            mutations.append(
+                _ExactSidecarMutation(
+                    before_guard=guards[0],
+                    before_bytes=states[0][0] if states[0] is not None else None,
+                    publication=backup_publication,
+                )
+            )
+            self.storage.read_guarded_bytes(backup_publication)
+            for mutation in mutations:
+                self._assert_exact_sidecar_publication(mutation.publication)
+        except BaseException:
+            self._rollback_exact_backup_mutations(
+                mutations,
+                preimages_preserved=True,
+            )
+            raise
+        return _ExactBackupResult(
+            BackupReport(backup, tuple(rotated)),
+            tuple(mutations),
+            recoveries,
+        )
+
+    def _rollback_exact_backup_mutations(
+        self,
+        mutations: Sequence[_ExactSidecarMutation],
+        *,
+        preimages_preserved: bool = False,
+    ) -> None:
+        """Restore every sidecar candidate that is still exactly ours."""
+
+        if not preimages_preserved:
+            recoveries = self._preserve_exact_preimages(
+                [
+                    (
+                        mutation.publication.path,
+                        mutation.before_bytes,
+                        mutation.before_guard.target_mode,
+                    )
+                    for mutation in mutations
+                    if mutation.before_bytes is not None
+                ],
+                marker="rollback-recovery",
+            )
+            if recoveries is None:
+                return
+
+        for mutation in reversed(mutations):
+            try:
+                self._assert_exact_sidecar_publication(
+                    mutation.publication
+                )
+            except (FileNotFoundError, OSError, RuntimeError):
+                continue
+            try:
+                if mutation.before_bytes is None:
+                    self.storage.remove_guarded_output(mutation.publication)
+                else:
+                    self.storage.atomic_publish_bytes(
+                        mutation.publication,
+                        mutation.before_bytes,
+                        mode=mutation.before_guard.target_mode,
+                    )
+            except (FileNotFoundError, OSError, RuntimeError):
+                # An external replacement that wins the CAS belongs to the
+                # external writer. Every original preimage was preserved
+                # before rollback began, so no later destructive step can
+                # erase the last recoverable generation.
+                continue
 
     def _decode_image_base64(self, image_base64: str) -> bytes:
         try:
@@ -710,7 +1104,152 @@ class HwpxOps:
 
     def undo_last_edit(self, path: str) -> Dict[str, Any]:
         resolved = self._resolve_path(path)
-        return undo_last_backup(resolved)
+        if not isinstance(self.storage, LocalDocumentStorage):
+            return undo_last_backup(resolved)
+
+        backup_path = backup_path_for(resolved)
+        target_guard = self.storage.capture_output_guard(resolved)
+        if not target_guard.target_existed:
+            raise FileNotFoundError(f"target document does not exist: {resolved}")
+        backup_guard = self._capture_exact_sidecar_guard(backup_path)
+        if not backup_guard.target_existed:
+            raise FileNotFoundError(
+                f"backup document does not exist: {backup_path}"
+            )
+        target_before = self.storage.read_guarded_bytes(target_guard)
+        backup_before = self.storage.read_guarded_bytes(backup_guard)
+        target_report = self._report_for_bytes(target_before, file_path=resolved)
+        backup_report = self._report_for_bytes(
+            backup_before,
+            file_path=backup_path,
+        )
+        if not target_report["openSafety"]["ok"]:
+            raise self._new_error(
+                "UNDO_TARGET_OPEN_SAFETY_FAILED",
+                "current document failed open-safety verification",
+            )
+        if not backup_report["openSafety"]["ok"]:
+            raise self._new_error(
+                "UNDO_BACKUP_OPEN_SAFETY_FAILED",
+                "backup document failed open-safety verification",
+            )
+
+        recoveries = self._preserve_exact_preimages(
+            [
+                (
+                    resolved,
+                    target_before,
+                    target_guard.target_mode,
+                ),
+                (
+                    backup_path,
+                    backup_before,
+                    backup_guard.target_mode,
+                ),
+            ],
+            marker="undo-recovery",
+        )
+        if recoveries is None:
+            raise RuntimeError("undo preimages could not be preserved")
+        target_publication: WorkspaceOutputGuard | None = None
+        backup_publication: WorkspaceOutputGuard | None = None
+        rollback_recoveries_ready = True
+        try:
+            target_publication = self.storage.atomic_publish_bytes(
+                target_guard,
+                backup_before,
+                mode=backup_guard.target_mode,
+            )
+            backup_publication = self.storage.atomic_publish_bytes(
+                backup_guard,
+                target_before,
+                mode=target_guard.target_mode,
+            )
+            self.storage.read_guarded_bytes(target_publication)
+            self.storage.read_guarded_bytes(backup_publication)
+            verification = self._report_for_bytes(
+                backup_before,
+                file_path=resolved,
+            )
+            if not verification["openSafety"]["ok"]:
+                raise RuntimeError("undo HWPX failed open-safety verification")
+            diff = self._semantic_diff_bytes(target_before, backup_before)
+            # Evidence was computed from immutable bytes; bind the success
+            # response to the exact two publications immediately before return.
+            self.storage.read_guarded_bytes(target_publication)
+            self.storage.read_guarded_bytes(backup_publication)
+            payload = {
+                "restored": True,
+                "filename": str(resolved),
+                "backupPath": str(backup_path),
+                "verificationReport": verification,
+                "openSafety": verification.get("openSafety"),
+                "semanticDiff": diff,
+            }
+            cleaned, rollback_recoveries_ready = (
+                self._cleanup_exact_recoveries(recoveries)
+            )
+            if not cleaned:
+                raise RuntimeError(
+                    "undo recovery cleanup lost its exact claim"
+                )
+            try:
+                self.storage.read_guarded_bytes(target_publication)
+                self.storage.read_guarded_bytes(backup_publication)
+            except (FileNotFoundError, OSError, RuntimeError):
+                rollback_recoveries_ready = (
+                    self._republish_exact_recoveries(recoveries)
+                )
+                raise
+            return payload
+        except BaseException:
+            if not rollback_recoveries_ready:
+                raise
+            if target_publication is not None and backup_publication is None:
+                try:
+                    self.storage.read_guarded_bytes(target_publication)
+                    self.storage.atomic_publish_bytes(
+                        target_publication,
+                        target_before,
+                        mode=target_guard.target_mode,
+                    )
+                except (FileNotFoundError, OSError, RuntimeError):
+                    pass
+                raise
+            target_owned = False
+            backup_owned = False
+            if target_publication is not None:
+                try:
+                    self.storage.read_guarded_bytes(target_publication)
+                    target_owned = True
+                except (FileNotFoundError, OSError, RuntimeError):
+                    pass
+            if backup_publication is not None:
+                try:
+                    self.storage.read_guarded_bytes(backup_publication)
+                    backup_owned = True
+                except (FileNotFoundError, OSError, RuntimeError):
+                    pass
+            # Roll back only while both swap candidates are still ours. The
+            # A/B recovery sidecars above remain available regardless of how
+            # either publication changes during the following writes.
+            if target_owned and backup_owned:
+                try:
+                    self.storage.atomic_publish_bytes(
+                        target_publication,
+                        target_before,
+                        mode=target_guard.target_mode,
+                    )
+                    self.storage.atomic_publish_bytes(
+                        backup_publication,
+                        backup_before,
+                        mode=backup_guard.target_mode,
+                    )
+                except (FileNotFoundError, OSError, RuntimeError):
+                    # The exact A/B recovery sidecars are intentionally retained
+                    # on every failure path, including cross-step CAS loss.
+                    pass
+            raise
 
     def _iter_paragraphs(self, document: HwpxDocument) -> List[HwpxOxmlParagraph]:
         return list(document.paragraphs)
@@ -2131,7 +2670,25 @@ class HwpxOps:
             ) from exc
 
         source_path = self._resolve_path(path)
-        target_path = self._resolve_output_path(output) if output else source_path
+        output_precondition = None
+        if isinstance(self.storage, LocalDocumentStorage):
+            output_precondition = self.storage.capture_output_precondition(
+                output if output else source_path
+            )
+            target_path = output_precondition.path
+            local_guard = (
+                output_precondition
+                if isinstance(output_precondition, WorkspaceOutputGuard)
+                else None
+            )
+        else:
+            target_path = self._resolve_output_path(output) if output else source_path
+            local_guard = None
+        target_before = (
+            self.storage.read_guarded_bytes(local_guard)
+            if local_guard is not None and local_guard.target_existed
+            else None
+        )
         result = paragraph_patch(source_path, patches)
         payload = result.to_dict()
         payload["outputPath"] = str(target_path)
@@ -2147,26 +2704,156 @@ class HwpxOps:
             payload["verificationReport"] = verification_report
             return payload
 
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(
-            prefix=f".{target_path.stem}.",
-            suffix=target_path.suffix or ".hwpx",
-            dir=str(target_path.parent),
+        candidate_bytes = bytes(result.data)
+        verification_report = build_hwpx_verification_report(
+            candidate_bytes,
+            file_path=target_path,
         )
-        tmp_path = Path(tmp_name)
-        try:
-            os.close(fd)
-            tmp_path.write_bytes(result.data)
-            verification_report = build_hwpx_verification_report(tmp_path)
-            if not verification_report["openSafety"]["ok"]:
-                raise self._new_error(
-                    "BYTE_PATCH_OPEN_SAFETY_FAILED",
-                    "patched HWPX failed open-safety verification: "
-                    + verification_report["openSafety"]["summary"],
+        if not verification_report["openSafety"]["ok"]:
+            raise self._new_error(
+                "BYTE_PATCH_OPEN_SAFETY_FAILED",
+                "patched HWPX failed open-safety verification: "
+                + verification_report["openSafety"]["summary"],
+            )
+
+        target_recoveries: tuple[_ExactRecoveryPublication, ...] = ()
+        if target_before is not None:
+            preserved_target = self._preserve_exact_preimages(
+                [
+                    (
+                        target_path,
+                        target_before,
+                        (
+                            local_guard.target_mode
+                            if local_guard is not None
+                            else None
+                        ),
+                    )
+                ],
+                marker="rollback-recovery",
+            )
+            if preserved_target is None:
+                raise RuntimeError(
+                    "byte patch target preimage could not be preserved"
                 )
-            os.replace(tmp_path, target_path)
+            target_recoveries = preserved_target
+        publication: WorkspaceOutputGuard | None = None
+        exact_backup: _ExactBackupResult | None = None
+        materialized_guard: WorkspaceOutputGuard | None = None
+        rollback_recoveries_ready = True
+        try:
+            if output_precondition is not None:
+                local_guard = self.storage.materialize_output_guard(
+                    output_precondition
+                )
+                materialized_guard = local_guard
+                # Preserve the retained public backup contract, but bind the
+                # sidecar to the exact preimage captured with the output guard.
+                exact_backup = self._rotate_and_backup_exact(
+                    target_path,
+                    target_guard=local_guard,
+                    target_bytes=target_before,
+                )
+                backup = exact_backup.report
+                publication = self.storage.atomic_publish_bytes(
+                    local_guard,
+                    candidate_bytes,
+                )
+            else:
+                backup = rotate_and_backup(target_path)
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                fd, tmp_name = tempfile.mkstemp(
+                    prefix=f".{target_path.stem}.",
+                    suffix=target_path.suffix or ".hwpx",
+                    dir=str(target_path.parent),
+                )
+                tmp_path = Path(tmp_name)
+                try:
+                    os.close(fd)
+                    tmp_path.write_bytes(candidate_bytes)
+                    os.replace(tmp_path, target_path)
+                finally:
+                    tmp_path.unlink(missing_ok=True)
+            verification_report["backup"] = backup.to_dict()
+            if backup.backup_path is not None:
+                try:
+                    verification_report["semanticDiff"] = (
+                        self._semantic_diff_bytes(
+                            target_before or b"",
+                            candidate_bytes,
+                        )
+                        if local_guard is not None
+                        else semantic_diff(backup.backup_path, target_path)
+                    )
+                except Exception as exc:  # pragma: no cover - diagnostic fallback
+                    verification_report["semanticDiff"] = {
+                        "schemaVersion": "hwpx.semantic-diff.v1",
+                        "changed": True,
+                        "summary": f"Semantic diff unavailable: {exc}",
+                        "items": [],
+                        "error": str(exc),
+                    }
+            if publication is not None:
+                # Receipt evidence is valid only while the exact published
+                # candidate and reported backup sidecars still occupy their
+                # authorized names with the exact published identities.
+                for mutation in exact_backup.mutations:
+                    self._assert_exact_sidecar_publication(
+                        mutation.publication
+                    )
+                self.storage.read_guarded_bytes(publication)
+            all_recoveries = target_recoveries + (
+                exact_backup.recoveries if exact_backup is not None else ()
+            )
+            cleaned, rollback_recoveries_ready = (
+                self._cleanup_exact_recoveries(all_recoveries)
+            )
+            if not cleaned:
+                raise RuntimeError(
+                    "byte patch recovery cleanup lost its exact claim"
+                )
+            try:
+                if publication is not None:
+                    for mutation in exact_backup.mutations:
+                        self._assert_exact_sidecar_publication(
+                            mutation.publication
+                        )
+                    self.storage.read_guarded_bytes(publication)
+            except (FileNotFoundError, OSError, RuntimeError):
+                rollback_recoveries_ready = (
+                    self._republish_exact_recoveries(all_recoveries)
+                )
+                raise
         except BaseException:
-            tmp_path.unlink(missing_ok=True)
+            target_preimage_preserved = (
+                target_before is None
+                or rollback_recoveries_ready
+            )
+            if target_preimage_preserved and publication is not None:
+                try:
+                    if local_guard is not None and local_guard.target_existed:
+                        if target_before is not None:
+                            restored_publication = self.storage.atomic_publish_bytes(
+                                publication,
+                                target_before,
+                                mode=local_guard.target_mode,
+                            )
+                            self.storage.read_guarded_bytes(
+                                restored_publication
+                            )
+                    else:
+                        self.storage.remove_guarded_output(publication)
+                except (OSError, RuntimeError):
+                    pass
+            if exact_backup is not None and target_preimage_preserved:
+                self._rollback_exact_backup_mutations(
+                    exact_backup.mutations,
+                    preimages_preserved=rollback_recoveries_ready,
+                )
+            if materialized_guard is not None:
+                self.storage.cleanup_owned_parent_directories(
+                    materialized_guard
+                )
             raise
         verification_report["filePath"] = str(target_path)
         verification_report["byteIdentical"] = payload["byteIdentical"]
@@ -2176,33 +2863,78 @@ class HwpxOps:
         payload["openSafety"] = verification_report["openSafety"]
         return payload
 
-    def _write_patched(self, target_path, data: bytes, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _write_patched(
+        self,
+        target_path,
+        data: bytes,
+        payload: Dict[str, Any],
+        *,
+        output_guard: (
+            WorkspaceOutputGuard | WorkspaceMissingParentGuard | None
+        ) = None,
+        output_precondition: (
+            WorkspaceOutputGuard | WorkspaceMissingParentGuard | None
+        ) = None,
+        publication_sink: Callable[[WorkspaceOutputGuard], None] | None = None,
+    ) -> Dict[str, Any]:
         """Atomic temp-write + open-safety gate for a byte-preserving result
         (shared by byte_preserving_patch / apply_table_ops)."""
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(
-            prefix=f".{target_path.stem}.", suffix=target_path.suffix or ".hwpx", dir=str(target_path.parent)
+        candidate_bytes = bytes(data)
+        report = build_hwpx_verification_report(
+            candidate_bytes,
+            file_path=target_path,
         )
-        tmp_path = Path(tmp_name)
-        try:
-            os.close(fd)
-            tmp_path.write_bytes(data)
-            report = build_hwpx_verification_report(tmp_path)
-            if not report["openSafety"]["ok"]:
-                raise self._new_error(
-                    "FORM_FILL_OPEN_SAFETY_FAILED",
-                    "form-fill output failed open-safety verification: " + report["openSafety"]["summary"],
-                )
-            os.replace(tmp_path, target_path)
-        except BaseException:
-            tmp_path.unlink(missing_ok=True)
-            raise
+        if not report["openSafety"]["ok"]:
+            raise self._new_error(
+                "FORM_FILL_OPEN_SAFETY_FAILED",
+                "form-fill output failed open-safety verification: "
+                + report["openSafety"]["summary"],
+            )
         report["filePath"] = str(target_path)
         report["byteIdentical"] = payload["byteIdentical"]
         report["changedParts"] = payload["changedParts"]
         report["skipped"] = payload["skipped"]
         payload["verificationReport"] = report
         payload["openSafety"] = report["openSafety"]
+
+        if isinstance(self.storage, LocalDocumentStorage):
+            precondition = (
+                output_precondition
+                or output_guard
+                or self.storage.capture_output_precondition(target_path)
+            )
+            materialized_guard: WorkspaceOutputGuard | None = None
+            try:
+                materialized_guard = self.storage.materialize_output_guard(
+                    precondition
+                )
+                publication = self.storage.atomic_publish_bytes(
+                    materialized_guard,
+                    candidate_bytes,
+                )
+                if publication_sink is not None:
+                    publication_sink(publication)
+                payload["_workspacePublication"] = publication
+            except BaseException:
+                if materialized_guard is not None:
+                    self.storage.cleanup_owned_parent_directories(
+                        materialized_guard
+                    )
+                raise
+        else:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = tempfile.mkstemp(
+                prefix=f".{target_path.stem}.",
+                suffix=target_path.suffix or ".hwpx",
+                dir=str(target_path.parent),
+            )
+            tmp_path = Path(tmp_name)
+            try:
+                os.close(fd)
+                tmp_path.write_bytes(candidate_bytes)
+                os.replace(tmp_path, target_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
         return payload
 
     def apply_table_ops(
@@ -2213,6 +2945,10 @@ class HwpxOps:
         output: Optional[str] = None,
         render_check: str = "off",
         dry_run: bool = False,
+        output_guard: (
+            WorkspaceOutputGuard | WorkspaceMissingParentGuard | None
+        ) = None,
+        publication_sink: Callable[[WorkspaceOutputGuard], None] | None = None,
     ) -> Dict[str, Any]:
         """Byte-preserving structural form-fill: apply cell fills + table structure
         ops (delete_column/row/table, insert_row_by_clone, insert_block_by_clone)
@@ -2233,7 +2969,23 @@ class HwpxOps:
             ) from exc
 
         source_path = self._resolve_path(path)
-        target_path = self._resolve_output_path(output) if output else source_path
+        output_precondition = None
+        if isinstance(self.storage, LocalDocumentStorage):
+            output_precondition = (
+                output_guard
+                or self.storage.capture_output_precondition(
+                    output if output else source_path
+                )
+            )
+            target_path = output_precondition.path
+        else:
+            target_path = (
+                self._resolve_path(output, must_exist=False)
+                if output and dry_run
+                else self._resolve_output_path(output)
+                if output
+                else source_path
+            )
         result = _apply(source_path, list(ops), dry_run=dry_run)
         payload = result.to_dict()
         if dry_run:
@@ -2241,8 +2993,6 @@ class HwpxOps:
             payload["outputPath"] = None
         else:
             payload["outputPath"] = str(target_path)
-            if not result.byte_identical:
-                payload = self._write_patched(target_path, result.data, payload)
 
         if render_check and render_check != "off":
             try:
@@ -2257,10 +3007,31 @@ class HwpxOps:
                     "warnings": list(report.warnings),
                     "errors": list(report.errors),
                 }
+                if report.render_checked and not report.ok:
+                    payload["ok"] = False
+                    if render_check == "required":
+                        raise self._new_error(
+                            "RENDER_CHECK_REQUIRED_FAILED",
+                            "required render detected overflow, overlap, or layout regression",
+                        )
             except Exception as exc:
                 if render_check == "required":
                     raise self._new_error("RENDER_CHECK_REQUIRED_FAILED", str(exc)) from exc
                 payload["renderVerdict"] = {"renderChecked": False, "note": str(exc)}
+        # A required render is a pre-publication gate: only replace the
+        # destination after the candidate has passed it.
+        if payload.get("ok") is not False and not dry_run and (
+            not result.byte_identical
+            or target_path.resolve(strict=False) != source_path.resolve(strict=False)
+        ):
+            payload = self._write_patched(
+                target_path,
+                result.data,
+                payload,
+                output_guard=output_guard,
+                output_precondition=output_precondition,
+                publication_sink=publication_sink,
+            )
         return payload
 
     def verify_form_fill(
@@ -2334,6 +3105,10 @@ class HwpxOps:
         *,
         output: Optional[str] = None,
         dry_run: bool = False,
+        output_guard: (
+            WorkspaceOutputGuard | WorkspaceMissingParentGuard | None
+        ) = None,
+        publication_sink: Callable[[WorkspaceOutputGuard], None] | None = None,
     ) -> Dict[str, Any]:
         """Byte-preserving BODY(표 밖 직속 문단) ops — Stage 2 결정표의 본문 어휘.
 
@@ -2350,7 +3125,23 @@ class HwpxOps:
                 "installed python-hwpx does not provide hwpx.body_patch.apply_body_ops",
             ) from exc
         source_path = self._resolve_path(path)
-        target_path = self._resolve_output_path(output) if output else source_path
+        output_precondition = None
+        if isinstance(self.storage, LocalDocumentStorage):
+            output_precondition = (
+                output_guard
+                or self.storage.capture_output_precondition(
+                    output if output else source_path
+                )
+            )
+            target_path = output_precondition.path
+        else:
+            target_path = (
+                self._resolve_path(output, must_exist=False)
+                if output and dry_run
+                else self._resolve_output_path(output)
+                if output
+                else source_path
+            )
         result = _apply(source_path, list(ops), dry_run=dry_run)
         payload = result.to_dict()
         if dry_run:
@@ -2358,8 +3149,18 @@ class HwpxOps:
             payload["outputPath"] = None
         else:
             payload["outputPath"] = str(target_path)
-            if not result.byte_identical:
-                payload = self._write_patched(target_path, result.data, payload)
+            if (
+                not result.byte_identical
+                or target_path.resolve(strict=False) != source_path.resolve(strict=False)
+            ):
+                payload = self._write_patched(
+                    target_path,
+                    result.data,
+                    payload,
+                    output_guard=output_guard,
+                    output_precondition=output_precondition,
+                    publication_sink=publication_sink,
+                )
         return payload
 
     def inspect_fill_residue(
@@ -2455,6 +3256,10 @@ class HwpxOps:
         render_check: str = "off",
         score_gold_path: Optional[str] = None,
         expected_pages: Optional[int] = None,
+        output_guard: (
+            WorkspaceOutputGuard | WorkspaceMissingParentGuard | None
+        ) = None,
+        publication_sink: Callable[[WorkspaceOutputGuard], None] | None = None,
     ) -> Dict[str, Any]:
         """Whole-form 평가계획 fill: {blank province form + review markdown} ->
         byte-preserving gold-quality 채움본 in ONE call. Runs the structure-driven
@@ -2480,10 +3285,20 @@ class HwpxOps:
 
         blank = self._resolve_path(path)
         md = self._resolve_path(review_md)
+        output_precondition = None
+        if isinstance(self.storage, LocalDocumentStorage):
+            output_precondition = (
+                output_guard
+                or self.storage.capture_output_precondition(
+                    output if output else blank
+                )
+            )
+            target_path = output_precondition.path
+        else:
+            target_path = self._resolve_output_path(output) if output else blank
         content = parse_review_file(md)
         res = fill_evalplan(blank, content, phase="all")
         data = res["_data"]
-        target_path = self._resolve_output_path(output) if output else blank
 
         report = res.get("content_report", {})
         rubric_nr = [s for s in report.get("rubrics", {}).get("skipped", [])
@@ -2500,9 +3315,6 @@ class HwpxOps:
             "changedParts": res.get("changedParts", []),
             "skipped": res.get("skipped", []),
         }
-        if not res.get("byteIdentical", True):
-            payload = self._write_patched(target_path, data, payload)
-
         if render_check and render_check != "off":
             try:
                 from hwpx.table_patch import verify_fill
@@ -2516,10 +3328,32 @@ class HwpxOps:
                     "warnings": list(verdict.warnings),
                     "errors": list(verdict.errors),
                 }
+                if verdict.render_checked and not verdict.ok:
+                    payload["ok"] = False
+                    if render_check == "required":
+                        raise self._new_error(
+                            "RENDER_CHECK_REQUIRED_FAILED",
+                            "required evalplan render detected overflow, overlap, or layout regression",
+                        )
             except Exception as exc:
                 if render_check == "required":
                     raise self._new_error("RENDER_CHECK_REQUIRED_FAILED", str(exc)) from exc
                 payload["renderVerdict"] = {"renderChecked": False, "note": str(exc)}
+
+        # Do not publish a partial/failed domain result. Required rendering is
+        # evaluated against candidate bytes before the atomic destination swap.
+        if payload["ok"] and (
+            not res.get("byteIdentical", True)
+            or target_path.resolve(strict=False) != blank.resolve(strict=False)
+        ):
+            payload = self._write_patched(
+                target_path,
+                data,
+                payload,
+                output_guard=output_guard,
+                output_precondition=output_precondition,
+                publication_sink=publication_sink,
+            )
 
         if score_gold_path:
             try:

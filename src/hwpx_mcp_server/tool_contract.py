@@ -277,7 +277,10 @@ _SKILL_REQUIRED_TOOLS = {
 
 _MUTATING_TOOLS = {
     "apply_document_commands", "replay_document_blueprint",
-    "render_submit", "render_cancel",
+    # These render tools can materialize queue or preview artifacts when their
+    # optional output arguments are supplied, so classify them conservatively
+    # as writers for process-wide serialization.
+    "render_preview", "render_submit", "render_status", "render_cancel",
     "start_workflow", "continue_workflow", "approve_workflow_decision",
     "cancel_workflow", "resume_workflow",
     "apply_table_ops", "apply_body_ops", "fill_form_field", "fill_by_path",

@@ -17,12 +17,13 @@ from datetime import date, datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Annotated, Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
 import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
+from pydantic import Field
 from hwpx import (
     analyze_template_formfit as analyze_hwpx_template_formfit,
     apply_style_profile_to_plan as apply_hwpx_style_profile_to_plan,
@@ -62,7 +63,6 @@ from hwpx.form_fit.wordbox import (
     render_glyph_boxes,
 )
 from hwpx.ingest import DocumentIngestError, DocumentIngestor
-from hwpx.patch import paragraph_patch as hwpx_paragraph_patch
 from hwpx.presets import (
     create_proposal_document as build_proposal_document,
     inspect_proposal_quality as inspect_proposal_document_quality,
@@ -112,7 +112,6 @@ from .core.transactions import (
     rotate_and_backup,
     save_dry_run,
     semantic_diff,
-    undo_last_backup,
 )
 from .document_state import document_state_payload, revision_mismatch_response
 from .agent_document import (
@@ -148,15 +147,28 @@ from .fastmcp_adapter import registered_tool_snapshots
 from .errors import build_error_payload, mcp_code_for_error
 from .hwpx_ops import HwpxOperationError, HwpxOps
 from .network_policy import NetworkPolicy, NetworkPolicyError, open_url
-from .mutation_models import BodyOperation, EditOperation, TableOperation, operation_payloads
+from .mutation_models import (
+    BodyOperation,
+    EditOperation,
+    TableOperation,
+    operation_payloads,
+)
 from .mixed_form import (
     MixedFormApplyInput,
     MixedFormCompiledPlanInput,
     MixedFormPlanInput,
     analyze_mixed_form_plan,
     apply_canonical_mixed_form_plan,
-    attach_common_form_receipt,
+    run_specialized_form_operation,
     verify_canonical_mixed_form_plan,
+)
+from .form_output_models import (
+    AnalyzeFormFillOutput,
+    ApplyBodyOpsOutput,
+    ApplyEvalplanFillOutput,
+    ApplyFormFillOutput,
+    ApplyTableOpsOutput,
+    VerifyFormFillOutput,
 )
 from .quality_generation import (
     analyze_quality_generation_workflow,
@@ -1413,35 +1425,6 @@ def _with_dry_run_verification(
     payload.update(dry_run)
     payload.update(document_state_payload(path))
     return payload
-
-
-def _write_verified_patch_result(target: Path, payload: bytes) -> dict[str, Any]:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    backup = rotate_and_backup(target)
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=f".{target.stem}.",
-        suffix=target.suffix or ".hwpx",
-        dir=str(target.parent),
-    )
-    tmp_path = Path(tmp_name)
-    try:
-        os.close(fd)
-        tmp_path.write_bytes(payload)
-        verification = build_hwpx_verification_report(tmp_path)
-        if not verification["openSafety"]["ok"]:
-            raise RuntimeError(
-                "patched HWPX failed open-safety verification: "
-                + verification["openSafety"]["summary"]
-            )
-        os.replace(tmp_path, target)
-        verification["filePath"] = str(target)
-        verification["backup"] = backup.to_dict()
-        if backup.backup_path is not None:
-            verification["semanticDiff"] = semantic_diff(backup.backup_path, target)
-        return verification
-    except BaseException:
-        tmp_path.unlink(missing_ok=True)
-        raise
 
 
 def _quality_profile_argument(
@@ -3346,7 +3329,7 @@ def apply_edits(
 def undo_last_edit(filename: str) -> dict:
     """마지막 저장 전 .bak 백업과 현재 문서를 교체해 직전 편집을 되돌립니다."""
     path = resolve_path(filename)
-    return undo_last_backup(path)
+    return _OPS.undo_last_edit(path)
 
 
 def byte_preserving_patch(
@@ -3360,32 +3343,8 @@ def byte_preserving_patch(
     capability handshake로 fail-closed 됩니다. 단, 바이트를 보존하므로 전체 재렌더(VisualComplete
     render) 게이트는 적용되지 않습니다(설계상 카브아웃).
     """
-    if hwpx_paragraph_patch is None:
-        raise RuntimeError("installed python-hwpx does not provide hwpx.patch.paragraph_patch")
     quality_contract.assert_write_capability()  # fail-closed on capability skew
-    path = Path(resolve_path(filename))
-    target = Path(resolve_path(output)) if output else path
-    result = hwpx_paragraph_patch(path, patches)
-    payload = result.to_dict()
-    payload["outputPath"] = str(target)
-    verification = {
-        "ok": bool(payload["openSafety"]["ok"]) and not payload["skipped"],
-        "filePath": str(target),
-        "openSafety": payload["openSafety"],
-        "byteIdentical": payload["byteIdentical"],
-        "changedParts": payload["changedParts"],
-        "skipped": payload["skipped"],
-    }
-    if payload["skipped"]:
-        payload["verificationReport"] = verification
-        return payload
-    verification = _write_verified_patch_result(target, result.data)
-    verification["byteIdentical"] = payload["byteIdentical"]
-    verification["changedParts"] = payload["changedParts"]
-    verification["skipped"] = payload["skipped"]
-    payload["verificationReport"] = verification
-    payload["openSafety"] = verification["openSafety"]
-    return payload
+    return _OPS.byte_preserving_patch(filename, patches, output=output)
 
 
 def apply_table_ops(
@@ -3394,28 +3353,27 @@ def apply_table_ops(
     output: str | None = None,
     render_check: str = "off",
     dry_run: bool = False,
-) -> dict:
+) -> ApplyTableOpsOutput:
     """바이트 보존으로 표 셀/행/열/표 구조 연산을 원자 적용합니다."""
 
     source = Path(resolve_path(filename))
     target = Path(resolve_path(output)) if output else source
-    source_before = source.read_bytes()
     if not dry_run:
         quality_contract.assert_write_capability()
-    result = _OPS.apply_table_ops(
-        str(source),
-        operation_payloads(ops),
-        output=str(target) if output else None,
-        render_check=render_check,
-        dry_run=dry_run,
-    )
-    return attach_common_form_receipt(
-        result,
+    return run_specialized_form_operation(
         operation="apply_table_ops",
         source=source,
         output=target,
-        source_before=source_before,
         dry_run=dry_run,
+        execute_with_guard=lambda output_guard, publication_sink: _OPS.apply_table_ops(
+            str(source),
+            operation_payloads(ops),
+            output=str(target) if output else None,
+            render_check=render_check,
+            dry_run=dry_run,
+            output_guard=output_guard,
+            publication_sink=publication_sink,
+        ),
     )
 
 
@@ -3424,7 +3382,11 @@ def verify_form_fill(
     before_path: str = None,
     require: bool = False,
     plan: MixedFormCompiledPlanInput = None,
-) -> dict:
+    expected_output_revision: Annotated[
+        str | None,
+        Field(pattern=r"^sha256:[0-9a-f]{64}$"),
+    ] = None,
+) -> VerifyFormFillOutput:
     """Compiled mixed-form 결과를 검증합니다. filename/before_path는 렌더 호환 경로입니다."""
 
     if plan is not None:
@@ -3435,6 +3397,7 @@ def verify_form_fill(
         return verify_canonical_mixed_form_plan(
             plan,
             require=require,
+            expected_output_revision=expected_output_revision,
             render_verifier=lambda after, before, required: _OPS.verify_form_fill(
                 after,
                 before,
@@ -3443,6 +3406,8 @@ def verify_form_fill(
         )
     if filename is None or before_path is None:
         raise ValueError("provide plan or both filename and before_path")
+    if expected_output_revision is not None:
+        raise ValueError("expected_output_revision requires plan")
     result = _OPS.verify_form_fill(
         resolve_path(filename), resolve_path(before_path), require=require
     )
@@ -3451,6 +3416,34 @@ def verify_form_fill(
         "canonicalInput": "plan: hwpx.mixed-form-compiled-plan/v1",
     }
     return result
+
+
+verify_form_fill.__hwpx_input_schema_extra__ = {  # type: ignore[attr-defined]
+    "oneOf": [
+        {
+            "required": ["plan"],
+            "properties": {"plan": {"not": {"type": "null"}}},
+            "not": {
+                "anyOf": [
+                    {
+                        "required": [name],
+                        "properties": {name: {"not": {"type": "null"}}},
+                    }
+                    for name in ("filename", "before_path")
+                ]
+            },
+        },
+        {
+            "required": ["filename", "before_path"],
+            "properties": {
+                "filename": {"not": {"type": "null"}},
+                "before_path": {"not": {"type": "null"}},
+                "plan": {"type": "null"},
+                "expected_output_revision": {"type": "null"},
+            },
+        },
+    ]
+}
 
 
 def score_form_fill(
@@ -3476,27 +3469,26 @@ def apply_body_ops(
     ops: list[BodyOperation],
     output: str | None = None,
     dry_run: bool = False,
-) -> dict:
+) -> ApplyBodyOpsOutput:
     """표 밖 본문 문단에 바이트 보존 연산을 적용합니다."""
 
     source = Path(resolve_path(filename))
     target = Path(resolve_path(output)) if output else source
-    source_before = source.read_bytes()
     if not dry_run:
         quality_contract.assert_write_capability()
-    result = _OPS.apply_body_ops(
-        str(source),
-        operation_payloads(ops),
-        output=str(target) if output else None,
-        dry_run=dry_run,
-    )
-    return attach_common_form_receipt(
-        result,
+    return run_specialized_form_operation(
         operation="apply_body_ops",
         source=source,
         output=target,
-        source_before=source_before,
         dry_run=dry_run,
+        execute_with_guard=lambda output_guard, publication_sink: _OPS.apply_body_ops(
+            str(source),
+            operation_payloads(ops),
+            output=str(target) if output else None,
+            dry_run=dry_run,
+            output_guard=output_guard,
+            publication_sink=publication_sink,
+        ),
     )
 
 
@@ -3525,27 +3517,27 @@ def apply_evalplan_fill(
     render_check: str = "off",
     score_gold_path: str | None = None,
     expected_pages: int | None = None,
-) -> dict:
+) -> ApplyEvalplanFillOutput:
     """빈 평가계획 양식과 검토용 Markdown을 바이트 보존 채움본으로 만듭니다."""
 
     quality_contract.assert_write_capability()
     source = Path(resolve_path(filename))
     target = Path(resolve_path(output)) if output else source
-    source_before = source.read_bytes()
-    result = _OPS.apply_evalplan_fill(
-        str(source),
-        resolve_path(review_md),
-        output=str(target) if output else None,
-        render_check=render_check,
-        score_gold_path=resolve_path(score_gold_path) if score_gold_path else None,
-        expected_pages=expected_pages,
-    )
-    return attach_common_form_receipt(
-        result,
+    return run_specialized_form_operation(
         operation="apply_evalplan_fill",
         source=source,
         output=target,
-        source_before=source_before,
+        dry_run=False,
+        execute_with_guard=lambda output_guard, publication_sink: _OPS.apply_evalplan_fill(
+            str(source),
+            resolve_path(review_md),
+            output=str(target) if output else None,
+            render_check=render_check,
+            score_gold_path=resolve_path(score_gold_path) if score_gold_path else None,
+            expected_pages=expected_pages,
+            output_guard=output_guard,
+            publication_sink=publication_sink,
+        ),
     )
 
 
@@ -4509,7 +4501,8 @@ def _capability_block(tool_surface_skew: bool, surface_details: list[str]) -> di
         "failClosed": fail_closed,
         "writesBlocked": fail_closed and bool(skew),
         "diagnosis": (
-            "Capability handshake OK; every write funnels through the SavePipeline gate."
+            "Capability handshake OK; general saves use SavePipeline, while guarded "
+            "byte-preserving form writers return open-safety receipts."
             if not skew
             else "Capability skew: install the contract-required core/MCP/plugin versions and restart the host."
         ),
@@ -5972,7 +5965,7 @@ def analyze_form_fill(
     destination_filename: str = None,
     options: FormFillAnalyzeOptions = None,
     plan: MixedFormPlanInput = None,
-) -> dict:
+) -> AnalyzeFormFillOutput:
     """엄격한 혼합 양식 계획을 비변경 분석합니다. 기존 formfill.v1 인자는 호환 경로입니다."""
     if plan is not None:
         compatibility_args = (
@@ -6004,6 +5997,39 @@ def analyze_form_fill(
     return result
 
 
+analyze_form_fill.__hwpx_input_schema_extra__ = {  # type: ignore[attr-defined]
+    "oneOf": [
+        {
+            "required": ["plan"],
+            "properties": {"plan": {"not": {"type": "null"}}},
+            "not": {
+                "anyOf": [
+                    {
+                        "required": [name],
+                        "properties": {name: {"not": {"type": "null"}}},
+                    }
+                    for name in (
+                        "source_filename",
+                        "input_json",
+                        "input_json_path",
+                        "input_docx",
+                        "destination_filename",
+                        "options",
+                    )
+                ]
+            },
+        },
+        {
+            "required": ["source_filename"],
+            "properties": {
+                "source_filename": {"not": {"type": "null"}},
+                "plan": {"type": "null"},
+            },
+        },
+    ]
+}
+
+
 def apply_form_fill(
     plan_id: str = None,
     analysis: FormFillPlanInput = None,
@@ -6012,7 +6038,7 @@ def apply_form_fill(
     canonical_input: CanonicalFormFillInput | str = None,
     confirm: bool = True,
     plan: MixedFormApplyInput = None,
-) -> dict:
+) -> ApplyFormFillOutput:
     """엄격한 public/compiled 혼합 양식 계획을 원자 적용합니다. 기존 인자는 호환 경로입니다."""
     if plan is not None:
         compatibility_args = (
@@ -6040,6 +6066,35 @@ def apply_form_fill(
         "canonicalInput": "plan: hwpx.mixed-form-plan/v1 or hwpx.mixed-form-compiled-plan/v1",
     }
     return result
+
+
+apply_form_fill.__hwpx_input_schema_extra__ = {  # type: ignore[attr-defined]
+    "oneOf": [
+        {
+            "required": ["plan"],
+            "properties": {
+                "plan": {"not": {"type": "null"}},
+                "confirm": {"const": True},
+            },
+            "not": {
+                "anyOf": [
+                    {
+                        "required": [name],
+                        "properties": {name: {"not": {"type": "null"}}},
+                    }
+                    for name in (
+                        "plan_id",
+                        "analysis",
+                        "source_filename",
+                        "destination_filename",
+                        "canonical_input",
+                    )
+                ]
+            },
+        },
+        {"properties": {"plan": {"type": "null"}}},
+    ]
+}
 
 
 def _workflow_service() -> WorkflowService:

@@ -10,15 +10,17 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import hwpx
+import hwpx.table_patch as table_patch
 
 pytest.importorskip(
     "hwpx.evalplan_fill", reason="requires python-hwpx with evalplan_fill recipe"
 )
 
-from hwpx_mcp_server.hwpx_ops import HwpxOps
+from hwpx_mcp_server.hwpx_ops import HwpxOperationError, HwpxOps
 from hwpx_mcp_server import server
 from hwpx_mcp_server.mixed_form import FORM_VERIFICATION_RECEIPT_SCHEMA
 from hwpx_mcp_server.tool_contract import bound_tool_registry
@@ -151,3 +153,36 @@ def test_evalplan_server_preserves_domain_semantics_with_common_receipt(tmp_path
     assert receipt["sourcePreservation"]["ok"] is True
     assert receipt["openSafety"]["ok"] is True
     assert receipt["domain"]["status"] == "specialized-semantics-preserved"
+
+
+def test_evalplan_required_render_failure_publishes_nothing(tmp_path, monkeypatch):
+    blank = tmp_path / "blank.hwpx"
+    review = tmp_path / "review.md"
+    output = tmp_path / "filled.hwpx"
+    shutil.copy(BLANK, blank)
+    review.write_text(SYNTHETIC_MD, encoding="utf-8")
+    before = blank.read_bytes()
+    ops = HwpxOps(base_directory=tmp_path)
+
+    def fail_render(*args, **kwargs):
+        return SimpleNamespace(
+            render_checked=True,
+            ok=False,
+            overflow_detected=True,
+            overlap_detected=False,
+            page_count_changed=False,
+            warnings=(),
+            errors=("observed evalplan overflow",),
+        )
+
+    monkeypatch.setattr(table_patch, "verify_fill", fail_render)
+    with pytest.raises(HwpxOperationError, match="required evalplan render detected"):
+        ops.apply_evalplan_fill(
+            "blank.hwpx",
+            "review.md",
+            output="filled.hwpx",
+            render_check="required",
+        )
+
+    assert blank.read_bytes() == before
+    assert not output.exists()

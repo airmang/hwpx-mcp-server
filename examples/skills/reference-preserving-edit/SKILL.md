@@ -35,6 +35,6 @@ Use this workflow when the document already exists and layout stability matters 
 
 ## Honest Limitations
 
-- `plan_edit`, `preview_edit`, and `apply_edit` are review/verification pipeline tools, not a full semantic patch engine.
+- `apply_document_commands` supports a typed set/add/remove/move/copy union, not arbitrary package mutation; use a domain-specific tool when its evidence or semantics are required.
 - There is no public layout-drift report or structure-diff tool on the active MCP surface.
 - Saving is implicit: mutating tools persist immediately, so always start from `copy_document` when the original must stay untouched.

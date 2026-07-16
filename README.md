@@ -122,7 +122,7 @@ pip install "hwpx-mcp-server[ingest]"
 처음부터 모든 도구를 외울 필요는 없습니다. 보통 아래 하나로 시작합니다.
 
 1. **읽기** — `get_document_info` → `get_document_outline` / `get_document_text` → `find_text`, `get_table_map` 등으로 필요한 부분만. (저장하지 않음)
-2. **안전 수정** — `copy_document`로 사본 생성 → 읽기 도구로 대상 확인 → `search_and_replace`, `set_table_cell_text`, `apply_edits` 등 가장 작은 변경 → 다시 읽어 확인 → 검토가 끝난 복사본을 handoff.
+2. **안전 수정** — `copy_document`로 사본 생성 → 읽기 도구로 대상 확인 → `search_and_replace`, `set_table_cell_text` 같은 전문 도구 또는 이종 편집용 `apply_document_commands`로 가장 작은 변경 → 다시 읽어 확인 → 검토가 끝난 복사본을 handoff.
 
 핵심은 **copy first · smallest edit · re-read after edits**입니다.
 
@@ -133,14 +133,14 @@ pip install "hwpx-mcp-server[ingest]"
 - **📖 읽기·탐색** — `get_document_info`, `get_document_text`, `get_document_outline`, `find_text`, `get_table_text`, `get_table_map`, `find_cell_by_label`, `list_styles`. `get_document_map`은 아웃라인·표 지도·누름틀·앵커를 한 호출로 반환(왕복 최소화). (저장하지 않음)
 - **📥 로컬 문서 ingest** — `document_to_markdown`, `document_extract_json`, `markdown_to_document_plan`이 로컬 문서를 Markdown/JSON/document plan으로 변환합니다. HWPX는 `python-hwpx` 엔진을 우선 사용하고, 비-HWPX는 `[ingest]` extra 설치 시 MarkItDown adapter로 처리합니다.
 - **🔎 검색·치환** — `search_and_replace`, `batch_replace`, `replace_in_paragraph`, `replace_by_anchor`. (`find_text` 외 즉시 저장)
-- **✏️ 편집·트랜잭션** — `add_heading`, `add_paragraph`/`insert_paragraph`/`delete_paragraph`, `add_page_break`, `add_memo` 계열. `apply_edits`는 연산 목록 원자 적용(중간 실패 시 전체 롤백·`dry_run`·`expected_revision` 동시성 가드·`idempotency_key`), `undo_last_edit`는 `.bak` 복원, `byte_preserving_patch`는 미수정 영역 바이트 보존, `add_tracked_edit`는 변경 추적(redline).
-- **📊 표·양식채움** — `add_table`, `set_table_cell_text`, `merge_table_cells`/`split_table_cell`, `format_table`, `table_compute`(합계·평균·소계), `fill_by_path`(`성명 > right` 경로 구문). **바이트 보존 구조적 양식채움**: 셀 바이트 채움(빈/다중 문단)·행/열/표 삭제·복제 삽입·열 너비 자동맞춤·폰트 축소맞춤을 양식 서식을 재구성하지 않고 그대로 보존하며 수행합니다. `verify_fill`은 구조 검증 결과를 제공하며, 최종 시각 품질을 확언할 때는 필요에 따라 실제 한컴 렌더 오라클을 별도로 사용합니다. `analyze_template_formfit`/`apply_template_formfit`은 승인된 양식을 원본과 다른 destination에만 반영.
-- **🖊️ 누름틀 양식** — `list_form_fields`, `fill_form_field`(서식 보존), `analyze_form_fill`(라벨 매칭 신뢰도 등급).
-- **🧾 선언형 문서 생성** — `hwpx.document_plan.v1`로 OWPML을 직접 만지지 않고 선언: `validate_document_plan`/`analyze_document_plan`(파일 미생성) → `create_document_from_plan`(생성+검증), `inspect_document_authoring_quality`, `inspect_operating_plan_quality`, `create_proposal_document`. `compose_exam`은 양식 HWPX+마크다운 → 시험지 재조판(`verify_question_splits`).
-- **🏛️ 공문서·비교·대량 생산** — `inspect_official_document_style`(행정업무 규정 lint: 항목기호 위계·"끝."·붙임·날짜), `inspect_reference_consistency`, `doc_diff`/`create_comparison_table_document`(신구대조표), `mail_merge`(템플릿+CSV/JSON → N부·파일명 패턴·zip), `inspect_mail_merge_placeholders`.
+- **✏️ 편집·트랜잭션** — `add_heading`, `add_paragraph`/`insert_paragraph`/`delete_paragraph`, `add_page_break`, `add_memo` 계열. `apply_document_commands`는 이종 command 목록을 한 번에 원자 적용하며 전체 롤백·`dry_run`·`expected_revision`·`idempotency_key`를 지원합니다. `apply_edits`는 전환기 호환 facade입니다. `undo_last_edit`는 `.bak` 복원, `byte_preserving_patch`는 미수정 영역 바이트 보존, `add_tracked_edit`는 변경 추적(redline)을 담당합니다.
+- **📊 표·양식채움** — `add_table`, `set_table_cell_text`, `merge_table_cells`/`split_table_cell`, `format_table`, `table_compute`(합계·평균·소계). 혼합 양식의 기본 경로는 `analyze_form_fill` → `apply_form_fill` → `verify_form_fill`이며 셀·필드·본문 미수정 영역의 바이트 보존 증거를 함께 반환합니다. `fill_by_path`와 template-formfit 쌍은 전환기 호환 경로입니다.
+- **🖊️ 혼합 양식 단일 트랜잭션** — `list_form_fields`와 읽기 도구로 대상을 확인한 뒤 `analyze_form_fill(plan=...)` → `apply_form_fill(plan=compiledPlan)` → `verify_form_fill(plan=...)`로 native field·label cell·canonical path·body anchor를 한 번에 원자 적용합니다. `fill_form_field`는 단일 네이티브 필드 호환 경로이고, 평가계획은 `apply_evalplan_fill`, 시험지는 `compose_exam`의 독립 전문 경로를 유지합니다.
+- **🧾 선언형 문서 생성** — `hwpx.document_plan.v1`로 OWPML을 직접 만지지 않고 선언: `validate_document_plan`/`analyze_document_plan`(파일 미생성) → `create_document_from_plan`(생성+검증), `inspect_document_authoring_quality`, `inspect_operating_plan_quality`. 제안서도 document plan 경로가 기본이며 `create_proposal_document`는 호환 facade입니다. `compose_exam`은 양식 HWPX+마크다운 → 시험지 재조판(`verify_question_splits`).
+- **🏛️ 공문서·비교·대량 생산** — `inspect_official_document_style`(행정업무 규정 lint: 항목기호 위계·"끝."·붙임·날짜), `inspect_reference_consistency`, `doc_diff` 후 comparison document plan을 `create_document_from_plan`으로 생성하는 신구대조표, `mail_merge`(템플릿+CSV/JSON → N부·파일명 패턴·zip), `inspect_mail_merge_placeholders`. `create_comparison_table_document`는 호환 facade입니다.
 - **🎨 서식·그림·생성기** — `set_paragraph_format`, `set_page_setup`, `set_header_footer`, `set_page_number`, `set_list_format`, `format_text`, `create_custom_style`(입력은 pt/mm/% 인간 단위); `insert_picture`(manifest 자동 등록)/`replace_picture`; `build_image_grid`(사진대지)·`build_meeting_nameplates`·`build_organization_chart`.
 - **🖥️ 프리뷰·추출·복구·진단** — `render_preview`(HTML/PNG 시각 자기검증), `hwpx_to_markdown`/`hwpx_to_html`/`hwpx_extract_json`(payload·URL 입력, 파일 미수정), `repair_hwpx`(원본 보존·mimetype-first 재패킹, `recover=true`로 손상 ZIP LFH scan 복구; 응답 `crcOk`/`validatePackage.ok`/`recovered` 확인), `mcp_server_health`(배포 스큐 자기진단·capability handshake).
-- **🔬 고급(`HWPX_MCP_ADVANCED=1`)** — `package_parts`, `package_get_xml`/`package_get_text`, `object_find_by_tag`/`object_find_by_attr`, `plan_edit`/`preview_edit`/`apply_edit`, `validate_structure`, `lint_text_conventions`.
+- **🔬 고급(`HWPX_MCP_ADVANCED=1`)** — `package_parts`, `package_get_xml`/`package_get_text`, `object_find_by_tag`/`object_find_by_attr`, `validate_structure`, `lint_text_conventions` 등 저수준 점검 도구. `plan_edit`/`preview_edit`/`apply_edit`는 한 전환 기간만 유지하는 deprecated stub이며 신규 흐름은 `apply_document_commands`를 사용합니다.
 
 > **위치 계약** — `paragraph_index`는 본문 직속 문단의 0-based 인덱스입니다. 표 안 문단은 이 인덱스에 섞지 않고 `{"kind":"table_cell_paragraph","table_index":0,"row":0,"col":1,"cell_paragraph_index":0}` 같은 `location` 객체로 지정하며, `get_table_map`/`find_text`가 반환한 값을 그대로 넘길 수 있습니다.
 
@@ -156,11 +156,11 @@ pip install "hwpx-mcp-server[ingest]"
 
 ### 품질 게이트 계약 (no raw XML)
 
-모델은 **operation/plan만** 보내고 raw XML을 직접 편집하지 않습니다. `raw_xml_replace`, `arbitrary_xpath_mutation` 같은 원시 XML 표면은 public 도구로 노출되지 않습니다. 모든 쓰기는 python-hwpx의 **단일 `SavePipeline` 게이트**(VisualComplete)를 통과하며 우회 경로가 없습니다(무결성·XML·OPC/ID·열림안전·FormFit·레이아웃·시각 오라클 → 하나의 리포트).
+모델은 **operation/plan만** 보내고 raw XML을 직접 편집하지 않습니다. `raw_xml_replace`, `arbitrary_xpath_mutation` 같은 원시 XML 표면은 public 도구로 노출되지 않습니다. 일반 문서 저장 경로는 python-hwpx의 **`SavePipeline` 게이트**를 사용해 무결성·XML·OPC/ID·열림안전을 검사하고, 요청한 품질 수준에 따라 FormFit·레이아웃·시각 오라클까지 적용합니다.
 
-- **모든 쓰기 응답에 `visualComplete` 블록**이 실립니다: `ok`, `status`(verified/unverified/failed), `errorCodes`, `warnings`, `suggestedRetry`.
-- `quality` 블록으로 게이트를 올립니다(생략 시 transparent = 열림안전만). 예: `apply_edits(..., quality="strict")` 또는 `quality={"mode":"strict","overflowPolicy":"fail","layoutLint":"strict"}`.
-- 게이트가 실패하면 저장이 **보류**되고(`ok=false`), 구조화된 오류 코드(`FIELD_OVERFLOW`, `STALE_LINESEG_DETECTED`, `VISUAL_COMPLETE_FAILED`, …)와 `suggestedRetry`로 재시도합니다.
+- `quality`를 받는 일반 저장 도구는 응답에 `visualComplete`를 싣습니다: `ok`, `status`(verified/unverified/failed), `errorCodes`, `warnings`, `suggestedRetry`. `quality`를 생략하면 transparent(열림안전), `"strict"` 또는 `{"mode":"strict","overflowPolicy":"fail","layoutLint":"strict"}`로 올리면 추가 게이트를 적용합니다.
+- `byte_preserving_patch`, `apply_table_ops`, `apply_body_ops`, `apply_evalplan_fill`은 untouched package byte를 유지하기 위한 명시적 carveout입니다. 이 경로는 guarded publication, open-safety, byte/member diff와 공통 verification receipt를 사용하며 `visualComplete`를 주장하지 않습니다. 표·평가계획은 요청 시 실제 렌더 검사를 별도 수행하고, 본문 fast path는 전체 재렌더를 하지 않습니다.
+- 해당 경로의 게이트가 실패하면 저장이 **보류**되거나 소유한 후보만 원복되고(`ok=false`), 구조화된 오류 코드로 재시도 여부를 알립니다.
 - **capability handshake**가 core/mcp/plugin 버전+해시를 점검하고, skew 시 쓰기를 **fail-closed**로 차단합니다(`mcp_server_health.capability`). 진단/우회는 `HWPX_MCP_REQUIRE_CAPABILITY=0`.
 
 > `visual_review_required=true`는 구조/파일 기반 검증은 통과했지만 렌더링된 시각 레이아웃은 아직 증명되지 않았다는 뜻입니다. 운영 계획서·template-formfit 결과를 최종 제출 가능(submission-ready)으로 주장하려면 열린 문서를 검토해 `hwpx.visual-review.v1` 증거를 남기고 `current.status="observed_pass"`여야 합니다.
@@ -184,6 +184,13 @@ pip install "hwpx-mcp-server[ingest]"
 HTTP storage/render transport는 HTTPS 및 공개 IP만 허용하고, 리다이렉트와 실제 연결
 피어를 다시 검사합니다. 사설망 opt-in은 운영자가 대상을 신뢰하고 네트워크 경계를
 별도로 통제할 때만 사용하세요.
+
+macOS와 `renameat2`를 제공하는 Linux의 canonical mixed-form 및 byte-preserving form 게시 경로는 root/parent descriptor와
+대상 byte·identity snapshot에 묶여 동시 rename·symlink 교체도 실패 후 원복합니다.
+Windows와 그 원자 교환 primitive를 제공하지 않는 기타 POSIX 호스트의 표준 라이브러리
+fallback은 동일한 handle-relative 보장을 제공하지 않습니다. 이 호스트에서는 로컬
+workspace를 신뢰된 디렉터리로 취급하고 ACL 또는 host sandbox로 같은 사용자 권한의
+동시 reparse/rename을 막아야 합니다.
 
 ## 더 보기
 

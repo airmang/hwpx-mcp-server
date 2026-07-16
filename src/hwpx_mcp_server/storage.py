@@ -10,6 +10,7 @@ import shutil
 import tempfile
 import zipfile
 from dataclasses import dataclass, field
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Protocol, Tuple
 from urllib import error, parse, request
@@ -32,7 +33,11 @@ else:
 
 from . import quality as quality_contract
 from .upstream import HwpxDocument, open_document, validate_document_path
-from .workspace import WorkspaceResolver
+from .workspace import (
+    WorkspaceMissingParentGuard,
+    WorkspaceOutputGuard,
+    WorkspaceResolver,
+)
 from .network_policy import NetworkPolicy, build_policy_opener
 
 _REQUIRED_HWPX_FILES = [
@@ -51,6 +56,8 @@ _PLACEHOLDER_PATTERNS = [
 _UNESCAPED_AMP_RE = re.compile(r"&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9A-Fa-f]+;)")
 _NESTED_OPENING_TAG_RE = re.compile(r"<hp:t\b[^>]*>[^<]*(<(?!/?hp:)[^>]+>)")
 _EMPTY_HP_T_RE = re.compile(r"<hp:t\b[^>]*>\s*</hp:t>")
+
+HwpxVerificationSource = Path | bytes
 
 
 class DocumentStorage(Protocol):
@@ -108,6 +115,62 @@ class LocalDocumentStorage:
     def resolve_output_path(self, path: str) -> Path:
         return self.workspace.resolve_output(path)
 
+    def capture_output_guard(
+        self,
+        path: str | os.PathLike[str],
+        *,
+        create_parents: bool = True,
+    ) -> WorkspaceOutputGuard:
+        return self.workspace.capture_output(path, create_parents=create_parents)
+
+    def capture_output_precondition(
+        self,
+        path: str | os.PathLike[str],
+    ) -> WorkspaceOutputGuard | WorkspaceMissingParentGuard:
+        return self.workspace.capture_output_precondition(path)
+
+    def materialize_output_guard(
+        self,
+        precondition: WorkspaceOutputGuard | WorkspaceMissingParentGuard,
+    ) -> WorkspaceOutputGuard:
+        return self.workspace.materialize_output_guard(precondition)
+
+    def cleanup_owned_parent_directories(
+        self,
+        guard: WorkspaceOutputGuard,
+    ) -> bool:
+        return self.workspace.cleanup_owned_parent_directories(guard)
+
+    def atomic_write_bytes(
+        self,
+        guard: WorkspaceOutputGuard,
+        data: bytes,
+        *,
+        mode: int | None = None,
+    ) -> Path:
+        return self.workspace.atomic_write_bytes(guard, data, mode=mode)
+
+    def atomic_publish_bytes(
+        self,
+        guard: WorkspaceOutputGuard,
+        data: bytes,
+        *,
+        mode: int | None = None,
+    ) -> WorkspaceOutputGuard:
+        """Publish and return the exact candidate identity for transaction ownership."""
+
+        return self.workspace.atomic_publish_bytes(guard, data, mode=mode)
+
+    def read_guarded_bytes(self, guard: WorkspaceOutputGuard) -> bytes:
+        """Read the exact preimage represented by an output guard."""
+
+        return self.workspace.read_guarded_bytes(guard)
+
+    def remove_guarded_output(self, guard: WorkspaceOutputGuard) -> None:
+        """Remove only the exact candidate represented by an output guard."""
+
+        self.workspace.remove_output(guard)
+
     def relative_path(self, path: Path) -> str:
         return self.workspace.display_path(path)
 
@@ -139,15 +202,15 @@ class LocalDocumentStorage:
     def save_document(
         self, document: HwpxDocument, target: Path, *, quality: Any = None
     ) -> Dict[str, Any]:
-        # Phase F: every write funnels through the one SavePipeline gate, and the
-        # capability handshake fails closed before any bytes are produced.
+        # General document saves use the SavePipeline gate. Byte-preserving
+        # form writers have their own guarded open-safety publication path.
         quality_contract.assert_write_capability()
+        guard = self.capture_output_guard(target)
         self.maybe_backup(target)
         pre_save_snapshot = build_hwpx_presave_snapshot(target)
-        # Atomic save: write to a sibling temp file, verify it, then replace.
-        tmp_fd, tmp_path_str = tempfile.mkstemp(
-            suffix=target.suffix, dir=str(target.parent)
-        )
+        # Validate in an isolated temp, then publish through the identity-bound
+        # workspace guard. Candidate creation never follows the output parent.
+        tmp_fd, tmp_path_str = tempfile.mkstemp(suffix=target.suffix)
         tmp_path = Path(tmp_path_str)
         try:
             os.close(tmp_fd)
@@ -160,13 +223,12 @@ class LocalDocumentStorage:
                     "saved HWPX failed open-safety verification: "
                     + verification_report["openSafety"]["summary"]
                 )
-            os.replace(tmp_path, target)
+            self.atomic_write_bytes(guard, tmp_path.read_bytes())
             verification_report["filePath"] = str(target)
             verification_report["visualComplete"] = quality_contract.visual_complete_block(report)
             return verification_report
-        except Exception:
+        finally:
             tmp_path.unlink(missing_ok=True)
-            raise
 
 
 class RemoteDocumentClient(Protocol):
@@ -191,13 +253,13 @@ def _report_allows_editor_open(report: Mapping[str, Any]) -> bool:
 
 
 def require_hwpx_editor_open_safe(
-    path: Path,
+    source: HwpxVerificationSource,
     *,
     role: str,
 ) -> Dict[str, Any]:
     """Fail only on conditions expected to stop an editor from opening HWPX."""
 
-    open_safety = build_hwpx_open_safety_report(path)
+    open_safety = build_hwpx_open_safety_report(source)
     if not _report_allows_editor_open(open_safety):
         raise RuntimeError(
             f"{role} failed open-safety verification: "
@@ -385,10 +447,12 @@ class HttpDocumentStorage:
         return self._cache_dir / filename
 
 
-def build_hwpx_presave_snapshot(path: Path | None) -> Dict[str, Any] | None:
-    if path is None or not path.exists():
+def build_hwpx_presave_snapshot(
+    source: HwpxVerificationSource | None,
+) -> Dict[str, Any] | None:
+    if source is None or (isinstance(source, Path) and not source.exists()):
         return None
-    return _collect_hwpx_snapshot(path)
+    return _collect_hwpx_snapshot(source)
 
 
 def _issue_messages(report: Any, attr_name: str = "issues") -> List[str]:
@@ -413,7 +477,9 @@ def _open_safety_dependency_error() -> str | None:
     return None
 
 
-def build_hwpx_open_safety_report(path: Path) -> Dict[str, Any]:
+def build_hwpx_open_safety_report(
+    source: HwpxVerificationSource,
+) -> Dict[str, Any]:
     package_payload: Dict[str, Any]
     document_payload: Dict[str, Any]
     reopen_payload: Dict[str, Any]
@@ -431,7 +497,7 @@ def build_hwpx_open_safety_report(path: Path) -> Dict[str, Any]:
         try:
             assert validate_package is not None
             assert is_editor_open_blocking_issue is not None
-            package_report = validate_package(path)
+            package_report = validate_package(source)
             package_errors = _issue_messages(package_report, "errors")
             blocking_issues = [
                 issue for issue in package_report.errors if is_editor_open_blocking_issue(issue)
@@ -458,7 +524,7 @@ def build_hwpx_open_safety_report(path: Path) -> Dict[str, Any]:
             }
 
     try:
-        document_report = validate_document_path(path)
+        document_report = validate_document_path(source)
         document_payload = {
             "ok": bool(document_report.ok),
             "errors": _issue_messages(document_report, "errors"),
@@ -472,7 +538,7 @@ def build_hwpx_open_safety_report(path: Path) -> Dict[str, Any]:
         }
 
     try:
-        reopened = open_document(path)
+        reopened = open_document(source)
         close = getattr(reopened, "close", None)
         if callable(close):
             close()
@@ -498,9 +564,16 @@ def build_hwpx_open_safety_report(path: Path) -> Dict[str, Any]:
     }
 
 
-def build_hwpx_verification_report(path: Path, pre_save_snapshot: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    snapshot = _collect_hwpx_snapshot(path)
-    open_safety = build_hwpx_open_safety_report(path)
+def build_hwpx_verification_report(
+    source: HwpxVerificationSource,
+    pre_save_snapshot: Dict[str, Any] | None = None,
+    *,
+    file_path: Path | None = None,
+) -> Dict[str, Any]:
+    snapshot = _collect_hwpx_snapshot(source)
+    open_safety = build_hwpx_open_safety_report(source)
+    displayed_path = file_path or (source if isinstance(source, Path) else None)
+    file_size = len(source) if isinstance(source, bytes) else source.stat().st_size
     totals = snapshot["totals"]
     missing_files = snapshot["missing_files"]
     warnings: List[str] = []
@@ -539,8 +612,8 @@ def build_hwpx_verification_report(path: Path, pre_save_snapshot: Dict[str, Any]
     return {
         "ok": ok,
         "summary": summary,
-        "filePath": str(path),
-        "fileSizeBytes": path.stat().st_size,
+        "filePath": str(displayed_path) if displayed_path is not None else "<memory>",
+        "fileSizeBytes": file_size,
         "requiredFilesChecked": list(_REQUIRED_HWPX_FILES),
         "missingFiles": missing_files,
         "openSafety": open_safety,
@@ -559,7 +632,7 @@ def build_hwpx_verification_report(path: Path, pre_save_snapshot: Dict[str, Any]
     }
 
 
-def _collect_hwpx_snapshot(path: Path) -> Dict[str, Any]:
+def _collect_hwpx_snapshot(source: HwpxVerificationSource) -> Dict[str, Any]:
     missing_files: List[str] = []
     section_reports: List[Dict[str, Any]] = []
     totals = {
@@ -572,7 +645,8 @@ def _collect_hwpx_snapshot(path: Path) -> Dict[str, Any]:
         "suspiciousPatterns": 0,
     }
 
-    with zipfile.ZipFile(path) as archive:
+    archive_source = BytesIO(source) if isinstance(source, bytes) else source
+    with zipfile.ZipFile(archive_source) as archive:
         names = set(archive.namelist())
         for required in _REQUIRED_HWPX_FILES:
             if required not in names:

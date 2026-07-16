@@ -1,51 +1,71 @@
 # HWPX MCP 서버 하드닝 가이드
 
-## 개요
-- 모든 MCP 툴 스키마는 draft-07 호환 Sanitizer를 거쳐 `$ref`, `anyOf`, nullable 타입 없이 노출됩니다.
-- `HWPX_MCP_HARDENING=1` 플래그를 사용하면 plan → preview → apply 편집 파이프라인과 보조 검색 도구가 활성화됩니다.
-- 플래그를 끄면 기존 동작을 그대로 유지하면서도 스키마 Sanitizer는 항상 적용됩니다.
+## 공개 계약과 프로필
+
+- 도구 등록, 입력·출력 스키마, health/capability 표면과 생성 문서는 하나의
+  `ToolSpec` 레지스트리에서 만들어집니다. 4.0.0 후보는 기본 121개, 고급 모드 포함
+  132개 도구이며 계약 해시는 `71661f4118e020c4`입니다.
+- 스키마는 JSON Schema 2020-12 기준이며 `$defs`, `$ref`, `anyOf`를 사용할 수
+  있습니다. 실제 호스트에 노출되는 계약은 `docs/tool-contract.generated.json`과
+  `docs/tool-contract.md`에서 확인합니다.
+- 기본 프로필을 운영 표면으로 사용하세요. package inspection, 저수준 검증과 전환기
+  편집 도구가 꼭 필요한 경우에만 `HWPX_MCP_ADVANCED=1`을 설정하고 호스트를 다시
+  시작합니다.
+- `plan_edit` → `preview_edit` → `apply_edit`는 고급 모드의 deprecated 전환
+  표면입니다. 신규 자동화는 `apply_document_commands` 또는 목적별 canonical form 도구를
+  우선합니다. 존재하지 않는 `HWPX_MCP_HARDENING`, `search`, `get_context` 도구에
+  의존하면 안 됩니다.
 
 ## 작업공간·네트워크 경계
 
 - `HWPX_MCP_WORKSPACE_ROOTS`에는 허용할 절대 디렉터리를 JSON 배열로 지정합니다.
   상대경로는 첫 root를 기준으로 해석되고, 절대경로는 나열된 root 중 하나에 속해야
-  합니다. traversal, workspace 밖 경로, symlink escape는 정형 MCP 오류로 거부됩니다.
+  합니다. traversal, workspace 밖 경로, symlink escape는 정형 MCP 오류로
+  거부됩니다.
 - 변수를 생략하면 서버 프로세스의 시작 cwd 하나만 workspace로 사용합니다. 호스트가
   cwd를 명확히 보장하지 못한다면 환경 변수를 명시하세요. filesystem root(`/`) 자체는
   허용할 수 없습니다.
+- macOS와 `renameat2`를 제공하는 Linux의 canonical mixed-form 및 byte-preserving
+  form 게시 경로는 root/parent descriptor와 대상 byte·identity·mode snapshot으로
+  동시 parent/target 교체를 검사하고, 실패 시 소유한 후보만 제거·원복합니다.
+- Windows와 원자 교환 primitive가 없는 기타 POSIX fallback은 후보의 실제 관측
+  mode와 게시 전후 identity를 검사하고 정상 실패 시 소유 후보를 원복합니다. 다만
+  handle-relative 원자 교환은 제공하지 않으므로 workspace를 신뢰된 로컬 디렉터리로
+  두고 ACL 또는 호스트 sandbox로 같은 사용자 권한의 동시 reparse/rename을
+  차단해야 합니다.
 - URL 입력, HTTP document storage, 원격 render transport는 기본적으로 HTTPS와 공개
   주소만 허용합니다. DNS 결과 전체, redirect 대상, 실제 연결 피어를 각각 검사합니다.
   `HWPX_MCP_ALLOW_PRIVATE_NETWORK=1`은 신뢰된 사설/루프백 HTTPS 서비스가 반드시
-  필요한 경우에만 사용하며 링크로컬·metadata·예약 주소는 여전히 차단됩니다.
-- 실패 응답은 `hwpx.mcp-error/v1` 계약의 `code`, `category`, `retryable`, `suggestion`을
-  사용하며 원래 인자나 로컬 절대경로를 되돌려 보내지 않습니다.
+  필요한 경우에만 사용하며 링크로컬·metadata·예약 주소는 계속 차단됩니다.
 
-## 활성화 방법
-1. 서버를 시작하기 전에 환경 변수 `HWPX_MCP_HARDENING=1`을 설정합니다.
-2. MCP 클라이언트에서 `ListTools` 응답을 확인하면 하드닝 전용 도구(`hwpx.plan_edit`, `hwpx.preview_edit`, `hwpx.apply_edit`, `hwpx.search`, `hwpx.get_context`)가 함께 나열됩니다.
-3. 플래그를 제거하거나 `0`으로 지정하면 기존 도구 세트만 노출됩니다.
+## 저장·검증 경계
 
-## 편집 파이프라인
-| 단계 | 도구 | 설명 |
-| --- | --- | --- |
-| Plan | `hwpx.plan_edit` | 편집 의도와 대상 정보를 제출하면 `planId`, 예상 diff 개요, 후속 예시 호출을 반환합니다. |
-| Preview | `hwpx.preview_edit` | `planId`를 검증하면서 diff, 모호성 후보, 안전 점수를 제공합니다. 이 기록이 없으면 Apply 단계로 이동할 수 없습니다. |
-| Apply | `hwpx.apply_edit` | `confirm: true`와 함께 요청해야 하며, 미리보기한 동일한 `planId`만 허용됩니다. `idempotencyKey`를 지정하면 재시도 시 안전하게 무시됩니다. |
+- 일반 문서 저장은 capability handshake와 `SavePipeline`을 사용합니다. `quality`를
+  받는 도구는 transparent 또는 strict 정책에 따른 `visualComplete` 결과를
+  반환합니다.
+- `byte_preserving_patch`, `apply_table_ops`, `apply_body_ops`,
+  `apply_evalplan_fill`은 untouched package byte를 지키기 위한 명시적 carveout입니다.
+  guarded publication, open-safety, byte/member diff와 공통 verification receipt를
+  사용하며 전체 `visualComplete` 렌더를 주장하지 않습니다.
+- canonical mixed-form 분석과 dry-run은 출력 상위 디렉터리를 만들지 않습니다. 적용과
+  검증은 source/output revision, inode, mode 및 정확한 publication token을 다시
+  확인하며 외부가 바꾼 파일은 같은 바이트여도 원복하거나 덮어쓰지 않습니다.
+- 기존 파일을 바꾸는 form/byte-preserving 트랜잭션은 첫 게시 전에 같은 workspace에
+  예측 불가능한 이름의 exact recovery sidecar를 예약합니다. 최종 identity 검증까지
+  성공한 경우에만 guarded cleanup하며, 실패·외부 경합 시에는 외부 파일을 건드리지
+  않고 원본 바이트 복구본을 남깁니다. 운영자는 실패 조사와 복구가 끝난 뒤에만 해당
+  `.recovery` 파일을 정리해야 합니다.
+- capability skew는 기본적으로 쓰기를 fail-closed로 막습니다. 진단 목적의
+  `HWPX_MCP_REQUIRE_CAPABILITY=0`은 계약 불일치를 이해한 운영자만 제한적으로
+  사용해야 합니다.
 
-> 📌 모든 하드닝 도구는 공통 `document` 로케이터 스키마를 사용합니다. 기존 `path` 값을 그대로 전달해도 되지만, 이미 로드된 문서를 후속 요청에서 재사용하려면 `{"type": "handle", "handleId": "..."}` 형태로 안정적인 식별자를 전달하는 것이 좋습니다. HTTP 백엔드를 사용할 때는 `{"type": "uri", "uri": "...", "backend": "http"}`와 같이 명시적으로 지정할 수 있습니다.
+## 오류와 운영 점검
 
-### 오류 코드 요약
-| 코드 | 의미 | 대응 |
-| --- | --- | --- |
-| `PREVIEW_REQUIRED` | 미리보기 없이 적용을 시도했을 때 발생 | `hwpx.preview_edit`를 먼저 호출한 뒤 다시 시도 |
-| `AMBIGUOUS_TARGET` | 타겟이 모호하여 여러 후보가 있을 때 | 반환된 `candidates`를 검토 후 대상 범위를 좁혀 재계획 |
-| `UNSAFE_WILDCARD` | 검색/치환 범위가 과도하게 넓을 때 | 제한 조건(`limit`, 정규식 등)을 조정하여 재계획 |
-| `IDEMPOTENT_REPLAY` | 동일한 `idempotencyKey`로 이미 적용된 요청 | 결과를 신뢰하고 중복 요청을 중단 |
-
-## 보조 도구
-- **`hwpx.search`**: 정규식 또는 키워드로 문서를 검색하고, 각 결과에 안정적인 `nodeId`와 문맥 조각을 제공합니다.
-- **`hwpx.get_context`**: 지정한 타깃 주변의 제한된 창(window)만 반환해 대용량 문서를 안전하게 검토할 수 있습니다.
-
-## 테스트
-- `pytest -q` 명령으로 스키마 회귀, 파이프라인 게이트, 멱등성 검증을 포함한 테스트를 실행할 수 있습니다.
-- 테스트 실패 시 플래그를 비활성화하여 운영 환경을 즉시 보호할 수 있으며, 수정 후 반드시 동일 명령으로 재검증하세요.
+- 실패 응답은 `hwpx.mcp-error/v1`의 `code`, `category`, `retryable`, `suggestion`을
+  사용하며 원래 인자나 로컬 절대경로를 노출하지 않습니다.
+- 시작 후 `mcp_server_health`에서 `capability.ok`, `toolSurface`와 계약 해시를
+  확인하고, `describe_capabilities`로 현재 프로필의 작업군과 진입점을 확인합니다.
+- 릴리스 후보 검증은 `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`,
+  `.venv/bin/python scripts/render_tool_contract.py --check --skip-skill`,
+  `.venv/bin/python scripts/render_contract_delta.py --check`,
+  `.venv/bin/python scripts/check_public_hygiene.py`를 모두 통과해야 합니다.

@@ -17,6 +17,7 @@ from ..upstream import HwpxDocument, open_document
 
 _MAX_SUMMARY_ITEMS = 20
 _MAX_SNIPPET = 80
+HwpxSnapshotSource = str | Path | bytes
 
 
 @dataclass(frozen=True)
@@ -112,9 +113,14 @@ def _paragraph_signature(paragraph: Any) -> dict[str, Any]:
     return {"attrs": attrs, "runs": runs}
 
 
-def snapshot_document(path: str | Path) -> dict[str, Any]:
-    resolved = Path(path)
-    document = open_document(resolved)
+def _source_bytes(source: HwpxSnapshotSource) -> bytes:
+    return source if isinstance(source, bytes) else Path(source).read_bytes()
+
+
+def snapshot_document(source: HwpxSnapshotSource) -> dict[str, Any]:
+    source_bytes = _source_bytes(source)
+    display_path = "<memory>" if isinstance(source, bytes) else str(Path(source))
+    document = open_document(source_bytes)
     try:
         paragraphs = [
             {
@@ -141,7 +147,7 @@ def snapshot_document(path: str | Path) -> dict[str, Any]:
                 }
             )
         return {
-            "path": str(resolved),
+            "path": display_path,
             "paragraphs": paragraphs,
             "tables": tables,
             "paragraphCount": len(paragraphs),
@@ -293,16 +299,19 @@ def _table_diff_items(before: list[dict[str, Any]], after: list[dict[str, Any]])
     return items
 
 
-def semantic_diff(before_path: str | Path, after_path: str | Path) -> dict[str, Any]:
-    before = snapshot_document(before_path)
-    after = snapshot_document(after_path)
+def semantic_diff(
+    before_source: HwpxSnapshotSource,
+    after_source: HwpxSnapshotSource,
+) -> dict[str, Any]:
+    before_bytes = _source_bytes(before_source)
+    after_bytes = _source_bytes(after_source)
+    before = snapshot_document(before_bytes)
+    after = snapshot_document(after_bytes)
     items = _paragraph_diff_items(before["paragraphs"], after["paragraphs"])
     remaining = max(0, _MAX_SUMMARY_ITEMS - len(items))
     if remaining:
         items.extend(_table_diff_items(before["tables"], after["tables"])[:remaining])
 
-    before_bytes = Path(before_path).read_bytes()
-    after_bytes = Path(after_path).read_bytes()
     changed = before_bytes != after_bytes
     if changed and not items:
         items.append(
