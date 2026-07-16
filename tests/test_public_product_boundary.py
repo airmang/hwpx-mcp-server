@@ -7,10 +7,12 @@ import zipfile
 import hwpx_mcp_server
 from hwpx_mcp_server import server
 from hwpx_mcp_server.tool_contract import (
+    BASELINE_TOOL_SPECS,
     DOMAIN_SPECS,
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
+    ToolClassification,
     contract_hash,
     expected_tool_names,
     skill_required_tool_names,
@@ -26,6 +28,20 @@ REMOVED_PRACTICE_TOOLS = {
     "continue_practice_campaign",
     "cancel_practice_campaign",
     "export_practice_campaign",
+}
+INTERNAL_FIXTURE_QA_TOOLS = {
+    "run_fixture_benchmark",
+    "export_fixture_benchmark",
+    "visual_review_fixture",
+    "visual_repair_fixture",
+}
+RETIRED_LEGACY_MODULES = {
+    "hwpx_mcp_server.tools": "tools.py",
+    "hwpx_mcp_server.legacy_server": "legacy_server.py",
+    "hwpx_mcp_server.prompts": "prompts.py",
+    "hwpx_mcp_server.logging_conf": "logging_conf.py",
+    "hwpx_mcp_server.schema.builder": "schema/builder.py",
+    "hwpx_mcp_server.schema.sanitizer": "schema/sanitizer.py",
 }
 
 
@@ -45,30 +61,45 @@ def test_practice_package_is_absent_from_the_import_surface() -> None:
     assert importlib.util.find_spec("hwpx_mcp_server.practice") is None
 
 
-def test_contract_and_live_registry_exclude_internal_practice_tools() -> None:
+def test_pre_fastmcp_shadow_modules_are_absent_from_the_import_surface() -> None:
+    package_root = Path(hwpx_mcp_server.__file__).resolve().parent
+
+    for module_name, relative_path in RETIRED_LEGACY_MODULES.items():
+        assert not (package_root / relative_path).exists()
+        assert importlib.util.find_spec(module_name) is None
+
+
+def test_contract_and_live_registry_exclude_internal_product_boundaries() -> None:
     default = expected_tool_names(advanced=False)
     advanced = expected_tool_names(advanced=True)
     live = set(server._fastmcp_tool_names())
 
-    assert len(default) == 126
-    assert len(advanced) == 136
-    assert len(skill_required_tool_names()) == 30
+    assert len(default) == 121
+    assert len(advanced) == 132
+    assert len(skill_required_tool_names()) == 28
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
-        "3.0.0",
-        "3.0.0",
-        "0.2.0",
+        "3.1.0",
+        "4.0.0",
+        "0.3.0",
     )
-    assert contract_hash() == "76d143ccc0787828"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(default)
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(advanced)
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(live)
+    assert INTERNAL_FIXTURE_QA_TOOLS.isdisjoint(default)
+    assert INTERNAL_FIXTURE_QA_TOOLS.isdisjoint(advanced)
+    assert INTERNAL_FIXTURE_QA_TOOLS.isdisjoint(live)
+    assert INTERNAL_FIXTURE_QA_TOOLS == {
+        spec.name
+        for spec in BASELINE_TOOL_SPECS
+        if spec.classification is ToolClassification.INTERNAL
+    }
     assert all(domain.key != "private_practice" for domain in DOMAIN_SPECS)
 
     health = server.mcp_server_health()
     assert health["toolSurface"]["status"] == "ok"
-    assert health["toolSurface"]["expectedFastMcpToolCount"] == 126
-    assert health["toolSurface"]["actualFastMcpToolCount"] == 126
-    assert health["toolSurface"]["contractHash"] == "76d143ccc0787828"
+    assert health["toolSurface"]["expectedFastMcpToolCount"] == 121
+    assert health["toolSurface"]["actualFastMcpToolCount"] == 121
+    assert health["toolSurface"]["contractHash"] == contract_hash()
     assert health["toolSurface"]["missingExpectedTools"] == []
     assert health["toolSurface"]["unexpectedRegisteredTools"] == []
 

@@ -8,16 +8,15 @@ from pathlib import Path
 from hwpx.document import HwpxDocument
 
 from hwpx_mcp_server import server
-from hwpx_mcp_server.tools import build_tool_definitions
+from hwpx_mcp_server.tool_contract import bound_tool_registry
 
 
-def test_render_preview_tool_is_exposed_in_legacy_registry() -> None:
-    definitions = {definition.name: definition for definition in build_tool_definitions()}
+def test_render_preview_tool_is_bound_to_the_canonical_registry() -> None:
+    binding = bound_tool_registry().by_name()["render_preview"]
 
-    assert "render_preview" in definitions
-    schema = definitions["render_preview"].input_model.model_json_schema()
-    assert "outputDir" in schema["properties"]
-    assert "maxPages" in schema["properties"]
+    assert binding.function is server.render_preview
+    assert "output_dir" in binding.input_schema["properties"]
+    assert "max_pages" in binding.input_schema["properties"]
 
 
 def test_render_preview_html_only_creates_manifest_and_visual_evidence(tmp_path: Path) -> None:

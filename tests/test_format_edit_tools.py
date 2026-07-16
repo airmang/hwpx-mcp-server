@@ -6,8 +6,7 @@ from pathlib import Path
 from hwpx.document import HwpxDocument
 from hwpx.tools.package_validator import validate_editor_open_safety
 from hwpx_mcp_server import server
-from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.tools import build_tool_definitions
+from hwpx_mcp_server.tool_contract import bound_tool_registry
 
 
 HH_NS = "http://www.hancom.co.kr/hwpml/2011/head"
@@ -106,12 +105,8 @@ def test_fastmcp_format_edit_tools_roundtrip(tmp_path: Path) -> None:
     assert reopened.sections[0].properties.get_footer().element.find(f".//{HP}pageNum") is not None
 
 
-def test_legacy_format_tools_schema_and_call(tmp_path: Path) -> None:
-    target = tmp_path / "legacy-format.hwpx"
-    server.create_document(str(target))
-    paragraph_index = server.add_paragraph(str(target), "legacy")["paragraph_index"]
-
-    definitions = {definition.name: definition for definition in build_tool_definitions()}
+def test_format_tools_are_bound_to_canonical_callables_and_schemas() -> None:
+    bindings = bound_tool_registry().by_name()
     for name in {
         "set_paragraph_format",
         "set_page_setup",
@@ -119,17 +114,11 @@ def test_legacy_format_tools_schema_and_call(tmp_path: Path) -> None:
         "set_page_number",
         "set_list_format",
     }:
-        assert name in definitions
+        binding = bindings[name]
+        assert binding.function is getattr(server, name)
+        assert binding.input_schema["additionalProperties"] is False
 
-    ops = HwpxOps(base_directory=tmp_path, auto_backup=False)
-    result = definitions["set_paragraph_format"].call(
-        ops,
-        {
-            "document": {"type": "path", "path": str(target)},
-            "paragraphIndex": paragraph_index,
-            "lineSpacingPercent": 160,
-            "dryRun": False,
-        },
+    paragraph_schema = bindings["set_paragraph_format"].input_schema
+    assert {"filename", "paragraph_index", "line_spacing_percent"} <= set(
+        paragraph_schema["properties"]
     )
-    assert result["openSafety"]["ok"] is True
-    assert result["verificationReport"]["openSafety"]["ok"] is True

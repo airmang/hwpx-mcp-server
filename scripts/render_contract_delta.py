@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render/check the versioned 3.0.0 public ToolSpec contract delta."""
+"""Render/check the versioned 4.0.0 ToolSpec consolidation delta."""
 
 from __future__ import annotations
 
@@ -16,30 +16,22 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from hwpx_mcp_server.tool_contract import (  # noqa: E402
+    BASELINE_TOOL_SPECS,
     DOMAIN_SPECS,
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
+    TOOL_SPECS,
+    ToolClassification,
+    bound_tool_registry,
     contract_hash,
     expected_tool_names,
     skill_required_tool_names,
 )
 
 
-DEFAULT_OUTPUT = ROOT / "docs" / "tool-contract-delta-3.0.0.json"
+DEFAULT_OUTPUT = ROOT / "docs" / "tool-contract-delta-4.0.0.json"
 BASELINE: dict[str, Any] = {
-    "versions": {
-        "pythonHwpx": "2.29.2",
-        "mcpServer": "2.23.1",
-        "skill": "0.1.31",
-    },
-    "defaultToolCount": 133,
-    "advancedToolCount": 143,
-    "domainCount": 22,
-    "skillRequiredToolCount": 32,
-    "contractHash": "0f9e1dcb7c646202",
-}
-EXPECTED_TARGET: dict[str, Any] = {
     "versions": {
         "pythonHwpx": "3.0.0",
         "mcpServer": "3.0.0",
@@ -51,155 +43,121 @@ EXPECTED_TARGET: dict[str, Any] = {
     "skillRequiredToolCount": 30,
     "contractHash": "76d143ccc0787828",
 }
-REMOVALS: tuple[dict[str, Any], ...] = (
-    {
-        "name": "start_practice_scenario",
-        "alias": None,
-        "replacementKind": "none",
-        "replacementTools": [],
-    },
-    {
-        "name": "apply_practice_scenario",
-        "alias": None,
-        "replacementKind": "none",
-        "replacementTools": [],
-    },
-    {
-        "name": "start_practice_campaign",
-        "alias": None,
-        "replacementKind": "none",
-        "replacementTools": [],
-    },
-    {
-        "name": "get_practice_campaign",
-        "alias": None,
-        "replacementKind": "none",
-        "replacementTools": [],
-    },
-    {
-        "name": "continue_practice_campaign",
-        "alias": None,
-        "replacementKind": "none",
-        "replacementTools": [],
-    },
-    {
-        "name": "cancel_practice_campaign",
-        "alias": None,
-        "replacementKind": "none",
-        "replacementTools": [],
-    },
-    {
-        "name": "export_practice_campaign",
-        "alias": None,
-        "replacementKind": "none",
-        "replacementTools": [],
-    },
-)
-PUBLIC_DOCUMENT_WORK_ALTERNATIVES: tuple[str, ...] = (
-    "apply_document_commands",
-    "apply_evalplan_fill",
-    "scan_form_guidance",
-    "apply_table_ops",
-    "apply_body_ops",
-    "verify_form_fill",
-)
 
 
-def _runtime_reference_hits(removed_names: set[str]) -> list[dict[str, Any]]:
-    hits: list[dict[str, Any]] = []
-    runtime_root = SRC / "hwpx_mcp_server"
-    for path in sorted(runtime_root.rglob("*.py")):
-        text = path.read_text(encoding="utf-8")
-        names = sorted(name for name in removed_names if name in text)
-        if names:
-            hits.append(
-                {
-                    "path": str(path.relative_to(ROOT)),
-                    "removedNames": names,
-                }
-            )
-    return hits
+def _by_classification(classification: ToolClassification) -> list[Any]:
+    return [
+        spec
+        for spec in BASELINE_TOOL_SPECS
+        if spec.classification is classification
+    ]
 
 
-def build_payload() -> dict[str, Any]:
-    default_names = expected_tool_names(advanced=False)
-    advanced_names = expected_tool_names(advanced=True)
-    removed_names = {item["name"] for item in REMOVALS}
-    replacement_names = set(PUBLIC_DOCUMENT_WORK_ALTERNATIVES)
-    runtime_hits = _runtime_reference_hits(removed_names)
-    runtime_package = ROOT / "src" / "hwpx_mcp_server" / "practice"
-    target = {
+def _target() -> dict[str, Any]:
+    return {
         "versions": {
             "pythonHwpx": MIN_PYTHON_HWPX,
             "mcpServer": MIN_MCP_VERSION,
             "skill": MIN_SKILL_VERSION,
         },
-        "defaultToolCount": len(default_names),
-        "advancedToolCount": len(advanced_names),
+        "defaultToolCount": len(expected_tool_names(advanced=False)),
+        "advancedToolCount": len(expected_tool_names(advanced=True)),
         "domainCount": len(DOMAIN_SPECS),
         "skillRequiredToolCount": len(skill_required_tool_names()),
         "contractHash": contract_hash(),
     }
 
+
+def build_payload() -> dict[str, Any]:
+    target = _target()
+    registry = bound_tool_registry()
+    internal = _by_classification(ToolClassification.INTERNAL)
+    compatibility = _by_classification(ToolClassification.COMPATIBILITY)
+    deprecated = _by_classification(ToolClassification.DEPRECATED)
+    removed_names = {spec.name for spec in internal}
+    active_names = {spec.name for spec in TOOL_SPECS}
+    server_source = (SRC / "hwpx_mcp_server" / "server.py").read_text(encoding="utf-8")
+    runtime_hits = sorted(name for name in removed_names if name in server_source)
+
     errors: list[str] = []
-    if target != EXPECTED_TARGET:
-        errors.append(f"target contract drift: expected {EXPECTED_TARGET!r}, got {target!r}")
-    if len(REMOVALS) != 7 or len(removed_names) != 7:
-        errors.append("the versioned delta must contain exactly seven unique removals")
-    if BASELINE["defaultToolCount"] - target["defaultToolCount"] != len(removed_names):
-        errors.append("default count delta does not match the seven removed tools")
-    if BASELINE["advancedToolCount"] - target["advancedToolCount"] != len(removed_names):
-        errors.append("advanced count delta does not match the seven removed tools")
-    if removed_names & advanced_names:
-        errors.append(f"removed names remain active: {sorted(removed_names & advanced_names)!r}")
-    if replacement_names - default_names:
-        errors.append(
-            f"replacement tools are not in the default contract: "
-            f"{sorted(replacement_names - default_names)!r}"
-        )
-    if any(item["alias"] is not None for item in REMOVALS):
-        errors.append("removed tools must not retain aliases")
-    if any(item["replacementKind"] != "none" or item["replacementTools"] for item in REMOVALS):
-        errors.append("removed private QA tools must not claim one-to-one public replacements")
-    if runtime_package.exists():
-        errors.append(f"removed runtime package still exists: {runtime_package.relative_to(ROOT)}")
+    expected_counts = {
+        "defaultToolCount": 121,
+        "advancedToolCount": 132,
+        "domainCount": 19,
+        "skillRequiredToolCount": 28,
+    }
+    for key, expected in expected_counts.items():
+        if target[key] != expected:
+            errors.append(f"{key}: expected {expected}, got {target[key]}")
+    if len(internal) != 4 or removed_names & active_names:
+        errors.append("the four internal fixture-QA names must be absent from the installed contract")
+    if len(compatibility) != 11 or any(not spec.replacement_tools for spec in compatibility):
+        errors.append("all eleven compatibility facades require replacement guidance")
+    if len(deprecated) != 5 or any(not spec.replacement_tools for spec in deprecated):
+        errors.append("all five transition deprecations require replacement guidance")
     if runtime_hits:
-        errors.append(f"removed tool call sites remain in runtime source: {runtime_hits!r}")
+        errors.append(f"removed fixture tools remain in server runtime: {runtime_hits}")
     if errors:
         raise RuntimeError("\n".join(errors))
 
     return {
-        "schemaVersion": "hwpx.tool-contract-delta.v1",
-        "release": "3.0.0",
-        "changeKind": "breaking-removal",
+        "schemaVersion": "hwpx.tool-contract-delta.v2",
+        "release": "4.0.0",
+        "changeKind": "breaking-removal-and-typed-registry",
         "baseline": BASELINE,
         "target": target,
         "delta": {
-            "defaultToolCount": target["defaultToolCount"] - BASELINE["defaultToolCount"],
-            "advancedToolCount": target["advancedToolCount"] - BASELINE["advancedToolCount"],
-            "domainCount": target["domainCount"] - BASELINE["domainCount"],
-            "skillRequiredToolCount": (
-                target["skillRequiredToolCount"] - BASELINE["skillRequiredToolCount"]
-            ),
+            key: target[key] - BASELINE[key]
+            for key in (
+                "defaultToolCount",
+                "advancedToolCount",
+                "domainCount",
+                "skillRequiredToolCount",
+            )
         },
-        "removedTools": list(REMOVALS),
+        "removedTools": [
+            {
+                "name": spec.name,
+                "classification": spec.classification.value,
+                "destination": "internal CI library",
+                "alias": None,
+                "replacementTools": [],
+            }
+            for spec in internal
+        ],
+        "profileMoves": [
+            {"name": "score_form_fill", "from": "default", "to": "advanced"}
+        ],
         "compatibility": {
             "aliases": [],
-            "deprecatedStubs": [],
+            "facades": [
+                {
+                    "name": spec.name,
+                    "replacementTools": list(spec.replacement_tools),
+                }
+                for spec in compatibility
+            ],
+            "deprecatedStubs": [
+                {
+                    "name": spec.name,
+                    "replacementTools": list(spec.replacement_tools),
+                    "transitionRelease": "4.0.0",
+                }
+                for spec in deprecated
+            ],
             "ghostRegistrations": [],
         },
-        "replacementGuidance": {
-            "oneToOnePublicReplacement": False,
-            "internalScenarioCampaignDestination": "workspace-private QA harness",
-            "publicDocumentWorkAlternatives": list(PUBLIC_DOCUMENT_WORK_ALTERNATIVES),
-        },
-        "callSiteRuntimeRemovalEvidence": {
+        "registrationEvidence": {
             "canonicalToolSpec": "src/hwpx_mcp_server/tool_contract.py",
             "fastMcpRegistration": "src/hwpx_mcp_server/server.py",
-            "removedRuntimePackage": "src/hwpx_mcp_server/practice",
-            "runtimePackagePresent": runtime_package.exists(),
-            "remainingRuntimeReferences": runtime_hits,
-            "activeRemovedNames": sorted(removed_names & advanced_names),
+            "boundInstalledToolCount": len(registry.tools),
+            "bindingHash": registry.binding_hash(),
+            "normalizedInputOutputSchemasComplete": all(
+                bool(item.input_schema) and bool(item.output_schema)
+                for item in registry.tools
+            ),
+            "remainingRemovedRuntimeReferences": runtime_hits,
+            "activeRemovedNames": sorted(removed_names & active_names),
         },
     }
 

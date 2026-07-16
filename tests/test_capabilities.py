@@ -59,4 +59,5 @@ def test_mcp_tool_registered_and_callable():
     out = s.describe_capabilities()
     assert out["coverage"]["ok"] is True
     assert out["toolCount"] == len(expected_tool_names(advanced=_active_advanced()))
-    assert skill_required_tool_names() <= set(s._fastmcp_tool_names())
+    active = expected_tool_names(advanced=_active_advanced())
+    assert skill_required_tool_names() & active <= set(s._fastmcp_tool_names())

@@ -16,12 +16,66 @@ import tempfile
 from datetime import date, datetime, timezone
 from io import BytesIO
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
 import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
+from hwpx import (
+    analyze_template_formfit as analyze_hwpx_template_formfit,
+    apply_style_profile_to_plan as apply_hwpx_style_profile_to_plan,
+    apply_template_formfit as apply_hwpx_template_formfit,
+    build_comparison_table_plan as build_hwpx_comparison_table_plan,
+    build_image_grid as build_hwpx_image_grid,
+    build_meeting_nameplates as build_hwpx_meeting_nameplates,
+    build_organization_chart as build_hwpx_organization_chart,
+    compare_style_profiles as compare_hwpx_style_profiles,
+    create_document_from_plan as build_document_from_plan,
+    describe_template as describe_hwpx_template,
+    doc_diff as build_hwpx_doc_diff,
+    extract_style_profile as extract_hwpx_style_profile,
+    get_document_plan_schema as get_hwpx_document_plan_schema,
+    inspect_document_authoring_quality as inspect_authoring_document_quality,
+    inspect_mail_merge_placeholders as inspect_hwpx_mail_merge_placeholders,
+    inspect_official_document_style as inspect_hwpx_official_document_style,
+    inspect_operating_plan_quality as inspect_operating_plan_document_quality,
+    inspect_reference_consistency as inspect_hwpx_reference_consistency,
+    list_templates as list_hwpx_templates,
+    mail_merge as build_hwpx_mail_merge,
+    normalize_document_plan as normalize_hwpx_document_plan,
+    register_template as register_hwpx_template,
+    table_compute as build_hwpx_table_compute,
+    validate_document_plan as validate_hwpx_document_plan,
+)
+from hwpx.exam import (
+    ExamParseError,
+    FormProfileError,
+    compose_exam_into_form,
+    measure_question_splits,
+)
+from hwpx.form_fit import seal as seal_ops
+from hwpx.form_fit.wordbox import (
+    OracleUnavailable,
+    extract_image_boxes,
+    render_glyph_boxes,
+)
+from hwpx.ingest import DocumentIngestError, DocumentIngestor
+from hwpx.patch import paragraph_patch as hwpx_paragraph_patch
+from hwpx.presets import (
+    create_proposal_document as build_proposal_document,
+    inspect_proposal_quality as inspect_proposal_document_quality,
+)
+from hwpx.tools import read_fidelity as _read_fidelity
+from hwpx.tools import report_utils as hwpx_report_utils
+from hwpx.tools.id_integrity import check_id_integrity
+from hwpx.tools.pii import DEFAULT_POLICY, detect_pii, mask_pii, mask_value
+from hwpx.tools.redline import verify_redline as verify_hwpx_redline
+from hwpx.tools.report_parser import (
+    parse_government_report_text as parse_hwpx_government_report_text,
+)
+from hwpx.visual.oracle import NullOracle, resolve_oracle
 
 from . import __version__
 from .core.content import (
@@ -82,15 +136,25 @@ from .agent_document import (
     replay_blueprint_document,
     tool_help as agent_tool_help,
 )
-from .form_fill import analyze_form_fill_workflow, apply_form_fill_workflow
-from . import quality as quality_contract
-from .blind_eval import (
-    export_fixture_benchmark as export_fixture_benchmark_bundle,
-    run_fixture_benchmark as run_fixture_benchmark_manifest,
+from .form_fill import (
+    CanonicalFormFillInput,
+    FormFillAnalyzeOptions,
+    FormFillPlanInput,
+    analyze_form_fill_workflow,
+    apply_form_fill_workflow,
 )
+from . import quality as quality_contract
+from .fastmcp_adapter import registered_tool_snapshots
 from .errors import build_error_payload, mcp_code_for_error
 from .hwpx_ops import HwpxOperationError, HwpxOps
 from .network_policy import NetworkPolicy, NetworkPolicyError, open_url
+from .mutation_models import BodyOperation, EditOperation, TableOperation, operation_payloads
+from .mixed_form import (
+    MixedFormApplyInput,
+    MixedFormPlanInput,
+    analyze_mixed_form_plan,
+    apply_canonical_mixed_form_plan,
+)
 from .quality_generation import (
     analyze_quality_generation_workflow,
     apply_quality_generation_workflow,
@@ -103,10 +167,13 @@ from .storage import (
     build_hwpx_verification_report,
 )
 from .tool_contract import (
+    RegisteredToolRegistry,
     contract_hash as tool_contract_hash,
     expected_tool_names,
+    expected_tool_order,
     register_fastmcp_tools,
     skill_required_tool_names,
+    validate_registered_tools,
 )
 from .upstream import (
     HP_NS,
@@ -115,7 +182,6 @@ from .upstream import (
     repair_pathological_text_spacing,
 )
 from .utils.helpers import default_max_chars, resolve_path, truncate_response
-from .visual_qa import repair_fixture, review_fixture_evidence, write_review_artifact
 from .workflow.render_queue import DurableRenderQueue, RenderQueueError
 from .workflow.render_security import RenderSecurityPolicy
 from .workflow.render_transport import RemoteRenderClientV2
@@ -127,17 +193,6 @@ from .workspace import (
     WorkspacePathError,
     WorkspaceResolver,
 )
-from hwpx.form_fit import seal as seal_ops
-from hwpx.form_fit.wordbox import (
-    OracleUnavailable,
-    extract_image_boxes,
-    render_glyph_boxes,
-)
-from hwpx.tools import read_fidelity as _read_fidelity
-from hwpx.tools.id_integrity import check_id_integrity
-from hwpx.tools.pii import DEFAULT_POLICY, detect_pii, mask_pii, mask_value
-
-
 def _mask_pii_text(value: str, mask: bool = True) -> str:
     """Mask machine-set PII (rrn/phone/email/card) in user-facing extract output.
 
@@ -164,142 +219,6 @@ def _deep_mask_pii(obj: Any, mask: bool = True) -> Any:
     if isinstance(obj, dict):
         return {key: _deep_mask_pii(val, True) for key, val in obj.items()}
     return obj
-
-try:  # python-hwpx >= proposal preset feature
-    from hwpx.presets import (
-        create_proposal_document as build_proposal_document,
-        inspect_proposal_quality as inspect_proposal_document_quality,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    build_proposal_document = None
-    inspect_proposal_document_quality = None
-
-try:  # python-hwpx >= document-plan authoring feature
-    from hwpx import (
-        create_document_from_plan as build_document_from_plan,
-        get_document_plan_schema as get_hwpx_document_plan_schema,
-        inspect_document_authoring_quality as inspect_authoring_document_quality,
-        inspect_operating_plan_quality as inspect_operating_plan_document_quality,
-        normalize_document_plan as normalize_hwpx_document_plan,
-        validate_document_plan as validate_hwpx_document_plan,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    build_document_from_plan = None
-    get_hwpx_document_plan_schema = None
-    inspect_authoring_document_quality = None
-    inspect_operating_plan_document_quality = None
-    normalize_hwpx_document_plan = None
-    validate_hwpx_document_plan = None
-
-try:  # python-hwpx >= MarkItDown-style ingest gateway
-    from hwpx.ingest import (
-        DocumentIngestError,
-        DocumentIngestor,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    DocumentIngestError = None
-    DocumentIngestor = None
-
-try:  # python-hwpx >= official-document style lint feature
-    from hwpx import (
-        inspect_official_document_style as inspect_hwpx_official_document_style,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    inspect_hwpx_official_document_style = None
-
-try:  # python-hwpx >= govoffice advanced generators
-    from hwpx import (
-        build_image_grid as build_hwpx_image_grid,
-        build_meeting_nameplates as build_hwpx_meeting_nameplates,
-        build_organization_chart as build_hwpx_organization_chart,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    build_hwpx_image_grid = None
-    build_hwpx_meeting_nameplates = None
-    build_hwpx_organization_chart = None
-
-try:  # python-hwpx >= clean-room document diff feature
-    from hwpx import (
-        build_comparison_table_plan as build_hwpx_comparison_table_plan,
-        doc_diff as build_hwpx_doc_diff,
-        inspect_reference_consistency as inspect_hwpx_reference_consistency,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    build_hwpx_comparison_table_plan = None
-    build_hwpx_doc_diff = None
-    inspect_hwpx_reference_consistency = None
-
-try:  # python-hwpx >= mail-merge and table-compute productivity tools
-    from hwpx import (
-        inspect_mail_merge_placeholders as inspect_hwpx_mail_merge_placeholders,
-        mail_merge as build_hwpx_mail_merge,
-        table_compute as build_hwpx_table_compute,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    inspect_hwpx_mail_merge_placeholders = None
-    build_hwpx_mail_merge = None
-    build_hwpx_table_compute = None
-
-try:  # python-hwpx >= style-profile and template registry tools
-    from hwpx import (
-        apply_style_profile_to_plan as apply_hwpx_style_profile_to_plan,
-        compare_style_profiles as compare_hwpx_style_profiles,
-        describe_template as describe_hwpx_template,
-        extract_style_profile as extract_hwpx_style_profile,
-        list_templates as list_hwpx_templates,
-        register_template as register_hwpx_template,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    apply_hwpx_style_profile_to_plan = None
-    compare_hwpx_style_profiles = None
-    describe_hwpx_template = None
-    extract_hwpx_style_profile = None
-    list_hwpx_templates = None
-    register_hwpx_template = None
-
-try:  # python-hwpx >= government-report tools
-    from hwpx.tools import report_utils as hwpx_report_utils
-    from hwpx.tools.report_parser import (
-        parse_government_report_text as parse_hwpx_government_report_text,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    hwpx_report_utils = None
-    parse_hwpx_government_report_text = None
-
-try:  # python-hwpx >= template form-fit feature
-    from hwpx import (
-        analyze_template_formfit as analyze_hwpx_template_formfit,
-        apply_template_formfit as apply_hwpx_template_formfit,
-    )
-except Exception:  # pragma: no cover - optional dependency compatibility
-    analyze_hwpx_template_formfit = None
-    apply_hwpx_template_formfit = None
-
-try:  # python-hwpx >= byte-preserving patch feature
-    from hwpx.patch import paragraph_patch as hwpx_paragraph_patch
-except Exception:  # pragma: no cover - optional dependency compatibility
-    hwpx_paragraph_patch = None
-
-try:  # python-hwpx >= exam typesetting composer (S-056 시험지 조판)
-    from hwpx.exam import (
-        ExamParseError,
-        FormProfileError,
-        compose_exam_into_form,
-        measure_question_splits,
-    )
-    from hwpx.visual.oracle import NullOracle, resolve_oracle
-except Exception:  # pragma: no cover - optional dependency compatibility
-    ExamParseError = None
-    FormProfileError = None
-    compose_exam_into_form = None
-    measure_question_splits = None
-    NullOracle = None
-    resolve_oracle = None
-
-try:  # python-hwpx >= redline authoring verification (S-058/FR-009)
-    from hwpx.tools.redline import verify_redline as verify_hwpx_redline
-except Exception:  # pragma: no cover - optional dependency compatibility
-    verify_hwpx_redline = None
 
 mcp = FastMCP("hwpx-mcp-server")
 # The current FastMCP constructor does not expose the low-level Server version
@@ -544,6 +463,7 @@ def _advanced_enabled() -> bool:
 
 
 _ACTIVE_ADVANCED = _advanced_enabled()
+_TOOL_REGISTRY: RegisteredToolRegistry | None = None
 
 
 _OPS = HwpxOps(auto_backup=False)
@@ -587,20 +507,9 @@ def _env_float(name: str, default: float) -> float:
 
 
 def _fastmcp_tool_names() -> list[str]:
-    manager = getattr(mcp, "_tool_manager", None)
-    if manager is None:
-        return []
-    tools = getattr(manager, "list_tools", lambda: [])()
-    return sorted(getattr(tool, "name", "") for tool in tools if getattr(tool, "name", ""))
+    """Return names observed through the isolated FastMCP adapter seam."""
 
-
-def _legacy_tool_names() -> list[str]:
-    try:
-        from .tools import build_tool_definitions
-
-        return sorted(definition.name for definition in build_tool_definitions())
-    except Exception:  # pragma: no cover - reported through health, not hidden
-        return []
+    return sorted(registered_tool_snapshots(mcp))
 
 
 def _normalize_output_mode(output: str | None) -> str:
@@ -3359,7 +3268,7 @@ def batch_replace(
 
 def apply_edits(
     filename: str,
-    operations: list[dict[str, Any]],
+    operations: list[EditOperation],
     dry_run: bool = False,
     expected_revision: str = None,
     idempotency_key: str = None,
@@ -3372,12 +3281,13 @@ def apply_edits(
     SavePipeline이 FormFit/레이아웃/시각 게이트를 적용하고, 실패 시 저장을 보류하며
     ``visualComplete`` 블록과 구조화된 오류 코드를 반환합니다.
     """
+    operations_payload = operation_payloads(operations)
     path = resolve_path(filename)
     scope = _idempotency_scope("apply_edits", path, idempotency_key)
     fingerprint = _idempotency_fingerprint(
         {
             "filename": filename,
-            "operations": operations,
+            "operations": operations_payload,
             "dry_run": dry_run,
             "expected_revision": expected_revision,
         }
@@ -3394,7 +3304,7 @@ def apply_edits(
     doc = open_doc(path)
     operation_results: list[dict[str, Any]] = []
     try:
-        for index, operation in enumerate(operations):
+        for index, operation in enumerate(operations_payload):
             result = _apply_edit_operation(doc, operation, index)
             result["operationIndex"] = index
             operation_results.append(result)
@@ -3477,7 +3387,7 @@ def byte_preserving_patch(
 
 def apply_table_ops(
     filename: str,
-    ops: list[dict[str, Any]],
+    ops: list[TableOperation],
     output: str | None = None,
     render_check: str = "off",
     dry_run: bool = False,
@@ -3488,7 +3398,7 @@ def apply_table_ops(
         quality_contract.assert_write_capability()
     return _OPS.apply_table_ops(
         resolve_path(filename),
-        ops,
+        operation_payloads(ops),
         output=resolve_path(output) if output else None,
         render_check=render_check,
         dry_run=dry_run,
@@ -3529,7 +3439,7 @@ def score_form_fill(
 
 def apply_body_ops(
     filename: str,
-    ops: list[dict[str, Any]],
+    ops: list[BodyOperation],
     output: str | None = None,
     dry_run: bool = False,
 ) -> dict:
@@ -3539,7 +3449,7 @@ def apply_body_ops(
         quality_contract.assert_write_capability()
     return _OPS.apply_body_ops(
         resolve_path(filename),
-        ops,
+        operation_payloads(ops),
         output=resolve_path(output) if output else None,
         dry_run=dry_run,
     )
@@ -4567,7 +4477,16 @@ def describe_capabilities(domain: str | None = None) -> dict:
     report = build_capability_report(domain if domain else None, advanced=advanced)
     live = set(_fastmcp_tool_names())
     report["toolCount"] = len(live)
-    report["coverage"] = coverage_against(live, advanced=advanced)
+    validation = (
+        validate_registered_tools(mcp, _TOOL_REGISTRY)
+        if _TOOL_REGISTRY is not None
+        else {"ok": False, "missing": sorted(expected_tool_names(advanced=advanced))}
+    )
+    report["coverage"] = coverage_against(
+        live,
+        advanced=advanced,
+        registry_validation=validation,
+    )
     return report
 
 
@@ -4586,13 +4505,33 @@ def mcp_server_health() -> dict:
             "configurationError": str(exc),
         }
     advanced = _ACTIVE_ADVANCED
-    fastmcp_tool_names = set(_fastmcp_tool_names())
-    legacy_tool_names = _legacy_tool_names()
+    registry_validation = (
+        validate_registered_tools(mcp, _TOOL_REGISTRY)
+        if _TOOL_REGISTRY is not None
+        else {
+            "ok": False,
+            "missing": sorted(expected_tool_names(advanced=advanced)),
+            "unexpected": [],
+            "callableMismatches": [],
+            "inputSchemaMismatches": [],
+            "outputSchemaMismatches": [],
+            "descriptionMismatches": [],
+            "unavailable": [],
+            "actualOrder": [],
+        }
+    )
+    fastmcp_tool_names = set(registry_validation["actualOrder"])
     expected = expected_tool_names(advanced=advanced)
+    active_required = skill_required_tool_names() & expected
     missing_expected = sorted(expected - fastmcp_tool_names)
     unexpected_registered = sorted(fastmcp_tool_names - expected)
-    missing_required = sorted(skill_required_tool_names() - fastmcp_tool_names)
-    skew_detected = bool(missing_expected or unexpected_registered or missing_required)
+    missing_required = sorted(active_required - fastmcp_tool_names)
+    skew_detected = bool(
+        missing_expected
+        or unexpected_registered
+        or missing_required
+        or not registry_validation["ok"]
+    )
     surface_details = []
     if missing_expected:
         surface_details.append(f"missing expected: {', '.join(missing_expected)}")
@@ -4600,6 +4539,16 @@ def mcp_server_health() -> dict:
         surface_details.append(f"unexpected registered: {', '.join(unexpected_registered)}")
     if missing_required:
         surface_details.append(f"missing skill-required: {', '.join(missing_required)}")
+    for key, label in (
+        ("callableMismatches", "callable mismatch"),
+        ("inputSchemaMismatches", "input schema mismatch"),
+        ("outputSchemaMismatches", "output schema mismatch"),
+        ("descriptionMismatches", "description mismatch"),
+        ("unavailable", "unavailable"),
+    ):
+        values = registry_validation[key]
+        if values:
+            surface_details.append(f"{label}: {', '.join(values)}")
     return {
         "server": "hwpx-mcp-server",
         "version": _package_version("hwpx-mcp-server"),
@@ -4612,15 +4561,21 @@ def mcp_server_health() -> dict:
             "status": "skewed" if skew_detected else "ok",
             "profile": "advanced" if advanced else "default",
             "contractHash": tool_contract_hash(),
+            "bindingHash": _TOOL_REGISTRY.binding_hash() if _TOOL_REGISTRY else None,
+            "bindingStatus": "bound" if _TOOL_REGISTRY else "unbound",
             "expectedFastMcpToolCount": len(expected),
             "actualFastMcpToolCount": len(fastmcp_tool_names),
-            "actualLegacyToolCount": len(legacy_tool_names),
             "missingExpectedTools": missing_expected,
             "unexpectedRegisteredTools": unexpected_registered,
             "missingSkillRequiredTools": missing_required,
+            "callableMismatches": registry_validation["callableMismatches"],
+            "inputSchemaMismatches": registry_validation["inputSchemaMismatches"],
+            "outputSchemaMismatches": registry_validation["outputSchemaMismatches"],
+            "descriptionMismatches": registry_validation["descriptionMismatches"],
+            "unavailableTools": registry_validation["unavailable"],
             # Compatibility alias for older skill startup checks.
             "missingKeyTools": missing_required,
-            "keyTools": sorted(skill_required_tool_names()),
+            "keyTools": sorted(active_required),
             "diagnosis": (
                 "Installed MCP surface is missing expected tools; reinstall the hwpx plugin, "
                 "remove stale plugin venv/cache, then start a fresh host session."
@@ -5950,15 +5905,30 @@ def fill_form_field(
 
 
 def analyze_form_fill(
-    source_filename: str,
-    input_json: dict = None,
+    source_filename: str = None,
+    input_json: CanonicalFormFillInput | str = None,
     input_json_path: str = None,
     input_docx: str = None,
     destination_filename: str = None,
-    options: dict = None,
+    options: FormFillAnalyzeOptions = None,
+    plan: MixedFormPlanInput = None,
 ) -> dict:
-    """HWPX 양식 채움 계획을 분석합니다. 파일 복사/채움 변경은 하지 않습니다."""
-    return analyze_form_fill_workflow(
+    """엄격한 혼합 양식 계획을 비변경 분석합니다. 기존 formfill.v1 인자는 호환 경로입니다."""
+    if plan is not None:
+        compatibility_args = (
+            source_filename,
+            input_json,
+            input_json_path,
+            input_docx,
+            destination_filename,
+            options,
+        )
+        if any(value is not None for value in compatibility_args):
+            raise ValueError("plan cannot be combined with hwpx.formfill.v1 compatibility arguments")
+        return analyze_mixed_form_plan(plan)
+    if source_filename is None:
+        raise ValueError("provide plan or source_filename for the hwpx.formfill.v1 compatibility path")
+    result = analyze_form_fill_workflow(
         source_filename=source_filename,
         input_json=input_json,
         input_json_path=input_json_path,
@@ -5966,18 +5936,36 @@ def analyze_form_fill(
         destination_filename=destination_filename,
         options=options,
     )
+    result["compatibility"] = {
+        "schemaVersion": "hwpx.formfill.v1",
+        "status": "retained",
+        "canonicalInput": "plan: hwpx.mixed-form-plan/v1",
+    }
+    return result
 
 
 def apply_form_fill(
     plan_id: str = None,
-    analysis: dict = None,
+    analysis: FormFillPlanInput = None,
     source_filename: str = None,
     destination_filename: str = None,
-    canonical_input: dict = None,
+    canonical_input: CanonicalFormFillInput | str = None,
     confirm: bool = True,
+    plan: MixedFormApplyInput = None,
 ) -> dict:
-    """분석된 HWPX 양식 채움 계획을 복사본에만 적용하고 구조/패키지를 검증합니다."""
-    return apply_form_fill_workflow(
+    """엄격한 public/compiled 혼합 양식 계획을 원자 적용합니다. 기존 인자는 호환 경로입니다."""
+    if plan is not None:
+        compatibility_args = (
+            plan_id,
+            analysis,
+            source_filename,
+            destination_filename,
+            canonical_input,
+        )
+        if any(value is not None for value in compatibility_args) or confirm is not True:
+            raise ValueError("plan cannot be combined with hwpx.formfill.v1 compatibility arguments")
+        return apply_canonical_mixed_form_plan(plan)
+    result = apply_form_fill_workflow(
         plan_id=plan_id,
         analysis=analysis,
         source_filename=source_filename,
@@ -5985,6 +5973,12 @@ def apply_form_fill(
         canonical_input=canonical_input,
         confirm=confirm,
     )
+    result["compatibility"] = {
+        "schemaVersion": "hwpx.formfill.v1",
+        "status": "retained",
+        "canonicalInput": "plan: hwpx.mixed-form-plan/v1 or hwpx.mixed-form-compiled-plan/v1",
+    }
+    return result
 
 
 def _workflow_service() -> WorkflowService:
@@ -5992,7 +5986,9 @@ def _workflow_service() -> WorkflowService:
 
     capability = mcp_server_health()["capability"]
     return WorkflowService(
-        globals(), capability_ok=bool(capability["ok"]), render_client=_render_client(),
+        _SERVER_TOOL_BINDINGS,
+        capability_ok=bool(capability["ok"]),
+        render_client=_render_client(),
     )
 
 
@@ -6019,118 +6015,6 @@ def _render_client():
     policy = RenderSecurityPolicy(sandbox_root=queue_root / "sandboxes")
     queue = DurableRenderQueue(queue_root, secret=secret.encode("utf-8"), policy=policy)
     return QueueRenderClientV2(queue, secret=secret.encode("utf-8"))
-
-
-def visual_review_fixture(
-    manifest_path: str,
-    case_id: str = None,
-    adapter_evidence_path: str = None,
-    output_dir: str = None,
-    strict: bool = True,
-) -> dict:
-    """전 페이지 fixture를 독립 어댑터로 검수합니다. 이 영수증은 실한컴 검증으로 승격되지 않습니다."""
-
-    review = review_fixture_evidence(
-        resolve_path(manifest_path),
-        case_id=case_id,
-        adapter_evidence_path=(resolve_path(adapter_evidence_path) if adapter_evidence_path else None),
-        strict=strict,
-    )
-    artifact = write_review_artifact(review, resolve_path(output_dir) if output_dir else None)
-    if artifact:
-        review["outputPath"] = artifact
-    return review
-
-
-def run_fixture_benchmark(
-    manifest_path: str,
-    output_dir: str = None,
-    strict: bool = True,
-) -> dict:
-    """동결 fixture 실행·판정의 provenance, 익명화, 전수 coverage를 검증합니다."""
-
-    return run_fixture_benchmark_manifest(
-        resolve_path(manifest_path),
-        output_dir=resolve_path(output_dir) if output_dir else None,
-        strict=strict,
-    )
-
-
-def export_fixture_benchmark(
-    result_manifest_path: str,
-    output_dir: str,
-    strict: bool = True,
-) -> dict:
-    """검증된 fixture 결과에서 private provenance가 없는 opaque 심사용 번들을 내보냅니다."""
-
-    return export_fixture_benchmark_bundle(
-        resolve_path(result_manifest_path),
-        output_dir=resolve_path(output_dir),
-        strict=strict,
-    )
-
-
-def visual_repair_fixture(
-    filename: str,
-    manifest_path: str,
-    repair_plan_path: str,
-    output_path: str,
-    expected_revision: str,
-    idempotency_key: str,
-    case_id: str = None,
-    output_dir: str = None,
-    max_rounds: int = 3,
-) -> dict:
-    """revision/idempotency guard와 최대 3회 예산으로 allow-listed fixture 수리를 수행합니다."""
-
-    source = resolve_path(filename)
-    scope = _idempotency_scope("visual_repair_fixture", source, idempotency_key)
-    fingerprint = _idempotency_fingerprint(
-        {
-            "filename": source,
-            "manifest_path": resolve_path(manifest_path),
-            "repair_plan_path": resolve_path(repair_plan_path),
-            "output_path": resolve_path(output_path),
-            "expected_revision": expected_revision,
-            "case_id": case_id,
-            "max_rounds": max_rounds,
-        }
-    )
-    replay = _idempotency_replay(scope, fingerprint=fingerprint)
-    if replay is not None:
-        replay = dict(replay)
-        replay["idempotentReplay"] = True
-        return replay
-
-    def apply_allowlisted(
-        target: Path, repair: dict[str, Any], revision: str, action_key: str,
-    ) -> dict[str, Any]:
-        if repair.get("type") != "replace_text":
-            raise ValueError("repair action is not allow-listed")
-        find_text = repair.get("findText")
-        replace_text = repair.get("replaceText")
-        if not isinstance(find_text, str) or not find_text or not isinstance(replace_text, str):
-            raise ValueError("replace_text requires non-empty findText and string replaceText")
-        return search_and_replace(
-            str(target), find_text, replace_text,
-            expected_revision=revision, idempotency_key=action_key,
-        )
-
-    result = repair_fixture(
-        filename=source,
-        manifest_path=resolve_path(manifest_path),
-        repair_plan_path=resolve_path(repair_plan_path),
-        case_id=case_id,
-        output_path=resolve_path(output_path),
-        expected_revision=expected_revision,
-        idempotency_key=idempotency_key,
-        max_rounds=max_rounds,
-        apply_repair=apply_allowlisted,
-    )
-    artifact = write_review_artifact(result, resolve_path(output_dir) if output_dir else None)
-    if artifact:
-        result["reviewOutputPath"] = artifact
-    return _idempotency_store(scope, fingerprint=fingerprint, payload=result)
 
 
 def render_submit(
@@ -6273,7 +6157,9 @@ def resume_workflow(workflow_id: str) -> dict:
     return _workflow_service().resume(workflow_id)
 
 
-if _ACTIVE_ADVANCED:
+# Advanced callables are always defined so the canonical 132-tool registry can
+# bind and hash their schemas.  ToolSpec alone decides whether they are exposed.
+if True:
 
     def package_parts(filename: str) -> dict:
         """[고급] HWPX 패키지 파트 목록을 조회합니다."""
@@ -6327,7 +6213,19 @@ if _ACTIVE_ADVANCED:
         return _OPS.lint_text_conventions(resolve_path(filename))
 
 
-register_fastmcp_tools(mcp, globals(), advanced=_ACTIVE_ADVANCED)
+# Snapshot exactly the names authorized by ToolSpec.  No later global mutation can
+# change the callable set used by FastMCP or durable workflow dispatch.
+_SERVER_TOOL_BINDINGS = MappingProxyType(
+    {
+        name: globals().get(name)
+        for name in expected_tool_order(advanced=True)
+    }
+)
+_TOOL_REGISTRY = register_fastmcp_tools(
+    mcp,
+    _SERVER_TOOL_BINDINGS,
+    advanced=_ACTIVE_ADVANCED,
+)
 
 
 def main(argv: list[str] | None = None) -> None:

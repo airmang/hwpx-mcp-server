@@ -1,99 +1,60 @@
 import jsonschema
 import pytest
 
-from hwpx_mcp_server.schema.builder import build_tool_schema
-from hwpx_mcp_server.tools import OpenInfoOutput, build_tool_definitions
-
-BANNED_KEYS = {"$defs", "definitions", "$ref", "anyOf", "oneOf", "allOf", "if", "then", "else", "const"}
+from hwpx_mcp_server.tool_contract import bound_tool_registry, contract_payload
 
 
-def _assert_object_shape(schema: dict) -> None:
-    assert schema.get("type") == "object"
-    assert "properties" in schema and isinstance(schema["properties"], dict)
-    assert "additionalProperties" in schema
-    additional = schema["additionalProperties"]
-    assert isinstance(additional, (bool, dict))
-    assert "required" in schema and isinstance(schema["required"], list)
-    prop_keys = list(schema["properties"].keys())
-    assert prop_keys == sorted(prop_keys)
-    assert schema["required"] == sorted(schema["required"])
+def test_representative_tools_are_exposed_only_through_the_canonical_registry():
+    names = set(bound_tool_registry().names)
+    assert {"insert_picture", "replace_picture", "render_preview", "repair_hwpx"} <= names
+    assert {
+        "convert_hwp_to_hwpx",
+        "fill_template",
+        "analyze_template_structure",
+        "open_document_handle",
+        "list_open_documents",
+        "close_document_handle",
+        "copy_table_between_documents",
+    }.isdisjoint(names)
 
 
-def _walk(node):
-    if isinstance(node, dict):
-        for key in BANNED_KEYS:
-            assert key not in node
-        type_value = node.get("type")
-        if isinstance(type_value, list):
-            assert "null" not in type_value
-        if node.get("type") == "object" or "properties" in node:
-            _assert_object_shape(node)
-        for value in node.values():
-            _walk(value)
-    elif isinstance(node, list):
-        for item in node:
-            _walk(item)
+def test_canonical_registry_has_normalized_input_and_output_schema_for_all_132_tools():
+    registry = bound_tool_registry()
+    assert len(registry.tools) == 132
+    for item in registry.tools:
+        assert item.input_schema["type"] == "object", item.spec.name
+        assert item.input_schema["additionalProperties"] is False, item.spec.name
+        assert isinstance(item.input_schema["properties"], dict), item.spec.name
+        assert isinstance(item.input_schema["required"], list), item.spec.name
+        assert item.output_schema, item.spec.name
+        jsonschema.Draft202012Validator.check_schema(dict(item.input_schema))
+        jsonschema.Draft202012Validator.check_schema(dict(item.output_schema))
 
 
-@pytest.mark.parametrize("flag", ["0", "1"])
-def test_tool_schemas_are_sanitized(monkeypatch, flag):
-    monkeypatch.setenv("HWPX_MCP_HARDENING", flag)
-    definitions = build_tool_definitions()
-    for definition in definitions:
-        tool = definition.to_tool()
-        _walk(tool.inputSchema)
-        _walk(tool.outputSchema)
-        assert tool.inputSchema.get("type") == "object"
-        assert tool.outputSchema.get("type") == "object"
+@pytest.mark.parametrize(
+    ("tool_name", "argument", "model_name", "discriminator", "variant_count"),
+    [
+        ("apply_edits", "operations", "EditOperation", "type", 10),
+        ("apply_table_ops", "ops", "TableOperation", "op", 12),
+        ("apply_body_ops", "ops", "BodyOperation", "op", 6),
+    ],
+)
+def test_public_mutation_batches_are_closed_discriminated_unions(
+    tool_name, argument, model_name, discriminator, variant_count
+):
+    schema = bound_tool_registry().by_name()[tool_name].input_schema
+    assert schema["properties"][argument]["items"] == {"$ref": f"#/$defs/{model_name}"}
+    union = schema["$defs"][model_name]
+    assert union["discriminator"]["propertyName"] == discriminator
+    assert len(union["oneOf"]) == variant_count
+    for ref in union["oneOf"]:
+        variant = schema["$defs"][ref["$ref"].rsplit("/", 1)[-1]]
+        assert variant["additionalProperties"] is False
 
 
-def test_open_info_meta_allows_additional_properties():
-    schema = build_tool_schema(OpenInfoOutput)
-    meta_schema = schema["properties"]["meta"]
-    assert meta_schema["additionalProperties"]
-
-    sample = {
-        "meta": {
-            "path": "document.hwpx",
-            "absolutePath": "/tmp/document.hwpx",
-            "size": 42,
-            "modified": "2024-01-01T00:00:00",
-        },
-        "sectionCount": 3,
-        "paragraphCount": 10,
-        "headerCount": 1,
-    }
-
-    jsonschema.validate(sample, schema)
-
-
-def test_convert_hwp_to_hwpx_tool_is_exposed():
-    definitions = {definition.name: definition for definition in build_tool_definitions()}
-    assert "convert_hwp_to_hwpx" in definitions
-    schema = definitions["convert_hwp_to_hwpx"].output_model.model_json_schema()
-    assert "openSafety" in schema["properties"]
-    assert "verification" in schema["properties"]
-
-
-def test_fill_template_output_exposes_verification_report():
-    definitions = {definition.name: definition for definition in build_tool_definitions()}
-    schema = definitions["fill_template"].output_model.model_json_schema()
-    assert "verificationReport" in schema["properties"]
-
-def test_analyze_template_structure_tool_is_exposed():
-    names = {definition.name for definition in build_tool_definitions()}
-    assert "analyze_template_structure" in names
-
-
-def test_document_handle_tools_are_exposed():
-    names = {definition.name for definition in build_tool_definitions()}
-    assert "open_document_handle" in names
-    assert "list_open_documents" in names
-    assert "close_document_handle" in names
-    assert "copy_table_between_documents" in names
-
-
-def test_picture_tools_are_exposed():
-    names = {definition.name for definition in build_tool_definitions()}
-    assert "insert_picture" in names
-    assert "replace_picture" in names
+def test_contract_payload_is_deterministic_and_contains_bound_schemas():
+    first = contract_payload()
+    second = contract_payload()
+    assert first == second
+    assert len(first["tools"]) == 132
+    assert all(tool["inputSchema"] and tool["outputSchema"] for tool in first["tools"])

@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-07-16
+
+### Added
+- Adds one closed `hwpx.mixed-form-plan/v1` surface for native fields, label-adjacent
+  cells, canonical paths, and exact-one body anchors. Analysis is non-mutating and
+  apply reuses the core revision-bound transaction for dry-run, rollback, replay,
+  byte-preservation, reopen, and open-safety receipts.
+- Adds generated machine-readable input/output schemas, typed availability reasons,
+  lifecycle/replacement metadata, and a narrow FastMCP adapter boundary.
+
+### Changed
+- Requires `python-hwpx>=3.1.0`. One ordered `ToolSpec` registry now validates
+  registration, callables, signatures, schemas, profiles, health/capabilities,
+  generated documentation, and the plugin contract.
+- The transition surface is 121 default / 132 advanced tools with contract hash
+  `16dd2a477260e7be`. Existing `hwpx.formfill.v1`, evalplan, native-field, and exam
+  behavior remains explicit; five older planner tools are deprecated for one transition.
+
+### Removed
+- Retires the pre-FastMCP 70-tool shadow registry and its unused legacy server,
+  prompt handlers, schema sanitizer/builder, and logging bootstrap. Installed
+  tools, schemas, health, capabilities, and documentation now come exclusively
+  from the canonical `ToolSpec` registry and FastMCP entrypoint.
+
 ## [3.0.0] - 2026-07-16
 
 ### Removed

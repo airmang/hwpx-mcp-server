@@ -7,7 +7,6 @@ import pytest
 from hwpx.document import HwpxDocument
 from hwpx_mcp_server.hwpx_ops import HH_NS, HP_NS, HwpxOps
 import hwpx_mcp_server.hwpx_ops as ops_module
-from hwpx_mcp_server.tools import build_tool_definitions
 
 PNG_1X1_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/axwAqkAAAAASUVORK5CYII="
 PNG_1X1_ALT_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAFgwJ/l8EydgAAAABJRU5ErkJggg=="
@@ -32,36 +31,29 @@ def test_open_info_counts(ops_with_sample):
     assert info["meta"]["absolutePath"].endswith("sample.hwpx")
 
 
-def test_picture_tool_definitions_call_ops_with_safe_asset_graph(tmp_path):
+def test_picture_operations_preserve_a_safe_asset_graph(tmp_path):
     workdir = tmp_path / "workspace"
     workdir.mkdir()
     target = workdir / "picture.hwpx"
     HwpxDocument.new().save_to_path(target)
     ops = HwpxOps(base_directory=workdir, auto_backup=True)
-    tools = {definition.name: definition for definition in build_tool_definitions()}
 
-    inserted = tools["insert_picture"].call(
-        ops,
-        {
-            "path": target.name,
-            "imageBase64": PNG_1X1_B64,
-            "imageFormat": "png",
-            "width": 11111,
-            "height": 22222,
-        },
+    inserted = ops.insert_picture(
+        target.name,
+        PNG_1X1_B64,
+        image_format="png",
+        width=11111,
+        height=22222,
     )
 
     assert inserted["openSafety"]["ok"] is True
     assert inserted["idIntegrity"]["ok"] is True
     assert inserted["picture"]["binaryItemIDRef"] == "BIN0001"
 
-    replaced = tools["replace_picture"].call(
-        ops,
-        {
-            "path": target.name,
-            "imageBase64": PNG_1X1_ALT_B64,
-            "imageFormat": "png",
-        },
+    replaced = ops.replace_picture(
+        target.name,
+        PNG_1X1_ALT_B64,
+        image_format="png",
     )
 
     assert replaced["openSafety"]["ok"] is True
@@ -135,22 +127,12 @@ def test_read_text_uses_default_limit(monkeypatch, tmp_path):
     assert expanded["nextOffset"] == expanded_limit
 
 
-def test_read_text_tool_omits_next_offset_when_complete(ops_with_sample):
+def test_read_text_marks_pagination_complete_with_null_next_offset(ops_with_sample):
     ops, path = ops_with_sample
-    read_text_tool = next(
-        tool for tool in build_tool_definitions() if tool.name == "read_text"
-    )
-
-    result = read_text_tool.call(
-        ops,
-        {
-            "path": str(path),
-            "limit": 10_000,
-        },
-    )
+    result = ops.read_text(str(path), limit=10_000)
 
     assert result["textChunk"]
-    assert "nextOffset" not in result
+    assert result["nextOffset"] is None
 
 
 def test_read_text_consumes_only_requested_slice(monkeypatch, tmp_path):
@@ -965,20 +947,10 @@ def test_copy_table_between_documents_with_handles(ops_with_sample):
     assert len(target_tables_after) == len(target_tables_before) + 1
 
 
-def test_read_text_tool_supports_handle_locator(ops_with_sample):
+def test_read_text_supports_a_registered_handle_path(ops_with_sample):
     ops, path = ops_with_sample
     handle_id = ops.open_document_handle(str(path))["handle"]["handleId"]
-    read_text_tool = next(
-        tool for tool in build_tool_definitions() if tool.name == "read_text"
-    )
-
-    result = read_text_tool.call(
-        ops,
-        {
-            "type": "handle",
-            "handleId": handle_id,
-            "limit": 2,
-        },
-    )
+    registered_path = ops.resolve_document_path(handle_id=handle_id)
+    result = ops.read_text(registered_path, limit=2)
 
     assert result["textChunk"]

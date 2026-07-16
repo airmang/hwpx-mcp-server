@@ -1,22 +1,90 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Single release-facing contract for the FastMCP HWPX tool surface.
+"""Typed, deterministic contract for the installed FastMCP tool surface.
 
-The legacy server inventory is intentionally not represented here.  The console
-entrypoint launches :mod:`hwpx_mcp_server.server`, so only tools registered from
-this module are callable by installed plugin users.
+``BASELINE_TOOL_SPECS`` records the complete 3.0.0 census, including tools that
+became internal in 4.0.0.  ``TOOL_SPECS`` is the only installed/public surface.
+Registration, capability reporting, generated documentation, health checks, and
+the versioned contract delta all consume these objects instead of maintaining
+parallel name lists.
 """
 
 from __future__ import annotations
 
+import functools
 import hashlib
+import inspect
 import json
 from dataclasses import dataclass
-from typing import Any, Mapping
+from enum import Enum
+from typing import Any, Callable, Mapping
+
+from .fastmcp_adapter import (
+    describe_callables,
+    register_tool,
+    registered_tool_snapshots,
+)
 
 
-MIN_PYTHON_HWPX = "3.0.0"
-MIN_MCP_VERSION = "3.0.0"
-MIN_SKILL_VERSION = "0.2.0"
+MIN_PYTHON_HWPX = "3.1.0"
+MIN_MCP_VERSION = "4.0.0"
+MIN_SKILL_VERSION = "0.3.0"
+
+
+class ToolClassification(str, Enum):
+    """Product decision for one name in the 3.0.0 136-tool baseline."""
+
+    PUBLIC = "public"
+    COMPATIBILITY = "compatibility"
+    ADVANCED = "advanced"
+    DEPRECATED = "deprecated"
+    INTERNAL = "internal"
+
+
+class ToolProfile(str, Enum):
+    DEFAULT = "default"
+    ADVANCED = "advanced"
+
+
+class ToolAvailability(str, Enum):
+    """Declared registration state of a tool in the selected profile."""
+
+    AVAILABLE = "available"
+    PROFILE_GATED = "profile-gated"
+    INTERNAL_ONLY = "internal-only"
+    UNAVAILABLE = "unavailable"
+
+
+class AvailabilityReasonCode(str, Enum):
+    CALLABLE_MISSING = "CALLABLE_MISSING"
+    DEPENDENCY_MISSING = "DEPENDENCY_MISSING"
+    DEPENDENCY_VERSION_SKEW = "DEPENDENCY_VERSION_SKEW"
+    PROFILE_DISABLED = "PROFILE_DISABLED"
+    INTERNAL_ONLY = "INTERNAL_ONLY"
+
+
+@dataclass(frozen=True, slots=True)
+class AvailabilityRequirement:
+    dependency: str
+    minimum_version: str
+    optional: bool = False
+    extra: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AvailabilityReason:
+    code: AvailabilityReasonCode
+    message: str
+    dependency: str | None = None
+    required_version: str | None = None
+    installed_version: str | None = None
+    install_hint: str | None = None
+
+
+class SchemaBinding(str, Enum):
+    """Authoritative source from which FastMCP builds the input schema."""
+
+    PYTHON_SIGNATURE = "python-signature"
+    INTERNAL_LIBRARY = "internal-library"
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,27 +94,153 @@ class DomainSpec:
     intent: str
     when_to_use: str
     tools: tuple[str, ...]
+    public: bool = True
 
 
 @dataclass(frozen=True, slots=True)
 class ToolSpec:
+    """Static release decision plus explicit callable/schema binding."""
+
     name: str
     domain: str
-    profile: str = "default"
+    profile: ToolProfile
+    classification: ToolClassification
+    availability_requirement: AvailabilityRequirement
+    availability: ToolAvailability
+    availability_reason: AvailabilityReason | None
+    reason: str
+    replacement_tools: tuple[str, ...] = ()
     skill_required: bool = False
+    callable_name: str | None = None
+    schema_binding: SchemaBinding = SchemaBinding.PYTHON_SIGNATURE
+    mutates: bool = False
+    tags: tuple[str, ...] = ()
+
+    @property
+    def installed(self) -> bool:
+        return self.classification is not ToolClassification.INTERNAL
 
 
-_ADVANCED_TOOLS = {
+@dataclass(frozen=True, slots=True)
+class SchemaParameter:
+    name: str
+    annotation: str
+    required: bool
+
+
+@dataclass(frozen=True, slots=True)
+class BoundToolSpec:
+    """A ToolSpec resolved to one concrete callable before registration."""
+
+    spec: ToolSpec
+    function: Callable[..., Any]
+    signature: str
+    parameters: tuple[SchemaParameter, ...]
+    description: str
+    input_schema: Mapping[str, Any]
+    output_schema: Mapping[str, Any]
+    availability: ToolAvailability = ToolAvailability.AVAILABLE
+    availability_reason: AvailabilityReason | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RegisteredToolRegistry:
+    """Immutable record of the exact callables handed to FastMCP."""
+
+    tools: tuple[BoundToolSpec, ...]
+
+    @property
+    def names(self) -> tuple[str, ...]:
+        return tuple(item.spec.name for item in self.tools)
+
+    def callable_map(self) -> Mapping[str, Callable[..., Any]]:
+        return {item.spec.name: item.function for item in self.tools}
+
+    def by_name(self) -> Mapping[str, BoundToolSpec]:
+        return {item.spec.name: item for item in self.tools}
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "schemaVersion": "hwpx.bound-tool-registry.v1",
+            "contractHash": contract_hash(),
+            "tools": [
+                {
+                    "name": item.spec.name,
+                    "callableName": item.spec.callable_name,
+                    "signature": item.signature,
+                    "description": item.description,
+                    "inputSchema": item.input_schema,
+                    "outputSchema": item.output_schema,
+                    "availability": item.availability.value,
+                    "availabilityReason": _availability_reason_payload(
+                        item.availability_reason
+                    ),
+                    "parameters": [
+                        {
+                            "name": parameter.name,
+                            "annotation": parameter.annotation,
+                            "required": parameter.required,
+                        }
+                        for parameter in item.parameters
+                    ],
+                }
+                for item in self.tools
+            ],
+        }
+
+    def binding_hash(self) -> str:
+        raw = json.dumps(self.payload(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+_ADVANCED_CLASSIFICATION = {
     "package_parts",
     "package_get_xml",
     "package_get_text",
     "object_find_by_tag",
     "object_find_by_attr",
-    "plan_edit",
-    "preview_edit",
-    "apply_edit",
     "validate_structure",
     "lint_text_conventions",
+    "score_form_fill",
+}
+
+_ADVANCED_PROFILE = _ADVANCED_CLASSIFICATION | {"plan_edit", "preview_edit", "apply_edit"}
+
+_COMPATIBILITY_REPLACEMENTS: dict[str, tuple[str, ...]] = {
+    "analyze_template_formfit": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
+    "apply_body_ops": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
+    "apply_edits": ("apply_document_commands",),
+    "apply_evalplan_fill": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
+    "apply_table_ops": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
+    "apply_template_formfit": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
+    "create_comparison_table_document": ("create_document_from_plan",),
+    "create_government_report_document": ("create_document_from_plan",),
+    "create_proposal_document": ("create_document_from_plan",),
+    "fill_by_path": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
+    "fill_form_field": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
+}
+
+_DEPRECATED_REPLACEMENTS: dict[str, tuple[str, ...]] = {
+    "analyze_quality_generation": (
+        "create_document_from_plan",
+        "create_proposal_document",
+        "inspect_document_quality",
+    ),
+    "apply_edit": ("apply_document_commands",),
+    "apply_quality_generation": (
+        "create_document_from_plan",
+        "create_proposal_document",
+        "inspect_document_quality",
+    ),
+    "plan_edit": ("apply_document_commands",),
+    "preview_edit": ("apply_document_commands",),
+}
+
+_INTERNAL_QA_TOOLS = {
+    "export_fixture_benchmark",
+    "run_fixture_benchmark",
+    "visual_repair_fixture",
+    "visual_review_fixture",
 }
 
 _SKILL_REQUIRED_TOOLS = {
@@ -78,19 +272,42 @@ _SKILL_REQUIRED_TOOLS = {
     "verify_form_fill",
     "apply_evalplan_fill",
     "score_form_fill",
-    "run_fixture_benchmark",
-    "export_fixture_benchmark",
 }
 
 
-DOMAIN_SPECS: tuple[DomainSpec, ...] = (
+_MUTATING_TOOLS = {
+    "apply_document_commands", "replay_document_blueprint",
+    "render_submit", "render_cancel",
+    "start_workflow", "continue_workflow", "approve_workflow_decision",
+    "cancel_workflow", "resume_workflow",
+    "apply_table_ops", "apply_body_ops", "fill_form_field", "fill_by_path",
+    "apply_form_fill", "apply_template_formfit", "apply_quality_generation",
+    "apply_evalplan_fill",
+    "create_document", "create_document_from_plan", "copy_document",
+    "create_government_report_document", "create_proposal_document",
+    "create_comparison_table_document", "register_template",
+    "add_heading", "add_paragraph", "insert_paragraph", "delete_paragraph",
+    "add_page_break", "apply_edits", "plan_edit", "apply_edit", "undo_last_edit",
+    "replace_by_anchor", "replace_in_paragraph", "search_and_replace", "batch_replace",
+    "byte_preserving_patch", "insert_picture", "replace_picture",
+    "add_table", "set_table_cell_text", "merge_table_cells", "split_table_cell",
+    "format_table", "table_compute",
+    "create_custom_style", "set_paragraph_format", "set_list_format", "format_text",
+    "apply_style_profile_to_plan", "set_page_setup", "set_header_footer",
+    "set_page_number", "add_toc", "add_cross_reference", "add_tracked_edit",
+    "compose_exam", "place_seal", "mail_merge", "build_image_grid",
+    "build_meeting_nameplates", "build_organization_chart", "add_memo",
+    "add_memo_by_anchor", "remove_memo", "repair_hwpx",
+}
+
+
+BASELINE_DOMAIN_SPECS: tuple[DomainSpec, ...] = (
     DomainSpec(
         "agent_document",
         "에이전트 문서 인터페이스",
         "공유 semantic node/path/query/command 계약으로 낯선 HWPX를 탐색하고 이종 편집을 한 번에 원자 적용.",
         "get_document_node/query_document_nodes로 revision-bound canonical path를 찾은 뒤 "
-        "apply_document_commands 한 배치로 set/add/remove/move/copy를 적용한다. 양식·시험·PII 등 "
-        "도메인 증거가 필요한 작업은 기존 전문 도구를 사용한다.",
+        "apply_document_commands 한 배치로 적용한다. 도메인 증거가 필요한 작업은 전문 도구를 사용한다.",
         (
             "get_document_node",
             "query_document_nodes",
@@ -103,14 +320,8 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
         "real_hancom_render",
         "실한컴 비동기 렌더",
         "인증된 private queue로 HWPX를 제출하고 실한컴 PDF·페이지 영수증을 비동기로 조회.",
-        "render_submit 후 즉시 job id를 받고 render_status로 폴링한다. render_health가 unavailable/degraded이면 "
-        "로컬 미리보기를 실한컴 검증으로 간주하지 말고 unverified로 보류한다.",
-        (
-            "render_submit",
-            "render_status",
-            "render_cancel",
-            "render_health",
-        ),
+        "render_submit 후 job id를 받고 render_status로 폴링한다. unavailable/degraded이면 unverified로 보류한다.",
+        ("render_submit", "render_status", "render_cancel", "render_health"),
     ),
     DomainSpec(
         "workflow",
@@ -129,19 +340,19 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
     ),
     DomainSpec(
         "visual_qa",
-        "전 페이지 비전 검수",
-        "버전 고정 fixture 페이지를 독립 어댑터로 검수하고 제한적으로 수정.",
-        "visual_review_fixture로 모든 페이지와 어댑터 disagreement를 확인한 뒤, 안전하게 매핑된 결함만 visual_repair_fixture로 최대 3회 수정한다. fixture 결과는 항상 실렌더 미검증이다.",
+        "전 페이지 fixture 비전 검수",
+        "제품 QA fixture 전용 검수와 제한 수리.",
+        "설치형 제품 도구가 아니라 CI 라이브러리로만 실행한다.",
         ("visual_review_fixture", "visual_repair_fixture"),
+        public=False,
     ),
     DomainSpec(
         "blind_eval",
         "블라인드 fixture 실무 평가",
-        "동결된 fixture 실행·판정 증거를 검증하고 출처를 숨긴 심사용 번들을 내보냄.",
-        "run_fixture_benchmark로 실행·ToolSpec·판정·익명화 coverage를 검증한 뒤 "
-        "export_fixture_benchmark로 opaque 번들을 내보낸다. fixture 결과는 사람·실에이전트·실한컴 "
-        "또는 사람 대체 근거로 승격할 수 없다.",
+        "동결 fixture 실행·판정 증거와 익명 심사용 번들.",
+        "설치형 제품 도구가 아니라 CI 라이브러리로만 실행한다.",
         ("run_fixture_benchmark", "export_fixture_benchmark"),
+        public=False,
     ),
     DomainSpec(
         "read",
@@ -158,8 +369,8 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
     DomainSpec(
         "form_fill",
         "양식 채움 (동적)",
-        "처음 보는 실양식을 서식일치·바이트보존으로 정찰, 채움, 검증.",
-        "scan_form_guidance → 사용자 승인 → apply_table_ops/apply_body_ops → residue/render 검증.",
+        "처음 보는 실양식을 정찰하고 typed plan을 한 transaction으로 채운 뒤 검증.",
+        "analyze_form_fill → 승인 → apply_form_fill → verify_form_fill을 canonical 경로로 사용한다.",
         (
             "scan_form_guidance", "apply_table_ops", "apply_body_ops", "inspect_fill_residue",
             "verify_form_fill", "list_form_fields", "fill_form_field", "find_cell_by_label",
@@ -209,20 +420,22 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
         ("set_page_setup", "set_header_footer", "set_page_number"),
     ),
     DomainSpec(
-        "toc_xref", "차례·상호참조", "한컴 네이티브 차례와 쪽 상호참조를 저작·검증.", "자동 목차/상호참조가 필요할 때.",
-        ("add_toc", "add_cross_reference", "verify_toc"),
+        "toc_xref", "차례·상호참조", "한컴 네이티브 차례와 쪽 상호참조를 저작·검증.",
+        "자동 목차/상호참조가 필요할 때.", ("add_toc", "add_cross_reference", "verify_toc"),
     ),
     DomainSpec("pii", "개인정보", "개인정보를 탐지·마스킹.", "배포 전 PII를 감사할 때.", ("scan_personal_info",)),
     DomainSpec("redline", "변경추적", "수락/거부 가능한 추적 변경을 저작.", "검토용 redline이 필요할 때.", ("add_tracked_edit",)),
     DomainSpec("exam", "시험지 조판", "문항 Markdown을 학교 양식에 조판.", "시험지 원안지에 문항을 앉힐 때.", ("compose_exam", "verify_question_splits")),
     DomainSpec("seal", "직인·관인", "직인을 배치하고 규정을 검사.", "공문 직인 처리에.", ("place_seal", "check_seal_compliance")),
     DomainSpec(
-        "generators", "대량생산·특수 산출", "메일머지·사진대지·명패·조직도를 생성.", "반복 문서나 특수 레이아웃을 만들 때.",
+        "generators", "대량생산·특수 산출", "메일머지·사진대지·명패·조직도를 생성.",
+        "반복 문서나 특수 레이아웃을 만들 때.",
         ("mail_merge", "inspect_mail_merge_placeholders", "build_image_grid", "build_meeting_nameplates", "build_organization_chart"),
     ),
     DomainSpec("memo", "메모·주석", "검토 메모를 추가·삭제.", "문서에 코멘트를 달 때.", ("add_memo", "add_memo_by_anchor", "remove_memo")),
     DomainSpec(
-        "verify_quality", "검증·품질·복구", "렌더·품질·정합·복구·서버 상태를 검사.", "산출물 확언 전 검증하거나 문제를 진단할 때.",
+        "verify_quality", "검증·품질·복구", "렌더·품질·정합·복구·서버 상태를 검사.",
+        "산출물 확언 전 검증하거나 문제를 진단할 때.",
         (
             "render_preview", "repair_hwpx", "mcp_server_health", "describe_capabilities", "doc_diff",
             "validate_structure", "lint_text_conventions", "inspect_document_quality",
@@ -236,60 +449,257 @@ DOMAIN_SPECS: tuple[DomainSpec, ...] = (
     ),
 )
 
+DOMAIN_SPECS: tuple[DomainSpec, ...] = tuple(domain for domain in BASELINE_DOMAIN_SPECS if domain.public)
 
-def _build_tool_specs() -> tuple[ToolSpec, ...]:
+
+def _classification(name: str) -> ToolClassification:
+    if name in _INTERNAL_QA_TOOLS:
+        return ToolClassification.INTERNAL
+    if name in _DEPRECATED_REPLACEMENTS:
+        return ToolClassification.DEPRECATED
+    if name in _COMPATIBILITY_REPLACEMENTS:
+        return ToolClassification.COMPATIBILITY
+    if name in _ADVANCED_CLASSIFICATION:
+        return ToolClassification.ADVANCED
+    return ToolClassification.PUBLIC
+
+
+def _reason(classification: ToolClassification) -> str:
+    return {
+        ToolClassification.PUBLIC: "canonical installed product capability",
+        ToolClassification.COMPATIBILITY: "transition facade over a canonical typed engine",
+        ToolClassification.ADVANCED: "opt-in diagnostic or expert capability outside ordinary routing",
+        ToolClassification.DEPRECATED: "one-transition stub with explicit replacement guidance",
+        ToolClassification.INTERNAL: "fixture QA library retained for CI but removed from installed registration",
+    }[classification]
+
+
+def _build_baseline_tool_specs() -> tuple[ToolSpec, ...]:
     seen: set[str] = set()
     specs: list[ToolSpec] = []
-    for domain in DOMAIN_SPECS:
+    for domain in BASELINE_DOMAIN_SPECS:
         for name in domain.tools:
             if name in seen:
                 raise RuntimeError(f"duplicate ToolSpec name: {name}")
             seen.add(name)
+            classification = _classification(name)
+            internal = classification is ToolClassification.INTERNAL
+            profile = ToolProfile.ADVANCED if name in _ADVANCED_PROFILE else ToolProfile.DEFAULT
+            availability = (
+                ToolAvailability.INTERNAL_ONLY
+                if internal
+                else ToolAvailability.PROFILE_GATED
+                if profile is ToolProfile.ADVANCED
+                else ToolAvailability.AVAILABLE
+            )
+            availability_reason = (
+                AvailabilityReason(
+                    code=AvailabilityReasonCode.INTERNAL_ONLY,
+                    message="fixture QA capability is retained only as an internal library",
+                )
+                if internal
+                else AvailabilityReason(
+                    code=AvailabilityReasonCode.PROFILE_DISABLED,
+                    message="set HWPX_MCP_ADVANCED=1 before server import",
+                )
+                if profile is ToolProfile.ADVANCED
+                else None
+            )
+            tags = tuple(
+                tag
+                for tag, enabled in (
+                    (domain.key, True),
+                    (classification.value, True),
+                    ("mutation", name in _MUTATING_TOOLS),
+                    ("skill-required", name in _SKILL_REQUIRED_TOOLS),
+                )
+                if enabled
+            )
             specs.append(
                 ToolSpec(
                     name=name,
                     domain=domain.key,
-                    profile="advanced" if name in _ADVANCED_TOOLS else "default",
+                    profile=profile,
+                    classification=classification,
+                    availability_requirement=AvailabilityRequirement(
+                        dependency="python-hwpx",
+                        minimum_version=MIN_PYTHON_HWPX,
+                    ),
+                    availability=availability,
+                    availability_reason=availability_reason,
+                    reason=_reason(classification),
+                    replacement_tools=(
+                        _COMPATIBILITY_REPLACEMENTS.get(name)
+                        or _DEPRECATED_REPLACEMENTS.get(name)
+                        or ()
+                    ),
                     skill_required=name in _SKILL_REQUIRED_TOOLS,
+                    callable_name=None if internal else name,
+                    schema_binding=(
+                        SchemaBinding.INTERNAL_LIBRARY if internal else SchemaBinding.PYTHON_SIGNATURE
+                    ),
+                    mutates=name in _MUTATING_TOOLS,
+                    tags=tags,
                 )
             )
-    if _ADVANCED_TOOLS - seen:
-        raise RuntimeError(f"advanced tools absent from domains: {sorted(_ADVANCED_TOOLS - seen)}")
-    if _SKILL_REQUIRED_TOOLS - seen:
-        raise RuntimeError(f"required tools absent from domains: {sorted(_SKILL_REQUIRED_TOOLS - seen)}")
+
+    expected_sets = (
+        _ADVANCED_CLASSIFICATION,
+        set(_COMPATIBILITY_REPLACEMENTS),
+        set(_DEPRECATED_REPLACEMENTS),
+        _INTERNAL_QA_TOOLS,
+        _SKILL_REQUIRED_TOOLS,
+    )
+    missing = set().union(*(items - seen for items in expected_sets))
+    if missing:
+        raise RuntimeError(f"classified tools absent from domains: {sorted(missing)}")
     return tuple(specs)
 
 
-TOOL_SPECS = _build_tool_specs()
+BASELINE_TOOL_SPECS = _build_baseline_tool_specs()
+TOOL_SPECS = tuple(spec for spec in BASELINE_TOOL_SPECS if spec.installed)
+
+
+def _validate_classification() -> None:
+    counts = classification_counts()
+    expected = {
+        ToolClassification.PUBLIC.value: 108,
+        ToolClassification.COMPATIBILITY.value: 11,
+        ToolClassification.ADVANCED.value: 8,
+        ToolClassification.DEPRECATED.value: 5,
+        ToolClassification.INTERNAL.value: 4,
+    }
+    if len(BASELINE_TOOL_SPECS) != 136 or counts != expected:
+        raise RuntimeError(
+            f"136-tool classification must be disjoint and exhaustive: {counts!r} != {expected!r}"
+        )
+    if len(TOOL_SPECS) != 132:
+        raise RuntimeError(f"installed advanced surface must contain 132 tools, got {len(TOOL_SPECS)}")
+    if sum(spec.skill_required for spec in TOOL_SPECS) != 28:
+        raise RuntimeError(
+            "installed surface must contain exactly 28 skill-required tools"
+        )
+
+
+def classification_counts() -> dict[str, int]:
+    return {
+        classification.value: sum(
+            spec.classification is classification for spec in BASELINE_TOOL_SPECS
+        )
+        for classification in ToolClassification
+    }
+
+
+_validate_classification()
 
 
 def active_tool_specs(*, advanced: bool) -> tuple[ToolSpec, ...]:
-    return tuple(spec for spec in TOOL_SPECS if spec.profile == "default" or advanced)
+    return tuple(
+        spec
+        for spec in TOOL_SPECS
+        if spec.profile is ToolProfile.DEFAULT or advanced
+    )
+
+
+def expected_tool_order(*, advanced: bool) -> tuple[str, ...]:
+    return tuple(spec.name for spec in active_tool_specs(advanced=advanced))
 
 
 def expected_tool_names(*, advanced: bool) -> set[str]:
-    return {spec.name for spec in active_tool_specs(advanced=advanced)}
+    return set(expected_tool_order(advanced=advanced))
 
 
 def skill_required_tool_names() -> set[str]:
     return {spec.name for spec in TOOL_SPECS if spec.skill_required}
 
 
-def contract_payload() -> dict[str, Any]:
+def classification_payload() -> dict[str, Any]:
     return {
-        "schemaVersion": "hwpx.tool-contract.v1",
+        "schemaVersion": "hwpx.tool-classification.v1",
+        "baselineToolCount": len(BASELINE_TOOL_SPECS),
+        "counts": classification_counts(),
+        "tools": [_tool_payload(spec) for spec in BASELINE_TOOL_SPECS],
+    }
+
+
+def _availability_reason_payload(reason: AvailabilityReason | None) -> dict[str, Any] | None:
+    if reason is None:
+        return None
+    return {
+        "code": reason.code.value,
+        "message": reason.message,
+        "dependency": reason.dependency,
+        "requiredVersion": reason.required_version,
+        "installedVersion": reason.installed_version,
+        "installHint": reason.install_hint,
+    }
+
+
+def _tool_payload(spec: ToolSpec, bound: BoundToolSpec | None = None) -> dict[str, Any]:
+    payload = {
+        "name": spec.name,
+        "domain": spec.domain,
+        "profile": spec.profile.value,
+        "classification": spec.classification.value,
+        "lifecycle": spec.classification.value,
+        "availabilityRequirement": {
+            "dependency": spec.availability_requirement.dependency,
+            "minimumVersion": spec.availability_requirement.minimum_version,
+            "optional": spec.availability_requirement.optional,
+            "extra": spec.availability_requirement.extra,
+        },
+        "declaredAvailability": spec.availability.value,
+        "availability": (bound.availability if bound else spec.availability).value,
+        "availabilityReason": _availability_reason_payload(
+            bound.availability_reason if bound else spec.availability_reason
+        ),
+        "decisionReason": spec.reason,
+        "replacementTools": list(spec.replacement_tools),
+        "skillRequired": spec.skill_required,
+        "callableName": spec.callable_name,
+        "schemaBinding": spec.schema_binding.value,
+        "mutates": spec.mutates,
+        "tags": list(spec.tags),
+    }
+    if bound is not None:
+        payload.update(
+            {
+                "description": bound.description,
+                "signature": bound.signature,
+                "inputSchema": bound.input_schema,
+                "outputSchema": bound.output_schema,
+            }
+        )
+    return payload
+
+
+_BOUND_TOOL_REGISTRY: RegisteredToolRegistry | None = None
+
+
+def bound_tool_registry() -> RegisteredToolRegistry:
+    """Return the complete installed registry, importing the server lazily if needed."""
+
+    global _BOUND_TOOL_REGISTRY
+    if _BOUND_TOOL_REGISTRY is None:
+        # Importing the console server completes binding at its deterministic
+        # registration point.  This keeps scripts and direct contract consumers
+        # on the same schema truth without a second hand-maintained inventory.
+        from . import server as _server  # noqa: F401
+    if _BOUND_TOOL_REGISTRY is None:
+        raise RuntimeError("canonical ToolSpec registry is not bound")
+    return _BOUND_TOOL_REGISTRY
+
+
+def contract_payload() -> dict[str, Any]:
+    registry = bound_tool_registry()
+    bound = registry.by_name()
+    return {
+        "schemaVersion": "hwpx.tool-contract.v2",
         "minPythonHwpx": MIN_PYTHON_HWPX,
         "minMcpVersion": MIN_MCP_VERSION,
         "minSkillVersion": MIN_SKILL_VERSION,
-        "tools": [
-            {
-                "name": spec.name,
-                "domain": spec.domain,
-                "profile": spec.profile,
-                "skillRequired": spec.skill_required,
-            }
-            for spec in TOOL_SPECS
-        ],
+        "tools": [_tool_payload(spec, bound[spec.name]) for spec in TOOL_SPECS],
+        "baselineClassification": classification_payload(),
     }
 
 
@@ -298,31 +708,239 @@ def contract_hash() -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
-def register_fastmcp_tools(mcp: Any, namespace: Mapping[str, Any], *, advanced: bool) -> None:
-    """Register the exact active ToolSpec set from functions in *namespace*."""
+def _annotation_name(annotation: Any) -> str:
+    if annotation is inspect.Parameter.empty:
+        return "untyped"
+    if isinstance(annotation, str):
+        return annotation
+    return getattr(annotation, "__name__", str(annotation).replace("typing.", ""))
 
-    missing: list[str] = []
-    for spec in active_tool_specs(advanced=advanced):
-        func = namespace.get(spec.name)
-        if not callable(func):
-            missing.append(spec.name)
+
+def bind_tool_specs(
+    namespace: Mapping[str, Any],
+    *,
+    advanced: bool | None = None,
+) -> RegisteredToolRegistry:
+    """Resolve callable identity and normalized schemas before registration.
+
+    Every missing/non-callable binding and every schema-signature failure is
+    reported together, so import/programming errors cannot produce a silently
+    degraded partial registry.
+    """
+
+    specs = TOOL_SPECS if advanced is None else active_tool_specs(advanced=advanced)
+    resolved: list[tuple[ToolSpec, Callable[..., Any], inspect.Signature]] = []
+    errors: list[str] = []
+    schema_entries: list[tuple[str, Callable[..., Any], str, Mapping[str, Any]]] = []
+    for spec in specs:
+        callable_name = spec.callable_name
+        function = namespace.get(callable_name) if callable_name else None
+        if not callable(function):
+            errors.append(f"{spec.name}: missing callable {callable_name!r}")
             continue
-        mcp.tool(name=spec.name)(func)
-    if missing:
-        raise RuntimeError(f"ToolSpec functions missing from server module: {missing}")
+        try:
+            signature = inspect.signature(function)
+        except (TypeError, ValueError) as exc:
+            errors.append(f"{spec.name}: invalid Python signature: {exc}")
+            continue
+        description = inspect.getdoc(function) or f"HWPX tool {spec.name}"
+        meta = {
+            "hwpxLifecycle": spec.classification.value,
+            "hwpxProfile": spec.profile.value,
+            "hwpxMutates": spec.mutates,
+            "hwpxReplacementTools": list(spec.replacement_tools),
+        }
+        resolved.append((spec, function, signature))
+        schema_entries.append((spec.name, function, description, meta))
+    if errors:
+        raise RuntimeError("ToolSpec binding failed:\n- " + "\n- ".join(errors))
+
+    try:
+        snapshots = describe_callables(schema_entries)
+    except Exception as exc:
+        raise RuntimeError(f"ToolSpec schema binding failed: {exc}") from exc
+
+    bound: list[BoundToolSpec] = []
+    for spec, function, signature in resolved:
+        parameters = tuple(
+            SchemaParameter(
+                name=parameter.name,
+                annotation=_annotation_name(parameter.annotation),
+                required=parameter.default is inspect.Parameter.empty,
+            )
+            for parameter in signature.parameters.values()
+            if parameter.kind
+            not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
+        )
+        bound.append(
+            BoundToolSpec(
+                spec=spec,
+                function=function,
+                signature=str(signature),
+                parameters=parameters,
+                description=snapshots[spec.name].description,
+                input_schema=snapshots[spec.name].input_schema,
+                output_schema=snapshots[spec.name].output_schema,
+                availability=ToolAvailability.AVAILABLE,
+                availability_reason=None,
+            )
+        )
+    return RegisteredToolRegistry(tuple(bound))
+
+
+def _deprecated_wrapper(item: BoundToolSpec) -> Callable[..., Any]:
+    replacement_tools = item.spec.replacement_tools
+    function = item.function
+
+    @functools.wraps(function)
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        result = function(*args, **kwargs)
+        if isinstance(result, Mapping):
+            payload = dict(result)
+            payload.setdefault(
+                "deprecation",
+                {
+                    "status": "deprecated",
+                    "tool": item.spec.name,
+                    "replacementTools": list(replacement_tools),
+                    "message": "This tool is retained for one transition release.",
+                },
+            )
+            return payload
+        return result
+
+    setattr(wrapped, "__hwpx_original_callable__", function)
+    return wrapped
+
+
+def register_fastmcp_tools(
+    mcp: Any,
+    namespace: Mapping[str, Any],
+    *,
+    advanced: bool,
+) -> RegisteredToolRegistry:
+    """Bind the full contract, then register the selected deterministic profile."""
+
+    global _BOUND_TOOL_REGISTRY
+    canonical = bind_tool_specs(namespace, advanced=None)
+    _BOUND_TOOL_REGISTRY = canonical
+    canonical_by_name = canonical.by_name()
+    active = RegisteredToolRegistry(
+        tuple(canonical_by_name[spec.name] for spec in active_tool_specs(advanced=advanced))
+    )
+    for item in active.tools:
+        function = (
+            _deprecated_wrapper(item)
+            if item.spec.classification is ToolClassification.DEPRECATED
+            else item.function
+        )
+        register_tool(
+            mcp,
+            name=item.spec.name,
+            func=function,
+            description=item.description,
+            meta={
+                "hwpxLifecycle": item.spec.classification.value,
+                "hwpxProfile": item.spec.profile.value,
+                "hwpxMutates": item.spec.mutates,
+                "hwpxReplacementTools": list(item.spec.replacement_tools),
+            },
+        )
+    report = validate_registered_tools(mcp, active)
+    if not report["ok"]:
+        raise RuntimeError(f"FastMCP registry validation failed: {report!r}")
+    return active
+
+
+def validate_registered_tools(mcp: Any, registry: RegisteredToolRegistry) -> dict[str, Any]:
+    """Compare live names, callable identity, description, and both schemas."""
+
+    actual_by_name = registered_tool_snapshots(mcp)
+    expected_by_name = registry.by_name()
+    expected_names = registry.names
+    actual_names = tuple(actual_by_name)
+    callable_mismatches: list[str] = []
+    input_schema_mismatches: list[str] = []
+    output_schema_mismatches: list[str] = []
+    description_mismatches: list[str] = []
+    for item in registry.tools:
+        actual = actual_by_name.get(item.spec.name)
+        if actual is None:
+            continue
+        if actual.callable is not item.function:
+            callable_mismatches.append(item.spec.name)
+        if actual.input_schema != item.input_schema:
+            input_schema_mismatches.append(item.spec.name)
+        if actual.output_schema != item.output_schema:
+            output_schema_mismatches.append(item.spec.name)
+        if actual.description != item.description:
+            description_mismatches.append(item.spec.name)
+    missing = [name for name in expected_names if name not in actual_by_name]
+    unexpected = [name for name in actual_names if name not in expected_by_name]
+    unavailable = [
+        item.spec.name
+        for item in registry.tools
+        if item.availability is not ToolAvailability.AVAILABLE
+    ]
+    return {
+        "ok": not any(
+            (
+                missing,
+                unexpected,
+                callable_mismatches,
+                input_schema_mismatches,
+                output_schema_mismatches,
+                description_mismatches,
+                unavailable,
+            )
+        ),
+        "missing": missing,
+        "unexpected": unexpected,
+        "callableMismatches": callable_mismatches,
+        "inputSchemaMismatches": input_schema_mismatches,
+        "outputSchemaMismatches": output_schema_mismatches,
+        "descriptionMismatches": description_mismatches,
+        "unavailable": unavailable,
+        "expectedOrder": list(expected_names),
+        "actualOrder": list(actual_names),
+    }
+
+
+async def validate_fastmcp_tools(mcp: Any, registry: RegisteredToolRegistry) -> dict[str, Any]:
+    """Async compatibility wrapper retained for existing diagnostics."""
+
+    return validate_registered_tools(mcp, registry)
 
 
 __all__ = [
+    "AvailabilityReason",
+    "AvailabilityReasonCode",
+    "AvailabilityRequirement",
+    "BASELINE_DOMAIN_SPECS",
+    "BASELINE_TOOL_SPECS",
+    "BoundToolSpec",
     "DOMAIN_SPECS",
-    "MIN_PYTHON_HWPX",
     "MIN_MCP_VERSION",
+    "MIN_PYTHON_HWPX",
     "MIN_SKILL_VERSION",
+    "RegisteredToolRegistry",
+    "SchemaBinding",
     "TOOL_SPECS",
+    "ToolAvailability",
+    "ToolClassification",
+    "ToolProfile",
     "ToolSpec",
     "active_tool_specs",
+    "bind_tool_specs",
+    "bound_tool_registry",
+    "classification_counts",
+    "classification_payload",
     "contract_hash",
     "contract_payload",
     "expected_tool_names",
+    "expected_tool_order",
     "register_fastmcp_tools",
     "skill_required_tool_names",
+    "validate_fastmcp_tools",
+    "validate_registered_tools",
 ]

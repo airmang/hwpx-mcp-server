@@ -4,7 +4,6 @@ import hashlib
 import json
 from pathlib import Path
 
-import anyio
 import pytest
 
 from hwpx_mcp_server import server
@@ -13,6 +12,7 @@ from hwpx_mcp_server.blind_eval import (
     export_fixture_benchmark,
     run_fixture_benchmark,
 )
+from hwpx_mcp_server.tool_contract import BASELINE_TOOL_SPECS, ToolClassification
 
 
 def _digest(data: bytes) -> str:
@@ -145,17 +145,14 @@ def test_fixture_benchmark_fails_closed_on_coverage_anonymization_or_label_prove
     assert any(reason in item for item in result["failReasons"])
 
 
-def test_tool_spec_registers_frozen_benchmark_surface() -> None:
+def test_fixture_benchmark_remains_internal_ci_library() -> None:
     names = set(server._fastmcp_tool_names())
-    assert {"run_fixture_benchmark", "export_fixture_benchmark"} <= names
-
-    async def schemas() -> dict[str, set[str]]:
-        return {
-            tool.name: set(tool.inputSchema.get("properties", {}))
-            for tool in await server.mcp.list_tools()
-            if tool.name in {"run_fixture_benchmark", "export_fixture_benchmark"}
-        }
-
-    inputs = anyio.run(schemas)
-    assert inputs["run_fixture_benchmark"] == {"manifest_path", "output_dir", "strict"}
-    assert inputs["export_fixture_benchmark"] == {"result_manifest_path", "output_dir", "strict"}
+    internal = {
+        spec.name
+        for spec in BASELINE_TOOL_SPECS
+        if spec.classification is ToolClassification.INTERNAL
+    }
+    assert {"run_fixture_benchmark", "export_fixture_benchmark"} <= internal
+    assert {"run_fixture_benchmark", "export_fixture_benchmark"}.isdisjoint(names)
+    assert not hasattr(server, "run_fixture_benchmark")
+    assert not hasattr(server, "export_fixture_benchmark")

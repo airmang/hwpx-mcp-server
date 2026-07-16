@@ -4,7 +4,6 @@ import hashlib
 import json
 from pathlib import Path
 
-import anyio
 import pytest
 
 from hwpx_mcp_server import server
@@ -15,6 +14,7 @@ from hwpx_mcp_server.visual_qa import (
     repair_fixture,
     review_fixture,
 )
+from hwpx_mcp_server.tool_contract import BASELINE_TOOL_SPECS, ToolClassification
 
 
 def _png(path: Path) -> str:
@@ -212,22 +212,14 @@ def test_repair_loop_is_revision_guarded_capped_and_rolls_back_regression(tmp_pa
     assert result["ledger"][0]["status"] == "rolled_back"
 
 
-def test_public_tools_are_registered_with_frozen_argument_names() -> None:
+def test_visual_fixture_tools_remain_internal_ci_library() -> None:
     names = set(server._fastmcp_tool_names())
-    assert {"visual_review_fixture", "visual_repair_fixture"} <= names
-
-    async def schemas() -> dict[str, set[str]]:
-        return {
-            tool.name: set(tool.inputSchema.get("properties", {}))
-            for tool in await server.mcp.list_tools()
-            if tool.name.startswith("visual_")
-        }
-
-    inputs = anyio.run(schemas)
-    assert inputs["visual_review_fixture"] == {
-        "manifest_path", "case_id", "adapter_evidence_path", "output_dir", "strict",
+    internal = {
+        spec.name
+        for spec in BASELINE_TOOL_SPECS
+        if spec.classification is ToolClassification.INTERNAL
     }
-    assert inputs["visual_repair_fixture"] == {
-        "filename", "manifest_path", "repair_plan_path", "output_path", "expected_revision",
-        "idempotency_key", "case_id", "output_dir", "max_rounds",
-    }
+    assert {"visual_review_fixture", "visual_repair_fixture"} <= internal
+    assert {"visual_review_fixture", "visual_repair_fixture"}.isdisjoint(names)
+    assert not hasattr(server, "visual_review_fixture")
+    assert not hasattr(server, "visual_repair_fixture")

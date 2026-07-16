@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+# ruff: noqa: E402
 """Thin integration helpers for the upstream ``python-hwpx`` library.
 
 Keep version-sensitive imports and non-obvious upstream calls here so the rest
@@ -14,6 +15,7 @@ from xml.etree import ElementTree as ET
 
 from .compat import patch_python_hwpx
 
+# Compatibility patching must precede version-sensitive python-hwpx imports.
 patch_python_hwpx()
 
 from hwpx import ObjectFinder

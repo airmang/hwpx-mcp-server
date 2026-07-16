@@ -15,6 +15,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
+import hwpx
 
 pytest.importorskip(
     "hwpx.table_patch", reason="requires python-hwpx with byte-preserving form-fill"
@@ -24,11 +25,11 @@ from hwpx.table_patch import _direct_cells, _iter_table_spans, build_grid
 from hwpx_mcp_server.hwpx_ops import HwpxOps
 from hwpx_mcp_server import server
 
-CORE_REPO = Path(
-    os.environ.get(
-        "PYTHON_HWPX_REPO",
-        Path(__file__).parent.parent.parent / "python-hwpx",
-    )
+_CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
+CORE_REPO = (
+    Path(_CORE_REPO_PIN).expanduser().resolve()
+    if _CORE_REPO_PIN
+    else Path(hwpx.__file__).resolve().parents[2]
 )
 FIXT = CORE_REPO / "tests" / "fixtures" / "m2_corpus" / "public_official_table.hwpx"
 if not FIXT.exists():

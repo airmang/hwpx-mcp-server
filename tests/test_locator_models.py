@@ -1,23 +1,39 @@
+from pydantic import TypeAdapter
+
+from hwpx_mcp_server.core.locator import (
+    DocumentLocator,
+    locator_identifier,
+    locator_path,
+    normalize_locator_payload,
+)
 from hwpx_mcp_server.core.plan import PlanEditInput
-from hwpx_mcp_server.tools import DocumentLocatorInput
 
 
-def test_document_locator_input_accepts_legacy_path() -> None:
-    payload = DocumentLocatorInput.model_validate({"path": "sample.hwpx"})
-    assert payload.to_hwpx_payload() == {"path": "sample.hwpx"}
+LOCATOR_ADAPTER = TypeAdapter(DocumentLocator)
 
 
-def test_document_locator_input_accepts_uri_variant() -> None:
+def _locator(payload: dict[str, object]) -> DocumentLocator:
+    normalized = normalize_locator_payload(payload)
+    return LOCATOR_ADAPTER.validate_python(normalized["document"])
+
+
+def test_document_locator_accepts_legacy_path() -> None:
+    locator = _locator({"path": "sample.hwpx"})
+    assert locator_path(locator) == "sample.hwpx"
+    assert locator_identifier(locator) == "sample.hwpx"
+
+
+def test_document_locator_accepts_uri_variant() -> None:
     uri = "https://example.com/sample.hwpx"
-    payload = DocumentLocatorInput.model_validate({"type": "uri", "uri": uri, "backend": "http"})
-    data = payload.to_hwpx_payload()
-    assert data["path"] == uri
+    locator = _locator({"type": "uri", "uri": uri, "backend": "http"})
+    assert locator_path(locator) == uri
+    assert locator_identifier(locator) == uri
 
 
 def test_document_locator_handle_supports_handle_id_flow() -> None:
-    payload = DocumentLocatorInput.model_validate({"type": "handle", "handleId": "doc-123"})
-    assert payload.to_hwpx_payload() == {"path": None, "handleId": "doc-123"}
-    assert payload.to_hwpx_payload(require_path=False) == {"handleId": "doc-123"}
+    locator = _locator({"type": "handle", "handleId": "doc-123"})
+    assert locator_path(locator) is None
+    assert locator_identifier(locator) == "doc-123"
 
 
 def test_plan_edit_input_surface_doc_id_for_handle() -> None:

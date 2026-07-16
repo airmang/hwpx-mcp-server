@@ -6,22 +6,24 @@ from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
 import pytest
+import hwpx
 from hwpx.tools.package_validator import validate_editor_open_safety
 from hwpx.tools.package_validator import validate_package
 
 import hwpx_mcp_server.server as server
 from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.tools import build_tool_definitions
+from hwpx_mcp_server.tool_contract import bound_tool_registry
 
 
 def _sample_hwpx() -> Path:
-    core_repo = Path(
-        os.environ.get(
-            "PYTHON_HWPX_REPO",
-            Path(__file__).resolve().parents[1].parent / "python-hwpx",
-        )
+    explicit_repo = os.environ.get("PYTHON_HWPX_REPO")
+    core_repo = (
+        Path(explicit_repo).expanduser().resolve()
+        if explicit_repo
+        else Path(hwpx.__file__).resolve().parents[2]
     )
-    return core_repo / "examples" / "Skeleton.hwpx"
+    core_sample = core_repo / "examples" / "Skeleton.hwpx"
+    return core_sample if core_sample.is_file() else Path(__file__).parent / "sample.hwpx"
 
 
 _THINKFIRST_REGRESSION_RAW = os.environ.get("HWPX_STALE_LINESEG_REGRESSION_FIXTURE")
@@ -38,10 +40,10 @@ def _truncate_central_directory(source: Path, destination: Path) -> None:
     destination.write_bytes(data[:offset])
 
 
-def test_repair_hwpx_tool_definition_is_exposed() -> None:
-    names = {definition.name for definition in build_tool_definitions()}
+def test_repair_hwpx_tool_is_bound_to_the_canonical_registry() -> None:
+    binding = bound_tool_registry().by_name()["repair_hwpx"]
 
-    assert "repair_hwpx" in names
+    assert binding.function is server.repair_hwpx
 
 
 def test_repair_hwpx_repack_produces_valid_package(tmp_path: Path) -> None:

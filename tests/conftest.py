@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import importlib.util
 import itertools
 import json
 import os
@@ -22,14 +23,40 @@ import pytest
 builtins.ET = _ET
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_LOCAL_PYTHON_HWPX_REPO = (
-    Path(os.environ.get("PYTHON_HWPX_REPO", _REPO_ROOT.parent / "python-hwpx"))
-    .expanduser()
-    .resolve()
+_MATCHING_CORE_REPO = _REPO_ROOT.parent / _REPO_ROOT.name.replace(
+    "hwpx-mcp-server", "python-hwpx", 1
 )
-_LOCAL_PYTHON_HWPX_SRC = _LOCAL_PYTHON_HWPX_REPO / "src"
 
-if _LOCAL_PYTHON_HWPX_SRC.exists():
+
+def _resolve_python_hwpx_paths() -> tuple[Path, Path | None]:
+    """Resolve core from an explicit pin, matching worktree, or installed package.
+
+    Never fall back to the owner's unpinned ``../python-hwpx`` checkout: that can
+    silently test a different revision and may be outside the active worktree's
+    filesystem boundary.
+    """
+
+    explicit = os.environ.get("PYTHON_HWPX_REPO")
+    if explicit:
+        repo = Path(explicit).expanduser().resolve()
+        return repo, repo / "src"
+    if _MATCHING_CORE_REPO.is_dir():
+        return _MATCHING_CORE_REPO, _MATCHING_CORE_REPO / "src"
+
+    spec = importlib.util.find_spec("hwpx")
+    if spec is None or spec.origin is None:
+        raise RuntimeError(
+            "python-hwpx is not installed; set PYTHON_HWPX_REPO to an explicit checkout"
+        )
+    package_dir = Path(spec.origin).resolve().parent
+    if package_dir.parent.name == "src":
+        return package_dir.parent.parent, package_dir.parent
+    return package_dir.parent, None
+
+
+_LOCAL_PYTHON_HWPX_REPO, _LOCAL_PYTHON_HWPX_SRC = _resolve_python_hwpx_paths()
+
+if _LOCAL_PYTHON_HWPX_SRC is not None and _LOCAL_PYTHON_HWPX_SRC.exists():
     local_hwpx_src = str(_LOCAL_PYTHON_HWPX_SRC)
     if local_hwpx_src not in sys.path:
         sys.path.insert(0, local_hwpx_src)
@@ -117,7 +144,7 @@ def _repo_root() -> Path:
 
 def _pythonpath_with_local_sources(existing: str = "") -> str:
     paths = [str(_repo_root() / "src")]
-    if _LOCAL_PYTHON_HWPX_SRC.exists():
+    if _LOCAL_PYTHON_HWPX_SRC is not None and _LOCAL_PYTHON_HWPX_SRC.exists():
         paths.append(str(_LOCAL_PYTHON_HWPX_SRC))
     if existing:
         paths.append(existing)

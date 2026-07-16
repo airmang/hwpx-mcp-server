@@ -11,21 +11,25 @@ import os
 from pathlib import Path
 
 import pytest
+import hwpx
 
 pytest.importorskip(
     "hwpx.guidance_scan", reason="requires python-hwpx with guidance_scan"
 )
 
 from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.tools import build_tool_definitions
+from hwpx_mcp_server.tool_contract import bound_tool_registry
 
-CORE_REPO = Path(
-    os.environ.get(
-        "PYTHON_HWPX_REPO",
-        Path(__file__).parent.parent.parent / "python-hwpx",
-    )
+_CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
+CORE_REPO = (
+    Path(_CORE_REPO_PIN).expanduser().resolve()
+    if _CORE_REPO_PIN
+    else Path(hwpx.__file__).resolve().parents[2]
 )
 BLANK = CORE_REPO / "tests" / "fixtures" / "m105_evalplan" / "blank_form_3hak.hwpx"
+pytestmark = pytest.mark.skipif(
+    not BLANK.is_file(), reason="python-hwpx evaluation-plan fixture is unavailable"
+)
 
 
 @pytest.fixture()
@@ -37,8 +41,7 @@ def ops(tmp_path):
 
 
 def test_tool_is_registered():
-    names = {d.name for d in build_tool_definitions()}
-    assert "scan_form_guidance" in names
+    assert "scan_form_guidance" in bound_tool_registry().by_name()
 
 
 def test_scan_reports_legend_and_candidates(ops):
@@ -128,10 +131,4 @@ def test_inspect_fill_residue_gate(ops):
     assert out["ok"] is False  # blank 그대로 = 최악의 채움본
     kinds = {e["kind"] for e in out["errors"]}
     assert {"delete_color_residue", "unmodified_sample"} <= kinds
-    names = {
-        d.name
-        for d in __import__(
-            "hwpx_mcp_server.tools", fromlist=["build_tool_definitions"]
-        ).build_tool_definitions()
-    }
-    assert "inspect_fill_residue" in names
+    assert "inspect_fill_residue" in bound_tool_registry().by_name()

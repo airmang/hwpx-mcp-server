@@ -18,14 +18,15 @@ import tempfile
 import uuid
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from xml.etree import ElementTree as ET
 
 from hwpx.tools.pii import DEFAULT_POLICY, mask_pii
+from pydantic import BaseModel, ConfigDict, Field
 
 try:  # python-hwpx >= 2.10.3
     from hwpx.tools.package_validator import validate_package
-except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+except ImportError as exc:  # pragma: no cover - expected only on dependency skew
     validate_package = None
     _PACKAGE_VALIDATOR_IMPORT_ERROR: Exception | None = exc
 else:
@@ -33,7 +34,7 @@ else:
 
 try:  # python-hwpx >= 2.10.3
     from hwpx.tools.repair import repair_repack
-except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+except ImportError as exc:  # pragma: no cover - expected only on dependency skew
     repair_repack = None
     _REPAIR_REPACK_IMPORT_ERROR: Exception | None = exc
 else:
@@ -56,6 +57,105 @@ _CONFIDENCE_LABEL_EXACT = "label-exact"
 _CONFIDENCE_LABEL_FUZZY = "label-fuzzy"
 _CONFIDENCE_POSITION_GUESS = "position-guess"
 _FUZZY_MATCH_THRESHOLD = 0.72
+
+
+class _FormFillModel(BaseModel):
+    """Typed MCP boundary while preserving forward-compatible plan metadata."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+
+class FormFillSourceInput(_FormFillModel):
+    type: str = "structured"
+    path: str | None = None
+    sha256: str | None = None
+
+
+class FormFillTargetInput(_FormFillModel):
+    kind: Literal[
+        "label-path",
+        "cell",
+        "coordinate",
+        "form-field",
+        "placeholder",
+        "canonical-path",
+        "body-anchor",
+    ] = "label-path"
+    path: str | None = None
+    token: str | None = None
+    table_index: int | None = None
+    row: int | None = None
+    col: int | None = None
+    field_index: int | None = None
+    field_id: str | None = None
+    name: str | None = None
+
+
+class FormFillFieldInput(_FormFillModel):
+    key: str | None = None
+    label: str | None = None
+    value: str | int | float | bool | None = ""
+    text: str | None = None
+    target: FormFillTargetInput | None = None
+    style_policy: str = Field(default="preserve-target", alias="stylePolicy")
+
+
+class CanonicalFormFillInput(_FormFillModel):
+    schema_version: Literal["hwpx.formfill.v1"] = Field(
+        default="hwpx.formfill.v1", alias="schemaVersion"
+    )
+    source: FormFillSourceInput = Field(default_factory=FormFillSourceInput)
+    fields: list[FormFillFieldInput] = Field(default_factory=list)
+    paragraphs: list[FormFillFieldInput] = Field(default_factory=list)
+
+
+class FormFillAnalyzeOptions(_FormFillModel):
+    require_unique_anchors: bool = Field(default=True, alias="requireUniqueAnchors")
+    allow_fuzzy_labels: bool = Field(default=True, alias="allowFuzzyLabels")
+    preserve_unmapped_parts: bool = Field(default=True, alias="preserveUnmappedParts")
+
+
+class FormFillPlanFile(_FormFillModel):
+    filename: str | None = None
+    path: str | None = None
+    sha256: str | None = None
+    mtime_ns: int | None = None
+
+
+class FormFillResolvedMapping(_FormFillModel):
+    kind: str
+    key: str | None = None
+    label: str | None = None
+    value: str | int | float | bool | None = None
+    confidence: str | None = None
+    confidence_grade: str | None = Field(default=None, alias="confidenceGrade")
+    method: str | None = None
+
+
+class FormFillMappingSet(_FormFillModel):
+    resolved: list[FormFillResolvedMapping] = Field(default_factory=list)
+    unresolved: list[FormFillResolvedMapping] = Field(default_factory=list)
+
+
+class FormFillPlanInput(_FormFillModel):
+    """Serializable output of analyze_form_fill accepted by apply_form_fill."""
+
+    plan_id: str
+    schema_version: Literal["hwpx.formfill.v1"] = Field(alias="schemaVersion")
+    source: FormFillPlanFile
+    destination: FormFillPlanFile
+    canonical_input: CanonicalFormFillInput = Field(alias="canonicalInput")
+    mappings: FormFillMappingSet
+    unresolved_count: int = 0
+    resolved_count: int = 0
+    mutated: bool = False
+    options: FormFillAnalyzeOptions = Field(default_factory=FormFillAnalyzeOptions)
+
+
+def _typed_payload(value: BaseModel | dict[str, Any] | str | None) -> dict[str, Any] | str | None:
+    if isinstance(value, BaseModel):
+        return value.model_dump(by_alias=True, exclude_none=True)
+    return value
 
 
 def _clear_paragraph_layout_cache(paragraph: Any) -> None:
@@ -81,11 +181,11 @@ def sha256_file(path: str | Path) -> str:
 def analyze_form_fill_workflow(
     *,
     source_filename: str,
-    input_json: dict[str, Any] | str | None = None,
+    input_json: CanonicalFormFillInput | dict[str, Any] | str | None = None,
     input_json_path: str | None = None,
     input_docx: str | None = None,
     destination_filename: str | None = None,
-    options: dict[str, Any] | None = None,
+    options: FormFillAnalyzeOptions | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a non-mutating form-fill analysis and serializable plan."""
 
@@ -95,7 +195,7 @@ def analyze_form_fill_workflow(
     destination_path = resolve_path(destination_filename) if destination_filename else None
 
     canonical_input = _load_canonical_input(
-        input_json=input_json,
+        input_json=_typed_payload(input_json),
         input_json_path=input_json_path,
         input_docx=input_docx,
     )
@@ -139,7 +239,7 @@ def analyze_form_fill_workflow(
         "resolved_count": len(mappings["resolved"]),
         "mutated": False,
         "next_tool": "apply_form_fill",
-        "options": options or {},
+        "options": _typed_payload(options) or {},
     }
     _FORM_FILL_PLANS[plan_id] = copy.deepcopy(analysis)
     after_hash = sha256_file(source)
@@ -150,10 +250,10 @@ def analyze_form_fill_workflow(
 def apply_form_fill_workflow(
     *,
     plan_id: str | None = None,
-    analysis: dict[str, Any] | None = None,
+    analysis: FormFillPlanInput | dict[str, Any] | None = None,
     source_filename: str | None = None,
     destination_filename: str | None = None,
-    canonical_input: dict[str, Any] | str | None = None,
+    canonical_input: CanonicalFormFillInput | dict[str, Any] | str | None = None,
     confirm: bool = True,
     mask: bool = True,
 ) -> dict[str, Any]:
@@ -164,7 +264,7 @@ def apply_form_fill_workflow(
 
     plan = _resolve_analysis(plan_id=plan_id, analysis=analysis)
     if canonical_input is not None:
-        plan["canonicalInput"] = _load_canonical_input(input_json=canonical_input)
+        plan["canonicalInput"] = _load_canonical_input(input_json=_typed_payload(canonical_input))
         doc_for_mapping = open_doc(_source_path_from_plan(plan, source_filename))
         plan["mappings"] = _build_mapping_analysis(doc_for_mapping, plan["canonicalInput"])
 
@@ -829,9 +929,16 @@ def _label_and_direction(field: dict[str, Any], target: dict[str, Any]) -> tuple
     return label, direction
 
 
-def _resolve_analysis(*, plan_id: str | None, analysis: dict[str, Any] | None) -> dict[str, Any]:
+def _resolve_analysis(
+    *,
+    plan_id: str | None,
+    analysis: FormFillPlanInput | dict[str, Any] | None,
+) -> dict[str, Any]:
     if analysis is not None:
-        return copy.deepcopy(analysis)
+        payload = _typed_payload(analysis)
+        if not isinstance(payload, dict):  # pragma: no cover - type contract guard
+            raise ValueError("analysis must be a typed form-fill plan object")
+        return copy.deepcopy(payload)
     if plan_id is None:
         raise ValueError("provide plan_id or analysis")
     try:

@@ -1,0 +1,208 @@
+{
+  "schemaVersion": "hwpx.tool-contract-delta.v2",
+  "release": "4.0.0",
+  "changeKind": "breaking-removal-and-typed-registry",
+  "baseline": {
+    "versions": {
+      "pythonHwpx": "3.0.0",
+      "mcpServer": "3.0.0",
+      "skill": "0.2.0"
+    },
+    "defaultToolCount": 126,
+    "advancedToolCount": 136,
+    "domainCount": 21,
+    "skillRequiredToolCount": 30,
+    "contractHash": "76d143ccc0787828"
+  },
+  "target": {
+    "versions": {
+      "pythonHwpx": "3.1.0",
+      "mcpServer": "4.0.0",
+      "skill": "0.3.0"
+    },
+    "defaultToolCount": 121,
+    "advancedToolCount": 132,
+    "domainCount": 19,
+    "skillRequiredToolCount": 28,
+    "contractHash": "16dd2a477260e7be"
+  },
+  "delta": {
+    "defaultToolCount": -5,
+    "advancedToolCount": -4,
+    "domainCount": -2,
+    "skillRequiredToolCount": -2
+  },
+  "removedTools": [
+    {
+      "name": "visual_review_fixture",
+      "classification": "internal",
+      "destination": "internal CI library",
+      "alias": null,
+      "replacementTools": []
+    },
+    {
+      "name": "visual_repair_fixture",
+      "classification": "internal",
+      "destination": "internal CI library",
+      "alias": null,
+      "replacementTools": []
+    },
+    {
+      "name": "run_fixture_benchmark",
+      "classification": "internal",
+      "destination": "internal CI library",
+      "alias": null,
+      "replacementTools": []
+    },
+    {
+      "name": "export_fixture_benchmark",
+      "classification": "internal",
+      "destination": "internal CI library",
+      "alias": null,
+      "replacementTools": []
+    }
+  ],
+  "profileMoves": [
+    {
+      "name": "score_form_fill",
+      "from": "default",
+      "to": "advanced"
+    }
+  ],
+  "compatibility": {
+    "aliases": [],
+    "facades": [
+      {
+        "name": "apply_table_ops",
+        "replacementTools": [
+          "analyze_form_fill",
+          "apply_form_fill",
+          "verify_form_fill"
+        ]
+      },
+      {
+        "name": "apply_body_ops",
+        "replacementTools": [
+          "analyze_form_fill",
+          "apply_form_fill",
+          "verify_form_fill"
+        ]
+      },
+      {
+        "name": "fill_form_field",
+        "replacementTools": [
+          "analyze_form_fill",
+          "apply_form_fill",
+          "verify_form_fill"
+        ]
+      },
+      {
+        "name": "fill_by_path",
+        "replacementTools": [
+          "analyze_form_fill",
+          "apply_form_fill",
+          "verify_form_fill"
+        ]
+      },
+      {
+        "name": "analyze_template_formfit",
+        "replacementTools": [
+          "analyze_form_fill",
+          "apply_form_fill",
+          "verify_form_fill"
+        ]
+      },
+      {
+        "name": "apply_template_formfit",
+        "replacementTools": [
+          "analyze_form_fill",
+          "apply_form_fill",
+          "verify_form_fill"
+        ]
+      },
+      {
+        "name": "apply_evalplan_fill",
+        "replacementTools": [
+          "analyze_form_fill",
+          "apply_form_fill",
+          "verify_form_fill"
+        ]
+      },
+      {
+        "name": "create_government_report_document",
+        "replacementTools": [
+          "create_document_from_plan"
+        ]
+      },
+      {
+        "name": "create_proposal_document",
+        "replacementTools": [
+          "create_document_from_plan"
+        ]
+      },
+      {
+        "name": "create_comparison_table_document",
+        "replacementTools": [
+          "create_document_from_plan"
+        ]
+      },
+      {
+        "name": "apply_edits",
+        "replacementTools": [
+          "apply_document_commands"
+        ]
+      }
+    ],
+    "deprecatedStubs": [
+      {
+        "name": "analyze_quality_generation",
+        "replacementTools": [
+          "create_document_from_plan",
+          "create_proposal_document",
+          "inspect_document_quality"
+        ],
+        "transitionRelease": "4.0.0"
+      },
+      {
+        "name": "apply_quality_generation",
+        "replacementTools": [
+          "create_document_from_plan",
+          "create_proposal_document",
+          "inspect_document_quality"
+        ],
+        "transitionRelease": "4.0.0"
+      },
+      {
+        "name": "plan_edit",
+        "replacementTools": [
+          "apply_document_commands"
+        ],
+        "transitionRelease": "4.0.0"
+      },
+      {
+        "name": "preview_edit",
+        "replacementTools": [
+          "apply_document_commands"
+        ],
+        "transitionRelease": "4.0.0"
+      },
+      {
+        "name": "apply_edit",
+        "replacementTools": [
+          "apply_document_commands"
+        ],
+        "transitionRelease": "4.0.0"
+      }
+    ],
+    "ghostRegistrations": []
+  },
+  "registrationEvidence": {
+    "canonicalToolSpec": "src/hwpx_mcp_server/tool_contract.py",
+    "fastMcpRegistration": "src/hwpx_mcp_server/server.py",
+    "boundInstalledToolCount": 132,
+    "bindingHash": "1761f78eb80b1932",
+    "normalizedInputOutputSchemasComplete": true,
+    "remainingRemovedRuntimeReferences": [],
+    "activeRemovedNames": []
+  }
+}

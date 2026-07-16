@@ -8,8 +8,6 @@ from hwpx_mcp_server.server import (
     get_table_text,
     undo_last_edit,
 )
-from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.tools import build_tool_definitions
 
 
 def test_dry_run_does_not_modify_document_or_create_backup(tmp_path: Path) -> None:
@@ -87,23 +85,3 @@ def test_undo_last_edit_restores_previous_backup(tmp_path: Path) -> None:
     assert undo["semanticDiff"]["changed"] is True
     assert "first saved paragraph" in text
     assert "second saved paragraph" not in text
-
-
-def test_legacy_registry_exposes_transaction_tools(tmp_path: Path) -> None:
-    target = tmp_path / "legacy-apply.hwpx"
-    create_document(str(target))
-    ops = HwpxOps(base_directory=tmp_path, auto_backup=True)
-    tools = {definition.name: definition for definition in build_tool_definitions()}
-
-    result = tools["apply_edits"].call(
-        ops,
-        {
-            "path": str(target),
-            "operations": [{"type": "add_paragraph", "text": "legacy transaction"}],
-        },
-    )
-
-    assert result["ok"] is True
-    assert result["operationsApplied"] == 1
-    assert result["openSafety"]["ok"] is True
-    assert tools["undo_last_edit"].call(ops, {"path": str(target)})["restored"] is True

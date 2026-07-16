@@ -12,21 +12,25 @@ import shutil
 from pathlib import Path
 
 import pytest
+import hwpx
 
 pytest.importorskip(
     "hwpx.evalplan_fill", reason="requires python-hwpx with evalplan_fill recipe"
 )
 
 from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.tools import build_tool_definitions
+from hwpx_mcp_server.tool_contract import bound_tool_registry
 
-CORE_REPO = Path(
-    os.environ.get(
-        "PYTHON_HWPX_REPO",
-        Path(__file__).parent.parent.parent / "python-hwpx",
-    )
+_CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
+CORE_REPO = (
+    Path(_CORE_REPO_PIN).expanduser().resolve()
+    if _CORE_REPO_PIN
+    else Path(hwpx.__file__).resolve().parents[2]
 )
 BLANK = CORE_REPO / "tests" / "fixtures" / "m105_evalplan" / "blank_form_3hak.hwpx"
+pytestmark = pytest.mark.skipif(
+    not BLANK.is_file(), reason="python-hwpx evaluation-plan fixture is unavailable"
+)
 
 SYNTHETIC_MD = """# 2026학년도 2학기 3학년 「합성 과목」 교수학습운영 및 평가계획 (검토용)
 
@@ -99,7 +103,7 @@ SYNTHETIC_MD = """# 2026학년도 2학기 3학년 「합성 과목」 교수학�
 
 
 def test_apply_evalplan_fill_registered():
-    assert "apply_evalplan_fill" in {t.name for t in build_tool_definitions()}
+    assert "apply_evalplan_fill" in bound_tool_registry().by_name()
 
 
 @pytest.mark.skipif(

@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .tool_contract import DOMAIN_SPECS, TOOL_SPECS, contract_hash, expected_tool_names
+from .tool_contract import (
+    DOMAIN_SPECS,
+    TOOL_SPECS,
+    bound_tool_registry,
+    contract_hash,
+    expected_tool_names,
+)
 
 
 # Backward-compatible data shape for callers that imported DOMAINS directly.
@@ -28,6 +34,8 @@ def build_capability_report(
     """Return only tools callable on the active FastMCP profile."""
 
     active = expected_tool_names(advanced=advanced)
+    specs = {spec.name: spec for spec in TOOL_SPECS}
+    bound = bound_tool_registry().by_name()
     selected = DOMAIN_SPECS if domain is None else tuple(item for item in DOMAIN_SPECS if item.key == domain)
     out_domains: list[dict[str, Any]] = []
     for item in selected:
@@ -42,6 +50,18 @@ def build_capability_report(
                 "whenToUse": item.when_to_use,
                 "toolCount": len(tools),
                 "tools": tools,
+                "toolDetails": [
+                    {
+                        "name": name,
+                        "lifecycle": specs[name].classification.value,
+                        "profile": specs[name].profile.value,
+                        "availability": bound[name].availability.value,
+                        "mutates": specs[name].mutates,
+                        "tags": list(specs[name].tags),
+                        "replacementTools": list(specs[name].replacement_tools),
+                    }
+                    for name in tools
+                ],
             }
         )
     return {
@@ -50,25 +70,33 @@ def build_capability_report(
         "profile": "advanced" if advanced else "default",
         "contractHash": contract_hash(),
         "note": (
-            "실제 FastMCP 등록 표면의 작업군 지도. legacy inventory는 호출 가능 도구 수에 포함하지 않는다. "
-            "양식 채움 상세 절차는 스킬 references/workflows-forms.md를 따른다."
+            "실제 FastMCP 등록 표면의 작업군 지도. isolated legacy testkit와 internal fixture QA는 "
+            "호출 가능 도구 수에 포함하지 않는다. 양식 채움은 analyze_form_fill → apply_form_fill → "
+            "verify_form_fill canonical 경로를 따른다."
         ),
     }
 
 
-def coverage_against(tool_names: set[str], *, advanced: bool = False) -> dict[str, Any]:
+def coverage_against(
+    tool_names: set[str],
+    *,
+    advanced: bool = False,
+    registry_validation: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Compare a live registry to the exact active ToolSpec set."""
 
     expected = expected_tool_names(advanced=advanced)
     missing = sorted(expected - tool_names)
     unexpected = sorted(tool_names - expected)
+    registry_ok = True if registry_validation is None else bool(registry_validation.get("ok"))
     return {
         "missingExpected": missing,
         "unexpectedRegistered": unexpected,
         # Compatibility keys retained for older health consumers/tests.
         "unmapped": unexpected,
         "mappedNotRegistered": missing,
-        "ok": not missing and not unexpected,
+        "registryValidation": registry_validation,
+        "ok": not missing and not unexpected and registry_ok,
     }
 
 
