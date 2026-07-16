@@ -17,7 +17,7 @@
   registration, callables, signatures, schemas, profiles, health/capabilities,
   generated documentation, and the plugin contract.
 - The transition surface is 121 default / 132 advanced tools with contract hash
-  `71661f4118e020c4`. Existing `hwpx.formfill.v1`, evalplan, native-field, and exam
+  `e1af9e16bacc52d7`. Existing `hwpx.formfill.v1`, evalplan, native-field, and exam
   behavior remains explicit; five older planner tools are deprecated for one transition.
 
 ### Fixed
