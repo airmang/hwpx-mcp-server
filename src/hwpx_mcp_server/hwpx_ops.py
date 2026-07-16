@@ -681,7 +681,72 @@ class HwpxOps:
                 )
             except (OSError, RuntimeError):
                 return None
-        return tuple(publications)
+        return self._ensure_exact_recoveries(publications)
+
+    def _ensure_exact_recoveries(
+        self,
+        recoveries: Sequence[_ExactRecoveryPublication],
+        *,
+        max_replacements: int = 32,
+    ) -> tuple[_ExactRecoveryPublication, ...] | None:
+        """Reclaim every immutable preimage after a helper-return race.
+
+        A successful publish helper return is not itself a durable claim: an
+        external writer can replace the random recovery path after the helper's
+        final read and before its caller mutates the live document or backup
+        chain. Re-read each returned token and, when it has gone stale,
+        republish the in-memory immutable bytes at a fresh random name. The
+        second read catches replacements triggered by the first revalidation.
+        """
+
+        ensured: list[_ExactRecoveryPublication] = []
+        for recovery in recoveries:
+            current = recovery
+            replacements = 0
+            while True:
+                try:
+                    if (
+                        self.storage.read_guarded_bytes(current.publication)
+                        != current.data
+                    ):
+                        raise RuntimeError(
+                            "exact recovery bytes changed after publication"
+                        )
+                    self.storage.read_guarded_bytes(current.publication)
+                except (FileNotFoundError, OSError, RuntimeError):
+                    if replacements >= max_replacements:
+                        return None
+                    replacements += 1
+                    try:
+                        current = self._publish_exact_recovery(
+                            recovery.base_path,
+                            recovery.data,
+                            mode=recovery.mode,
+                            marker=recovery.marker,
+                        )
+                    except (OSError, RuntimeError):
+                        return None
+                    # Never accept the helper's token without re-entering the
+                    # validation loop after it has returned.
+                    continue
+                ensured.append(current)
+                break
+        return tuple(ensured)
+
+    def _require_exact_recoveries(
+        self,
+        recoveries: Sequence[_ExactRecoveryPublication],
+        *,
+        context: str,
+    ) -> tuple[_ExactRecoveryPublication, ...]:
+        """Fail closed unless every destructive step has a live recovery."""
+
+        ensured = self._ensure_exact_recoveries(recoveries)
+        if ensured is None:
+            raise RuntimeError(
+                f"{context}: exact recovery preimages could not be re-established"
+            )
+        return ensured
 
     def _cleanup_exact_recoveries(
         self,
@@ -791,6 +856,10 @@ class HwpxOps:
                 if desired is None:
                     if not destination_guard.target_existed:
                         continue
+                    recoveries = self._require_exact_recoveries(
+                        recoveries,
+                        context="backup rotation deletion preflight",
+                    )
                     publication = self._absent_publication_guard(
                         destination_guard
                     )
@@ -804,6 +873,10 @@ class HwpxOps:
                     self.storage.remove_guarded_output(destination_guard)
                     self._assert_exact_sidecar_publication(publication)
                     continue
+                recoveries = self._require_exact_recoveries(
+                    recoveries,
+                    context="backup rotation publish preflight",
+                )
                 publication = self.storage.atomic_publish_bytes(
                     destination_guard,
                     desired[0],
@@ -823,6 +896,10 @@ class HwpxOps:
                 self.storage.read_guarded_bytes(publication)
                 rotated.append(paths[index])
 
+            recoveries = self._require_exact_recoveries(
+                recoveries,
+                context="backup snapshot publish preflight",
+            )
             backup_publication = self.storage.atomic_publish_bytes(
                 guards[0],
                 preimage,
@@ -839,9 +916,13 @@ class HwpxOps:
             for mutation in mutations:
                 self._assert_exact_sidecar_publication(mutation.publication)
         except BaseException:
+            recoveries = self._require_exact_recoveries(
+                recoveries,
+                context="backup rotation failure",
+            )
             self._rollback_exact_backup_mutations(
                 mutations,
-                preimages_preserved=True,
+                recoveries=recoveries,
             )
             raise
         return _ExactBackupResult(
@@ -854,12 +935,12 @@ class HwpxOps:
         self,
         mutations: Sequence[_ExactSidecarMutation],
         *,
-        preimages_preserved: bool = False,
+        recoveries: Sequence[_ExactRecoveryPublication] | None = None,
     ) -> None:
         """Restore every sidecar candidate that is still exactly ours."""
 
-        if not preimages_preserved:
-            recoveries = self._preserve_exact_preimages(
+        if recoveries is None:
+            preserved = self._preserve_exact_preimages(
                 [
                     (
                         mutation.publication.path,
@@ -871,8 +952,16 @@ class HwpxOps:
                 ],
                 marker="rollback-recovery",
             )
-            if recoveries is None:
-                return
+            if preserved is None:
+                raise RuntimeError(
+                    "backup rollback preimages could not be preserved"
+                )
+            recoveries = preserved
+        else:
+            recoveries = self._require_exact_recoveries(
+                recoveries,
+                context="backup rollback preflight",
+            )
 
         for mutation in reversed(mutations):
             try:
@@ -880,7 +969,15 @@ class HwpxOps:
                     mutation.publication
                 )
             except (FileNotFoundError, OSError, RuntimeError):
+                recoveries = self._require_exact_recoveries(
+                    recoveries,
+                    context="backup rollback ownership failure",
+                )
                 continue
+            recoveries = self._require_exact_recoveries(
+                recoveries,
+                context="backup rollback mutation preflight",
+            )
             try:
                 if mutation.before_bytes is None:
                     self.storage.remove_guarded_output(mutation.publication)
@@ -892,9 +989,12 @@ class HwpxOps:
                     )
             except (FileNotFoundError, OSError, RuntimeError):
                 # An external replacement that wins the CAS belongs to the
-                # external writer. Every original preimage was preserved
-                # before rollback began, so no later destructive step can
-                # erase the last recoverable generation.
+                # external writer. Re-establish every immutable preimage before
+                # considering any later rollback mutation.
+                recoveries = self._require_exact_recoveries(
+                    recoveries,
+                    context="backup rollback mutation failure",
+                )
                 continue
 
     def _decode_image_base64(self, image_base64: str) -> bytes:
@@ -1153,12 +1253,19 @@ class HwpxOps:
             raise RuntimeError("undo preimages could not be preserved")
         target_publication: WorkspaceOutputGuard | None = None
         backup_publication: WorkspaceOutputGuard | None = None
-        rollback_recoveries_ready = True
         try:
+            recoveries = self._require_exact_recoveries(
+                recoveries,
+                context="undo target publish preflight",
+            )
             target_publication = self.storage.atomic_publish_bytes(
                 target_guard,
                 backup_before,
                 mode=backup_guard.target_mode,
+            )
+            recoveries = self._require_exact_recoveries(
+                recoveries,
+                context="undo backup publish preflight",
             )
             backup_publication = self.storage.atomic_publish_bytes(
                 backup_guard,
@@ -1186,9 +1293,7 @@ class HwpxOps:
                 "openSafety": verification.get("openSafety"),
                 "semanticDiff": diff,
             }
-            cleaned, rollback_recoveries_ready = (
-                self._cleanup_exact_recoveries(recoveries)
-            )
+            cleaned, _ = self._cleanup_exact_recoveries(recoveries)
             if not cleaned:
                 raise RuntimeError(
                     "undo recovery cleanup lost its exact claim"
@@ -1197,24 +1302,34 @@ class HwpxOps:
                 self.storage.read_guarded_bytes(target_publication)
                 self.storage.read_guarded_bytes(backup_publication)
             except (FileNotFoundError, OSError, RuntimeError):
-                rollback_recoveries_ready = (
-                    self._republish_exact_recoveries(recoveries)
+                recoveries = self._require_exact_recoveries(
+                    recoveries,
+                    context="undo final publication claim failure",
                 )
                 raise
             return payload
         except BaseException:
-            if not rollback_recoveries_ready:
-                raise
+            recoveries = self._require_exact_recoveries(
+                recoveries,
+                context="undo failure",
+            )
             if target_publication is not None and backup_publication is None:
                 try:
                     self.storage.read_guarded_bytes(target_publication)
+                    recoveries = self._require_exact_recoveries(
+                        recoveries,
+                        context="undo single-publication rollback preflight",
+                    )
                     self.storage.atomic_publish_bytes(
                         target_publication,
                         target_before,
                         mode=target_guard.target_mode,
                     )
                 except (FileNotFoundError, OSError, RuntimeError):
-                    pass
+                    recoveries = self._require_exact_recoveries(
+                        recoveries,
+                        context="undo single-publication rollback failure",
+                    )
                 raise
             target_owned = False
             backup_owned = False
@@ -1223,22 +1338,36 @@ class HwpxOps:
                     self.storage.read_guarded_bytes(target_publication)
                     target_owned = True
                 except (FileNotFoundError, OSError, RuntimeError):
-                    pass
+                    recoveries = self._require_exact_recoveries(
+                        recoveries,
+                        context="undo target ownership failure",
+                    )
             if backup_publication is not None:
                 try:
                     self.storage.read_guarded_bytes(backup_publication)
                     backup_owned = True
                 except (FileNotFoundError, OSError, RuntimeError):
-                    pass
+                    recoveries = self._require_exact_recoveries(
+                        recoveries,
+                        context="undo backup ownership failure",
+                    )
             # Roll back only while both swap candidates are still ours. The
             # A/B recovery sidecars above remain available regardless of how
             # either publication changes during the following writes.
             if target_owned and backup_owned:
                 try:
+                    recoveries = self._require_exact_recoveries(
+                        recoveries,
+                        context="undo target rollback preflight",
+                    )
                     self.storage.atomic_publish_bytes(
                         target_publication,
                         target_before,
                         mode=target_guard.target_mode,
+                    )
+                    recoveries = self._require_exact_recoveries(
+                        recoveries,
+                        context="undo backup rollback preflight",
                     )
                     self.storage.atomic_publish_bytes(
                         backup_publication,
@@ -1248,7 +1377,10 @@ class HwpxOps:
                 except (FileNotFoundError, OSError, RuntimeError):
                     # The exact A/B recovery sidecars are intentionally retained
                     # on every failure path, including cross-step CAS loss.
-                    pass
+                    recoveries = self._require_exact_recoveries(
+                        recoveries,
+                        context="undo rollback failure",
+                    )
             raise
 
     def _iter_paragraphs(self, document: HwpxDocument) -> List[HwpxOxmlParagraph]:
@@ -2740,13 +2872,17 @@ class HwpxOps:
         publication: WorkspaceOutputGuard | None = None
         exact_backup: _ExactBackupResult | None = None
         materialized_guard: WorkspaceOutputGuard | None = None
-        rollback_recoveries_ready = True
+        all_recoveries = target_recoveries
         try:
             if output_precondition is not None:
                 local_guard = self.storage.materialize_output_guard(
                     output_precondition
                 )
                 materialized_guard = local_guard
+                all_recoveries = self._require_exact_recoveries(
+                    all_recoveries,
+                    context="byte patch backup preflight",
+                )
                 # Preserve the retained public backup contract, but bind the
                 # sidecar to the exact preimage captured with the output guard.
                 exact_backup = self._rotate_and_backup_exact(
@@ -2755,6 +2891,13 @@ class HwpxOps:
                     target_bytes=target_before,
                 )
                 backup = exact_backup.report
+                all_recoveries = (
+                    all_recoveries + exact_backup.recoveries
+                )
+                all_recoveries = self._require_exact_recoveries(
+                    all_recoveries,
+                    context="byte patch publish preflight",
+                )
                 publication = self.storage.atomic_publish_bytes(
                     local_guard,
                     candidate_bytes,
@@ -2802,12 +2945,7 @@ class HwpxOps:
                         mutation.publication
                     )
                 self.storage.read_guarded_bytes(publication)
-            all_recoveries = target_recoveries + (
-                exact_backup.recoveries if exact_backup is not None else ()
-            )
-            cleaned, rollback_recoveries_ready = (
-                self._cleanup_exact_recoveries(all_recoveries)
-            )
+            cleaned, _ = self._cleanup_exact_recoveries(all_recoveries)
             if not cleaned:
                 raise RuntimeError(
                     "byte patch recovery cleanup lost its exact claim"
@@ -2820,17 +2958,22 @@ class HwpxOps:
                         )
                     self.storage.read_guarded_bytes(publication)
             except (FileNotFoundError, OSError, RuntimeError):
-                rollback_recoveries_ready = (
-                    self._republish_exact_recoveries(all_recoveries)
+                all_recoveries = self._require_exact_recoveries(
+                    all_recoveries,
+                    context="byte patch final publication claim failure",
                 )
                 raise
         except BaseException:
-            target_preimage_preserved = (
-                target_before is None
-                or rollback_recoveries_ready
+            all_recoveries = self._require_exact_recoveries(
+                all_recoveries,
+                context="byte patch failure",
             )
-            if target_preimage_preserved and publication is not None:
+            if publication is not None:
                 try:
+                    all_recoveries = self._require_exact_recoveries(
+                        all_recoveries,
+                        context="byte patch target rollback preflight",
+                    )
                     if local_guard is not None and local_guard.target_existed:
                         if target_before is not None:
                             restored_publication = self.storage.atomic_publish_bytes(
@@ -2844,11 +2987,14 @@ class HwpxOps:
                     else:
                         self.storage.remove_guarded_output(publication)
                 except (OSError, RuntimeError):
-                    pass
-            if exact_backup is not None and target_preimage_preserved:
+                    all_recoveries = self._require_exact_recoveries(
+                        all_recoveries,
+                        context="byte patch target rollback failure",
+                    )
+            if exact_backup is not None:
                 self._rollback_exact_backup_mutations(
                     exact_backup.mutations,
-                    preimages_preserved=rollback_recoveries_ready,
+                    recoveries=all_recoveries,
                 )
             if materialized_guard is not None:
                 self.storage.cleanup_owned_parent_directories(

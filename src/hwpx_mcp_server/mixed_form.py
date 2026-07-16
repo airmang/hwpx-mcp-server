@@ -518,6 +518,12 @@ def _publish_exact_failure_recovery(
                 raise RuntimeError(
                     "mixed-form recovery sidecar differs from the output preimage"
                 )
+            # Re-enter the publication claim before returning it. A caller
+            # must still revalidate the token after this helper returns.
+            if workspace.read_guarded_bytes(publication) != data:
+                raise RuntimeError(
+                    "mixed-form recovery sidecar changed after publication"
+                )
         except (
             WorkspacePathError,
             FileNotFoundError,
@@ -552,19 +558,36 @@ class _FailurePreimagePreserver:
     def reserve(self) -> WorkspaceOutputGuard | None:
         if self.data is None:
             return None
-        if self.publication is not None:
+        for _ in range(64):
+            publication = self.publication
+            if publication is None:
+                publication = _publish_exact_failure_recovery(
+                    self.workspace,
+                    self.output,
+                    self.data,
+                    mode=self.mode,
+                )
+                self.publication = publication
             try:
-                if self.workspace.read_guarded_bytes(self.publication) == self.data:
-                    return self.publication
+                if self.workspace.read_guarded_bytes(publication) != self.data:
+                    raise RuntimeError(
+                        "mixed-form recovery sidecar differs from its preimage"
+                    )
+                # A helper-return or first-read race is observable only on a
+                # subsequent guarded read. Never return a token after a single
+                # successful claim check.
+                if self.workspace.read_guarded_bytes(publication) != self.data:
+                    raise RuntimeError(
+                        "mixed-form recovery sidecar changed before mutation"
+                    )
             except (OSError, RuntimeError):
                 self.publication = None
-        self.publication = _publish_exact_failure_recovery(
-            self.workspace,
-            self.output,
-            self.data,
-            mode=self.mode,
+                continue
+            return publication
+        raise RuntimeError(
+            f"mixed-form recovery claim could not be re-established for "
+            f"{self.output.name}"
         )
-        return self.publication
 
     def preserve(self) -> WorkspaceOutputGuard | None:
         return self.reserve()
@@ -1457,6 +1480,8 @@ def _restore_owned_candidate(
             if output_existed:
                 if output_before is None:  # pragma: no cover - snapshot invariant
                     return False
+                if failure_preimage is not None:
+                    failure_preimage.preserve()
                 workspace.atomic_publish_bytes(
                     publication,
                     output_before,
@@ -1465,7 +1490,11 @@ def _restore_owned_candidate(
             else:
                 workspace.remove_output(publication)
         except (OSError, RuntimeError):
+            if failure_preimage is not None:
+                failure_preimage.preserve()
             return False
+        if failure_preimage is not None:
+            failure_preimage.preserve()
         if not output_existed:
             return workspace.cleanup_owned_parent_directories(publication)
         return True
@@ -2243,11 +2272,29 @@ def _verify_canonical_mixed_form_plan_locked(
                     "errorCode": type(exc).__name__,
                 }
             )
+    if (
+        not require
+        and real_hancom.get("renderChecked") is not True
+        and real_hancom.get("status") != "failed"
+    ):
+        # Optional visual verification is advisory. A fully installed visual
+        # stack can report ``ok=false`` when the external Hancom oracle itself
+        # is unavailable, while a base install raises and reaches the explicit
+        # unavailable branch above. Normalize both environments to the same
+        # honest unverified state; only observed render failures or internal
+        # snapshot-cleanup failures may fail structural verification.
+        real_hancom = {
+            **real_hancom,
+            "ok": None,
+            "status": "unavailable",
+            "renderChecked": False,
+        }
     core_verification["realHancom"] = real_hancom
     values_ok = bool(checks) and all(bool(item.get("ok")) for item in checks)
     render_observed = real_hancom.get("renderChecked") is True
     render_failed = bool(
-        real_hancom.get("ok") is False or real_hancom.get("status") == "failed"
+        (render_observed and real_hancom.get("ok") is False)
+        or real_hancom.get("status") == "failed"
     )
     render_ok = (
         bool(real_hancom.get("ok"))
@@ -2697,6 +2744,7 @@ def _run_specialized_form_operation_locked(
             if output_before.existed:
                 if output_before.data is None:  # pragma: no cover - invariant
                     return False
+                failure_preimage.preserve()
                 workspace.atomic_publish_bytes(
                     publication,
                     output_before.data,
@@ -2705,7 +2753,9 @@ def _run_specialized_form_operation_locked(
             else:
                 workspace.remove_output(publication)
         except (OSError, RuntimeError):
+            failure_preimage.preserve()
             return False
+        failure_preimage.preserve()
         if not output_before.existed:
             return workspace.cleanup_owned_parent_directories(publication)
         return True
