@@ -13,8 +13,9 @@ import copy
 import functools
 import inspect
 from dataclasses import dataclass
-from typing import Annotated, Any, Callable, Mapping, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, Callable, Mapping, get_args, get_origin
 
+import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
 from pydantic import TypeAdapter
 
@@ -90,13 +91,35 @@ def normalize_schema(schema: Mapping[str, Any] | None, *, input_schema: bool) ->
     return normalized
 
 
+def _resolved_annotations(func: Callable[..., Any]) -> dict[str, Any]:
+    """Resolve annotations without Python 3.10's implicit Optional rewrite."""
+
+    candidates: list[Callable[..., Any]] = []
+    seen: set[int] = set()
+    current = func
+    while callable(current) and id(current) not in seen:
+        seen.add(id(current))
+        candidates.append(current)
+        nested = getattr(current, "__hwpx_original_callable__", current)
+        if nested is current:
+            break
+        current = nested
+    for candidate in candidates:
+        try:
+            return dict(inspect.get_annotations(candidate, eval_str=True))
+        except (NameError, TypeError, ValueError):
+            continue
+    for candidate in reversed(candidates):
+        raw = getattr(candidate, "__annotations__", None)
+        if isinstance(raw, Mapping):
+            return dict(raw)
+    return {}
+
+
 def _resolved_return_annotation(func: Callable[..., Any]) -> Any:
-    try:
-        return get_type_hints(func, include_extras=True).get(
-            "return", inspect.Signature.empty
-        )
-    except (NameError, TypeError):
-        return inspect.signature(func).return_annotation
+    return _resolved_annotations(func).get(
+        "return", inspect.signature(func).return_annotation
+    )
 
 
 def _annotation_schema_extra(annotation: Any) -> dict[str, Any]:
@@ -129,10 +152,7 @@ def _restore_parameter_schema_extras(
     properties = restored.get("properties")
     if not isinstance(properties, dict):
         return restored
-    try:
-        hints = get_type_hints(func, include_extras=True)
-    except (NameError, TypeError):
-        hints = dict(getattr(func, "__annotations__", {}))
+    hints = _resolved_annotations(func)
     for name, annotation in hints.items():
         if name == "return" or name not in properties:
             continue
@@ -145,18 +165,94 @@ def _restore_parameter_schema_extras(
     return restored
 
 
+def _normalize_implicit_none_parameters(
+    schema: Mapping[str, Any] | None,
+    func: Callable[..., Any],
+) -> dict[str, Any]:
+    """Remove Python-version-specific implicit nullability.
+
+    A number of legacy callables use ``value: T = None`` without declaring
+    ``T | None``. Pydantic emits different schemas for that invalid typing
+    pattern on Python 3.10 and newer interpreters. The public contract follows
+    the explicit annotation: omitted arguments may still receive their default,
+    but an explicitly supplied JSON ``null`` is accepted only when the
+    annotation itself includes ``None``. Catalog-owned schema extras are
+    restored after this normalization and therefore remain authoritative.
+    """
+
+    normalized = copy.deepcopy(dict(schema or {}))
+    properties = normalized.get("properties")
+    if not isinstance(properties, dict):
+        return normalized
+    source = original_callable(func)
+    try:
+        # Unlike get_type_hints(), inspect.get_annotations() does not rewrite
+        # ``T = None`` into Optional[T] on Python 3.10. That distinction is the
+        # exact source declaration this normalization must preserve.
+        hints = inspect.get_annotations(source, eval_str=True)
+    except (NameError, TypeError, ValueError):
+        hints = dict(getattr(source, "__annotations__", {}))
+    try:
+        signature = inspect.signature(source)
+    except (TypeError, ValueError):  # pragma: no cover - binding checks first
+        return normalized
+
+    for name, parameter in signature.parameters.items():
+        if parameter.default is not None or name not in properties:
+            continue
+        annotation = hints.get(name, parameter.annotation)
+        while get_origin(annotation) is Annotated:
+            annotation = get_args(annotation)[0]
+        annotation_args = get_args(annotation)
+        if isinstance(annotation, str) and (
+            "None" in annotation or "Optional" in annotation
+        ):
+            continue
+        if (
+            annotation is None
+            or annotation is type(None)
+            or None in annotation_args
+            or type(None) in annotation_args
+        ):
+            continue
+        property_schema = properties[name]
+        if not isinstance(property_schema, dict):
+            continue
+        options = property_schema.get("anyOf")
+        if not isinstance(options, list):
+            continue
+        retained = [
+            option
+            for option in options
+            if not (isinstance(option, Mapping) and option.get("type") == "null")
+        ]
+        if len(retained) == len(options) or not retained:
+            continue
+        siblings = {
+            key: value for key, value in property_schema.items() if key != "anyOf"
+        }
+        if len(retained) == 1 and isinstance(retained[0], Mapping):
+            properties[name] = {**copy.deepcopy(dict(retained[0])), **siblings}
+        else:
+            properties[name] = {**siblings, "anyOf": retained}
+    return normalize_schema(normalized, input_schema=True)
+
+
 def _registration_callable(func: Callable[..., Any]) -> tuple[Callable[..., Any], bool]:
     """Normalize bare ``dict`` returns for structured output without altering API functions."""
 
-    try:
-        # ``include_extras`` is contract-critical: the core agent catalog binds
-        # its closed command/blueprint schemas through Annotated[...,
-        # Field(json_schema_extra=...)]. Stripping those extras would silently
-        # widen FastMCP inputs to generic dicts.
-        resolved_hints = get_type_hints(func, include_extras=True)
-    except (NameError, TypeError):
-        resolved_hints = dict(getattr(func, "__annotations__", {}))
+    # Annotated metadata is contract-critical: the core agent catalog binds its
+    # closed command/blueprint schemas through Field(json_schema_extra=...).
+    resolved_hints = _resolved_annotations(func)
     return_annotation = resolved_hints.get("return", inspect.signature(func).return_annotation)
+    call_result, call_result_model = _call_tool_result_output_model(return_annotation)
+    if call_result:
+        if call_result_model is None:
+            raise FastMcpAdapterError(
+                "CallToolResult returns require Annotated[CallToolResult, OutputModel] "
+                "so outputSchema validates structuredContent"
+            )
+        return func, True
     if return_annotation is not dict:
         return func, return_annotation is not inspect.Signature.empty and return_annotation is not Any
 
@@ -180,6 +276,23 @@ def _registration_callable(func: Callable[..., Any]) -> tuple[Callable[..., Any]
     return structured_wrapper, True
 
 
+def _call_tool_result_output_model(annotation: Any) -> tuple[bool, Any | None]:
+    """Return whether *annotation* is CallToolResult and its owned output model."""
+
+    metadata: tuple[Any, ...] = ()
+    base = annotation
+    if get_origin(annotation) is Annotated:
+        base, *nested_metadata = get_args(annotation)
+        metadata = tuple(nested_metadata)
+    try:
+        is_call_result = isinstance(base, type) and issubclass(
+            base, mcp_types.CallToolResult
+        )
+    except TypeError:  # pragma: no cover - defensive for exotic annotations
+        is_call_result = False
+    return is_call_result, metadata[0] if is_call_result and metadata else None
+
+
 def _serialize_mutation_callable(
     func: Callable[..., Any],
     *,
@@ -200,10 +313,7 @@ def _serialize_mutation_callable(
     # strings verbatim makes FastMCP try to resolve e.g. ``mcp_types`` here and
     # can incorrectly treat CallToolResult as structured output.  Bind the
     # already-resolved objects onto both the signature and annotations.
-    try:
-        resolved_hints = get_type_hints(func, include_extras=True)
-    except (NameError, TypeError):
-        resolved_hints = dict(getattr(func, "__annotations__", {}))
+    resolved_hints = _resolved_annotations(func)
     original_signature = inspect.signature(func)
     serialized.__signature__ = original_signature.replace(  # type: ignore[attr-defined]
         parameters=[
@@ -269,7 +379,7 @@ def _register(
         kwargs["meta"] = dict(meta)
     if "structured_output" not in parameters:
         raise FastMcpAdapterError(
-            "FastMCP.tool lacks structured_output; mcp>=1.14.1 is required"
+            "FastMCP.tool lacks structured_output; mcp>=1.28.1,<1.29 is required"
         )
     kwargs["structured_output"] = structured_output
     tool_method(**kwargs)(adapted)
@@ -280,21 +390,40 @@ def _register(
     input_json = normalize_schema(
         getattr(tool, "parameters", None), input_schema=True
     )
+    input_json = _normalize_implicit_none_parameters(input_json, func)
     # Overlay catalog fragments after normalization so their original array
     # order and intentional open-object semantics remain exact.
     input_json = _restore_parameter_schema_extras(input_json, func)
     raw_output = getattr(tool, "output_schema", None)
     if raw_output is None:
-        return_annotation = _resolved_return_annotation(func)
-        try:
-            raw_output = TypeAdapter(return_annotation).json_schema()
-        except Exception as exc:  # pragma: no cover - every public tool is annotated
-            raise FastMcpAdapterError(f"cannot derive output schema for {name!r}: {exc}") from exc
+        raise FastMcpAdapterError(
+            f"FastMCP did not publish an output schema for {name!r}"
+        )
     output_json = normalize_schema(raw_output, input_schema=False)
 
+    call_result, call_result_model = _call_tool_result_output_model(
+        _resolved_return_annotation(func)
+    )
+    if call_result:
+        assert call_result_model is not None  # guarded by _registration_callable
+        try:
+            expected_output = normalize_schema(
+                TypeAdapter(call_result_model).json_schema(),
+                input_schema=False,
+            )
+        except Exception as exc:
+            raise FastMcpAdapterError(
+                f"cannot derive structuredContent schema for {name!r}: {exc}"
+            ) from exc
+        if output_json != expected_output:
+            raise FastMcpAdapterError(
+                f"FastMCP did not honor the Annotated CallToolResult output model "
+                f"for {name!r}; mcp>=1.28.1,<1.29 is required"
+            )
+
     # Make the live MCP schema byte-for-byte comparable with the canonical
-    # registry.  Non-structured CallToolResult functions keep FastMCP's None
-    # output schema because the SDK handles those result objects specially.
+    # registry. CallToolResult tools advertise their source-owned structured
+    # content model, never the outer MCP response envelope.
     tool.parameters = input_json
     if structured_output:
         tool.output_schema = output_json
@@ -351,13 +480,13 @@ def registered_tool_snapshots(mcp: Any) -> dict[str, FastMcpToolSnapshot]:
             raise FastMcpAdapterError(f"registered tool {name!r} has no callable")
         raw_output = getattr(tool, "output_schema", None)
         if raw_output is None:
-            try:
-                raw_output = TypeAdapter(_resolved_return_annotation(func)).json_schema()
-            except Exception as exc:
-                raise FastMcpAdapterError(f"cannot derive live output schema for {name!r}: {exc}") from exc
+            raise FastMcpAdapterError(
+                f"registered tool {name!r} has no output schema"
+            )
         input_schema = normalize_schema(
             getattr(tool, "parameters", None), input_schema=True
         )
+        input_schema = _normalize_implicit_none_parameters(input_schema, func)
         input_schema = _restore_parameter_schema_extras(input_schema, func)
         snapshots[name] = FastMcpToolSnapshot(
             name=name,

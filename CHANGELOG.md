@@ -13,14 +13,21 @@
   lifecycle/replacement metadata, and a narrow FastMCP adapter boundary.
 
 ### Changed
-- Requires `python-hwpx>=3.1.0`. One ordered `ToolSpec` registry now validates
+- Requires `python-hwpx>=3.1.0`, `mcp>=1.28.1,<1.29`, and `pydantic>=2.11,<3`.
+  One ordered `ToolSpec` registry now validates
   registration, callables, signatures, schemas, profiles, health/capabilities,
   generated documentation, and the plugin contract.
 - The transition surface is 121 default / 132 advanced tools with contract hash
-  `71661f4118e020c4`. Existing `hwpx.formfill.v1`, evalplan, native-field, and exam
+  `f46ec677231b3a20`. Existing `hwpx.formfill.v1`, evalplan, native-field, and exam
   behavior remains explicit; five older planner tools are deprecated for one transition.
 
 ### Fixed
+- Publishes and validates the source-owned `render_preview` manifest schema as
+  `CallToolResult.structuredContent` while preserving inline image content blocks,
+  instead of incorrectly advertising the outer MCP response envelope.
+- Resolves postponed annotations without Python 3.10's implicit-`Optional`
+  rewrite, keeping advertised input schemas and live argument validation identical
+  across supported Python versions.
 - Pre-reserves exact, randomly named recovery sidecars before transactional form and
   byte-preserving writes. Successful writes remove them after final identity checks;
   failed or raced writes retain the immutable preimages without overwriting an external
