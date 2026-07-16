@@ -2110,6 +2110,88 @@ def test_canonical_rollback_claim_loss_keeps_external_and_recovery_preimage(
     assert recoveries[0].read_bytes() == output_before
 
 
+def test_canonical_republishes_post_return_recovery_after_rollback_claim_loss(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "canonical-source.hwpx"
+    output = tmp_path / "canonical-output.hwpx"
+    external = tmp_path / "canonical-external.hwpx"
+    _build_fixture(source)
+    output_before = b"canonical-generation-A"
+    output.write_bytes(output_before)
+    external_bytes = b"canonical-external-generation-C"
+    external.write_bytes(external_bytes)
+    original_apply = mixed_form_adapter.apply_mixed_form_plan
+    original_read = workspace_module.WorkspaceResolver.read_guarded_bytes
+    original_publish = workspace_module.WorkspaceResolver.atomic_publish_bytes
+    recovery_reads = 0
+    output_publications = 0
+
+    def apply_then_raise(*args: Any, **kwargs: Any) -> Any:
+        original_apply(*args, **kwargs)
+        raise RuntimeError("forced adapter failure after canonical publication")
+
+    def replace_recovery_after_third_read(
+        self: workspace_module.WorkspaceResolver,
+        guard: workspace_module.WorkspaceOutputGuard,
+    ) -> bytes:
+        nonlocal recovery_reads
+        data = original_read(self, guard)
+        if guard.path.name.startswith(".hwpx-mixed-form-recovery-"):
+            recovery_reads += 1
+            if recovery_reads == 3:
+                staging = guard.path.with_name(guard.path.name + ".external")
+                staging.write_bytes(b"external recovery owner")
+                os.replace(staging, guard.path)
+        return data
+
+    def replace_output_after_rollback_publish(
+        self: workspace_module.WorkspaceResolver,
+        guard: workspace_module.WorkspaceOutputGuard,
+        data: bytes,
+        *,
+        mode: int | None = None,
+    ) -> workspace_module.WorkspaceOutputGuard:
+        nonlocal output_publications
+        publication = original_publish(self, guard, data, mode=mode)
+        if guard.path == output:
+            output_publications += 1
+            if output_publications == 2:
+                os.replace(external, output)
+                raise workspace_module.WorkspacePathError(
+                    "forced canonical rollback claim loss",
+                    code="WORKSPACE_PATH_CHANGED",
+                    reason="output_target_changed",
+                )
+        return publication
+
+    monkeypatch.setattr(mixed_form_adapter, "apply_mixed_form_plan", apply_then_raise)
+    monkeypatch.setattr(
+        workspace_module.WorkspaceResolver,
+        "read_guarded_bytes",
+        replace_recovery_after_third_read,
+    )
+    monkeypatch.setattr(
+        workspace_module.WorkspaceResolver,
+        "atomic_publish_bytes",
+        replace_output_after_rollback_publish,
+    )
+
+    with pytest.raises(RuntimeError, match="adapter failure"):
+        server.apply_form_fill(
+            plan=_plan(source, output, key="post-return-canonical")
+        )
+
+    assert recovery_reads > 3
+    assert output_publications == 2
+    assert output.read_bytes() == external_bytes
+    assert any(
+        path.read_bytes() == output_before
+        for path in _failure_recoveries(output)
+    )
+
+
 def test_canonical_post_cleanup_claim_loss_recreates_random_recovery(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2462,6 +2544,91 @@ def test_specialized_rollback_claim_loss_keeps_external_and_recovery_preimage(
     recoveries = _failure_recoveries(output)
     assert len(recoveries) == 1
     assert recoveries[0].read_bytes() == output_before
+
+
+def test_specialized_republishes_post_return_recovery_after_callback_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "specialized-source.hwpx"
+    output = tmp_path / "specialized-output.hwpx"
+    external = tmp_path / "specialized-external.hwpx"
+    _build_fixture(source)
+    output_before = b"specialized-generation-A"
+    output.write_bytes(output_before)
+    external_bytes = b"specialized-external-generation-C"
+    external.write_bytes(external_bytes)
+    original_read = workspace_module.WorkspaceResolver.read_guarded_bytes
+    original_publish = workspace_module.WorkspaceResolver.atomic_publish_bytes
+    recovery_reads = 0
+    output_publications = 0
+
+    def publish_then_raise(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        publication = (
+            workspace_module.WorkspaceResolver.from_environment().atomic_publish_bytes(
+                kwargs["output_guard"],
+                source.read_bytes(),
+            )
+        )
+        kwargs["publication_sink"](publication)
+        raise RuntimeError("forced specialized callback failure")
+
+    def replace_recovery_after_third_read(
+        self: workspace_module.WorkspaceResolver,
+        guard: workspace_module.WorkspaceOutputGuard,
+    ) -> bytes:
+        nonlocal recovery_reads
+        data = original_read(self, guard)
+        if guard.path.name.startswith(".hwpx-mixed-form-recovery-"):
+            recovery_reads += 1
+            if recovery_reads == 3:
+                staging = guard.path.with_name(guard.path.name + ".external")
+                staging.write_bytes(b"external recovery owner")
+                os.replace(staging, guard.path)
+        return data
+
+    def replace_output_after_rollback_publish(
+        self: workspace_module.WorkspaceResolver,
+        guard: workspace_module.WorkspaceOutputGuard,
+        data: bytes,
+        *,
+        mode: int | None = None,
+    ) -> workspace_module.WorkspaceOutputGuard:
+        nonlocal output_publications
+        publication = original_publish(self, guard, data, mode=mode)
+        if guard.path == output:
+            output_publications += 1
+            if output_publications == 2:
+                os.replace(external, output)
+                raise workspace_module.WorkspacePathError(
+                    "forced specialized rollback claim loss",
+                    code="WORKSPACE_PATH_CHANGED",
+                    reason="output_target_changed",
+                )
+        return publication
+
+    monkeypatch.setattr(server._OPS, "apply_table_ops", publish_then_raise)
+    monkeypatch.setattr(
+        workspace_module.WorkspaceResolver,
+        "read_guarded_bytes",
+        replace_recovery_after_third_read,
+    )
+    monkeypatch.setattr(
+        workspace_module.WorkspaceResolver,
+        "atomic_publish_bytes",
+        replace_output_after_rollback_publish,
+    )
+
+    with pytest.raises(RuntimeError, match="callback failure"):
+        server.apply_table_ops(str(source), [], output=str(output))
+
+    assert recovery_reads > 3
+    assert output_publications == 2
+    assert output.read_bytes() == external_bytes
+    assert any(
+        path.read_bytes() == output_before
+        for path in _failure_recoveries(output)
+    )
 
 
 def test_successful_mixed_form_mutations_do_not_create_recovery_sidecars(

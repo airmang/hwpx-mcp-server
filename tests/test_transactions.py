@@ -590,6 +590,54 @@ def test_undo_recovery_preflight_failure_does_not_mutate_swap_pair(
     assert backup.read_bytes() == backup_before
 
 
+def test_undo_post_return_recovery_replacement_fails_before_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "undo-post-return-recovery-loss.hwpx"
+    create_document(str(target))
+    add_paragraph(str(target), "generation B")
+    add_paragraph(str(target), "generation A")
+    backup = target.with_suffix(target.suffix + ".bak")
+    target_before = target.read_bytes()
+    backup_before = backup.read_bytes()
+    storage = server_module._OPS.storage
+    original_read = storage.read_guarded_bytes
+    original_publish = storage.atomic_publish_bytes
+    poisoned: set[Path] = set()
+    target_publish_attempted = False
+
+    def replace_each_recovery_after_helper_read(guard):
+        data = original_read(guard)
+        if ".undo-recovery." in guard.path.name and guard.path not in poisoned:
+            poisoned.add(guard.path)
+            staging = guard.path.with_name(guard.path.name + ".external")
+            staging.write_bytes(b"external recovery owner")
+            os.replace(staging, guard.path)
+        return data
+
+    def track_target_publish(guard, data, **kwargs):
+        nonlocal target_publish_attempted
+        if guard.path == target:
+            target_publish_attempted = True
+        return original_publish(guard, data, **kwargs)
+
+    monkeypatch.setattr(
+        storage,
+        "read_guarded_bytes",
+        replace_each_recovery_after_helper_read,
+    )
+    monkeypatch.setattr(storage, "atomic_publish_bytes", track_target_publish)
+
+    with pytest.raises(RuntimeError, match="could not be preserved"):
+        undo_last_edit(str(target))
+
+    assert poisoned
+    assert target_publish_attempted is False
+    assert target.read_bytes() == target_before
+    assert backup.read_bytes() == backup_before
+
+
 def test_undo_post_cleanup_claim_loss_republishes_a_b_before_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
