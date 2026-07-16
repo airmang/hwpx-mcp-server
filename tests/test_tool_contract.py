@@ -262,12 +262,14 @@ def test_form_tool_outputs_publish_typed_receipts_in_live_contract() -> None:
     }
     for schema in outputs.values():
         Draft202012Validator.check_schema(schema)
+        assert schema["type"] == "object"
         assert not (
             schema.get("additionalProperties") is True
             and schema.get("properties") == {}
         )
 
     analyze = outputs["analyze_form_fill"]
+    assert analyze["type"] == "object"
     assert len(analyze["anyOf"]) == 2
     assert analyze["$defs"]["CanonicalMixedFormAnalysisOutput"][
         "additionalProperties"
@@ -277,6 +279,7 @@ def test_form_tool_outputs_publish_typed_receipts_in_live_contract() -> None:
     ] is True
 
     apply = outputs["apply_form_fill"]
+    assert apply["type"] == "object"
     assert len(apply["anyOf"]) == 2
     canonical_apply = apply["$defs"]["CanonicalMixedFormApplyOutput"]
     assert canonical_apply["additionalProperties"] is False
@@ -291,6 +294,7 @@ def test_form_tool_outputs_publish_typed_receipts_in_live_contract() -> None:
     ] is False
 
     verify = outputs["verify_form_fill"]
+    assert verify["type"] == "object"
     assert len(verify["anyOf"]) == 2
     assert verify["$defs"]["FormVerificationReceipt"][
         "additionalProperties"
