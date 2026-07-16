@@ -518,12 +518,6 @@ def _publish_exact_failure_recovery(
                 raise RuntimeError(
                     "mixed-form recovery sidecar differs from the output preimage"
                 )
-            # Re-enter the publication claim before returning it. A caller
-            # must still revalidate the token after this helper returns.
-            if workspace.read_guarded_bytes(publication) != data:
-                raise RuntimeError(
-                    "mixed-form recovery sidecar changed after publication"
-                )
         except (
             WorkspacePathError,
             FileNotFoundError,
@@ -558,36 +552,19 @@ class _FailurePreimagePreserver:
     def reserve(self) -> WorkspaceOutputGuard | None:
         if self.data is None:
             return None
-        for _ in range(64):
-            publication = self.publication
-            if publication is None:
-                publication = _publish_exact_failure_recovery(
-                    self.workspace,
-                    self.output,
-                    self.data,
-                    mode=self.mode,
-                )
-                self.publication = publication
+        if self.publication is not None:
             try:
-                if self.workspace.read_guarded_bytes(publication) != self.data:
-                    raise RuntimeError(
-                        "mixed-form recovery sidecar differs from its preimage"
-                    )
-                # A helper-return or first-read race is observable only on a
-                # subsequent guarded read. Never return a token after a single
-                # successful claim check.
-                if self.workspace.read_guarded_bytes(publication) != self.data:
-                    raise RuntimeError(
-                        "mixed-form recovery sidecar changed before mutation"
-                    )
+                if self.workspace.read_guarded_bytes(self.publication) == self.data:
+                    return self.publication
             except (OSError, RuntimeError):
                 self.publication = None
-                continue
-            return publication
-        raise RuntimeError(
-            f"mixed-form recovery claim could not be re-established for "
-            f"{self.output.name}"
+        self.publication = _publish_exact_failure_recovery(
+            self.workspace,
+            self.output,
+            self.data,
+            mode=self.mode,
         )
+        return self.publication
 
     def preserve(self) -> WorkspaceOutputGuard | None:
         return self.reserve()
@@ -1480,8 +1457,6 @@ def _restore_owned_candidate(
             if output_existed:
                 if output_before is None:  # pragma: no cover - snapshot invariant
                     return False
-                if failure_preimage is not None:
-                    failure_preimage.preserve()
                 workspace.atomic_publish_bytes(
                     publication,
                     output_before,
@@ -1490,11 +1465,7 @@ def _restore_owned_candidate(
             else:
                 workspace.remove_output(publication)
         except (OSError, RuntimeError):
-            if failure_preimage is not None:
-                failure_preimage.preserve()
             return False
-        if failure_preimage is not None:
-            failure_preimage.preserve()
         if not output_existed:
             return workspace.cleanup_owned_parent_directories(publication)
         return True
@@ -2726,7 +2697,6 @@ def _run_specialized_form_operation_locked(
             if output_before.existed:
                 if output_before.data is None:  # pragma: no cover - invariant
                     return False
-                failure_preimage.preserve()
                 workspace.atomic_publish_bytes(
                     publication,
                     output_before.data,
@@ -2735,9 +2705,7 @@ def _run_specialized_form_operation_locked(
             else:
                 workspace.remove_output(publication)
         except (OSError, RuntimeError):
-            failure_preimage.preserve()
             return False
-        failure_preimage.preserve()
         if not output_before.existed:
             return workspace.cleanup_owned_parent_directories(publication)
         return True
