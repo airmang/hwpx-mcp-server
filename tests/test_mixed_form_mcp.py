@@ -13,8 +13,11 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+import mcp.types as mcp_types
 import pytest
 from jsonschema import Draft202012Validator
+from mcp.shared.exceptions import McpError
+from mcp.shared.memory import create_connected_server_and_client_session
 from pydantic import TypeAdapter, ValidationError
 
 import hwpx_mcp_server.mixed_form as mixed_form_adapter
@@ -1811,6 +1814,52 @@ def test_zero_multiple_and_cross_run_targets_fail_closed(tmp_path: Path) -> None
             plan=_single(_plan(split, tmp_path / "split-out.hwpx"), "body-owner")
         )
     assert cross_run.value.code == "unsupported_content"
+
+
+def test_duplicate_native_field_protocol_preserves_ambiguous_target(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "duplicate.hwpx"
+    output = tmp_path / "duplicate-out.hwpx"
+    _build_fixture(source, duplicate_native_field=True)
+    source_before = source.read_bytes()
+    duplicate_plan = _single(_plan(source, output), "native-project")
+    duplicate_plan["operations"][0]["target"] = {
+        "kind": "nativeField",
+        "name": "사업명",
+    }
+
+    async def call() -> mcp_types.ErrorData:
+        async with create_connected_server_and_client_session(server.mcp) as client:
+            health = await client.call_tool("mcp_server_health", {})
+            assert health.isError is False
+            with pytest.raises(McpError) as captured:
+                await client.call_tool(
+                    "analyze_form_fill",
+                    {"plan": duplicate_plan},
+                )
+            return captured.value.error
+
+    error = asyncio.run(call())
+
+    assert error.code == -32000
+    assert error.data["errorCode"] == "ambiguous_target"
+    assert error.data["tool"] == "analyze_form_fill"
+    assert error.data["error"]["schemaVersion"] == "hwpx.mcp-error/v1"
+    assert error.data["error"]["code"] == "ambiguous_target"
+    assert error.data["error"]["category"] == "document"
+    encoded = json.dumps(error.data, ensure_ascii=False)
+    for private_detail in (
+        str(source),
+        str(output),
+        "사업명",
+        "AI 수업 나눔의 날",
+        "native form-field locator matched 2 fields",
+    ):
+        assert private_detail not in encoded
+    assert "arguments" not in error.data
+    assert source.read_bytes() == source_before
+    assert not output.exists()
 
 
 def test_legacy_formfill_is_marked_and_evalplan_exam_remain_separate(

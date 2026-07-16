@@ -50,6 +50,7 @@ from hwpx import (
     table_compute as build_hwpx_table_compute,
     validate_document_plan as validate_hwpx_document_plan,
 )
+from hwpx.agent import AgentContractError
 from hwpx.exam import (
     ExamParseError,
     FormProfileError,
@@ -297,6 +298,11 @@ def _classified_error_payload(exc: BaseException | None) -> dict[str, Any]:
         for item in _exception_chain(exc):
             if isinstance(item, HwpxOperationError):
                 return item.to_payload()
+            if isinstance(item, AgentContractError):
+                return build_error_payload(
+                    code=item.code,
+                    message="문서 에이전트 계약을 안전하게 해석할 수 없습니다.",
+                )
             if isinstance(item, WorkspacePathError):
                 return build_error_payload(
                     code=item.code,
