@@ -202,7 +202,10 @@ def test_canonical_form_fill_tools_use_typed_closed_top_level_schemas() -> None:
     assert verify["additionalProperties"] is False
     assert any("$ref" in option for option in analyze["properties"]["input_json"]["anyOf"])
     assert "$ref" in apply["properties"]["analysis"]
-    assert set(verify["properties"]) == {"filename", "before_path", "require"}
+    assert set(verify["properties"]) == {"filename", "before_path", "require", "plan"}
+    assert verify["properties"]["plan"]["$ref"].endswith(
+        "MixedFormCompiledPlanInput"
+    )
 
 
 def test_missing_required_core_symbol_is_startup_fatal_and_never_ghost_registered() -> None:
@@ -274,7 +277,9 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
 
     inputs = anyio.run(schemas)
     canonical = bound_tool_registry().by_name()
-    assert {"filename", "before_path", "require"} == inputs["verify_form_fill"]
+    assert {"filename", "before_path", "require", "plan"} == inputs[
+        "verify_form_fill"
+    ]
     assert {"filename", "gold_path", "blank_path", "run_render", "expected_pages"} == set(
         canonical["score_form_fill"].input_schema["properties"]
     )

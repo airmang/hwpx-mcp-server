@@ -19,6 +19,8 @@ pytest.importorskip(
 )
 
 from hwpx_mcp_server.hwpx_ops import HwpxOps
+from hwpx_mcp_server import server
+from hwpx_mcp_server.mixed_form import FORM_VERIFICATION_RECEIPT_SCHEMA
 from hwpx_mcp_server.tool_contract import bound_tool_registry
 
 _CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
@@ -124,3 +126,28 @@ def test_apply_evalplan_fill_one_shot(tmp_path):
     # honest-defer count is surfaced (never silent), int and consistent with notes
     assert out["rubricNeedsReview"] == len(out["needsReviewNotes"])
     assert (tmp_path / "filled.hwpx").exists()
+
+
+@pytest.mark.skipif(
+    not BLANK.exists(), reason="public blank-form fixture not available"
+)
+def test_evalplan_server_preserves_domain_semantics_with_common_receipt(tmp_path):
+    blank = tmp_path / "blank.hwpx"
+    review = tmp_path / "review.md"
+    output = tmp_path / "filled.hwpx"
+    shutil.copy(BLANK, blank)
+    review.write_text(SYNTHETIC_MD, encoding="utf-8")
+    before = blank.read_bytes()
+
+    result = server.apply_evalplan_fill(str(blank), str(review), output=str(output))
+
+    assert result["ok"] is True
+    assert result["contentReport"]
+    assert blank.read_bytes() == before
+    receipt = result["verificationReceipt"]
+    assert receipt["schemaVersion"] == FORM_VERIFICATION_RECEIPT_SCHEMA
+    assert receipt["phase"] == "domain-apply"
+    assert receipt["operation"] == "apply_evalplan_fill"
+    assert receipt["sourcePreservation"]["ok"] is True
+    assert receipt["openSafety"]["ok"] is True
+    assert receipt["domain"]["status"] == "specialized-semantics-preserved"

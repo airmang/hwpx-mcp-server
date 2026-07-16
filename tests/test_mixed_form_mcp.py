@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
+from pydantic import TypeAdapter, ValidationError
 
 import hwpx_mcp_server.mixed_form as mixed_form_adapter
 import hwpx_mcp_server.server as server
@@ -16,6 +18,10 @@ from hwpx import HwpxDocument, validate_editor_open_safety
 from hwpx.agent import AgentContractError, HwpxAgentDocument
 from hwpx.oxml.namespaces import HP
 from hwpx_mcp_server.tool_contract import bound_tool_registry
+from hwpx_mcp_server.mixed_form import (
+    FORM_VERIFICATION_RECEIPT_SCHEMA,
+    MixedFormPlanInput,
+)
 
 
 def _append(parent: Any, tag: str, attrs: dict[str, str] | None = None) -> Any:
@@ -194,6 +200,48 @@ def test_tool_schemas_are_discriminated_and_closed() -> None:
         "canonicalPath",
         "bodyAnchor",
     }
+    assert len(defs["NativeFieldTarget"]["oneOf"]) == 2
+    assert len(defs["LabelCellTarget"]["oneOf"]) == 2
+
+
+def test_strict_plan_rejects_unknown_keys_and_selector_xor(tmp_path: Path) -> None:
+    source = tmp_path / "source.hwpx"
+    output = tmp_path / "output.hwpx"
+    _build_fixture(source)
+    adapter = TypeAdapter(MixedFormPlanInput)
+    schema = adapter.json_schema(by_alias=True)
+    validator = Draft202012Validator(schema)
+
+    unknown = _plan(source, output)
+    unknown["unexpected"] = True
+    assert list(validator.iter_errors(unknown))
+    with pytest.raises(ValidationError):
+        server.analyze_form_fill(plan=unknown)
+
+    missing_native = _single(_plan(source, output), "native-project")
+    missing_native["operations"][0]["target"] = {"kind": "nativeField"}
+    assert list(validator.iter_errors(missing_native))
+    with pytest.raises(ValidationError):
+        server.analyze_form_fill(plan=missing_native)
+
+    both_native = _single(_plan(source, output), "native-project")
+    both_native["operations"][0]["target"] = {
+        "kind": "nativeField",
+        "fieldId": "240021",
+        "name": "사업명",
+    }
+    assert list(validator.iter_errors(both_native))
+    with pytest.raises(ValidationError):
+        server.analyze_form_fill(plan=both_native)
+
+    both_table = _single(_plan(source, output), "label-department")
+    both_table["operations"][0]["target"]["tableIndex"] = 0
+    assert list(validator.iter_errors(both_table))
+    with pytest.raises(ValidationError):
+        server.analyze_form_fill(plan=both_table)
+
+    with pytest.raises(ValueError, match="cannot be combined"):
+        server.analyze_form_fill(source_filename=str(source), plan=_plan(source, output))
 
 
 def test_analyze_and_apply_four_targets_with_receipt_and_member_preservation(tmp_path: Path) -> None:
@@ -224,6 +272,10 @@ def test_analyze_and_apply_four_targets_with_receipt_and_member_preservation(tmp
     assert result["openSafety"]["ok"] is True
     assert result["verificationReceipt"]["reopen"]["ok"] is True
     assert result["verificationReceipt"]["bytePreservation"]["ok"] is True
+    assert result["verificationReceipt"]["schemaVersion"] == FORM_VERIFICATION_RECEIPT_SCHEMA
+    assert result["verificationReceipt"]["status"] == "committed"
+    assert result["verificationReceipt"]["plan"]["planHash"] == compiled["planHash"]
+    assert result["verificationReceipt"]["sourcePreservation"]["ok"] is True
     assert validate_editor_open_safety(output).ok
     assert source.read_bytes() == source_before
 
@@ -239,6 +291,25 @@ def test_analyze_and_apply_four_targets_with_receipt_and_member_preservation(tmp
         assert purpose.summary["text"] == "행사 목적: 교내 AI 활용 사례 공유"
         assert owner.summary["text"] == "담당자: 김서현"
 
+    verified = server.verify_form_fill(plan=compiled)
+    assert verified["schemaVersion"] == FORM_VERIFICATION_RECEIPT_SCHEMA
+    assert verified["phase"] == "verify"
+    assert verified["ok"] is True
+    assert verified["plan"]["planHash"] == compiled["planHash"]
+    assert verified["sourcePreservation"]["ok"] is True
+    assert verified["memberDiff"]["ok"] is True
+    assert verified["valueVerification"]["ok"] is True
+    assert len(verified["valueVerification"]["checks"]) == 4
+
+    server.fill_form_field(str(output), "변조값", field_id="240021")
+    tampered = server.verify_form_fill(plan=compiled)
+    assert tampered["ok"] is False
+    assert tampered["valueVerification"]["ok"] is False
+    assert any(
+        item["operationId"] == "native-project" and not item["ok"]
+        for item in tampered["valueVerification"]["checks"]
+    )
+
 
 def test_dry_run_rollback_replay_and_key_conflict(
     tmp_path: Path,
@@ -251,6 +322,8 @@ def test_dry_run_rollback_replay_and_key_conflict(
     dry = server.apply_form_fill(plan=_plan(source, dry_output, dry_run=True))
     assert dry["ok"] is True and dry["dryRun"] is True
     assert not dry_output.exists()
+    assert dry["verificationReceipt"]["status"] == "dry-run"
+    assert dry["verificationReceipt"]["sourcePreservation"]["ok"] is True
 
     failed_output = tmp_path / "failed.hwpx"
     failed_output.write_bytes(b"existing destination")
@@ -263,6 +336,8 @@ def test_dry_run_rollback_replay_and_key_conflict(
     failed = server.apply_form_fill(plan=_plan(source, failed_output))
     assert failed["ok"] is False and failed["rolledBack"] is True
     assert failed_output.read_bytes() == b"existing destination"
+    assert failed["verificationReceipt"]["status"] == "rolled-back"
+    assert failed["verificationReceipt"]["rollbackPreservation"]["preserved"] is True
     monkeypatch.setattr(mixed_form_adapter, "_fault_injector_for_tests", None)
 
     replay_output = tmp_path / "replay.hwpx"
@@ -277,6 +352,31 @@ def test_dry_run_rollback_replay_and_key_conflict(
     conflict = server.apply_form_fill(plan=conflict_request)
     assert conflict["ok"] is False
     assert conflict["error"]["code"] == "idempotency_conflict"
+
+
+def test_compiled_paths_are_authorized_canonical_and_writes_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source.hwpx"
+    output = tmp_path / "output.hwpx"
+    _build_fixture(source)
+    with pytest.raises(AgentContractError, match="output"):
+        server.analyze_form_fill(plan=_plan(source, source))
+
+    compiled = server.analyze_form_fill(plan=_plan(source, output))["compiledPlan"]
+    relative = copy.deepcopy(compiled)
+    relative["batch"]["input"]["filename"] = source.name
+    with pytest.raises(ValueError, match="canonical absolute path"):
+        server.apply_form_fill(plan=relative)
+
+    def blocked() -> None:
+        raise RuntimeError("capability skew")
+
+    monkeypatch.setattr(server.quality_contract, "assert_write_capability", blocked)
+    with pytest.raises(RuntimeError, match="capability skew"):
+        server.apply_form_fill(plan=compiled)
+    assert not output.exists()
 
 
 def test_zero_multiple_and_cross_run_targets_fail_closed(tmp_path: Path) -> None:

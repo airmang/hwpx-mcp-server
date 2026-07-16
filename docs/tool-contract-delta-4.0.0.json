@@ -24,7 +24,7 @@
     "advancedToolCount": 132,
     "domainCount": 19,
     "skillRequiredToolCount": 28,
-    "contractHash": "16dd2a477260e7be"
+    "contractHash": "b3673279acce516e"
   },
   "delta": {
     "defaultToolCount": -5,
@@ -200,7 +200,7 @@
     "canonicalToolSpec": "src/hwpx_mcp_server/tool_contract.py",
     "fastMcpRegistration": "src/hwpx_mcp_server/server.py",
     "boundInstalledToolCount": 132,
-    "bindingHash": "1761f78eb80b1932",
+    "bindingHash": "06c7a8e6cc7c4a37",
     "normalizedInputOutputSchemasComplete": true,
     "remainingRemovedRuntimeReferences": [],
     "activeRemovedNames": []

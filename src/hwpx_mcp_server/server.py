@@ -151,9 +151,12 @@ from .network_policy import NetworkPolicy, NetworkPolicyError, open_url
 from .mutation_models import BodyOperation, EditOperation, TableOperation, operation_payloads
 from .mixed_form import (
     MixedFormApplyInput,
+    MixedFormCompiledPlanInput,
     MixedFormPlanInput,
     analyze_mixed_form_plan,
     apply_canonical_mixed_form_plan,
+    attach_common_form_receipt,
+    verify_canonical_mixed_form_plan,
 )
 from .quality_generation import (
     analyze_quality_generation_workflow,
@@ -3394,29 +3397,60 @@ def apply_table_ops(
 ) -> dict:
     """바이트 보존으로 표 셀/행/열/표 구조 연산을 원자 적용합니다."""
 
+    source = Path(resolve_path(filename))
+    target = Path(resolve_path(output)) if output else source
+    source_before = source.read_bytes()
     if not dry_run:
         quality_contract.assert_write_capability()
-    return _OPS.apply_table_ops(
-        resolve_path(filename),
+    result = _OPS.apply_table_ops(
+        str(source),
         operation_payloads(ops),
-        output=resolve_path(output) if output else None,
+        output=str(target) if output else None,
         render_check=render_check,
+        dry_run=dry_run,
+    )
+    return attach_common_form_receipt(
+        result,
+        operation="apply_table_ops",
+        source=source,
+        output=target,
+        source_before=source_before,
         dry_run=dry_run,
     )
 
 
 def verify_form_fill(
-    filename: str,
-    before_path: str,
+    filename: str = None,
+    before_path: str = None,
     require: bool = False,
+    plan: MixedFormCompiledPlanInput = None,
 ) -> dict:
-    """실제 한컴 렌더로 양식 채움의 넘침·겹침·페이지 변화를 검증합니다."""
+    """Compiled mixed-form 결과를 검증합니다. filename/before_path는 렌더 호환 경로입니다."""
 
-    return _OPS.verify_form_fill(
-        resolve_path(filename),
-        resolve_path(before_path),
-        require=require,
+    if plan is not None:
+        if filename is not None or before_path is not None:
+            raise ValueError(
+                "plan cannot be combined with legacy filename/before_path arguments"
+            )
+        return verify_canonical_mixed_form_plan(
+            plan,
+            require=require,
+            render_verifier=lambda after, before, required: _OPS.verify_form_fill(
+                after,
+                before,
+                require=required,
+            ),
+        )
+    if filename is None or before_path is None:
+        raise ValueError("provide plan or both filename and before_path")
+    result = _OPS.verify_form_fill(
+        resolve_path(filename), resolve_path(before_path), require=require
     )
+    result["compatibility"] = {
+        "status": "retained-render-verifier",
+        "canonicalInput": "plan: hwpx.mixed-form-compiled-plan/v1",
+    }
+    return result
 
 
 def score_form_fill(
@@ -3445,12 +3479,23 @@ def apply_body_ops(
 ) -> dict:
     """표 밖 본문 문단에 바이트 보존 연산을 적용합니다."""
 
+    source = Path(resolve_path(filename))
+    target = Path(resolve_path(output)) if output else source
+    source_before = source.read_bytes()
     if not dry_run:
         quality_contract.assert_write_capability()
-    return _OPS.apply_body_ops(
-        resolve_path(filename),
+    result = _OPS.apply_body_ops(
+        str(source),
         operation_payloads(ops),
-        output=resolve_path(output) if output else None,
+        output=str(target) if output else None,
+        dry_run=dry_run,
+    )
+    return attach_common_form_receipt(
+        result,
+        operation="apply_body_ops",
+        source=source,
+        output=target,
+        source_before=source_before,
         dry_run=dry_run,
     )
 
@@ -3484,13 +3529,23 @@ def apply_evalplan_fill(
     """빈 평가계획 양식과 검토용 Markdown을 바이트 보존 채움본으로 만듭니다."""
 
     quality_contract.assert_write_capability()
-    return _OPS.apply_evalplan_fill(
-        resolve_path(filename),
+    source = Path(resolve_path(filename))
+    target = Path(resolve_path(output)) if output else source
+    source_before = source.read_bytes()
+    result = _OPS.apply_evalplan_fill(
+        str(source),
         resolve_path(review_md),
-        output=resolve_path(output) if output else None,
+        output=str(target) if output else None,
         render_check=render_check,
         score_gold_path=resolve_path(score_gold_path) if score_gold_path else None,
         expected_pages=expected_pages,
+    )
+    return attach_common_form_receipt(
+        result,
+        operation="apply_evalplan_fill",
+        source=source,
+        output=target,
+        source_before=source_before,
     )
 
 
@@ -5901,6 +5956,11 @@ def fill_form_field(
         name=name,
         dry_run=dry_run,
     )
+    result["compatibility"] = {
+        "status": "retained-native-field-facade",
+        "canonicalTarget": "nativeField",
+        "reason": "in-place/index compatibility semantics are preserved",
+    }
     return _with_document_state(result, path)
 
 
@@ -5964,6 +6024,7 @@ def apply_form_fill(
         )
         if any(value is not None for value in compatibility_args) or confirm is not True:
             raise ValueError("plan cannot be combined with hwpx.formfill.v1 compatibility arguments")
+        quality_contract.assert_write_capability()
         return apply_canonical_mixed_form_plan(plan)
     result = apply_form_fill_workflow(
         plan_id=plan_id,
