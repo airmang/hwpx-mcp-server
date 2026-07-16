@@ -176,6 +176,7 @@ from .quality_generation import (
     create_quality_document_fallback,
     inspect_quality_fallback,
 )
+from .preview_output_models import RenderPreviewOutput
 from .storage import (
     LocalDocumentStorage,
     build_hwpx_open_safety_report,
@@ -2870,7 +2871,7 @@ def render_preview(
     max_pages: int | None = None,
     embed_images: bool = True,
     max_image_bytes: int | None = None,
-) -> mcp_types.CallToolResult:
+) -> Annotated[mcp_types.CallToolResult, RenderPreviewOutput]:
     """레이아웃 충실 HTML과 headless browser PNG 프리뷰 산출물을 생성합니다.
 
     embed_images 가 참이면 각 페이지 PNG 를 인라인 이미지 콘텐츠 블록으로 함께

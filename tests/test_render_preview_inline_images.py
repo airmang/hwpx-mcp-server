@@ -13,8 +13,13 @@ import asyncio
 import base64
 
 import mcp.types as mcp_types
+import pytest
+from jsonschema import Draft202012Validator
+from mcp.server.fastmcp.exceptions import ToolError
+from mcp.shared.memory import create_connected_server_and_client_session
 
 from hwpx_mcp_server import server
+from hwpx_mcp_server.tool_contract import bound_tool_registry
 
 # 1x1 transparent PNG.
 _PNG_1X1 = base64.b64decode(
@@ -64,7 +69,15 @@ def test_embed_screenshot_image_noop_when_disabled(tmp_path) -> None:
 # --------------------------------------------------------------------------- #
 def _fake_manifest_with_image() -> dict:
     return {
+        "schemaVersion": "hwpx.render-preview.v1",
         "status": "ok",
+        "generatedAt": "2026-07-16T00:00:00Z",
+        "sourcePath": "doc.hwpx",
+        "outputDir": "doc-preview",
+        "htmlPath": "doc-preview/preview.html",
+        "manifestPath": "doc-preview/manifest.json",
+        "visualReviewPath": "doc-preview/visual-review.json",
+        "mode": "pages",
         "pageCount": 1,
         "pages": [{"index": 0}],
         "screenshots": [
@@ -76,6 +89,14 @@ def _fake_manifest_with_image() -> dict:
                 "bytes": len(_PNG_1X1),
             }
         ],
+        "screenshotEngine": {
+            "requested": True,
+            "available": True,
+            "backend": "test",
+            "message": "captured",
+        },
+        "warnings": [],
+        "suggestion": None,
     }
 
 
@@ -102,17 +123,44 @@ def test_render_preview_lifts_base64_into_image_content(monkeypatch) -> None:
     assert shot["imageEmbedded"] is True
 
 
-def test_render_preview_image_survives_mcp_call_tool(monkeypatch) -> None:
-    # End-to-end through the FastMCP transport: the image block must reach the
-    # client unchanged.
+def test_render_preview_image_survives_client_schema_validation(monkeypatch) -> None:
+    # End-to-end through a real ClientSession: tools/list must cache the owned
+    # manifest schema and tools/call must validate structuredContent against it
+    # without dropping the image block.
     monkeypatch.setattr(
         server._OPS, "render_preview", lambda **kwargs: _fake_manifest_with_image()
     )
 
-    result = asyncio.run(server.mcp.call_tool("render_preview", {"filename": "doc.hwpx"}))
+    async def run_client() -> mcp_types.CallToolResult:
+        async with create_connected_server_and_client_session(server.mcp) as client:
+            listed = await client.list_tools()
+            tool = next(item for item in listed.tools if item.name == "render_preview")
+            assert tool.outputSchema is not None
+            assert tool.outputSchema["title"] == "RenderPreviewOutput"
+            assert {
+                "content",
+                "structuredContent",
+                "isError",
+            }.isdisjoint(tool.outputSchema["properties"])
+            return await client.call_tool("render_preview", {"filename": "doc.hwpx"})
+
+    result = asyncio.run(run_client())
 
     assert isinstance(result, mcp_types.CallToolResult)
     image_blocks = [b for b in result.content if b.type == "image"]
     assert len(image_blocks) == 1
     assert base64.b64decode(image_blocks[0].data) == _PNG_1X1
     assert result.structuredContent["status"] == "ok"
+    schema = bound_tool_registry().by_name()["render_preview"].output_schema
+    assert not list(Draft202012Validator(schema).iter_errors(result.structuredContent))
+
+
+def test_render_preview_rejects_invalid_structured_content(monkeypatch) -> None:
+    monkeypatch.setattr(
+        server._OPS,
+        "render_preview",
+        lambda **kwargs: {"status": "ok"},
+    )
+
+    with pytest.raises(ToolError, match="validation error"):
+        asyncio.run(server.mcp.call_tool("render_preview", {"filename": "doc.hwpx"}))

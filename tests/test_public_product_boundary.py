@@ -4,6 +4,11 @@ import importlib.util
 from pathlib import Path
 import zipfile
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib
+
 import hwpx_mcp_server
 from hwpx_mcp_server import server
 from hwpx_mcp_server.tool_contract import (
@@ -43,6 +48,14 @@ RETIRED_LEGACY_MODULES = {
     "hwpx_mcp_server.schema.builder": "schema/builder.py",
     "hwpx_mcp_server.schema.sanitizer": "schema/sanitizer.py",
 }
+
+
+def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    dependencies = project["project"]["dependencies"]
+
+    assert "mcp>=1.28.1,<1.29" in dependencies
+    assert "pydantic>=2.11,<3" in dependencies
 
 
 def _load_hygiene_module():

@@ -4,7 +4,7 @@
 
 - 도구 등록, 입력·출력 스키마, health/capability 표면과 생성 문서는 하나의
   `ToolSpec` 레지스트리에서 만들어집니다. 4.0.0 후보는 기본 121개, 고급 모드 포함
-  132개 도구이며 계약 해시는 `e1af9e16bacc52d7`입니다.
+  132개 도구이며 계약 해시는 `f46ec677231b3a20`입니다.
 - 스키마는 JSON Schema 2020-12 기준이며 `$defs`, `$ref`, `anyOf`를 사용할 수
   있습니다. 실제 호스트에 노출되는 계약은 `docs/tool-contract.generated.json`과
   `docs/tool-contract.md`에서 확인합니다.

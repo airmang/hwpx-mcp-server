@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from hwpx.document import HwpxDocument
+from jsonschema import Draft202012Validator
 
 from hwpx_mcp_server import server
 from hwpx_mcp_server.tool_contract import bound_tool_registry
@@ -17,6 +18,25 @@ def test_render_preview_tool_is_bound_to_the_canonical_registry() -> None:
     assert binding.function is server.render_preview
     assert "output_dir" in binding.input_schema["properties"]
     assert "max_pages" in binding.input_schema["properties"]
+    assert binding.output_schema["title"] == "RenderPreviewOutput"
+    assert binding.output_schema["required"] == [
+        "schemaVersion",
+        "status",
+        "generatedAt",
+        "sourcePath",
+        "outputDir",
+        "htmlPath",
+        "manifestPath",
+        "visualReviewPath",
+        "mode",
+        "pageCount",
+        "pages",
+        "screenshots",
+        "screenshotEngine",
+        "warnings",
+        "suggestion",
+    ]
+    assert "content" not in binding.output_schema["properties"]
 
 
 def test_render_preview_html_only_creates_manifest_and_visual_evidence(tmp_path: Path) -> None:
@@ -44,6 +64,11 @@ def test_render_preview_html_only_creates_manifest_and_visual_evidence(tmp_path:
     assert result["screenshotEngine"]["requested"] is False
     # html_only -> no screenshots -> no inline image blocks
     assert all(block.type != "image" for block in call_result.content)
+    assert not list(
+        Draft202012Validator(
+            bound_tool_registry().by_name()["render_preview"].output_schema
+        ).iter_errors(result)
+    )
 
     html_path = Path(result["htmlPath"])
     manifest_path = Path(result["manifestPath"])
