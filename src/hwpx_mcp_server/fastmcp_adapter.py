@@ -41,6 +41,8 @@ def normalize_schema(schema: Mapping[str, Any] | None, *, input_schema: bool) ->
     Object inputs are closed at every generated object boundary unless their
     schema explicitly declares an open mapping. Array order is preserved so
     catalog-owned schemas remain byte-for-byte attributable to their source.
+    MCP restricts both tool input and output schemas to an object at the root;
+    Pydantic root-model unions need that discriminator restored explicitly.
     """
 
     def visit(value: Any) -> Any:
@@ -50,9 +52,15 @@ def normalize_schema(schema: Mapping[str, Any] | None, *, input_schema: bool) ->
             # JSON Schema property map. Only explicit object-schema nodes are
             # eligible for generated closure defaults.
             if out.get("type") == "object":
-                out.setdefault("properties", {})
-                if "additionalProperties" not in out:
-                    out["additionalProperties"] = False if out["properties"] else True
+                composed = any(
+                    keyword in out for keyword in ("$ref", "allOf", "anyOf", "oneOf")
+                )
+                if "properties" in out or not composed:
+                    out.setdefault("properties", {})
+                    if "additionalProperties" not in out:
+                        out["additionalProperties"] = (
+                            False if out["properties"] else True
+                        )
             return out
         if isinstance(value, (list, tuple)):
             return [visit(item) for item in value]
@@ -70,8 +78,15 @@ def normalize_schema(schema: Mapping[str, Any] | None, *, input_schema: bool) ->
         # Nested mapping values keep their explicitly generated openness.
         normalized["additionalProperties"] = False
         normalized.setdefault("required", [])
-    elif not normalized:
-        normalized = {"type": "object", "properties": {}, "additionalProperties": True}
+    else:
+        root_type = normalized.get("type")
+        if root_type not in (None, "object"):
+            raise FastMcpAdapterError(
+                f"MCP output schema root must be object, got {root_type!r}"
+            )
+        normalized.setdefault("type", "object")
+        if len(normalized) == 1:
+            normalized.update({"properties": {}, "additionalProperties": True})
     return normalized
 
 
