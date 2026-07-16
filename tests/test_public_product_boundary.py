@@ -66,13 +66,7 @@ def test_pre_fastmcp_shadow_modules_are_absent_from_the_import_surface() -> None
 
     for module_name, relative_path in RETIRED_LEGACY_MODULES.items():
         assert not (package_root / relative_path).exists()
-        try:
-            spec = importlib.util.find_spec(module_name)
-        except ModuleNotFoundError:
-            # Nested retired modules are absent when their retired parent
-            # package is absent; Python 3.13 reports that state by raising.
-            spec = None
-        assert spec is None
+        assert importlib.util.find_spec(module_name) is None
 
 
 def test_contract_and_live_registry_exclude_internal_product_boundaries() -> None:

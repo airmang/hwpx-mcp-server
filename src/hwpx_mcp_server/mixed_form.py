@@ -2272,29 +2272,11 @@ def _verify_canonical_mixed_form_plan_locked(
                     "errorCode": type(exc).__name__,
                 }
             )
-    if (
-        not require
-        and real_hancom.get("renderChecked") is not True
-        and real_hancom.get("status") != "failed"
-    ):
-        # Optional visual verification is advisory. A fully installed visual
-        # stack can report ``ok=false`` when the external Hancom oracle itself
-        # is unavailable, while a base install raises and reaches the explicit
-        # unavailable branch above. Normalize both environments to the same
-        # honest unverified state; only observed render failures or internal
-        # snapshot-cleanup failures may fail structural verification.
-        real_hancom = {
-            **real_hancom,
-            "ok": None,
-            "status": "unavailable",
-            "renderChecked": False,
-        }
     core_verification["realHancom"] = real_hancom
     values_ok = bool(checks) and all(bool(item.get("ok")) for item in checks)
     render_observed = real_hancom.get("renderChecked") is True
     render_failed = bool(
-        (render_observed and real_hancom.get("ok") is False)
-        or real_hancom.get("status") == "failed"
+        real_hancom.get("ok") is False or real_hancom.get("status") == "failed"
     )
     render_ok = (
         bool(real_hancom.get("ok"))

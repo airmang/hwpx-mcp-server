@@ -804,29 +804,6 @@ def test_analyze_and_apply_four_targets_with_receipt_and_member_preservation(
         server._OPS,
         "verify_form_fill",
         lambda *args, **kwargs: {
-            "renderChecked": False,
-            "ok": False,
-            "overflowDetected": False,
-            "overlapDetected": False,
-            "pageCountChanged": None,
-            "warnings": [],
-            "errors": [
-                "RENDER_ORACLE_UNAVAILABLE: external Hancom oracle unavailable"
-            ],
-        },
-    )
-    installed_visual_degrade = server.verify_form_fill(plan=compiled)
-    assert installed_visual_degrade["ok"] is True
-    assert installed_visual_degrade["status"] == "structurally-verified"
-    assert installed_visual_degrade["realHancom"]["renderChecked"] is False
-    assert installed_visual_degrade["realHancom"]["ok"] is None
-    assert installed_visual_degrade["realHancom"]["status"] == "unavailable"
-    assert installed_visual_degrade["realHancom"]["errors"]
-
-    monkeypatch.setattr(
-        server._OPS,
-        "verify_form_fill",
-        lambda *args, **kwargs: {
             "renderChecked": True,
             "ok": False,
             "overflowDetected": True,
