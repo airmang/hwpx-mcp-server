@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: airmang/python-hwpx
-          ref: bf1f52cb380962ffab397ad916538eed7fcba505
+          ref: cbed9a3c5a0e42bc415c742ffc063c0937cc2990
           path: python-hwpx
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:

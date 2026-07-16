@@ -3,7 +3,7 @@
 ## 공개 계약과 프로필
 
 - 도구 등록, 입력·출력 스키마, health/capability 표면과 생성 문서는 하나의
-  `ToolSpec` 레지스트리에서 만들어집니다. 4.0.0 후보는 기본 121개, 고급 모드 포함
+  `ToolSpec` 레지스트리에서 만들어집니다. 4.0.0 공개 릴리스는 기본 121개, 고급 모드 포함
   132개 도구이며 계약 해시는 `f46ec677231b3a20`입니다.
 - 스키마는 JSON Schema 2020-12 기준이며 `$defs`, `$ref`, `anyOf`를 사용할 수
   있습니다. 실제 호스트에 노출되는 계약은 `docs/tool-contract.generated.json`과
@@ -65,7 +65,7 @@
   사용하며 원래 인자나 로컬 절대경로를 노출하지 않습니다.
 - 시작 후 `mcp_server_health`에서 `capability.ok`, `toolSurface`와 계약 해시를
   확인하고, `describe_capabilities`로 현재 프로필의 작업군과 진입점을 확인합니다.
-- 릴리스 후보 검증은 `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`,
+- 릴리스 검증은 `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`,
   `.venv/bin/python scripts/render_tool_contract.py --check --skip-skill`,
   `.venv/bin/python scripts/render_contract_delta.py --check`,
   `.venv/bin/python scripts/check_public_hygiene.py`를 모두 통과해야 합니다.
