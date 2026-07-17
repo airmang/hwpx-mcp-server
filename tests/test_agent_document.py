@@ -8,6 +8,7 @@ import anyio
 from hwpx import HwpxDocument
 from hwpx.agent import AGENT_BATCH_RESULT_SCHEMA, HwpxAgentDocument, agent_json_schemas
 from hwpx.agent.blueprint import BLUEPRINT_REPLAY_RESULT_SCHEMA, blueprint_json_schemas
+from hwpx.oxml import HwpxOxmlDocument
 from hwpx_mcp_server import server
 
 
@@ -23,6 +24,35 @@ def _fixture(path: Path) -> None:
         table.rows[0].cells[0].text = "항목"
         table.rows[0].cells[1].text = "내용"
         document.save_to_path(path)
+
+
+def _multi_story_fixture(path: Path) -> tuple[str, str]:
+    with HwpxDocument.new() as document:
+        section = document.sections[0]
+        section.paragraphs[0].text = "S-080 MCP 본문 원본"
+        table_paragraph = document.add_paragraph("표 문단")
+        table = table_paragraph.add_table(1, 1)
+        table.rows[0].cells[0].text = "S-080 MCP 셀 원본"
+        document.set_header_text(
+            "S-080 MCP 머리글 원본",
+            section=section,
+            page_type="BOTH",
+        )
+        document.save_to_path(path)
+    with HwpxAgentDocument.open(path) as view:
+        body_path = next(
+            record.path
+            for record in view.records
+            if record.kind == "paragraph"
+            and record.summary.get("text") == "S-080 MCP 본문 원본"
+        )
+        cell_path = next(
+            record.path
+            for record in view.records
+            if record.kind == "cell"
+            and record.summary.get("text") == "S-080 MCP 셀 원본"
+        )
+    return body_path, cell_path
 
 
 def _revision(path: Path) -> str:
@@ -154,6 +184,69 @@ def test_atomic_apply_reuses_core_verification_revision_and_idempotency(tmp_path
             if record.kind == "paragraph"
         ]
     assert texts.count("MCP 수정") == 2
+
+
+def test_apply_document_commands_routes_body_table_header_transaction_once(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    source = tmp_path / "multi-story-input.hwpx"
+    output = tmp_path / "multi-story-output.hwpx"
+    body_path, cell_path = _multi_story_fixture(source)
+    serialize_calls = 0
+    original_serialize = HwpxOxmlDocument.serialize
+
+    def counted_serialize(document: HwpxOxmlDocument) -> dict[str, bytes]:
+        nonlocal serialize_calls
+        serialize_calls += 1
+        return original_serialize(document)
+
+    monkeypatch.setattr(HwpxOxmlDocument, "serialize", counted_serialize)
+    result = server.apply_document_commands(
+        str(source),
+        str(output),
+        [
+            {
+                "commandId": "body",
+                "op": "set",
+                "path": body_path,
+                "properties": {"text": "S-080 MCP 본문 수정"},
+            },
+            {
+                "commandId": "cell",
+                "op": "set",
+                "path": cell_path,
+                "properties": {"text": "S-080 MCP 셀 수정"},
+            },
+            {
+                "commandId": "header",
+                "op": "set",
+                "path": '/section[1]/header[@page-type="BOTH"]',
+                "properties": {"text": "S-080 MCP 머리글 수정"},
+            },
+        ],
+        expected_revision=_revision(source),
+        idempotency_key="s080-mcp-multi-story",
+    )
+
+    assert result["ok"] is True and result["rolledBack"] is False
+    assert serialize_calls == 1
+    assert result["verificationReport"]["storyPreservation"]["ok"] is True
+    assert result["verificationReport"]["storyPreservation"]["storyCount"] == 1
+    assert result["verificationReport"]["bytePreservation"]["changedMembers"] == [
+        "Contents/section0.xml"
+    ]
+    assert result["verificationReport"]["openSafety"]["ok"] is True
+    with HwpxDocument.open(output) as reopened:
+        header = reopened.sections[0].properties.get_header("BOTH")
+        assert header is not None and header.text == "S-080 MCP 머리글 수정"
+    with HwpxAgentDocument.open(output) as view:
+        texts = {
+            record.summary.get("text")
+            for record in view.records
+            if record.kind in {"paragraph", "cell"}
+        }
+    assert {"S-080 MCP 본문 수정", "S-080 MCP 셀 수정"} <= texts
 
 
 def test_apply_stale_and_capability_skew_fail_closed_without_output(

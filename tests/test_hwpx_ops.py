@@ -7,6 +7,7 @@ import pytest
 from hwpx.document import HwpxDocument
 from hwpx_mcp_server.hwpx_ops import HH_NS, HP_NS, HwpxOps
 import hwpx_mcp_server.hwpx_ops as ops_module
+import hwpx_mcp_server.ops_services.read_query as read_query_module
 
 PNG_1X1_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/axwAqkAAAAASUVORK5CYII="
 PNG_1X1_ALT_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAFgwJ/l8EydgAAAABJRU5ErkJggg=="
@@ -109,7 +110,7 @@ def test_read_text_uses_default_limit(monkeypatch, tmp_path):
         def iter_document_paragraphs(self):
             yield from paragraphs
 
-    monkeypatch.setattr(ops_module, "create_text_extractor", FakeExtractor)
+    monkeypatch.setattr(read_query_module, "create_text_extractor", FakeExtractor)
 
     ops = HwpxOps(base_directory=tmp_path)
     dummy = tmp_path / "dummy.hwpx"
@@ -169,7 +170,7 @@ def test_read_text_consumes_only_requested_slice(monkeypatch, tmp_path):
                 yielded_indexes.append(paragraph.index)
                 yield paragraph
 
-    monkeypatch.setattr(ops_module, "create_text_extractor", FakeExtractor)
+    monkeypatch.setattr(read_query_module, "create_text_extractor", FakeExtractor)
 
     ops = HwpxOps(base_directory=tmp_path)
     dummy = tmp_path / "dummy.hwpx"
@@ -186,9 +187,6 @@ def test_read_text_consumes_only_requested_slice(monkeypatch, tmp_path):
     for index, paragraph in enumerate(paragraphs):
         expected_calls = 1 if offset <= index < offset + limit else 0
         assert paragraph.text_calls == expected_calls
-
-
-
 
 def test_resolve_path_permission_error_maps_code(tmp_path, monkeypatch):
     ops = HwpxOps(base_directory=tmp_path)
@@ -235,7 +233,7 @@ def test_find_truncates_context_and_respects_radius(monkeypatch, tmp_path):
         def iter_document_paragraphs(self):
             yield FakeParagraph(0, text)
 
-    monkeypatch.setattr(ops_module, "create_text_extractor", FakeExtractor)
+    monkeypatch.setattr(read_query_module, "create_text_extractor", FakeExtractor)
 
     ops = HwpxOps(base_directory=tmp_path)
     dummy = tmp_path / "dummy.hwpx"
@@ -835,7 +833,7 @@ def test_hwp_open_info_returns_read_only_metadata(monkeypatch, tmp_path):
     hwp_path.write_bytes(b"fake")
 
     monkeypatch.setattr(
-        ops,
+        ops._services.context,
         "_read_only_hwp_paragraphs",
         lambda path: (["첫 문단", "둘째 문단"], hwp_path, "PrvText"),
     )
@@ -854,7 +852,7 @@ def test_hwp_read_text_and_find_use_read_only_pipeline(monkeypatch, tmp_path):
     hwp_path.write_bytes(b"fake")
 
     monkeypatch.setattr(
-        ops,
+        ops._services.context,
         "_read_only_hwp_paragraphs",
         lambda path: (["학교 안내문", "2026년 행사 공지", "문의처"], hwp_path, "PrvText"),
     )

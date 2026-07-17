@@ -53,7 +53,12 @@ RETIRED_LEGACY_MODULES = {
 def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     dependencies = project["project"]["dependencies"]
+    optional_dependencies = project["project"]["optional-dependencies"]
 
+    assert project["project"]["version"] == "4.1.0"
+    assert "python-hwpx>=3.2.0" in dependencies
+    assert optional_dependencies["oracle"] == ["python-hwpx[visual]>=3.2.0"]
+    assert optional_dependencies["vision"] == ["python-hwpx[visual]>=3.2.0"]
     assert "mcp>=1.28.1,<1.29" in dependencies
     assert "pydantic>=2.11,<3" in dependencies
 
@@ -97,9 +102,9 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
     assert len(advanced) == 132
     assert len(skill_required_tool_names()) == 28
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
-        "3.1.0",
-        "4.0.0",
-        "0.3.0",
+        "3.2.0",
+        "4.1.0",
+        "0.4.0",
     )
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(default)
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(advanced)

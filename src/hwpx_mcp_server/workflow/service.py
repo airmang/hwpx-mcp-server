@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from hwpx_mcp_server.document_state import document_revision
-from hwpx_mcp_server.tool_contract import contract_hash
+from hwpx_mcp_server.tool_contract import RELEASED_CONTRACT_HASH
 
 from .adapters import ADAPTERS, AdapterAbstention
 from .dispatcher import AllowlistedDispatcher
@@ -52,12 +52,14 @@ class WorkflowService:
         store: WorkflowStore | None = None,
         capability_ok: bool = True,
         render_client: RenderClientV2 | None = None,
+        tool_spec_hash: str = RELEASED_CONTRACT_HASH,
     ) -> None:
         self.store = store or WorkflowStore(default_workflow_store_path())
         self.dispatcher = AllowlistedDispatcher(namespace)
         self.policy = WorkflowPolicyEngine()
         self.capability_ok = capability_ok
         self.render_client = render_client or NullRenderClientV2()
+        self.tool_spec_hash = tool_spec_hash
 
     def start(
         self,
@@ -477,7 +479,7 @@ class WorkflowService:
                 "mcp": _package_version("hwpx-mcp-server"),
                 "pythonHwpx": _package_version("python-hwpx"),
             },
-            "toolSpecHash": contract_hash(),
+            "toolSpecHash": self.tool_spec_hash,
             "stopReason": stop_reason,
         }
 
@@ -728,7 +730,7 @@ class WorkflowService:
                 "mcp": _package_version("hwpx-mcp-server"),
                 "pythonHwpx": _package_version("python-hwpx"),
             },
-            "toolSpecHash": contract_hash(),
+            "toolSpecHash": RELEASED_CONTRACT_HASH,
             "stopReason": reason,
         }
 

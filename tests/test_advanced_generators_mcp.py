@@ -5,6 +5,7 @@ from pathlib import Path
 
 from hwpx.tools.package_validator import validate_editor_open_safety
 from hwpx_mcp_server import server
+from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
 PNG_1X1 = base64.b64decode(
@@ -13,7 +14,7 @@ PNG_1X1 = base64.b64decode(
 
 
 def test_advanced_generator_tools_are_exposed() -> None:
-    names = set(server.mcp._tool_manager._tools.keys())
+    names = set(snapshot_runtime_tools(server.mcp))
 
     assert {
         "build_image_grid",

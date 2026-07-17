@@ -13,6 +13,7 @@ import zipfile
 import pytest
 
 import hwpx_mcp_server.server as server
+from hwpx_mcp_server.handlers import specialized as specialized_handler
 from hwpx.form_fit.wordbox import OracleUnavailable, Rect, WordBox
 
 HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
@@ -63,7 +64,7 @@ def test_place_seal_with_explicit_anchor_needs_no_oracle(tmp_path, monkeypatch):
     def _boom(*a, **k):
         raise AssertionError("oracle must not be called when anchor is explicit")
 
-    monkeypatch.setattr(server, "render_glyph_boxes", _boom)
+    monkeypatch.setattr(specialized_handler, "render_glyph_boxes", _boom)
     path = _make_form(tmp_path)
     cx, cy = _anchor_center()
     result = server.place_seal(
@@ -78,7 +79,7 @@ def test_place_seal_with_explicit_anchor_needs_no_oracle(tmp_path, monkeypatch):
 
 def test_place_seal_uses_oracle_render_to_find_anchor(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        server, "render_glyph_boxes",
+        specialized_handler, "render_glyph_boxes",
         lambda *a, **k: (_sender_boxes(), [(595.0, 842.0)], "StubOracle"),
     )
     path = _make_form(tmp_path)
@@ -93,7 +94,7 @@ def test_place_seal_degrades_without_oracle(tmp_path, monkeypatch):
     def _no_oracle(*a, **k):
         raise OracleUnavailable("no reachable Hancom render backend")
 
-    monkeypatch.setattr(server, "render_glyph_boxes", _no_oracle)
+    monkeypatch.setattr(specialized_handler, "render_glyph_boxes", _no_oracle)
     path = _make_form(tmp_path)
     result = server.place_seal(path, SENDER, PNG_1X1)
     assert result["ok"] is False
@@ -104,7 +105,7 @@ def test_place_seal_degrades_without_oracle(tmp_path, monkeypatch):
 
 def test_place_seal_sender_absent_in_render_fails_closed(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        server, "render_glyph_boxes",
+        specialized_handler, "render_glyph_boxes",
         lambda *a, **k: ([WordBox(x0=0, y0=0, x1=10, y1=12, text="본", page=0)], [(595.0, 842.0)], "StubOracle"),
     )
     path = _make_form(tmp_path)
@@ -135,8 +136,8 @@ def test_check_seal_compliance_pass(tmp_path, monkeypatch):
     cx, cy = _anchor_center()
     seal_rect = Rect(cx - 30, cy - 30, cx + 30, cy + 30, label="seal", page=0)
     render, images = _stub_render(seal_rect)
-    monkeypatch.setattr(server, "render_glyph_boxes", render)
-    monkeypatch.setattr(server, "extract_image_boxes", images)
+    monkeypatch.setattr(specialized_handler, "render_glyph_boxes", render)
+    monkeypatch.setattr(specialized_handler, "extract_image_boxes", images)
     path = _make_form(tmp_path)
     result = server.check_seal_compliance(path, SENDER, tol_pt=8.0)
     assert result["renderChecked"] is True
@@ -147,8 +148,8 @@ def test_check_seal_compliance_fail_when_misplaced(tmp_path, monkeypatch):
     cx, cy = _anchor_center()
     seal_rect = Rect(cx + 150, cy - 30, cx + 210, cy + 30, label="seal", page=0)  # far off
     render, images = _stub_render(seal_rect)
-    monkeypatch.setattr(server, "render_glyph_boxes", render)
-    monkeypatch.setattr(server, "extract_image_boxes", images)
+    monkeypatch.setattr(specialized_handler, "render_glyph_boxes", render)
+    monkeypatch.setattr(specialized_handler, "extract_image_boxes", images)
     path = _make_form(tmp_path)
     result = server.check_seal_compliance(path, SENDER, tol_pt=8.0)
     assert result["renderChecked"] is True
@@ -159,7 +160,7 @@ def test_check_seal_compliance_degrades_without_oracle(tmp_path, monkeypatch):
     def _no_oracle(*a, **k):
         raise OracleUnavailable("no reachable Hancom render backend")
 
-    monkeypatch.setattr(server, "render_glyph_boxes", _no_oracle)
+    monkeypatch.setattr(specialized_handler, "render_glyph_boxes", _no_oracle)
     path = _make_form(tmp_path)
     result = server.check_seal_compliance(path, SENDER)
     assert result["ok"] is False and result["renderChecked"] is False

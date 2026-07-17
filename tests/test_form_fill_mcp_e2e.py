@@ -11,6 +11,7 @@ import pytest
 import hwpx_mcp_server.server as server
 import hwpx_mcp_server.form_fill as form_fill_module
 from hwpx_mcp_server.core.document import open_doc, save_doc
+from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 from hwpx.tools.package_validator import validate_package
 from hwpx.tools.validator import validate_document
 
@@ -109,7 +110,7 @@ def _write_minimal_docx(path: Path, rows: list[tuple[str, str]]) -> None:
 
 
 def test_form_fill_tools_are_exposed() -> None:
-    names = set(server.mcp._tool_manager._tools.keys())
+    names = set(snapshot_runtime_tools(server.mcp))
 
     assert {"list_form_fields", "fill_form_field", "analyze_form_fill", "apply_form_fill"}.issubset(names)
 

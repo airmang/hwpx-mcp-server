@@ -15,18 +15,12 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from hwpx_mcp_server import runtime as _runtime  # noqa: E402,F401
 from hwpx_mcp_server.tool_contract import (  # noqa: E402
     BASELINE_TOOL_SPECS,
-    DOMAIN_SPECS,
-    MIN_MCP_VERSION,
-    MIN_PYTHON_HWPX,
-    MIN_SKILL_VERSION,
     TOOL_SPECS,
     ToolClassification,
     bound_tool_registry,
-    contract_hash,
-    expected_tool_names,
-    skill_required_tool_names,
 )
 
 
@@ -43,6 +37,19 @@ BASELINE: dict[str, Any] = {
     "skillRequiredToolCount": 30,
     "contractHash": "76d143ccc0787828",
 }
+FROZEN_TARGET: dict[str, Any] = {
+    "versions": {
+        "pythonHwpx": "3.1.0",
+        "mcpServer": "4.0.0",
+        "skill": "0.3.0",
+    },
+    "defaultToolCount": 121,
+    "advancedToolCount": 132,
+    "domainCount": 19,
+    "skillRequiredToolCount": 28,
+    "contractHash": "f46ec677231b3a20",
+}
+FROZEN_BINDING_HASH = "0deefdad1aa81a68"
 
 
 def _by_classification(classification: ToolClassification) -> list[Any]:
@@ -54,18 +61,14 @@ def _by_classification(classification: ToolClassification) -> list[Any]:
 
 
 def _target() -> dict[str, Any]:
-    return {
-        "versions": {
-            "pythonHwpx": MIN_PYTHON_HWPX,
-            "mcpServer": MIN_MCP_VERSION,
-            "skill": MIN_SKILL_VERSION,
-        },
-        "defaultToolCount": len(expected_tool_names(advanced=False)),
-        "advancedToolCount": len(expected_tool_names(advanced=True)),
-        "domainCount": len(DOMAIN_SPECS),
-        "skillRequiredToolCount": len(skill_required_tool_names()),
-        "contractHash": contract_hash(),
-    }
+    """Return the immutable 4.0.0 release coordinates.
+
+    This renderer is a historical receipt, not the current release contract.
+    Keep the target and binding hash literal when later releases raise their
+    compatibility floors and therefore receive a new canonical contract hash.
+    """
+
+    return dict(FROZEN_TARGET)
 
 
 def build_payload() -> dict[str, Any]:
@@ -151,7 +154,7 @@ def build_payload() -> dict[str, Any]:
             "canonicalToolSpec": "src/hwpx_mcp_server/tool_contract.py",
             "fastMcpRegistration": "src/hwpx_mcp_server/server.py",
             "boundInstalledToolCount": len(registry.tools),
-            "bindingHash": registry.binding_hash(),
+            "bindingHash": FROZEN_BINDING_HASH,
             "normalizedInputOutputSchemasComplete": all(
                 bool(item.input_schema) and bool(item.output_schema)
                 for item in registry.tools

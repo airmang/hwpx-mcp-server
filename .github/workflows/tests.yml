@@ -23,18 +23,42 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: airmang/python-hwpx
-          ref: cbed9a3c5a0e42bc415c742ffc063c0937cc2990
+          # Exact public python-hwpx 3.2.0 release commit.
+          ref: 52fb49102d10cd95d97f11b7dc0080158344bfa0
           path: python-hwpx
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e ../python-hwpx
         working-directory: hwpx-mcp-server
-      - run: python -m pip install -e ".[test]"
+      - run: python -m pip install -e ".[test,typecheck]"
         working-directory: hwpx-mcp-server
       - run: python scripts/check_public_hygiene.py
         working-directory: hwpx-mcp-server
-      - run: ruff check --select E9,F .
+      - name: Ruff source and touched-seam gates
+        run: |
+          ruff check --select E9,F .
+          ruff check --select E4,E7,E9,F \
+            src/hwpx_mcp_server/handlers \
+            src/hwpx_mcp_server/ops_services \
+            src/hwpx_mcp_server/runtime.py \
+            src/hwpx_mcp_server/runtime_services.py \
+            src/hwpx_mcp_server/fastmcp_adapter.py \
+            src/hwpx_mcp_server/tool_bindings.py \
+            src/hwpx_mcp_server/server.py \
+            src/hwpx_mcp_server/hwpx_ops.py \
+            src/hwpx_mcp_server/form_fill.py \
+            src/hwpx_mcp_server/tool_contract.py \
+            src/hwpx_mcp_server/workflow/service.py \
+            scripts/check_architecture_ratchets.py \
+            tests/test_architecture_ratchets.py
+        working-directory: hwpx-mcp-server
+      - name: Static type gates
+        run: |
+          python -m mypy
+          pyright --pythonpath "$(command -v python)"
+        working-directory: hwpx-mcp-server
+      - run: python scripts/check_architecture_ratchets.py
         working-directory: hwpx-mcp-server
       - run: python -m pytest -q
         working-directory: hwpx-mcp-server
@@ -62,7 +86,8 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: airmang/python-hwpx
-          ref: cbed9a3c5a0e42bc415c742ffc063c0937cc2990
+          # Exact public python-hwpx 3.2.0 release commit.
+          ref: 52fb49102d10cd95d97f11b7dc0080158344bfa0
           path: python-hwpx
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:

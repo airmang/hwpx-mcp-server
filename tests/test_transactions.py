@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-import hwpx_mcp_server.hwpx_ops as hwpx_ops_module
+import hwpx_mcp_server.ops_services.save_policy as save_policy_module
 import hwpx_mcp_server.server as server_module
 
 from hwpx_mcp_server.core.transactions import semantic_diff
@@ -157,7 +157,7 @@ def test_undo_last_edit_never_claims_same_bytes_external_replacement(
     backup = target.with_suffix(target.suffix + ".bak")
     target_before = target.read_bytes()
     backup_before = backup.read_bytes()
-    original_diff = server_module._OPS._semantic_diff_bytes
+    original_diff = server_module._OPS._services.save._semantic_diff_bytes
     replaced = False
 
     def replace_after_diff(before: bytes, after: bytes) -> dict:
@@ -170,7 +170,7 @@ def test_undo_last_edit_never_claims_same_bytes_external_replacement(
         return report
 
     monkeypatch.setattr(
-        server_module._OPS,
+        server_module._OPS._services.save,
         "_semantic_diff_bytes",
         replace_after_diff,
     )
@@ -195,7 +195,7 @@ def test_undo_preserves_owned_target_when_backup_publication_is_replaced(
     backup = target.with_suffix(target.suffix + ".bak")
     target_before = target.read_bytes()
     backup_before = backup.read_bytes()
-    original_diff = server_module._OPS._semantic_diff_bytes
+    original_diff = server_module._OPS._services.save._semantic_diff_bytes
     replaced = False
 
     def replace_backup_after_diff(before: bytes, after: bytes) -> dict:
@@ -208,7 +208,7 @@ def test_undo_preserves_owned_target_when_backup_publication_is_replaced(
         return report
 
     monkeypatch.setattr(
-        server_module._OPS,
+        server_module._OPS._services.save,
         "_semantic_diff_bytes",
         replace_backup_after_diff,
     )
@@ -236,7 +236,9 @@ def test_undo_rolls_back_both_owned_publications_after_evidence_failure(
     def fail_diff(before: bytes, after: bytes) -> dict:
         raise RuntimeError("forced undo evidence failure")
 
-    monkeypatch.setattr(server_module._OPS, "_semantic_diff_bytes", fail_diff)
+    monkeypatch.setattr(
+        server_module._OPS._services.save, "_semantic_diff_bytes", fail_diff
+    )
 
     with pytest.raises(RuntimeError, match="undo evidence"):
         undo_last_edit(str(target))
@@ -282,7 +284,9 @@ def test_undo_preserves_both_preimages_when_backup_rollback_loses_cas(
             replaced = True
         return original_publish(guard, data, **kwargs)
 
-    monkeypatch.setattr(server_module._OPS, "_semantic_diff_bytes", fail_diff)
+    monkeypatch.setattr(
+        server_module._OPS._services.save, "_semantic_diff_bytes", fail_diff
+    )
     monkeypatch.setattr(
         storage,
         "atomic_publish_bytes",
@@ -328,7 +332,9 @@ def test_undo_recovery_does_not_overwrite_existing_numbered_candidate(
             recovery_publications.append(guard.path)
         return original_publish(guard, data, **kwargs)
 
-    monkeypatch.setattr(server_module._OPS, "_semantic_diff_bytes", fail_diff)
+    monkeypatch.setattr(
+        server_module._OPS._services.save, "_semantic_diff_bytes", fail_diff
+    )
     monkeypatch.setattr(
         storage,
         "atomic_publish_bytes",
@@ -385,7 +391,9 @@ def test_undo_target_rollback_claim_loss_preserves_a_b_and_external_c(
             replaced = True
         return publication
 
-    monkeypatch.setattr(server_module._OPS, "_semantic_diff_bytes", fail_diff)
+    monkeypatch.setattr(
+        server_module._OPS._services.save, "_semantic_diff_bytes", fail_diff
+    )
     monkeypatch.setattr(
         storage,
         "atomic_publish_bytes",
@@ -506,7 +514,9 @@ def test_undo_recovery_claim_loss_retries_fresh_random_candidate(
             replaced = True
         return original_read(guard)
 
-    monkeypatch.setattr(server_module._OPS, "_semantic_diff_bytes", fail_diff)
+    monkeypatch.setattr(
+        server_module._OPS._services.save, "_semantic_diff_bytes", fail_diff
+    )
     monkeypatch.setattr(
         storage,
         "read_guarded_bytes",
@@ -549,7 +559,9 @@ def test_undo_ignores_exhausted_legacy_recovery_namespace(
     def fail_diff(before: bytes, after: bytes) -> dict:
         raise RuntimeError("forced undo evidence failure")
 
-    monkeypatch.setattr(server_module._OPS, "_semantic_diff_bytes", fail_diff)
+    monkeypatch.setattr(
+        server_module._OPS._services.save, "_semantic_diff_bytes", fail_diff
+    )
 
     with pytest.raises(RuntimeError, match="undo evidence"):
         undo_last_edit(str(target))
@@ -578,7 +590,7 @@ def test_undo_recovery_preflight_failure_does_not_mutate_swap_pair(
         raise RuntimeError("forced recovery storage failure")
 
     monkeypatch.setattr(
-        server_module._OPS,
+        server_module._OPS._services.save,
         "_publish_exact_recovery",
         fail_recovery,
     )
@@ -689,7 +701,7 @@ def test_undo_validates_guarded_bytes_without_temp_path_substitution(
     assert build_hwpx_open_safety_report(backup)["ok"] is False
 
     observed_sources: list[object] = []
-    original_report = hwpx_ops_module.build_hwpx_verification_report
+    original_report = save_policy_module.build_hwpx_verification_report
 
     def substitute_only_path_sources(source, *args, **kwargs):
         observed_sources.append(source)
@@ -698,7 +710,7 @@ def test_undo_validates_guarded_bytes_without_temp_path_substitution(
         return original_report(source, *args, **kwargs)
 
     monkeypatch.setattr(
-        hwpx_ops_module,
+        save_policy_module,
         "build_hwpx_verification_report",
         substitute_only_path_sources,
     )

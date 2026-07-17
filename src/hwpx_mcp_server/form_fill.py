@@ -44,7 +44,6 @@ from . import quality as quality_contract
 from .core.content import get_table_data, get_table_map_in_doc, set_cell_text
 from .core.document import open_doc
 from .core.formatting import list_styles_in_doc
-from .hwpx_ops import HwpxOps
 from .storage import build_hwpx_open_safety_report
 from .upstream import repair_pathological_text_spacing, validate_document_path
 from .utils.helpers import resolve_path
@@ -549,7 +548,7 @@ def _document_outline(doc: Any) -> list[dict[str, Any]]:
     return outline
 
 
-def _build_mapping_analysis(doc: Any, canonical_input: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+def _build_mapping_analysis(doc: Any, canonical_input: dict[str, Any]) -> dict[str, Any]:
     resolved: list[dict[str, Any]] = []
     unresolved: list[dict[str, Any]] = []
     form_fields = _document_form_fields(doc)
@@ -988,7 +987,7 @@ def _cell_text(doc: Any, table_index: int, row: int, col: int) -> str:
 
 
 def _cell(doc: Any, table_index: int, row: int, col: int) -> Any:
-    tables = []
+    tables: list[Any] = []
     for paragraph in doc.paragraphs:
         tables.extend(getattr(paragraph, "tables", []))
     return tables[table_index].rows[row].cells[col]
@@ -1078,8 +1077,15 @@ def _reread_touched(doc: Any, applied: list[dict[str, Any]]) -> list[dict[str, A
 
 
 def _runtime_validation(path: str) -> dict[str, Any]:
-    ops = HwpxOps(auto_backup=False)
-    structure = ops.validate_structure(path)
+    document_report = validate_document_path(path)
+    structure_issues = [
+        {
+            "part": getattr(issue, "part_name", None),
+            "message": getattr(issue, "message", str(issue)),
+        }
+        for issue in getattr(document_report, "issues", ())
+    ]
+    structure = {"ok": not structure_issues, "issues": structure_issues}
     if validate_package is None:
         package = _dependency_unavailable_report(
             "python-hwpx>=2.10.3 is required for HWPX package validation",
@@ -1087,7 +1093,6 @@ def _runtime_validation(path: str) -> dict[str, Any]:
         )
     else:
         package = _package_report(validate_package(path))
-    document_report = validate_document_path(path)
     open_safety = build_hwpx_open_safety_report(Path(path))
     return {
         "validate_structure": structure,

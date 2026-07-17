@@ -9,6 +9,7 @@ import anyio
 import pytest
 
 from hwpx_mcp_server.compat import patch_python_hwpx
+from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
 def _reload_server():
@@ -91,7 +92,7 @@ def test_batch_replace_schema_and_runtime_align(tmp_path: Path):
     server.create_document(str(target))
     server.add_paragraph(str(target), "2026년 계획, 2025년 실적")
 
-    schema = server.mcp._tool_manager._tools["batch_replace"].parameters
+    schema = snapshot_runtime_tools(server.mcp)["batch_replace"].input_schema
     assert "replacements" in schema.get("properties", {})
     assert "replacements" in schema.get("required", [])
 

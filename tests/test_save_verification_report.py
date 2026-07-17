@@ -519,11 +519,17 @@ def test_generated_document_save_preserves_existing_target_when_open_safety_fail
             }
         }
 
-    monkeypatch.setattr(server_module, "build_hwpx_verification_report", blocked_verification)
+    from hwpx_mcp_server.handlers import authoring as authoring_handler
+
+    monkeypatch.setattr(
+        authoring_handler,
+        "build_hwpx_verification_report",
+        blocked_verification,
+    )
     doc = new_document()
     try:
         with pytest.raises(RuntimeError, match="generated HWPX failed open-safety"):
-            server_module._save_generated_document(doc, str(target))
+            authoring_handler._save_generated_document(doc, str(target))
     finally:
         doc.close()
 

@@ -4,6 +4,7 @@ import pytest
 
 import hwpx_mcp_server.quality_generation as quality_generation_module
 from hwpx_mcp_server import server
+from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
 def _idea() -> dict:
@@ -40,7 +41,7 @@ def _idea() -> dict:
 
 
 def test_quality_generation_tools_are_exposed() -> None:
-    names = set(server.mcp._tool_manager._tools.keys())
+    names = set(snapshot_runtime_tools(server.mcp))
 
     assert {"analyze_quality_generation", "apply_quality_generation"}.issubset(names)
 

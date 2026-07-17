@@ -3040,7 +3040,7 @@ def test_specialized_missing_parent_precondition_rejects_external_appearance(
     source = tmp_path / "source.hwpx"
     output = tmp_path / "new/deep/output.hwpx"
     _build_fixture(source)
-    original_write = server._OPS._write_patched
+    original_write = server._OPS._services.save._write_patched
     external = b"external output"
 
     def create_external_before_materialization(*args: Any, **kwargs: Any) -> Any:
@@ -3049,7 +3049,7 @@ def test_specialized_missing_parent_precondition_rejects_external_appearance(
         return original_write(*args, **kwargs)
 
     monkeypatch.setattr(
-        server._OPS,
+        server._OPS._services.save,
         "_write_patched",
         create_external_before_materialization,
     )

@@ -3,6 +3,7 @@ import importlib
 import pytest
 
 from hwpx_mcp_server.core.document import open_doc
+from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
 @pytest.fixture(autouse=True)
@@ -43,7 +44,7 @@ def test_advanced_tools_hidden_by_default(monkeypatch):
     import hwpx_mcp_server.server as server
 
     reloaded = importlib.reload(server)
-    tool_names = set(reloaded.mcp._tool_manager._tools.keys())
+    tool_names = set(snapshot_runtime_tools(reloaded.mcp))
 
     assert "package_parts" not in tool_names
     assert "plan_edit" not in tool_names

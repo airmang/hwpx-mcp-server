@@ -18,6 +18,7 @@ import pytest
 
 import hwpx
 import hwpx_mcp_server.server as server
+from hwpx_mcp_server.handlers import specialized as specialized_handler
 from hwpx.document import HwpxDocument
 from hwpx.exam import SplitReport
 from hwpx.oxml.namespaces import HH
@@ -97,7 +98,9 @@ def test_set_paragraph_format_page_break_before(tmp_path):
 
 def test_verify_question_splits_no_oracle(tmp_path, monkeypatch):
     path = _make_doc(tmp_path)
-    monkeypatch.setattr(server, "resolve_oracle", lambda: _FakeOracle(False, None))
+    monkeypatch.setattr(
+        specialized_handler, "resolve_oracle", lambda: _FakeOracle(False, None)
+    )
     res = server.verify_question_splits(path)
     assert res["renderChecked"] is False
     assert res["needsReview"] is True
@@ -106,7 +109,9 @@ def test_verify_question_splits_no_oracle(tmp_path, monkeypatch):
 
 def test_verify_question_splits_render_returns_none(tmp_path, monkeypatch):
     path = _make_doc(tmp_path)
-    monkeypatch.setattr(server, "resolve_oracle", lambda: _FakeOracle(True, None))
+    monkeypatch.setattr(
+        specialized_handler, "resolve_oracle", lambda: _FakeOracle(True, None)
+    )
     res = server.verify_question_splits(path)
     assert res["renderChecked"] is False
     assert res["needsReview"] is True
@@ -115,8 +120,16 @@ def test_verify_question_splits_render_returns_none(tmp_path, monkeypatch):
 
 def test_verify_question_splits_curve_export(tmp_path, monkeypatch):
     path = _make_doc(tmp_path)
-    monkeypatch.setattr(server, "resolve_oracle", lambda: _FakeOracle(True, "/tmp/fake.pdf"))
-    monkeypatch.setattr(server, "measure_question_splits", lambda pdf, **kw: SplitReport(0, 0, 0, {}, ()))
+    monkeypatch.setattr(
+        specialized_handler,
+        "resolve_oracle",
+        lambda: _FakeOracle(True, "/tmp/fake.pdf"),
+    )
+    monkeypatch.setattr(
+        specialized_handler,
+        "measure_question_splits",
+        lambda pdf, **kw: SplitReport(0, 0, 0, {}, ()),
+    )
     res = server.verify_question_splits(path, valid_question_numbers=["1", "2"])
     assert res["renderChecked"] is True
     assert res["splits"] is None  # curve-export form: unverifiable, never a silent 0
@@ -126,9 +139,15 @@ def test_verify_question_splits_curve_export(tmp_path, monkeypatch):
 
 def test_verify_question_splits_reports_splits(tmp_path, monkeypatch):
     path = _make_doc(tmp_path)
-    monkeypatch.setattr(server, "resolve_oracle", lambda: _FakeOracle(True, "/tmp/fake.pdf"))
     monkeypatch.setattr(
-        server, "measure_question_splits", lambda pdf, **kw: SplitReport(2, 5, 120, {"column": 2}, ("3", "4"))
+        specialized_handler,
+        "resolve_oracle",
+        lambda: _FakeOracle(True, "/tmp/fake.pdf"),
+    )
+    monkeypatch.setattr(
+        specialized_handler,
+        "measure_question_splits",
+        lambda pdf, **kw: SplitReport(2, 5, 120, {"column": 2}, ("3", "4")),
     )
     res = server.verify_question_splits(path)
     assert res["renderChecked"] is True
@@ -140,8 +159,16 @@ def test_verify_question_splits_reports_splits(tmp_path, monkeypatch):
 
 def test_verify_question_splits_clean(tmp_path, monkeypatch):
     path = _make_doc(tmp_path)
-    monkeypatch.setattr(server, "resolve_oracle", lambda: _FakeOracle(True, "/tmp/fake.pdf"))
-    monkeypatch.setattr(server, "measure_question_splits", lambda pdf, **kw: SplitReport(0, 5, 120, {}, ()))
+    monkeypatch.setattr(
+        specialized_handler,
+        "resolve_oracle",
+        lambda: _FakeOracle(True, "/tmp/fake.pdf"),
+    )
+    monkeypatch.setattr(
+        specialized_handler,
+        "measure_question_splits",
+        lambda pdf, **kw: SplitReport(0, 5, 120, {}, ()),
+    )
     res = server.verify_question_splits(path)
     assert res["renderChecked"] is True
     assert res["splits"] == 0

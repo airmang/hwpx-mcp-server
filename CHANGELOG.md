@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-07-17
+
+### Added
+- Extends the existing `apply_document_commands` transaction to edit body text,
+  table-cell text, and simple text in an existing section `BOTH` header in one
+  revision-bound serialization. Dry-run, rollback, idempotency, byte preservation,
+  reopen, and open-safety receipts remain part of the same installed tool.
+- Adds architecture ratchets for handler ownership, service boundaries, import cycles,
+  FastMCP private-access isolation, complexity, and the supported `mcp==1.28.1`
+  registration/error/protocol contract.
+
+### Changed
+- Requires `python-hwpx>=3.2.0` for the multi-story transaction and correct
+  renderable multi-section package construction. The `oracle` and `vision` extras
+  require the matching `python-hwpx[visual]>=3.2.0` floor.
+- Decomposes all 132 canonical callables into ten handler owners behind one immutable
+  binding map, and places the exact `HwpxOps` compatibility facade over twelve bounded
+  services. All unavoidable FastMCP private access is confined to one audited adapter.
+- Preserves the exact 121 default / 132 advanced tool names, order, schemas, and 28
+  skill-required tools. The approved minimum coordinates are MCP `4.1.0`, core `3.2.0`,
+  and skill `0.4.0`; because those coordinates are part of the canonical payload, the
+  release contract hash is `c127914cc3f4480e`.
+
+### Fixed
+- Routes durable workflow dispatch and direct FastMCP registration through the same
+  immutable callable owners, preventing the two runtime paths from drifting.
+- Fails the non-body story command closed for unsupported rich/control headers instead
+  of partially editing or flattening their structure.
+
 ## [4.0.0] - 2026-07-16
 
 ### Added

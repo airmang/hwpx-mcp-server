@@ -9,6 +9,7 @@ import hwpx_mcp_server.server as server
 from hwpx.tools.redline import verify_redline
 from hwpx.visual import oracle as _oracle
 from hwpx_mcp_server.core.document import open_doc
+from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
 @pytest.fixture
@@ -50,7 +51,7 @@ def _sample_edits(paragraph_index: int) -> list[dict[str, object]]:
 
 
 def test_add_tracked_edit_tool_is_exposed() -> None:
-    assert "add_tracked_edit" in server.mcp._tool_manager._tools
+    assert "add_tracked_edit" in snapshot_runtime_tools(server.mcp)
 
 
 def test_add_tracked_edit_writes_structural_redline_receipt(

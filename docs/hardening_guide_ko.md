@@ -3,8 +3,14 @@
 ## 공개 계약과 프로필
 
 - 도구 등록, 입력·출력 스키마, health/capability 표면과 생성 문서는 하나의
-  `ToolSpec` 레지스트리에서 만들어집니다. 4.0.0 공개 릴리스는 기본 121개, 고급 모드 포함
-  132개 도구이며 계약 해시는 `f46ec677231b3a20`입니다.
+  `ToolSpec` 레지스트리에서 만들어집니다. 4.1.0 공개 릴리스는 기본 121개, 고급 모드 포함
+  132개 도구와 28개 skill-required 도구를 유지하며 계약 해시는
+  `c127914cc3f4480e`입니다. 최소 좌표는 core `3.2.0`, MCP `4.1.0`, skill
+  `0.4.0`입니다.
+- 4.0.0의 `f46ec677231b3a20`은 역사적 계약입니다. 최소 버전 좌표도 canonical
+  payload에 포함되므로 도구 이름·순서·스키마가 같더라도 4.1.0 해시와 섞어 쓰면
+  안 됩니다. `mcp_server_health`가 좌표나 해시 skew를 보고하면 쓰기를 진행하지
+  마세요.
 - 스키마는 JSON Schema 2020-12 기준이며 `$defs`, `$ref`, `anyOf`를 사용할 수
   있습니다. 실제 호스트에 노출되는 계약은 `docs/tool-contract.generated.json`과
   `docs/tool-contract.md`에서 확인합니다.
@@ -47,6 +53,9 @@
   `apply_evalplan_fill`은 untouched package byte를 지키기 위한 명시적 carveout입니다.
   guarded publication, open-safety, byte/member diff와 공통 verification receipt를
   사용하며 전체 `visualComplete` 렌더를 주장하지 않습니다.
+- `apply_document_commands`의 다중 story 트랜잭션은 본문, 표 셀, 기존 구역의
+  단순 `BOTH` 머리글을 같은 revision과 직렬화에 묶습니다. rich/control 머리글은
+  평탄화하지 않고 fail-closed로 거부하며, 실패 시 부분 출력이 없어야 합니다.
 - canonical mixed-form 분석과 dry-run은 출력 상위 디렉터리를 만들지 않습니다. 적용과
   검증은 source/output revision, inode, mode 및 정확한 publication token을 다시
   확인하며 외부가 바꾼 파일은 같은 바이트여도 원복하거나 덮어쓰지 않습니다.

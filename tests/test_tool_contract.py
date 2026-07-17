@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import anyio
@@ -12,12 +13,19 @@ from jsonschema import Draft202012Validator
 
 from hwpx_mcp_server import __version__
 from hwpx_mcp_server import server
+import hwpx_mcp_server.tool_contract as tool_contract_module
+from hwpx_mcp_server.handlers import quality_render as quality_render_handlers
+from hwpx_mcp_server.fastmcp_adapter import (
+    runtime_server_version,
+    snapshot_runtime_tools,
+)
 from hwpx_mcp_server.tool_contract import (
     BASELINE_TOOL_SPECS,
     DOMAIN_SPECS,
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
+    RELEASED_CONTRACT_HASH,
     ToolClassification,
     ToolAvailability,
     bind_tool_specs,
@@ -101,7 +109,7 @@ REMOVED_PRACTICE_TOOLS = {
 
 
 def test_active_registry_exactly_matches_contract() -> None:
-    assert server.mcp._mcp_server.version == __version__
+    assert runtime_server_version(server.mcp) == __version__
     assert set(server._fastmcp_tool_names()) == expected_tool_names(
         advanced=server._ACTIVE_ADVANCED
     )
@@ -141,13 +149,14 @@ def test_artifact_materializing_render_tools_are_marked_mutating() -> None:
 
 def test_release_contract_versions_counts_and_hash_are_exact() -> None:
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
-        "3.1.0",
-        "4.0.0",
-        "0.3.0",
+        "3.2.0",
+        "4.1.0",
+        "0.4.0",
     )
     assert len(expected_tool_names(advanced=False)) == 121
     assert len(expected_tool_names(advanced=True)) == 132
     assert len(skill_required_tool_names()) == 28
+    assert RELEASED_CONTRACT_HASH == contract_hash() == "c127914cc3f4480e"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 
@@ -336,12 +345,18 @@ import hwpx_mcp_server.server  # noqa: F401
 
 
 def test_health_detects_live_schema_skew(monkeypatch) -> None:
-    manager = server.mcp._tool_manager
-    tool = manager._tools["apply_table_ops"]
-    skewed = dict(tool.parameters)
+    snapshots = dict(snapshot_runtime_tools(server.mcp))
+    tool = snapshots["apply_table_ops"]
+    skewed = dict(tool.input_schema)
     skewed["properties"] = dict(skewed["properties"])
     skewed["properties"].pop("ops")
-    monkeypatch.setattr(tool, "parameters", skewed)
+    snapshots["apply_table_ops"] = replace(tool, input_schema=skewed)
+    monkeypatch.setattr(
+        tool_contract_module,
+        "snapshot_runtime_tools",
+        lambda _mcp: snapshots,
+        raising=False,
+    )
 
     health = server.mcp_server_health()
 
@@ -467,7 +482,11 @@ def test_health_fails_exactly_when_required_tool_missing(monkeypatch) -> None:
         name for name in report["actualOrder"] if name != "apply_table_ops"
     ]
     report["missing"] = ["apply_table_ops"]
-    monkeypatch.setattr(server, "validate_registered_tools", lambda *_: report)
+    monkeypatch.setattr(
+        quality_render_handlers,
+        "validate_registered_tools",
+        lambda *_: report,
+    )
 
     health = server.mcp_server_health()
 
@@ -525,7 +544,7 @@ def test_generated_versioned_contract_delta_is_current() -> None:
         "advancedToolCount": 132,
         "domainCount": 19,
         "skillRequiredToolCount": 28,
-        "contractHash": contract_hash(),
+        "contractHash": "f46ec677231b3a20",
     }
     assert {item["name"] for item in payload["removedTools"]} == INTERNAL_FIXTURE_QA_TOOLS
     assert all(item["alias"] is None for item in payload["removedTools"])

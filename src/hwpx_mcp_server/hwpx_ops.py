@@ -1,183 +1,37 @@
 # SPDX-License-Identifier: Apache-2.0
-""":mod:`python-hwpx` 위에 구축한 고수준 연산 모음."""
+
+""":mod:`python-hwpx` 위에 구축한 고수준 연산 호환 facade."""
 
 from __future__ import annotations
 
-import base64
-import binascii
-import copy
-import dataclasses
-import hashlib
-import json
 import logging
-import math
-import os
-import re
-import re as _re
-import shutil
-import subprocess
-import tempfile
-from dataclasses import asdict
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
-from uuid import uuid4
-from xml.etree import ElementTree as ET
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
 
-from .core.plan import (
-    ApplyEditInput,
-    GetContextInput,
-    PipelineError,
-    PlanEditInput,
-    PlanManager,
-    PreviewEditInput,
-    SearchHitModel,
-    SearchInput,
-    SearchOutput,
-)
-from .hwp_support import HwpBinaryError, extract_hwp_text
-from .hwp_converter import HwpConversionError, convert_hwp_to_hwpx
-from .metadata import tools_meta
+from .core.plan import PlanManager
 from .core.locator import RegisteredHandle
-from .core.context import default_session_lifecycle_policy
-from .core.resources import (
-    DocumentMetadataResource,
-    DocumentParagraphsResource,
-    DocumentTablesResource,
-    ParagraphResourceEntry,
-    TableResourceEntry,
-)
-from .core.content import (
-    add_heading_to_doc,
-    add_page_break_to_doc,
-    add_paragraph_to_doc,
-    add_table_to_doc,
-    delete_paragraph_from_doc,
-    insert_paragraph_to_doc,
-    set_cell_text,
-)
-from . import quality as quality_contract
-from .errors import build_error_payload
-from .storage import DocumentStorage, LocalDocumentStorage, build_hwpx_verification_report
-from .workspace import (
-    WorkspaceMissingParentGuard,
-    WorkspaceOutputGuard,
-    WorkspacePathError,
-)
-from .core.search import batch_replace_in_doc, replace_in_doc
-from .core.transactions import (
-    BackupReport,
-    backup_path_for,
-    rotate_and_backup,
-    rotated_backup_path,
-    save_dry_run,
-    semantic_diff,
-    undo_last_backup,
-)
+from .storage import DocumentStorage, LocalDocumentStorage
+from .workspace import WorkspaceMissingParentGuard, WorkspaceOutputGuard
+from .upstream import HH_NS as HH_NS
+from .upstream import HP_NS as HP_NS
 from .upstream import (
-    AnnotationOptions,
-    HH_NS,
-    HP_NS,
     HwpxDocument,
     HwpxOxmlMemo,
     HwpxOxmlParagraph,
-    HwpxOxmlRun,
     HwpxOxmlTable,
-    ValidationReport,
-    create_object_finder,
-    create_text_extractor,
-    default_cell_width,
-    ensure_char_style,
-    export_document,
-    new_document,
-    normalize_hex_color,
-    open_package,
-    validate_document_path,
 )
-from hwpx.tools.id_integrity import check_id_integrity
-
-try:  # python-hwpx >= layout preview feature
-    from hwpx.tools.layout_preview import render_layout_preview as render_hwpx_layout_preview
-except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
-    render_hwpx_layout_preview = None
-    _LAYOUT_PREVIEW_IMPORT_ERROR: Exception | None = exc
-else:
-    _LAYOUT_PREVIEW_IMPORT_ERROR = None
+from .errors import build_error_payload
+from .ops_services.composition import HwpxOpsServices, build_hwpx_ops_services
+from .ops_services.context import DocumentContext
+from .ops_services.save_policy import (
+    SavePolicy,
+    _ExactBackupResult,
+    _ExactRecoveryPublication,
+    _ExactSidecarMutation,
+)
+from .ops_services.tables import DEFAULT_PAGING_PARAGRAPH_LIMIT
 
 logger = logging.getLogger(__name__)
-
-_CELL_TEXT_ILLEGAL = _re.compile(
-    r"[\x00-\x08\x09\x0b\x0c\x0d\x0e-\x1f\ufffe\uffff]"
-)
-
-
-def _sanitize_cell_text(value: str) -> str:
-    """Remove characters illegal inside HWPML <hp:t> nodes.
-
-    Tab (U+0009) is stripped - it must live in a separate cell column,
-    not be concatenated with the text. \r is stripped; \n is kept.
-    Logs a warning when anything is actually removed.
-    """
-    cleaned = _CELL_TEXT_ILLEGAL.sub("", value)
-    if cleaned != value:
-        logger.warning(
-            "cell text contained illegal characters and was sanitised",
-            extra={"original_len": len(value), "cleaned_len": len(cleaned)},
-        )
-    return cleaned
-
-_DEFAULT_CELL_WIDTH = default_cell_width()
-
-_AUTO_FIT_CHAR_UNIT = max(360, _DEFAULT_CELL_WIDTH // 10)
-_AUTO_FIT_PADDING_CHARS = 2
-_AUTO_FIT_MIN_COLUMN_WIDTH = max(_AUTO_FIT_CHAR_UNIT * (_AUTO_FIT_PADDING_CHARS + 1), _DEFAULT_CELL_WIDTH // 2)
-_AUTO_FIT_MAX_COLUMN_WIDTH = _DEFAULT_CELL_WIDTH * 12
-
-
-DEFAULT_PAGING_PARAGRAPH_LIMIT = 200
-_PREVIEW_SCHEMA_VERSION = "hwpx.render-preview.v1"
-_VISUAL_REVIEW_SCHEMA_VERSION = "hwpx.visual-review.v1"
-# Cap for inline-embedded preview PNGs (per page). Oversized pages keep their
-# on-disk path but skip the base64 payload so a response can't balloon.
-_DEFAULT_MAX_PREVIEW_IMAGE_BYTES = 6 * 1024 * 1024
-_CSS_PX_PER_MM = 96 / 25.4
-_CHROME_CANDIDATES = (
-    "chromium",
-    "chromium-browser",
-    "google-chrome",
-    "google-chrome-stable",
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-)
-
-
-def _preview_slug(path: Path) -> str:
-    stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", path.stem).strip("-")
-    return stem or "document"
-
-
-def _chrome_executable() -> str | None:
-    env_path = os.environ.get("HWPX_MCP_CHROME_PATH")
-    if env_path and Path(env_path).exists():
-        return env_path
-    for candidate in _CHROME_CANDIDATES:
-        if candidate.startswith("/"):
-            if Path(candidate).exists():
-                return candidate
-            continue
-        resolved = shutil.which(candidate)
-        if resolved:
-            return resolved
-    return None
-
-
-def _page_viewport(page: Dict[str, Any]) -> tuple[int, int]:
-    width = max(320, math.ceil(float(page.get("widthMm", 210.0)) * _CSS_PX_PER_MM))
-    height = max(320, math.ceil(float(page.get("heightMm", 297.0)) * _CSS_PX_PER_MM))
-    return width, height
-
-
-def _write_json(path: Path, payload: Dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 class HwpxOperationError(RuntimeError):
@@ -210,35 +64,6 @@ class HwpxHandleNotFoundError(HwpxOperationError):
     """등록되지 않은 핸들 조회 시 사용하는 예외."""
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
-class _ExactSidecarMutation:
-    """One identity-bound sidecar publication and its exact prestate."""
-
-    before_guard: WorkspaceOutputGuard
-    before_bytes: bytes | None
-    publication: WorkspaceOutputGuard
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class _ExactRecoveryPublication:
-    """One randomly named exact recovery publication and its immutable bytes."""
-
-    base_path: Path
-    data: bytes
-    mode: int | None
-    marker: str
-    publication: WorkspaceOutputGuard
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class _ExactBackupResult:
-    """Backup receipt plus reversible identity-bound sidecar publications."""
-
-    report: BackupReport
-    mutations: tuple[_ExactSidecarMutation, ...] = ()
-    recoveries: tuple[_ExactRecoveryPublication, ...] = ()
-
-
 class HwpxOps:
     """MCP 도구에서 활용하는 안전한 고수준 헬퍼 모음."""
 
@@ -253,7 +78,9 @@ class HwpxOps:
         if storage is not None and (base_directory is not None or auto_backup):
             logger.debug(
                 "Ignoring base_directory/auto_backup parameters because explicit storage was provided",
-                extra={"base_directory": str(base_directory) if base_directory else None},
+                extra={
+                    "base_directory": str(base_directory) if base_directory else None
+                },
             )
 
         if storage is None:
@@ -263,19 +90,23 @@ class HwpxOps:
                 logger=logger,
             )
 
+        context = DocumentContext(
+            storage=storage,
+            paging_paragraph_limit=paging_paragraph_limit,
+            error_type=HwpxOperationError,
+            handle_error_type=HwpxHandleNotFoundError,
+        )
+        self._services: HwpxOpsServices = build_hwpx_ops_services(context)
         self.storage = storage
         self.base_directory = storage.base_directory
-        self.paging_limit = max(1, paging_paragraph_limit)
-        self._plan_manager = PlanManager()
-        self._registered_handles: Dict[str, RegisteredHandle] = {}
+        self.paging_limit = context.paging_limit
+        self._plan_manager = self._services.planning.plan_manager
+        self._registered_handles = context.registered_handles
 
     @property
     def plan_manager(self) -> PlanManager:
-        return self._plan_manager
+        return self._services.planning.plan_manager
 
-    # ------------------------------------------------------------------
-    # Basic helpers
-    # ------------------------------------------------------------------
     def _new_error(
         self,
         code: str,
@@ -284,71 +115,33 @@ class HwpxOps:
         details: Optional[Dict[str, Any]] = None,
         hint: Optional[str] = None,
     ) -> HwpxOperationError:
-        return HwpxOperationError(message, code=code, details=details, hint=hint)
+        return cast(HwpxOperationError, self._services.context._new_error(
+            code, message, details=details, hint=hint
+        ))
 
     def _resolve_path(self, path: str, *, must_exist: bool = True) -> Path:
-        try:
-            resolved = self.storage.resolve_path(path, must_exist=must_exist)
-        except FileNotFoundError as exc:
-            raise self._new_error(
-                "DOCUMENT_NOT_FOUND",
-                "요청한 문서를 허용된 작업공간에서 찾을 수 없습니다.",
-                details={"requestedName": Path(path).name},
-            ) from exc
-        except WorkspacePathError as exc:
-            raise self._new_error(
-                exc.code,
-                "요청한 경로가 허용된 HWPX 작업공간 경계를 벗어났습니다.",
-                details=exc.safe_details(),
-            ) from exc
-        except PermissionError as exc:
-            raise self._new_error(
-                "PERMISSION_DENIED",
-                "요청한 문서에 접근할 권한이 없습니다.",
-                details={"requestedName": Path(path).name},
-            ) from exc
-        self._register_handle(path, resolved)
-        return resolved
+        return self._services.context._resolve_path(path, must_exist=must_exist)
 
     def _make_handle_id(self, path: str, backend: Optional[str] = None) -> str:
-        seed = f"{backend or 'local'}::{path}"
-        digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
-        return f"h_{digest}"
+        return self._services.context._make_handle_id(path, backend)
 
     def _register_handle(self, path: str, resolved: Path) -> RegisteredHandle:
-        relative = self._relative_path(resolved)
-        handle_id = self._make_handle_id(relative)
-        handle = RegisteredHandle(handleId=handle_id, path=relative)
-        self._registered_handles[handle_id] = handle
-        return handle
+        return self._services.context._register_handle(path, resolved)
 
     def list_registered_handles(self) -> List[RegisteredHandle]:
-        return sorted(self._registered_handles.values(), key=lambda item: item.handle_id)
+        return self._services.context.list_registered_handles()
 
     def open_document_handle(self, path: str) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        handle = self._register_handle(path, resolved)
-        return {"handle": handle.model_dump(by_alias=True)}
+        return self._services.context.open_document_handle(path)
 
     def list_open_documents(self) -> Dict[str, Any]:
-        policy = default_session_lifecycle_policy()
-        return {
-            "documents": [
-                handle.model_dump(by_alias=True)
-                for handle in self.list_registered_handles()
-            ],
-            "sessionPolicy": policy.as_dict(),
-        }
+        return self._services.context.list_open_documents()
 
     def close_document_handle(self, handle_id: str) -> Dict[str, Any]:
-        removed = self._registered_handles.pop(handle_id, None)
-        return {"closed": removed is not None}
+        return self._services.context.close_document_handle(handle_id)
 
     def get_registered_handle(self, handle_id: str) -> RegisteredHandle:
-        handle = self._registered_handles.get(handle_id)
-        if handle is None:
-            raise HwpxHandleNotFoundError(f"등록되지 않은 handleId입니다: {handle_id}")
-        return handle
+        return self._services.context.get_registered_handle(handle_id)
 
     def resolve_document_path(
         self,
@@ -356,259 +149,77 @@ class HwpxOps:
         path: Optional[str] = None,
         handle_id: Optional[str] = None,
     ) -> str:
-        if path:
-            return path
-        if handle_id:
-            return self.get_registered_handle(handle_id).path
-        raise self._new_error(
-            "DOCUMENT_LOCATOR_REQUIRED",
-            "path 또는 handleId 중 하나를 제공해야 합니다.",
+        return self._services.context.resolve_document_path(
+            path=path, handle_id=handle_id
         )
 
     def get_metadata_by_handle(self, handle_id: str) -> Dict[str, Any]:
-        handle = self.get_registered_handle(handle_id)
-        payload = self.open_info(handle.path)
-        model = DocumentMetadataResource(
-            handleId=handle.handle_id,
-            locator=handle.model_dump(by_alias=True),
-            meta=payload["meta"],
-            sectionCount=payload["sectionCount"],
-            paragraphCount=payload["paragraphCount"],
-            headerCount=payload["headerCount"],
-        )
-        return model.model_dump(by_alias=True)
+        return self._services.read_query.get_metadata_by_handle(handle_id)
 
     def get_paragraphs_by_handle(self, handle_id: str) -> Dict[str, Any]:
-        handle = self.get_registered_handle(handle_id)
-        resolved = self._resolve_path(handle.path)
-        if resolved.suffix.lower() == ".hwp":
-            paragraphs, _, _ = self._read_only_hwp_paragraphs(handle.path)
-            serialized = [
-                ParagraphResourceEntry(paragraphIndex=index, text=text)
-                for index, text in enumerate(paragraphs)
-            ]
-            model = DocumentParagraphsResource(handleId=handle.handle_id, paragraphs=serialized)
-            return model.model_dump(by_alias=True)
-
-        serialized: List[ParagraphResourceEntry] = []
-        with create_text_extractor(resolved) as extractor:
-            for paragraph in extractor.iter_document_paragraphs():
-                serialized.append(
-                    ParagraphResourceEntry(
-                        paragraphIndex=paragraph.index,
-                        text=paragraph.text(preserve_breaks=True),
-                    )
-                )
-        model = DocumentParagraphsResource(handleId=handle.handle_id, paragraphs=serialized)
-        return model.model_dump(by_alias=True)
+        return self._services.read_query.get_paragraphs_by_handle(handle_id)
 
     def get_tables_by_handle(self, handle_id: str) -> Dict[str, Any]:
-        handle = self.get_registered_handle(handle_id)
-        resolved = self._resolve_path(handle.path)
-        if resolved.suffix.lower() == ".hwp":
-            model = DocumentTablesResource(handleId=handle.handle_id, tables=[])
-            return model.model_dump(by_alias=True)
-
-        document, _ = self._open_document(handle.path)
-        tables = self._iter_tables(document)
-        serialized = [
-            TableResourceEntry(
-                tableIndex=index,
-                rowCount=len(table.rows),
-                columnCount=len(table.columns),
-            )
-            for index, table in enumerate(tables)
-        ]
-        model = DocumentTablesResource(handleId=handle.handle_id, tables=serialized)
-        return model.model_dump(by_alias=True)
+        return self._services.read_query.get_tables_by_handle(handle_id)
 
     def _resolve_output_path(self, path: str) -> Path:
-        return self.storage.resolve_output_path(path)
+        return self._services.context._resolve_output_path(path)
 
     def _ensure_backup(self, path: Path) -> Optional[Path]:
-        return self.storage.ensure_backup(path)
+        return self._services.save._ensure_backup(path)
 
     def _relative_path(self, path: Path) -> str:
-        return self.storage.relative_path(path)
+        return self._services.context._relative_path(path)
 
     def _maybe_backup(self, path: Path) -> None:
-        self.storage.maybe_backup(path)
+        return self._services.save._maybe_backup(path)
 
     def _open_document(self, path: str) -> Tuple[HwpxDocument, Path]:
-        resolved = self._resolve_path(path)
-        if resolved.suffix.lower() == ".hwp":
-            raise self._new_error(
-                "READ_ONLY_HWP_DOCUMENT",
-                "HWP 파일은 편집이 불가합니다. 먼저 convert_hwp_to_hwpx 도구로 HWPX 변환 후 편집하세요.",
-            )
-        try:
-            document, resolved = self.storage.open_document(path)
-        except FileNotFoundError as exc:
-            raise self._new_error(
-                "DOCUMENT_NOT_FOUND",
-                "요청한 문서를 허용된 작업공간에서 찾을 수 없습니다.",
-                details={"requestedName": Path(path).name},
-            ) from exc
-        except WorkspacePathError as exc:
-            raise self._new_error(
-                exc.code,
-                "요청한 경로가 허용된 HWPX 작업공간 경계를 벗어났습니다.",
-                details=exc.safe_details(),
-            ) from exc
-        except PermissionError as exc:
-            raise self._new_error(
-                "PERMISSION_DENIED",
-                "요청한 문서에 접근할 권한이 없습니다.",
-                details={"requestedName": Path(path).name},
-            ) from exc
-        except Exception as exc:  # pragma: no cover - delegated to backend
-            raise self._new_error(
-                "DOCUMENT_OPEN_FAILED",
-                f"failed to open '{path}': {exc}",
-                details={"path": path},
-            ) from exc
-        return document, resolved
+        return self._services.context._open_document(path)
 
     def _read_only_hwp_paragraphs(self, path: str) -> Tuple[List[str], Path, str]:
-        resolved = self._resolve_path(path)
-        try:
-            snapshot = extract_hwp_text(resolved)
-        except HwpBinaryError as exc:
-            raise self._new_error("HWP_TEXT_EXTRACT_FAILED", f"HWP 텍스트 추출 실패: {exc}") from exc
-        return snapshot.paragraphs, resolved, snapshot.source
+        return self._services.context._read_only_hwp_paragraphs(path)
 
     def _ensure_planner_document(self, doc_id: str, path: str) -> None:
-        resolved = self._resolve_path(path)
-        paragraphs: List[str] = []
-        with create_text_extractor(resolved) as extractor:
-            for paragraph in extractor.iter_document_paragraphs():
-                paragraphs.append(paragraph.text(preserve_breaks=True))
-        self._plan_manager.register_document(doc_id, "\n".join(paragraphs))
+        return self._services.planning._ensure_planner_document(doc_id, path)
 
     def _save_document(
         self, document: HwpxDocument, target: Path, *, quality: Any = None
     ) -> Dict[str, Any]:
-        try:
-            return self.storage.save_document(document, target, quality=quality)
-        except quality_contract.CapabilitySkewError as exc:
-            # Fail closed on core/mcp/plugin skew (plan §2 Phase F).
-            raise self._new_error(
-                "CAPABILITY_SKEW",
-                f"capability handshake skew; writes are blocked: {exc}",
-                details={"capability": exc.state, "path": str(target)},
-            ) from exc
-        except quality_contract.QualityGateError as exc:
-            # visual_complete gate failed under an elevated policy → ok=false with
-            # a structured, retry-able error the model can act on.
-            raise self._new_error(
-                exc.code,
-                f"visual_complete gate failed: {exc}",
-                details={
-                    "path": str(target),
-                    "visualComplete": exc.block,
-                    "suggestedRetry": exc.block.get("suggestedRetry"),
-                },
-            ) from exc
-        except PermissionError as exc:
-            raise self._new_error(
-                "PERMISSION_DENIED",
-                f"문서 저장 권한이 없습니다: {target}",
-                details={"path": str(target)},
-            ) from exc
-        except Exception as exc:  # pragma: no cover - delegated to backend
-            raise self._new_error(
-                "DOCUMENT_SAVE_FAILED",
-                f"failed to save '{target}': {exc}",
-                details={"path": str(target)},
-            ) from exc
+        return self._services.save._save_document(document, target, quality=quality)
 
     def _save_transaction_document(
         self, document: HwpxDocument, target: Path, *, quality: Any = None
     ) -> Dict[str, Any]:
-        backup = rotate_and_backup(target)
-        verification = self._save_document(document, target, quality=quality)
-        if not isinstance(verification, dict):
-            verification = build_hwpx_verification_report(target)
-        verification["filePath"] = str(target)
-        verification["backup"] = backup.to_dict()
-        if backup.backup_path is not None:
-            try:
-                verification["semanticDiff"] = semantic_diff(
-                    backup.backup_path,
-                    target,
-                )
-            except Exception as exc:  # pragma: no cover - diagnostic fallback
-                verification["semanticDiff"] = {
-                    "schemaVersion": "hwpx.semantic-diff.v1",
-                    "changed": True,
-                    "summary": f"Semantic diff unavailable: {exc}",
-                    "items": [],
-                    "error": str(exc),
-                }
-        return verification
+        return self._services.save._save_transaction_document(
+            document, target, quality=quality
+        )
 
     @staticmethod
     def _report_for_bytes(data: bytes, *, file_path: Path) -> Dict[str, Any]:
-        return build_hwpx_verification_report(data, file_path=file_path)
+        return SavePolicy._report_for_bytes(data, file_path=file_path)
 
     @staticmethod
     def _semantic_diff_bytes(before: bytes, after: bytes) -> Dict[str, Any]:
-        return semantic_diff(before, after)
+        return SavePolicy._semantic_diff_bytes(before, after)
 
     def _capture_exact_sidecar_guard(self, path: Path) -> WorkspaceOutputGuard:
         """Authorize one derived sidecar name without following a final alias."""
-
-        if not isinstance(self.storage, LocalDocumentStorage):  # pragma: no cover
-            raise TypeError("exact sidecar guards require local storage")
-        lexical_path = path.parent.resolve(strict=True) / path.name
-        guard = self.storage.capture_output_guard(path)
-        if guard.path != lexical_path:
-            raise WorkspacePathError(
-                "derived backup path must not be a symlink or alias",
-                code="WORKSPACE_PATH_INVALID",
-                reason="output_target_alias",
-            )
-        return guard
+        return self._services.save._capture_exact_sidecar_guard(path)
 
     @staticmethod
     def _absent_publication_guard(
         guard: WorkspaceOutputGuard,
     ) -> WorkspaceOutputGuard:
         """Represent the exact absent state produced by a guarded deletion."""
-
-        return dataclasses.replace(
-            guard,
-            target_existed=False,
-            target_device=None,
-            target_inode=None,
-            target_digest=None,
-            target_mode=None,
-        )
+        return SavePolicy._absent_publication_guard(guard)
 
     def _assert_exact_sidecar_publication(
         self,
         guard: WorkspaceOutputGuard,
     ) -> None:
         """Revalidate either an exact file publication or guarded absence."""
-
-        if guard.target_existed:
-            self.storage.read_guarded_bytes(guard)
-            return
-        observed = self._capture_exact_sidecar_guard(guard.path)
-        if (
-            observed.target_existed
-            or observed.path != guard.path
-            or observed.root != guard.root
-            or observed.root_device != guard.root_device
-            or observed.root_inode != guard.root_inode
-            or observed.parent_device != guard.parent_device
-            or observed.parent_inode != guard.parent_inode
-        ):
-            raise WorkspacePathError(
-                "deleted sidecar changed before completion",
-                code="WORKSPACE_PATH_CHANGED",
-                reason="output_target_changed",
-            )
+        return self._services.save._assert_exact_sidecar_publication(guard)
 
     def _publish_exact_recovery(
         self,
@@ -620,44 +231,8 @@ class HwpxOps:
         max_candidates: int = 32,
     ) -> _ExactRecoveryPublication:
         """Publish recovery bytes without overwriting an existing sidecar."""
-
-        safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", base_path.name)[:48]
-        name_digest = hashlib.sha256(
-            os.fsencode(base_path.name)
-        ).hexdigest()[:12]
-        for _ in range(max_candidates):
-            candidate = base_path.with_name(
-                f".{safe_name}.{marker}.{name_digest}."
-                f"{uuid4().hex}.recovery"
-            )
-            try:
-                guard = self._capture_exact_sidecar_guard(candidate)
-            except WorkspacePathError:
-                continue
-            if guard.target_existed:
-                continue
-            try:
-                publication = self.storage.atomic_publish_bytes(
-                    guard,
-                    data,
-                    mode=mode,
-                )
-                self.storage.read_guarded_bytes(publication)
-                return _ExactRecoveryPublication(
-                    base_path=base_path,
-                    data=data,
-                    mode=mode,
-                    marker=marker,
-                    publication=publication,
-                )
-            except (OSError, RuntimeError):
-                # A publish-then-claim race may have installed and then
-                # replaced this candidate before the returned token could be
-                # verified. Preserve that external winner and retry the same
-                # immutable preimage at a fresh unpredictable name.
-                continue
-        raise RuntimeError(
-            f"no available exact recovery sidecar for {base_path.name}"
+        return self._services.save._publish_exact_recovery(
+            base_path, data, mode=mode, marker=marker, max_candidates=max_candidates
         )
 
     def _preserve_exact_preimages(
@@ -667,55 +242,21 @@ class HwpxOps:
         marker: str,
     ) -> tuple[_ExactRecoveryPublication, ...] | None:
         """Preserve every preimage before any destructive mutation begins."""
-
-        publications: list[_ExactRecoveryPublication] = []
-        for path, data, mode in preimages:
-            try:
-                publications.append(
-                    self._publish_exact_recovery(
-                        path,
-                        data,
-                        mode=mode,
-                        marker=marker,
-                    )
-                )
-            except (OSError, RuntimeError):
-                return None
-        return tuple(publications)
+        return self._services.save._preserve_exact_preimages(preimages, marker=marker)
 
     def _cleanup_exact_recoveries(
         self,
         recoveries: Sequence[_ExactRecoveryPublication],
     ) -> tuple[bool, bool]:
         """Remove proven recoveries, republishing all if any cleanup loses CAS."""
-
-        for recovery in recoveries:
-            try:
-                self.storage.read_guarded_bytes(recovery.publication)
-                self.storage.remove_guarded_output(recovery.publication)
-            except (FileNotFoundError, OSError, RuntimeError):
-                return False, self._republish_exact_recoveries(
-                    recoveries
-                )
-        return True, True
+        return self._services.save._cleanup_exact_recoveries(recoveries)
 
     def _republish_exact_recoveries(
         self,
         recoveries: Sequence[_ExactRecoveryPublication],
     ) -> bool:
         """Recreate immutable recovery copies after cleanup or claim loss."""
-
-        for item in recoveries:
-            try:
-                self._publish_exact_recovery(
-                    item.base_path,
-                    item.data,
-                    mode=item.mode,
-                    marker=item.marker,
-                )
-            except (OSError, RuntimeError):
-                return False
-        return True
+        return self._services.save._republish_exact_recoveries(recoveries)
 
     def _rotate_and_backup_exact(
         self,
@@ -726,128 +267,11 @@ class HwpxOps:
         max_backups: int = 5,
     ) -> _ExactBackupResult:
         """Rotate local sidecars from no-follow guards and an exact preimage."""
-
-        if not isinstance(self.storage, LocalDocumentStorage):
-            return _ExactBackupResult(
-                rotate_and_backup(target, max_backups=max_backups)
-            )
-        guard = target_guard or self.storage.capture_output_guard(target)
-        if not guard.target_existed:
-            return _ExactBackupResult(BackupReport(None))
-        preimage = (
-            target_bytes
-            if target_bytes is not None
-            else self.storage.read_guarded_bytes(guard)
-        )
-        # Revalidate ownership immediately before mutating any sidecar.
-        if self.storage.read_guarded_bytes(guard) != preimage:
-            raise WorkspacePathError(
-                "backup source changed before snapshot",
-                code="WORKSPACE_PATH_CHANGED",
-                reason="output_target_changed",
-            )
-        source_report = self._report_for_bytes(preimage, file_path=target)
-        if not source_report["openSafety"]["ok"]:
-            raise self._new_error(
-                "BACKUP_SOURCE_OPEN_SAFETY_FAILED",
-                "backup source failed open-safety verification",
-            )
-
-        backup = backup_path_for(target)
-        paths = [backup] + [
-            rotated_backup_path(target, index)
-            for index in range(1, max_backups + 1)
-        ]
-        guards = [self._capture_exact_sidecar_guard(path) for path in paths]
-        states: list[tuple[bytes, int | None] | None] = []
-        for slot_guard in guards:
-            states.append(
-                (
-                    self.storage.read_guarded_bytes(slot_guard),
-                    slot_guard.target_mode,
-                )
-                if slot_guard.target_existed
-                else None
-            )
-
-        recoveries = self._preserve_exact_preimages(
-            [
-                (path, state[0], state[1])
-                for path, state in zip(paths, states)
-                if state is not None
-            ],
-            marker="rollback-recovery",
-        )
-        if recoveries is None:
-            raise RuntimeError(
-                "backup rotation preimages could not be preserved"
-            )
-        rotated: list[Path] = []
-        mutations: list[_ExactSidecarMutation] = []
-        try:
-            for index in range(max_backups, 0, -1):
-                destination_guard = guards[index]
-                desired = states[index - 1]
-                if desired is None:
-                    if not destination_guard.target_existed:
-                        continue
-                    publication = self._absent_publication_guard(
-                        destination_guard
-                    )
-                    mutations.append(
-                        _ExactSidecarMutation(
-                            before_guard=destination_guard,
-                            before_bytes=states[index][0],
-                            publication=publication,
-                        )
-                    )
-                    self.storage.remove_guarded_output(destination_guard)
-                    self._assert_exact_sidecar_publication(publication)
-                    continue
-                publication = self.storage.atomic_publish_bytes(
-                    destination_guard,
-                    desired[0],
-                    mode=desired[1],
-                )
-                mutations.append(
-                    _ExactSidecarMutation(
-                        before_guard=destination_guard,
-                        before_bytes=(
-                            states[index][0]
-                            if states[index] is not None
-                            else None
-                        ),
-                        publication=publication,
-                    )
-                )
-                self.storage.read_guarded_bytes(publication)
-                rotated.append(paths[index])
-
-            backup_publication = self.storage.atomic_publish_bytes(
-                guards[0],
-                preimage,
-                mode=guard.target_mode,
-            )
-            mutations.append(
-                _ExactSidecarMutation(
-                    before_guard=guards[0],
-                    before_bytes=states[0][0] if states[0] is not None else None,
-                    publication=backup_publication,
-                )
-            )
-            self.storage.read_guarded_bytes(backup_publication)
-            for mutation in mutations:
-                self._assert_exact_sidecar_publication(mutation.publication)
-        except BaseException:
-            self._rollback_exact_backup_mutations(
-                mutations,
-                preimages_preserved=True,
-            )
-            raise
-        return _ExactBackupResult(
-            BackupReport(backup, tuple(rotated)),
-            tuple(mutations),
-            recoveries,
+        return self._services.save._rotate_and_backup_exact(
+            target,
+            target_guard=target_guard,
+            target_bytes=target_bytes,
+            max_backups=max_backups,
         )
 
     def _rollback_exact_backup_mutations(
@@ -857,63 +281,15 @@ class HwpxOps:
         preimages_preserved: bool = False,
     ) -> None:
         """Restore every sidecar candidate that is still exactly ours."""
-
-        if not preimages_preserved:
-            recoveries = self._preserve_exact_preimages(
-                [
-                    (
-                        mutation.publication.path,
-                        mutation.before_bytes,
-                        mutation.before_guard.target_mode,
-                    )
-                    for mutation in mutations
-                    if mutation.before_bytes is not None
-                ],
-                marker="rollback-recovery",
-            )
-            if recoveries is None:
-                return
-
-        for mutation in reversed(mutations):
-            try:
-                self._assert_exact_sidecar_publication(
-                    mutation.publication
-                )
-            except (FileNotFoundError, OSError, RuntimeError):
-                continue
-            try:
-                if mutation.before_bytes is None:
-                    self.storage.remove_guarded_output(mutation.publication)
-                else:
-                    self.storage.atomic_publish_bytes(
-                        mutation.publication,
-                        mutation.before_bytes,
-                        mode=mutation.before_guard.target_mode,
-                    )
-            except (FileNotFoundError, OSError, RuntimeError):
-                # An external replacement that wins the CAS belongs to the
-                # external writer. Every original preimage was preserved
-                # before rollback began, so no later destructive step can
-                # erase the last recoverable generation.
-                continue
+        return self._services.save._rollback_exact_backup_mutations(
+            mutations, preimages_preserved=preimages_preserved
+        )
 
     def _decode_image_base64(self, image_base64: str) -> bytes:
-        try:
-            payload = base64.b64decode((image_base64 or "").strip(), validate=True)
-        except (binascii.Error, ValueError) as exc:
-            raise ValueError("invalid image_base64 payload") from exc
-        if not payload:
-            raise ValueError("image_base64 decoded to empty payload")
-        return payload
+        return self._services.media._decode_image_base64(image_base64)
 
     def _id_integrity_payload(self, document: HwpxDocument) -> Dict[str, Any]:
-        report = check_id_integrity(document)
-        return {
-            "ok": report.ok,
-            "dangling": [str(item) for item in report.dangling],
-            "orphanBinData": [str(item) for item in report.orphan_bin_data],
-            "ignored": [str(item) for item in report.ignored],
-        }
+        return self._services.media._id_integrity_payload(document)
 
     def _with_transaction_verification(
         self,
@@ -924,28 +300,16 @@ class HwpxOps:
         dry_run: bool,
         quality: Any = None,
     ) -> Dict[str, Any]:
-        payload = dict(result)
-        payload.setdefault("dryRun", dry_run)
-        if dry_run:
-            payload.update(save_dry_run(document, target, quality=quality))
-            return payload
+        return self._services.transactions._with_transaction_verification(
+            result, document, target, dry_run=dry_run, quality=quality
+        )
 
-        verification = self._save_transaction_document(document, target, quality=quality)
-        payload["verificationReport"] = verification
-        payload["openSafety"] = verification.get("openSafety")
-        if "visualComplete" in verification:
-            payload["visualComplete"] = verification["visualComplete"]
-        if "backup" in verification:
-            payload["backup"] = verification["backup"]
-        if "semanticDiff" in verification:
-            payload["semanticDiff"] = verification["semanticDiff"]
-        return payload
-
-    def _operation_value(self, operation: Dict[str, Any], *names: str, default: Any = None) -> Any:
-        for name in names:
-            if name in operation:
-                return operation[name]
-        return default
+    def _operation_value(
+        self, operation: Dict[str, Any], *names: str, default: Any = None
+    ) -> Any:
+        return self._services.transactions._operation_value(
+            operation, *names, default=default
+        )
 
     def _apply_transaction_operation(
         self,
@@ -953,106 +317,9 @@ class HwpxOps:
         operation: Dict[str, Any],
         index: int,
     ) -> Dict[str, Any]:
-        if not isinstance(operation, dict):
-            raise TypeError(f"operation {index} must be an object")
-        raw_type = self._operation_value(operation, "type", "op", "operation")
-        if not isinstance(raw_type, str) or not raw_type.strip():
-            raise ValueError(f"operation {index} must include a type")
-        op_type = raw_type.strip().replace("-", "_")
-
-        if op_type == "replace_text":
-            find = self._operation_value(operation, "findText", "find_text", "find")
-            replace = self._operation_value(operation, "replaceText", "replace_text", "replace", default="")
-            if find is None:
-                raise ValueError("replace_text requires findText")
-            count = replace_in_doc(document, find_text=str(find), replace_text=str(replace))
-            return {"type": op_type, "replaced_count": count}
-
-        if op_type == "batch_replace":
-            replacements = self._operation_value(operation, "replacements")
-            if not isinstance(replacements, list):
-                raise ValueError("batch_replace requires a replacements list")
-            result = batch_replace_in_doc(document, replacements)
-            return {"type": op_type, **result}
-
-        if op_type == "add_heading":
-            text = self._operation_value(operation, "text", default="")
-            level = int(self._operation_value(operation, "level", default=1))
-            paragraph_index = add_heading_to_doc(document, str(text), level)
-            return {"type": op_type, "paragraph_index": paragraph_index}
-
-        if op_type == "add_paragraph":
-            text = self._operation_value(operation, "text", default="")
-            style = self._operation_value(operation, "style")
-            paragraph_index = add_paragraph_to_doc(document, str(text), style)
-            return {"type": op_type, "paragraph_index": paragraph_index}
-
-        if op_type == "insert_paragraph":
-            paragraph_index = self._operation_value(operation, "paragraphIndex", "paragraph_index")
-            if paragraph_index is None:
-                raise ValueError("insert_paragraph requires paragraphIndex")
-            text = self._operation_value(operation, "text", default="")
-            style = self._operation_value(operation, "style")
-            inserted = insert_paragraph_to_doc(document, int(paragraph_index), str(text), style)
-            return {"type": op_type, "inserted_index": inserted}
-
-        if op_type == "delete_paragraph":
-            paragraph_index = self._operation_value(operation, "paragraphIndex", "paragraph_index")
-            if paragraph_index is None:
-                raise ValueError("delete_paragraph requires paragraphIndex")
-            remaining = delete_paragraph_from_doc(document, int(paragraph_index))
-            return {
-                "type": op_type,
-                "deleted_index": int(paragraph_index),
-                "remaining_paragraphs": remaining,
-            }
-
-        if op_type == "add_table":
-            rows = self._operation_value(operation, "rows")
-            cols = self._operation_value(operation, "cols", "columns")
-            if rows is None or cols is None:
-                raise ValueError("add_table requires rows and cols")
-            data = self._operation_value(operation, "data")
-            table_index = add_table_to_doc(document, int(rows), int(cols), data)
-            return {"type": op_type, "table_index": table_index}
-
-        if op_type == "set_table_cell_text":
-            table_index = self._operation_value(operation, "tableIndex", "table_index", default=0)
-            row = self._operation_value(operation, "row")
-            col = self._operation_value(operation, "col", "column")
-            text = self._operation_value(operation, "text", default="")
-            if row is None or col is None:
-                raise ValueError("set_table_cell_text requires row and col")
-            preserve_format = bool(self._operation_value(operation, "preserveFormat", "preserve_format", default=True))
-            split_paragraphs = bool(self._operation_value(operation, "splitParagraphs", "split_paragraphs", default=False))
-            set_cell_text(
-                document,
-                int(table_index),
-                int(row),
-                int(col),
-                str(text),
-                preserve_format=preserve_format,
-                split_paragraphs=split_paragraphs,
-            )
-            return {
-                "type": op_type,
-                "table_index": int(table_index),
-                "row": int(row),
-                "col": int(col),
-            }
-
-        if op_type == "fill_by_path":
-            mappings = self._operation_value(operation, "mappings")
-            if not isinstance(mappings, dict):
-                raise ValueError("fill_by_path requires mappings")
-            result = document.fill_by_path(mappings)
-            return {"type": op_type, **result}
-
-        if op_type == "add_page_break":
-            add_page_break_to_doc(document)
-            return {"type": op_type, "success": True}
-
-        raise ValueError(f"unsupported operation type: {raw_type}")
+        return self._services.transactions._apply_transaction_operation(
+            document, operation, index
+        )
 
     def apply_edits(
         self,
@@ -1062,293 +329,31 @@ class HwpxOps:
         dry_run: bool = False,
         quality: Any = None,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        operation_results: List[Dict[str, Any]] = []
-        try:
-            for index, operation in enumerate(operations):
-                result = self._apply_transaction_operation(document, operation, index)
-                result["operationIndex"] = index
-                operation_results.append(result)
-        except Exception as exc:
-            return {
-                "ok": False,
-                "rolledBack": True,
-                "dryRun": dry_run,
-                "filename": path,
-                "failedOperationIndex": len(operation_results),
-                "error": str(exc),
-                "operationsApplied": 0,
-            }
-
-        result: Dict[str, Any] = {
-            "ok": True,
-            "rolledBack": False,
-            "dryRun": dry_run,
-            "filename": path,
-            "operationsApplied": len(operation_results),
-            "operationResults": operation_results,
-        }
-        if dry_run:
-            result.update(save_dry_run(document, resolved, quality=quality))
-            return result
-        verification = self._save_transaction_document(document, resolved, quality=quality)
-        result["verificationReport"] = verification
-        result["openSafety"] = verification.get("openSafety")
-        if "visualComplete" in verification:
-            result["visualComplete"] = verification["visualComplete"]
-        if "backup" in verification:
-            result["backup"] = verification["backup"]
-        if "semanticDiff" in verification:
-            result["semanticDiff"] = verification["semanticDiff"]
-        return result
+        return self._services.transactions.apply_edits(
+            path, operations, dry_run=dry_run, quality=quality
+        )
 
     def undo_last_edit(self, path: str) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        if not isinstance(self.storage, LocalDocumentStorage):
-            return undo_last_backup(resolved)
-
-        backup_path = backup_path_for(resolved)
-        target_guard = self.storage.capture_output_guard(resolved)
-        if not target_guard.target_existed:
-            raise FileNotFoundError(f"target document does not exist: {resolved}")
-        backup_guard = self._capture_exact_sidecar_guard(backup_path)
-        if not backup_guard.target_existed:
-            raise FileNotFoundError(
-                f"backup document does not exist: {backup_path}"
-            )
-        target_before = self.storage.read_guarded_bytes(target_guard)
-        backup_before = self.storage.read_guarded_bytes(backup_guard)
-        target_report = self._report_for_bytes(target_before, file_path=resolved)
-        backup_report = self._report_for_bytes(
-            backup_before,
-            file_path=backup_path,
-        )
-        if not target_report["openSafety"]["ok"]:
-            raise self._new_error(
-                "UNDO_TARGET_OPEN_SAFETY_FAILED",
-                "current document failed open-safety verification",
-            )
-        if not backup_report["openSafety"]["ok"]:
-            raise self._new_error(
-                "UNDO_BACKUP_OPEN_SAFETY_FAILED",
-                "backup document failed open-safety verification",
-            )
-
-        recoveries = self._preserve_exact_preimages(
-            [
-                (
-                    resolved,
-                    target_before,
-                    target_guard.target_mode,
-                ),
-                (
-                    backup_path,
-                    backup_before,
-                    backup_guard.target_mode,
-                ),
-            ],
-            marker="undo-recovery",
-        )
-        if recoveries is None:
-            raise RuntimeError("undo preimages could not be preserved")
-        target_publication: WorkspaceOutputGuard | None = None
-        backup_publication: WorkspaceOutputGuard | None = None
-        rollback_recoveries_ready = True
-        try:
-            target_publication = self.storage.atomic_publish_bytes(
-                target_guard,
-                backup_before,
-                mode=backup_guard.target_mode,
-            )
-            backup_publication = self.storage.atomic_publish_bytes(
-                backup_guard,
-                target_before,
-                mode=target_guard.target_mode,
-            )
-            self.storage.read_guarded_bytes(target_publication)
-            self.storage.read_guarded_bytes(backup_publication)
-            verification = self._report_for_bytes(
-                backup_before,
-                file_path=resolved,
-            )
-            if not verification["openSafety"]["ok"]:
-                raise RuntimeError("undo HWPX failed open-safety verification")
-            diff = self._semantic_diff_bytes(target_before, backup_before)
-            # Evidence was computed from immutable bytes; bind the success
-            # response to the exact two publications immediately before return.
-            self.storage.read_guarded_bytes(target_publication)
-            self.storage.read_guarded_bytes(backup_publication)
-            payload = {
-                "restored": True,
-                "filename": str(resolved),
-                "backupPath": str(backup_path),
-                "verificationReport": verification,
-                "openSafety": verification.get("openSafety"),
-                "semanticDiff": diff,
-            }
-            cleaned, rollback_recoveries_ready = (
-                self._cleanup_exact_recoveries(recoveries)
-            )
-            if not cleaned:
-                raise RuntimeError(
-                    "undo recovery cleanup lost its exact claim"
-                )
-            try:
-                self.storage.read_guarded_bytes(target_publication)
-                self.storage.read_guarded_bytes(backup_publication)
-            except (FileNotFoundError, OSError, RuntimeError):
-                rollback_recoveries_ready = (
-                    self._republish_exact_recoveries(recoveries)
-                )
-                raise
-            return payload
-        except BaseException:
-            if not rollback_recoveries_ready:
-                raise
-            if target_publication is not None and backup_publication is None:
-                try:
-                    self.storage.read_guarded_bytes(target_publication)
-                    self.storage.atomic_publish_bytes(
-                        target_publication,
-                        target_before,
-                        mode=target_guard.target_mode,
-                    )
-                except (FileNotFoundError, OSError, RuntimeError):
-                    pass
-                raise
-            target_owned = False
-            backup_owned = False
-            if target_publication is not None:
-                try:
-                    self.storage.read_guarded_bytes(target_publication)
-                    target_owned = True
-                except (FileNotFoundError, OSError, RuntimeError):
-                    pass
-            if backup_publication is not None:
-                try:
-                    self.storage.read_guarded_bytes(backup_publication)
-                    backup_owned = True
-                except (FileNotFoundError, OSError, RuntimeError):
-                    pass
-            # Roll back only while both swap candidates are still ours. The
-            # A/B recovery sidecars above remain available regardless of how
-            # either publication changes during the following writes.
-            if target_owned and backup_owned:
-                try:
-                    self.storage.atomic_publish_bytes(
-                        target_publication,
-                        target_before,
-                        mode=target_guard.target_mode,
-                    )
-                    self.storage.atomic_publish_bytes(
-                        backup_publication,
-                        backup_before,
-                        mode=backup_guard.target_mode,
-                    )
-                except (FileNotFoundError, OSError, RuntimeError):
-                    # The exact A/B recovery sidecars are intentionally retained
-                    # on every failure path, including cross-step CAS loss.
-                    pass
-            raise
+        return self._services.transactions.undo_last_edit(path)
 
     def _iter_paragraphs(self, document: HwpxDocument) -> List[HwpxOxmlParagraph]:
-        return list(document.paragraphs)
+        return self._services.context._iter_paragraphs(document)
 
     def _iter_tables(self, document: HwpxDocument) -> List[HwpxOxmlTable]:
-        tables: List[HwpxOxmlTable] = []
-        for paragraph in document.paragraphs:
-            tables.extend(paragraph.tables)
-        return tables
+        return self._services.context._iter_tables(document)
 
     def _auto_fit_table_columns(self, table: HwpxOxmlTable) -> List[int]:
-        column_count = table.column_count
-        if column_count <= 0:
-            return []
-
-        char_requirements: List[float] = [0.0] * column_count
-        for position in table.iter_grid():
-            if not position.is_anchor:
-                continue
-            text = position.cell.text or ""
-            lines = text.splitlines()
-            if not lines:
-                lines = [text]
-            longest = max(len(line) for line in lines)
-            span = max(1, position.col_span)
-            per_column = longest / span if span else float(longest)
-            for offset in range(span):
-                column_index = position.column + offset
-                if 0 <= column_index < column_count:
-                    char_requirements[column_index] = max(
-                        char_requirements[column_index],
-                        per_column,
-                    )
-
-        column_widths: List[int] = []
-        for requirement in char_requirements:
-            width = int(math.ceil((requirement + _AUTO_FIT_PADDING_CHARS) * _AUTO_FIT_CHAR_UNIT))
-            width = max(width, _AUTO_FIT_MIN_COLUMN_WIDTH)
-            width = min(width, _AUTO_FIT_MAX_COLUMN_WIDTH)
-            column_widths.append(width)
-
-        total_width = sum(column_widths)
-        if total_width <= 0:
-            column_widths = [max(_AUTO_FIT_MIN_COLUMN_WIDTH, _AUTO_FIT_CHAR_UNIT)] * column_count
-            total_width = sum(column_widths)
-
-        size_element = table.element.find(f"{HP_NS}sz")
-        if size_element is not None:
-            size_element.set("width", str(total_width))
-
-        for position in table.iter_grid():
-            if not position.is_anchor:
-                continue
-            span = max(1, position.col_span)
-            start = position.column
-            width_value = 0
-            for offset in range(span):
-                column_index = start + offset
-                if 0 <= column_index < column_count:
-                    width_value += column_widths[column_index]
-            if width_value <= 0:
-                continue
-            cell_size = position.cell.element.find(f"{HP_NS}cellSz")
-            if cell_size is not None:
-                cell_size.set("width", str(width_value))
-
-        table.mark_dirty()
-        return column_widths
+        return self._services.tables._auto_fit_table_columns(table)
 
     def _normalize_color(self, color: str | None) -> Optional[str]:
-        return normalize_hex_color(color, field_name="colorHex")
+        return self._services.memo_style._normalize_color(color)
 
     def _ensure_char_style(
         self,
         document: HwpxDocument,
         run_style: Optional[Dict[str, Any]],
     ) -> Optional[str]:
-        if not run_style:
-            return None
-        bold = bool(run_style.get("bold", False))
-        italic = bool(run_style.get("italic", False))
-        underline = bool(run_style.get("underline", False))
-        color = self._normalize_color(run_style.get("colorHex"))
-        try:
-            return ensure_char_style(
-                document,
-                base_char_pr_id=None,
-                bold=bold,
-                italic=italic,
-                underline=underline,
-                color=color,
-            )
-        except (ValueError, RuntimeError) as exc:
-            message = str(exc)
-            if "document does not contain any headers" in message:
-                raise self._new_error("STYLE_HEADER_MISSING", message) from exc
-            if "char property does not expose an identifier" in message:
-                raise self._new_error("STYLE_CHAR_PROPERTY_ID_MISSING", message) from exc
-            raise
+        return self._services.memo_style._ensure_char_style(document, run_style)
 
     def _ensure_table_border_fill(
         self,
@@ -1359,308 +364,32 @@ class HwpxOps:
         border_width: Optional[str | float | int] = None,
         fill_color: Optional[str] = None,
     ) -> str:
-        normalized_style = (border_style or "").strip().lower() or None
-        if normalized_style not in {None, "solid", "none"}:
-            raise ValueError(f"Unsupported border style: {border_style}")
-
-        normalized_border_color = self._normalize_color(border_color)
-        normalized_fill_color = self._normalize_color(fill_color)
-
-        if normalized_style == "none" and not any(
-            [normalized_border_color, normalized_fill_color, border_width]
-        ):
-            return "0"
-
-        if (
-            normalized_style in {None, "solid"}
-            and normalized_border_color is None
-            and normalized_fill_color is None
-            and border_width is None
-        ):
-            return document.oxml.ensure_basic_border_fill()
-
-        if not document.headers:
-            raise self._new_error(
-                "STYLE_BORDER_FILL_HEADER_MISSING",
-                "document does not contain any headers to host border fills",
-            )
-
-        header = document.headers[0]
-
-        border_type = "NONE" if normalized_style == "none" else "SOLID"
-
-        def normalize_length(value: Optional[str | float | int], default: str) -> str:
-            if value is None:
-                return default
-            if isinstance(value, (int, float)):
-                return f"{value:g} mm"
-            text = str(value).strip()
-            if not text:
-                return default
-            match = re.fullmatch(r"([0-9]+(?:\\.[0-9]+)?)\\s*([A-Za-z]+)?", text)
-            if match:
-                number, unit = match.groups()
-                unit = (unit or "mm").lower()
-                return f"{number} {unit}"
-            return text
-
-        if border_type == "NONE":
-            width_default = "0 mm"
-            diag_default = "0 mm"
-        else:
-            width_default = "0.12 mm"
-            diag_default = "0.1 mm"
-
-        width_value = normalize_length(border_width, width_default)
-        if border_width is not None:
-            diagonal_width_value = normalize_length(border_width, width_default)
-        else:
-            diagonal_width_value = normalize_length(None, diag_default)
-
-        def normalize_length_token(value: Optional[str]) -> str:
-            if not value:
-                return ""
-            return re.sub(r"\s+", "", str(value)).lower()
-
-        width_token = normalize_length_token(width_value)
-        diagonal_width_token = normalize_length_token(diagonal_width_value)
-
-        if border_type == "SOLID":
-            edge_color = normalized_border_color or "#000000"
-            diagonal_color = edge_color
-        else:
-            edge_color = normalized_border_color
-            diagonal_color = normalized_border_color
-
-        ref_list = header.element.find(f"{HH_NS}refList")
-        if ref_list is None:
-            ref_list = ET.SubElement(header.element, f"{HH_NS}refList")
-            header.mark_dirty()
-
-        border_fills_element = ref_list.find(f"{HH_NS}borderFills")
-        if border_fills_element is None:
-            border_fills_element = ET.SubElement(
-                ref_list, f"{HH_NS}borderFills", {"itemCnt": "0"}
-            )
-            header.mark_dirty()
-
-        def matches(existing: ET.Element) -> bool:
-            if (existing.get("threeD") or "0") != "0":
-                return False
-            if (existing.get("shadow") or "0") != "0":
-                return False
-            if (existing.get("centerLine") or "NONE").upper() != "NONE":
-                return False
-            if (existing.get("breakCellSeparateLine") or "0") != "0":
-                return False
-
-            for slash_name in ("slash", "backSlash"):
-                slash = existing.find(f"{HH_NS}{slash_name}")
-                if slash is None:
-                    return False
-                if (slash.get("type") or "NONE").upper() != "NONE":
-                    return False
-                if slash.get("Crooked", "0") != "0":
-                    return False
-                if slash.get("isCounter", "0") != "0":
-                    return False
-
-            for child_name in ("leftBorder", "rightBorder", "topBorder", "bottomBorder"):
-                border_child = existing.find(f"{HH_NS}{child_name}")
-                if border_child is None:
-                    return False
-                if (border_child.get("type") or "").upper() != border_type:
-                    return False
-                if normalize_length_token(border_child.get("width")) != width_token:
-                    return False
-                if edge_color is not None:
-                    if (border_child.get("color") or "").upper() != edge_color:
-                        return False
-                else:
-                    if border_child.get("color") not in (None, ""):
-                        return False
-
-            diagonal_child = existing.find(f"{HH_NS}diagonal")
-            if diagonal_child is None:
-                return False
-            expected_diagonal_type = "SOLID" if border_type == "SOLID" else "NONE"
-            if (diagonal_child.get("type") or "").upper() != expected_diagonal_type:
-                return False
-            if normalize_length_token(diagonal_child.get("width")) != diagonal_width_token:
-                return False
-            if diagonal_color is not None:
-                if (diagonal_child.get("color") or "").upper() != diagonal_color:
-                    return False
-            else:
-                if diagonal_child.get("color") not in (None, ""):
-                    return False
-
-            fill_brush = existing.find(f"{HH_NS}fillBrush")
-            if normalized_fill_color is None:
-                if fill_brush is not None:
-                    return False
-            else:
-                if fill_brush is None:
-                    return False
-                solid_brush = fill_brush.find(f"{HH_NS}solidBrush")
-                if solid_brush is None:
-                    return False
-                if (solid_brush.get("type") or "SOLID").upper() != "SOLID":
-                    return False
-                if (solid_brush.get("color") or "").upper() != normalized_fill_color:
-                    return False
-
-            return True
-
-        for candidate in border_fills_element.findall(f"{HH_NS}borderFill"):
-            identifier = candidate.get("id")
-            if not identifier:
-                continue
-            if matches(candidate):
-                return identifier
-
-        # Upstream still does not expose a public border-fill creation API.
-        # Keep the private helper usage isolated here until python-hwpx offers one.
-        if not hasattr(header, "_allocate_border_fill_id"):
-            raise self._new_error("STYLE_ID_ALLOCATOR_MISSING", "header does not expose ID allocation helpers")
-
-        new_id = header._allocate_border_fill_id(border_fills_element)  # type: ignore[attr-defined]
-        border_fill_element = ET.SubElement(
-            border_fills_element,
-            f"{HH_NS}borderFill",
-            {
-                "id": new_id,
-                "threeD": "0",
-                "shadow": "0",
-                "centerLine": "NONE",
-                "breakCellSeparateLine": "0",
-            },
+        return self._services.tables._ensure_table_border_fill(
+            document,
+            border_style=border_style,
+            border_color=border_color,
+            border_width=border_width,
+            fill_color=fill_color,
         )
 
-        for slash_name in ("slash", "backSlash"):
-            ET.SubElement(
-                border_fill_element,
-                f"{HH_NS}{slash_name}",
-                {"type": "NONE", "Crooked": "0", "isCounter": "0"},
-            )
-
-        def append_border(name: str, *, width: str, color: Optional[str], kind: str) -> None:
-            attrs = {"type": kind}
-            if width:
-                attrs["width"] = width
-            if color is not None:
-                attrs["color"] = color
-            ET.SubElement(border_fill_element, f"{HH_NS}{name}", attrs)
-
-        for side in ("leftBorder", "rightBorder", "topBorder", "bottomBorder"):
-            append_border(side, width=width_value, color=edge_color, kind=border_type)
-
-        append_border(
-            "diagonal",
-            width=diagonal_width_value,
-            color=diagonal_color,
-            kind="SOLID" if border_type == "SOLID" else "NONE",
-        )
-
-        if normalized_fill_color is not None:
-            fill_brush = ET.SubElement(border_fill_element, f"{HH_NS}fillBrush")
-            ET.SubElement(
-                fill_brush,
-                f"{HH_NS}solidBrush",
-                {"type": "SOLID", "color": normalized_fill_color, "alpha": "255"},
-            )
-
-        if hasattr(header, "_update_border_fills_item_count"):
-            header._update_border_fills_item_count(border_fills_element)  # type: ignore[attr-defined]
-        else:
-            count = len(border_fills_element.findall(f"{HH_NS}borderFill"))
-            border_fills_element.set("itemCnt", str(count))
-        header.mark_dirty()
-        return new_id
-
-    # ------------------------------------------------------------------
-    # Document information
-    # ------------------------------------------------------------------
     def open_info(self, path: str) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        if resolved.suffix.lower() == ".hwp":
-            paragraphs, _, source = self._read_only_hwp_paragraphs(path)
-            stat = resolved.stat()
-            meta = {
-                "path": self._relative_path(resolved),
-                "absolutePath": str(resolved),
-                "size": stat.st_size,
-                "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                "format": "hwp",
-                "readOnly": True,
-                "extractionSource": source,
-            }
-            return {
-                "meta": meta,
-                "sectionCount": 0,
-                "paragraphCount": len(paragraphs),
-                "headerCount": 0,
-            }
-
-        document, resolved = self._open_document(path)
-        sections = document.sections
-        section_count = len(sections)
-        paragraph_count = sum(len(section.paragraphs) for section in sections)
-        header_count = len(document.headers)
-        stat = resolved.stat()
-        meta = {
-            "path": self._relative_path(resolved),
-            "absolutePath": str(resolved),
-            "size": stat.st_size,
-            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-        }
-        return {
-            "meta": meta,
-            "sectionCount": section_count,
-            "paragraphCount": paragraph_count,
-            "headerCount": header_count,
-        }
+        return self._services.read_query.open_info(path)
 
     def list_sections(self, path: str) -> Dict[str, Any]:
-        document, _ = self._open_document(path)
-        sections: List[Dict[str, Any]] = []
-        for index, section in enumerate(document.sections):
-            sections.append(
-                {
-                    "index": index,
-                    "paragraphCount": len(section.paragraphs),
-                    "partName": getattr(section, "part_name", None),
-                }
-            )
-        return {"sections": sections}
+        return self._services.read_query.list_sections(path)
 
     def list_headers(self, path: str) -> Dict[str, Any]:
-        document, _ = self._open_document(path)
-        headers: List[Dict[str, Any]] = []
-        has_master_page = bool(document.master_pages)
-        for index, header in enumerate(document.headers):
-            headers.append(
-                {
-                    "index": index,
-                    "styleCount": len(header.styles),
-                    "bulletCount": len(header.bullets),
-                    "hasMasterPage": has_master_page,
-                    "partName": getattr(header, "part_name", None),
-                }
-            )
-        return {"headers": headers}
+        return self._services.read_query.list_headers(path)
 
     def package_parts(self, path: str) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        package = open_package(resolved)
-        parts = sorted(package.part_names())
-        return {"parts": parts}
+        return self._services.package_validation.package_parts(path)
 
-    def package_get_text(self, path: str, part_name: str, encoding: str | None = None) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        package = open_package(resolved)
-        text = package.get_text(part_name, encoding=encoding or "utf-8")
-        return {"text": text}
+    def package_get_text(
+        self, path: str, part_name: str, encoding: str | None = None
+    ) -> Dict[str, Any]:
+        return self._services.package_validation.package_get_text(
+            path, part_name, encoding
+        )
 
     def repair_hwpx(
         self,
@@ -1673,57 +402,16 @@ class HwpxOps:
         max_total_size: int = 512 * 1024 * 1024,
         max_source_size: int = 512 * 1024 * 1024,
     ) -> Dict[str, Any]:
-        try:
-            from hwpx.tools.package_validator import validate_editor_open_safety
-            from hwpx.tools.package_validator import validate_package
-            from hwpx.tools.repair import repair_from_recovered, repair_repack
-        except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
-            raise self._new_error(
-                "REPAIR_UNAVAILABLE",
-                "python-hwpx repair support is not available; install a python-hwpx build with hwpx.tools.repair",
-                hint="Upgrade python-hwpx to a version that includes hwpx.tools.repair and hwpx.tools.recover.",
-            ) from exc
+        return self._services.package_validation.repair_hwpx(
+            source,
+            output,
+            recover=recover,
+            overwrite=overwrite,
+            max_entry_size=max_entry_size,
+            max_total_size=max_total_size,
+            max_source_size=max_source_size,
+        )
 
-        source_path = self._resolve_path(source)
-        output_path = self.storage.resolve_output_path(output)
-        if recover:
-            result = repair_from_recovered(
-                source_path,
-                output_path,
-                overwrite=overwrite,
-                max_entry_size=max_entry_size,
-                max_total_size=max_total_size,
-                max_source_size=max_source_size,
-            )
-        else:
-            result = repair_repack(
-                source_path,
-                output_path,
-                overwrite=overwrite,
-                max_entry_size=max_entry_size,
-                max_total_size=max_total_size,
-            )
-        validation = validate_package(output_path)
-        open_safety = validate_editor_open_safety(output_path)
-        return {
-            "outputPath": self._relative_path(output_path),
-            "entries": list(result.entries),
-            "entryCount": len(result.entries),
-            "reordered": result.reordered,
-            "crcOk": result.crc_ok,
-            "recovered": result.recovered,
-            "validatePackage": {
-                "ok": validation.ok,
-                "errors": [str(issue) for issue in validation.errors],
-                "warnings": [str(issue) for issue in validation.warnings],
-            },
-            "openSafety": open_safety.to_dict(),
-        }
-
-
-    # ------------------------------------------------------------------
-    # Text extraction
-    # ------------------------------------------------------------------
     def read_text(
         self,
         path: str,
@@ -1733,55 +421,13 @@ class HwpxOps:
         with_highlights: bool = False,
         with_footnotes: bool = False,
     ) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        if resolved.suffix.lower() == ".hwp":
-            paragraphs, _, _ = self._read_only_hwp_paragraphs(path)
-            effective_limit = self.paging_limit if limit is None else max(1, limit)
-            start = max(0, offset)
-            chunk = paragraphs[start : start + effective_limit]
-            next_offset = None
-            if start + effective_limit < len(paragraphs):
-                next_offset = start + effective_limit
-            return {"textChunk": "\n".join(chunk), "nextOffset": next_offset}
-
-        if limit is None:
-            effective_limit = self.paging_limit
-        else:
-            effective_limit = max(1, limit)
-        annotations = None
-        if with_highlights or with_footnotes:
-            annotations = AnnotationOptions(
-                highlight="markers" if with_highlights else "ignore",
-                footnote="inline" if with_footnotes else "ignore",
-                endnote="inline" if with_footnotes else "ignore",
-            )
-        paragraphs: List[str] = []
-        next_offset: Optional[int] = None
-        start = max(0, offset)
-        with create_text_extractor(resolved) as extractor:
-            paragraph_iter = extractor.iter_document_paragraphs()
-            sentinel = object()
-
-            skip_exhausted = False
-            for _ in range(start):
-                if next(paragraph_iter, sentinel) is sentinel:
-                    skip_exhausted = True
-                    break
-
-            if not skip_exhausted:
-                while len(paragraphs) < effective_limit:
-                    paragraph = next(paragraph_iter, sentinel)
-                    if paragraph is sentinel:
-                        break
-                    paragraphs.append(
-                        paragraph.text(annotations=annotations, preserve_breaks=True)
-                    )
-
-                if len(paragraphs) == effective_limit:
-                    if next(paragraph_iter, sentinel) is not sentinel:
-                        next_offset = start + len(paragraphs)
-
-        return {"textChunk": "\n".join(paragraphs), "nextOffset": next_offset}
+        return self._services.read_query.read_text(
+            path,
+            offset=offset,
+            limit=limit,
+            with_highlights=with_highlights,
+            with_footnotes=with_footnotes,
+        )
 
     def get_paragraphs(
         self,
@@ -1791,87 +437,15 @@ class HwpxOps:
         with_highlights: bool = False,
         with_footnotes: bool = False,
     ) -> Dict[str, Any]:
-        if not paragraph_indexes:
-            return {"paragraphs": []}
-        normalized_indexes: List[int] = []
-        unique_indexes: set[int] = set()
-        for index in paragraph_indexes:
-            if index < 0:
-                raise ValueError("paragraphIndexes must contain non-negative integers")
-            normalized_indexes.append(int(index))
-            unique_indexes.add(int(index))
-
-        resolved = self._resolve_path(path)
-        if resolved.suffix.lower() == ".hwp":
-            paragraphs, _, _ = self._read_only_hwp_paragraphs(path)
-            collected = {idx: paragraphs[idx] for idx in unique_indexes if idx < len(paragraphs)}
-            missing = [index for index in normalized_indexes if index not in collected]
-            if missing:
-                raise ValueError(
-                    "paragraphIndexes out of range: " + ", ".join(str(idx) for idx in sorted(set(missing)))
-                )
-            return {
-                "paragraphs": [
-                    {"paragraphIndex": index, "text": collected[index]}
-                    for index in normalized_indexes
-                ]
-            }
-
-        annotations = None
-        if with_highlights or with_footnotes:
-            annotations = AnnotationOptions(
-                highlight="markers" if with_highlights else "ignore",
-                footnote="inline" if with_footnotes else "ignore",
-                endnote="inline" if with_footnotes else "ignore",
-            )
-
-        collected: Dict[int, str] = {}
-        with create_text_extractor(resolved) as extractor:
-            for paragraph in extractor.iter_document_paragraphs():
-                para_index = paragraph.index
-                if para_index in unique_indexes and para_index not in collected:
-                    collected[para_index] = paragraph.text(
-                        annotations=annotations, preserve_breaks=True
-                    )
-                    if len(collected) == len(unique_indexes):
-                        break
-
-        missing = [index for index in normalized_indexes if index not in collected]
-        if missing:
-            raise ValueError(
-                "paragraphIndexes out of range: " + ", ".join(str(idx) for idx in sorted(set(missing)))
-            )
-
-        return {
-            "paragraphs": [
-                {"paragraphIndex": index, "text": collected[index]}
-                for index in normalized_indexes
-            ]
-        }
+        return self._services.read_query.get_paragraphs(
+            path,
+            paragraph_indexes,
+            with_highlights=with_highlights,
+            with_footnotes=with_footnotes,
+        )
 
     def text_extract_report(self, path: str, mode: str = "plain") -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        if resolved.suffix.lower() == ".hwp":
-            paragraphs, _, source = self._read_only_hwp_paragraphs(path)
-            return {
-                "content": "\n".join(paragraphs)
-                + f"\n\n[HWP read-only mode] extraction_source={source}; annotations/structure are unavailable."
-            }
-
-        annotations = None
-        if mode == "with_annotations":
-            annotations = AnnotationOptions(
-                highlight="markers",
-                footnote="inline",
-                endnote="inline",
-                control="placeholder",
-            )
-        with create_text_extractor(resolved) as extractor:
-            content = extractor.extract_text(
-                annotations=annotations,
-                include_nested=True,
-            )
-        return {"content": content}
+        return self._services.read_query.text_extract_report(path, mode)
 
     def analyze_template_structure(
         self,
@@ -1880,130 +454,10 @@ class HwpxOps:
         placeholder_patterns: Optional[Sequence[str]] = None,
         lock_keywords: Optional[Sequence[str]] = None,
     ) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        if resolved.suffix.lower() == ".hwp":
-            paragraphs, _, source = self._read_only_hwp_paragraphs(path)
-        else:
-            paragraphs = []
-            with create_text_extractor(resolved) as extractor:
-                for paragraph in extractor.iter_document_paragraphs():
-                    paragraphs.append(paragraph.text(preserve_breaks=True))
-            source = "hwpx.text_extractor"
+        return self._services.read_query.analyze_template_structure(
+            path, placeholder_patterns=placeholder_patterns, lock_keywords=lock_keywords
+        )
 
-        paragraph_count = len(paragraphs)
-        if paragraph_count == 0:
-            return {
-                "summary": {
-                    "isTemplate": False,
-                    "paragraphCount": 0,
-                    "placeholderCount": 0,
-                    "extractionSource": source,
-                },
-                "regions": [],
-                "placeholders": [],
-            }
-
-        top_band = max(1, min(3, max(1, paragraph_count // 10)))
-        bottom_band = max(1, min(3, max(1, paragraph_count // 10)))
-        if top_band + bottom_band > paragraph_count:
-            bottom_band = max(1, paragraph_count - top_band)
-
-        header_range = (0, max(0, top_band - 1))
-        body_range = (top_band, max(top_band, paragraph_count - bottom_band - 1))
-        footer_range = (max(0, paragraph_count - bottom_band), paragraph_count - 1)
-
-        default_placeholder_patterns = [
-            r"\{\{[^{}]+\}\}",
-            r"\[[^\[\]]*(입력|작성|기재)[^\[\]]*\]",
-            r"(본문 영역|제목을 입력하세요|날짜를 입력하세요|제20\d{2}년)",
-        ]
-        default_lock_keywords = [
-            "로고",
-            "교훈",
-            "연락처",
-            "슬로건",
-            "학교장",
-            "직인",
-        ]
-
-        compiled_patterns = [
-            re.compile(pattern)
-            for pattern in (placeholder_patterns or default_placeholder_patterns)
-        ]
-        lock_terms = [term.strip() for term in (lock_keywords or default_lock_keywords) if term and term.strip()]
-
-        def paragraph_zone(index: int) -> str:
-            if header_range[0] <= index <= header_range[1]:
-                return "header"
-            if footer_range[0] <= index <= footer_range[1]:
-                return "footer"
-            return "body"
-
-        placeholders: List[Dict[str, Any]] = []
-        locked_indexes: set[int] = set()
-        for index, text in enumerate(paragraphs):
-            stripped = text.strip()
-            if not stripped:
-                continue
-
-            zone = paragraph_zone(index)
-            contains_lock_keyword = any(keyword in stripped for keyword in lock_terms)
-            if zone in {"header", "footer"} or contains_lock_keyword:
-                locked_indexes.add(index)
-
-            for pattern in compiled_patterns:
-                for match in pattern.finditer(stripped):
-                    token = match.group(0)
-                    placeholders.append(
-                        {
-                            "token": token,
-                            "paragraphIndex": index,
-                            "zone": zone,
-                            "editable": index not in locked_indexes,
-                            "context": stripped[:200],
-                        }
-                    )
-
-        is_template = bool(placeholders) or any(index in locked_indexes for index in range(paragraph_count))
-        regions = [
-            {
-                "name": "header",
-                "startParagraph": header_range[0],
-                "endParagraph": header_range[1],
-                "editable": False,
-                "reason": "상단 고정 영역(휴리스틱)",
-            },
-            {
-                "name": "body",
-                "startParagraph": body_range[0],
-                "endParagraph": body_range[1],
-                "editable": True,
-                "reason": "본문 편집 가능 영역(휴리스틱)",
-            },
-            {
-                "name": "footer",
-                "startParagraph": footer_range[0],
-                "endParagraph": footer_range[1],
-                "editable": False,
-                "reason": "하단 고정 영역(휴리스틱)",
-            },
-        ]
-
-        return {
-            "summary": {
-                "isTemplate": is_template,
-                "paragraphCount": paragraph_count,
-                "placeholderCount": len(placeholders),
-                "lockedParagraphCount": len(locked_indexes),
-                "extractionSource": source,
-            },
-            "regions": regions,
-            "placeholders": placeholders,
-        }
-
-    # ------------------------------------------------------------------
-    # Search & replace
-    # ------------------------------------------------------------------
     def find(
         self,
         path: str,
@@ -2013,90 +467,13 @@ class HwpxOps:
         max_results: int = 100,
         context_radius: int = 80,
     ) -> Dict[str, Any]:
-        if not query:
-            raise ValueError("query must be a non-empty string")
-        resolved = self._resolve_path(path)
-        matches: List[Dict[str, Any]] = []
-        radius = max(0, context_radius)
-
-        def build_context(text: str, start: int, end: int) -> str:
-            context_start = max(0, start - radius)
-            context_end = min(len(text), end + radius)
-            snippet = text[context_start:context_end]
-            if context_start > 0:
-                snippet = "..." + snippet
-            if context_end < len(text):
-                snippet = snippet + "..."
-            return snippet
-
-        pattern = re.compile(query) if is_regex else None
-        if resolved.suffix.lower() == ".hwp":
-            paragraphs, _, _ = self._read_only_hwp_paragraphs(path)
-            for para_index, text in enumerate(paragraphs):
-                if is_regex:
-                    for match in pattern.finditer(text):  # type: ignore[union-attr]
-                        matches.append(
-                            {
-                                "paragraphIndex": para_index,
-                                "start": match.start(),
-                                "end": match.end(),
-                                "context": build_context(text, match.start(), match.end()),
-                            }
-                        )
-                        if len(matches) >= max_results:
-                            return {"matches": matches}
-                else:
-                    start = 0
-                    while True:
-                        found = text.find(query, start)
-                        if found == -1:
-                            break
-                        matches.append(
-                            {
-                                "paragraphIndex": para_index,
-                                "start": found,
-                                "end": found + len(query),
-                                "context": build_context(text, found, found + len(query)),
-                            }
-                        )
-                        if len(matches) >= max_results:
-                            return {"matches": matches}
-                        start = found + len(query)
-            return {"matches": matches}
-
-        with create_text_extractor(resolved) as extractor:
-            for paragraph in extractor.iter_document_paragraphs():
-                text = paragraph.text()
-                if is_regex:
-                    for match in pattern.finditer(text):  # type: ignore[union-attr]
-                        matches.append(
-                            {
-                                "paragraphIndex": paragraph.index,
-                                "start": match.start(),
-                                "end": match.end(),
-                                "context": build_context(text, match.start(), match.end()),
-                            }
-                        )
-                        if len(matches) >= max_results:
-                            return {"matches": matches}
-                else:
-                    start = 0
-                    while True:
-                        found = text.find(query, start)
-                        if found == -1:
-                            break
-                        matches.append(
-                            {
-                                "paragraphIndex": paragraph.index,
-                                "start": found,
-                                "end": found + len(query),
-                                "context": build_context(text, found, found + len(query)),
-                            }
-                        )
-                        if len(matches) >= max_results:
-                            return {"matches": matches}
-                        start = found + len(query)
-        return {"matches": matches}
+        return self._services.read_query.find(
+            path,
+            query,
+            is_regex=is_regex,
+            max_results=max_results,
+            context_radius=context_radius,
+        )
 
     def find_runs_by_style(
         self,
@@ -2105,38 +482,9 @@ class HwpxOps:
         filters: Optional[Dict[str, Any]] = None,
         max_results: int = 200,
     ) -> Dict[str, Any]:
-        document, _ = self._open_document(path)
-        filter_args: Dict[str, Any] = {}
-        if filters:
-            if "colorHex" in filters and filters["colorHex"]:
-                filter_args["text_color"] = self._normalize_color(filters["colorHex"])
-            if "underline" in filters:
-                filter_args["underline_type"] = "SOLID" if filters["underline"] else "NONE"
-            if "charPrIDRef" in filters and filters["charPrIDRef"]:
-                filter_args["char_pr_id_ref"] = filters["charPrIDRef"]
-        runs = document.find_runs_by_style(**filter_args)
-        paragraph_index_map: Dict[int, int] = {}
-        paragraphs = self._iter_paragraphs(document)
-        for index, paragraph in enumerate(paragraphs):
-            paragraph_index_map[id(paragraph.element)] = index
-        results: List[Dict[str, Any]] = []
-        for run in runs[:max_results]:
-            paragraph = run.paragraph
-            para_index = paragraph_index_map.get(id(paragraph.element), -1)
-            style = {}
-            if run.style is not None:
-                style_data = run.style
-                if dataclasses.is_dataclass(style_data):
-                    style = asdict(style_data)
-            results.append(
-                {
-                    "text": run.text,
-                    "paragraphIndex": para_index,
-                    "charPrIDRef": run.char_pr_id_ref,
-                    "style": style,
-                }
-            )
-        return {"runs": results}
+        return self._services.memo_style.find_runs_by_style(
+            path, filters=filters, max_results=max_results
+        )
 
     def replace_text_in_runs(
         self,
@@ -2148,28 +496,15 @@ class HwpxOps:
         limit_per_run: Optional[int] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        filter_args: Dict[str, Any] = {}
-        if style_filter:
-            if "colorHex" in style_filter and style_filter["colorHex"]:
-                filter_args["text_color"] = self._normalize_color(style_filter["colorHex"])
-            if "underline" in style_filter:
-                filter_args["underline_type"] = "SOLID" if style_filter["underline"] else "NONE"
-            if "charPrIDRef" in style_filter and style_filter["charPrIDRef"]:
-                filter_args["char_pr_id_ref"] = style_filter["charPrIDRef"]
-        replaced = document.replace_text_in_runs(
+        return self._services.content_layout.replace_text_in_runs(
+            path,
             search,
             replacement,
-            limit=limit_per_run,
-            **filter_args,
+            style_filter=style_filter,
+            limit_per_run=limit_per_run,
+            dry_run=dry_run,
         )
-        if not dry_run and replaced:
-            self._save_document(document, resolved)
-        return {"replacedCount": replaced}
 
-    # ------------------------------------------------------------------
-    # Paragraph and table editing
-    # ------------------------------------------------------------------
     def add_paragraph(
         self,
         path: str,
@@ -2178,22 +513,9 @@ class HwpxOps:
         section_index: Optional[int] = None,
         run_style: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        char_id = self._ensure_char_style(document, run_style)
-        paragraph = document.add_paragraph(
-            text,
-            section_index=section_index,
-            char_pr_id_ref=char_id,
+        return self._services.content_layout.add_paragraph(
+            path, text, section_index=section_index, run_style=run_style
         )
-        paragraphs = self._iter_paragraphs(document)
-        index = len(paragraphs) - 1
-        element_id = id(paragraph.element)
-        for idx, candidate in enumerate(paragraphs):
-            if id(candidate.element) == element_id:
-                index = idx
-                break
-        self._save_document(document, resolved)
-        return {"paragraphIndex": index}
 
     def insert_paragraphs_bulk(
         self,
@@ -2204,24 +526,13 @@ class HwpxOps:
         run_style: Optional[Dict[str, Any]] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        if not paragraphs:
-            return {"added": 0}
-
-        if dry_run:
-            return {"added": len(paragraphs)}
-
-        document, resolved = self._open_document(path)
-        char_id = self._ensure_char_style(document, run_style)
-        count = 0
-        for text in paragraphs:
-            document.add_paragraph(
-                text,
-                section_index=section_index,
-                char_pr_id_ref=char_id,
-            )
-            count += 1
-        self._save_document(document, resolved)
-        return {"added": count}
+        return self._services.content_layout.insert_paragraphs_bulk(
+            path,
+            paragraphs,
+            section_index=section_index,
+            run_style=run_style,
+            dry_run=dry_run,
+        )
 
     def set_paragraph_format(
         self,
@@ -2242,8 +553,8 @@ class HwpxOps:
         page_break_before: Optional[bool] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        result = document.set_paragraph_format(
+        return self._services.content_layout.set_paragraph_format(
+            path,
             paragraph_index=paragraph_index,
             paragraph_indexes=paragraph_indexes,
             alignment=alignment,
@@ -2257,9 +568,8 @@ class HwpxOps:
             keep_with_next=keep_with_next,
             keep_lines=keep_lines,
             page_break_before=page_break_before,
+            dry_run=dry_run,
         )
-        result.update({"ok": True, "filename": path})
-        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
 
     def set_page_setup(
         self,
@@ -2282,8 +592,8 @@ class HwpxOps:
         section_index: Optional[int] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        result = document.set_page_setup(
+        return self._services.content_layout.set_page_setup(
+            path,
             paper_size=paper_size,
             width_mm=width_mm,
             height_mm=height_mm,
@@ -2299,9 +609,8 @@ class HwpxOps:
             columns=columns,
             column_gap_mm=column_gap_mm,
             section_index=section_index,
+            dry_run=dry_run,
         )
-        result.update({"ok": True, "filename": path})
-        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
 
     def _header_footer_payload(
         self,
@@ -2310,17 +619,9 @@ class HwpxOps:
         kind: str,
         page_type: str,
     ) -> Dict[str, Any]:
-        element = getattr(wrapper, "element", None)
-        page_number_count = 0
-        if element is not None and hasattr(element, "iter"):
-            page_number_count = sum(1 for _ in element.iter(f"{HP_NS}pageNum"))
-        return {
-            "kind": kind,
-            "pageType": page_type,
-            "id": getattr(wrapper, "id", None),
-            "text": getattr(wrapper, "text", ""),
-            "pageNumberCount": page_number_count,
-        }
+        return self._services.content_layout._header_footer_payload(
+            wrapper, kind=kind, page_type=page_type
+        )
 
     def set_header_footer(
         self,
@@ -2333,24 +634,15 @@ class HwpxOps:
         page_type: str = "BOTH",
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        wrapper = document.set_header_footer(
+        return self._services.content_layout.set_header_footer(
+            path,
             kind=kind,
             text=text,
             content=content,
             section_index=section_index,
             page_type=page_type,
+            dry_run=dry_run,
         )
-        result = {
-            "ok": True,
-            "filename": path,
-            "headerFooter": self._header_footer_payload(
-                wrapper,
-                kind=kind,
-                page_type=page_type,
-            ),
-        }
-        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
 
     def set_page_number(
         self,
@@ -2367,8 +659,8 @@ class HwpxOps:
         section_index: Optional[int] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        wrapper = document.set_page_number(
+        return self._services.content_layout.set_page_number(
+            path,
             target=target,
             page_type=page_type,
             format=format,
@@ -2378,19 +670,8 @@ class HwpxOps:
             suffix=suffix,
             format_type=format_type,
             section_index=section_index,
+            dry_run=dry_run,
         )
-        result = {
-            "ok": True,
-            "filename": path,
-            "target": target,
-            "format": format,
-            "headerFooter": self._header_footer_payload(
-                wrapper,
-                kind=target,
-                page_type=page_type,
-            ),
-        }
-        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
 
     def set_list_format(
         self,
@@ -2405,8 +686,8 @@ class HwpxOps:
         start: Optional[int] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        result = document.set_list_format(
+        return self._services.content_layout.set_list_format(
+            path,
             paragraph_index=paragraph_index,
             paragraph_indexes=paragraph_indexes,
             kind=kind,
@@ -2414,21 +695,14 @@ class HwpxOps:
             bullet_char=bullet_char,
             number_format=number_format,
             start=start,
+            dry_run=dry_run,
         )
-        result.update({"ok": True, "filename": path})
-        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
 
     def list_form_fields(
         self,
         path: str,
     ) -> Dict[str, Any]:
-        document, _resolved = self._open_document(path)
-        fields = document.list_form_fields()
-        return {
-            "fieldCount": len(fields),
-            "fields": fields,
-            "fallback": "table-label" if not fields else None,
-        }
+        return self._services.form_fields.list_form_fields(path)
 
     def fill_form_field(
         self,
@@ -2440,15 +714,14 @@ class HwpxOps:
         name: Optional[str] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        result = document.fill_form_field(
-            value,
+        return self._services.form_fields.fill_form_field(
+            path,
+            value=value,
             field_index=field_index,
             field_id=field_id,
             name=name,
+            dry_run=dry_run,
         )
-        result.update({"ok": True, "filename": path})
-        return self._with_transaction_verification(result, document, resolved, dry_run=dry_run)
 
     def add_table(
         self,
@@ -2463,31 +736,17 @@ class HwpxOps:
         fill_color: Optional[str] = None,
         auto_fit: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        border_fill = self._ensure_table_border_fill(
-            document,
+        return self._services.tables.add_table(
+            path,
+            rows,
+            cols,
+            section_index=section_index,
             border_style=border_style,
             border_color=border_color,
             border_width=border_width,
             fill_color=fill_color,
+            auto_fit=auto_fit,
         )
-        table = document.add_table(
-            rows,
-            cols,
-            section_index=section_index,
-            border_fill_id_ref=border_fill,
-        )
-        if auto_fit:
-            self._auto_fit_table_columns(table)
-        tables = self._iter_tables(document)
-        element_id = id(table.element)
-        index = len(tables) - 1
-        for idx, candidate in enumerate(tables):
-            if id(candidate.element) == element_id:
-                index = idx
-                break
-        self._save_document(document, resolved)
-        return {"tableIndex": index, "cellCount": rows * cols}
 
     def set_table_border_fill(
         self,
@@ -2499,70 +758,21 @@ class HwpxOps:
         border_width: Optional[str | float | int] = None,
         fill_color: Optional[str] = None,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        tables = self._iter_tables(document)
-        try:
-            table = tables[table_index]
-        except IndexError as exc:
-            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
-
-        border_fill = self._ensure_table_border_fill(
-            document,
+        return self._services.tables.set_table_border_fill(
+            path,
+            table_index,
             border_style=border_style,
             border_color=border_color,
             border_width=border_width,
             fill_color=fill_color,
         )
 
-        table.element.set("borderFillIDRef", border_fill)
-        anchor_elements: set[int] = set()
-        for position in table.iter_grid():
-            if getattr(position, "is_anchor", False):
-                cell_element = position.cell.element
-                cell_element.set("borderFillIDRef", border_fill)
-                anchor_elements.add(id(cell_element))
-
-        table.mark_dirty()
-        self._save_document(document, resolved)
-        return {"borderFillIDRef": border_fill, "anchorCells": len(anchor_elements)}
-
     def get_table_cell_map(
         self,
         path: str,
         table_index: int,
     ) -> Dict[str, Any]:
-        document, _ = self._open_document(path)
-        tables = self._iter_tables(document)
-        try:
-            table = tables[table_index]
-        except IndexError as exc:
-            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
-
-        grid_positions = table.get_cell_map()
-        serialized: List[List[Dict[str, Any]]] = []
-        for row in grid_positions:
-            row_payload: List[Dict[str, Any]] = []
-            for position in row:
-                anchor_row, anchor_col = position.anchor
-                row_span, col_span = position.span
-                cell_text: Optional[str] = None
-                cell = position.cell
-                if cell is not None:
-                    cell_text = cell.text
-                row_payload.append(
-                    {
-                        "row": position.row,
-                        "column": position.column,
-                        "anchor": {"row": anchor_row, "column": anchor_col},
-                        "rowSpan": row_span,
-                        "colSpan": col_span,
-                        "text": cell_text,
-                    }
-                )
-            serialized.append(row_payload)
-        row_count = len(serialized)
-        column_count = len(serialized[0]) if serialized else 0
-        return {"grid": serialized, "rowCount": row_count, "columnCount": column_count}
+        return self._services.tables.get_table_cell_map(path, table_index)
 
     def set_table_cell_text(
         self,
@@ -2577,30 +787,17 @@ class HwpxOps:
         split_merged: Optional[bool] = None,
         auto_fit: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        tables = self._iter_tables(document)
-        try:
-            table = tables[table_index]
-        except IndexError as exc:
-            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
-        kwargs: Dict[str, bool] = {}
-        if logical is not None:
-            kwargs["logical"] = logical
-        if split_merged is not None:
-            kwargs["split_merged"] = split_merged
-        guidance = (
-            "failed to update table cell; check indexes, enable logical addressing, "
-            "or split merged cells first"
+        return self._services.tables.set_table_cell_text(
+            path,
+            table_index,
+            row,
+            col,
+            text,
+            dry_run=dry_run,
+            logical=logical,
+            split_merged=split_merged,
+            auto_fit=auto_fit,
         )
-        try:
-            table.set_cell_text(row, col, _sanitize_cell_text(text), **kwargs)
-        except (IndexError, ValueError) as exc:
-            raise self._new_error("TABLE_CELL_OPERATION_FAILED", f"{guidance}: {exc}") from exc
-        if auto_fit and not dry_run:
-            self._auto_fit_table_columns(table)
-        if not dry_run:
-            self._save_document(document, resolved)
-        return {"ok": True}
 
     def replace_table_region(
         self,
@@ -2615,44 +812,17 @@ class HwpxOps:
         split_merged: Optional[bool] = None,
         auto_fit: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        tables = self._iter_tables(document)
-        try:
-            table = tables[table_index]
-        except IndexError as exc:
-            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
-        kwargs: Dict[str, bool] = {}
-        if logical is not None:
-            kwargs["logical"] = logical
-        if split_merged is not None:
-            kwargs["split_merged"] = split_merged
-        guidance = (
-            "failed to update table cell; check indexes, enable logical addressing, "
-            "or split merged cells first"
+        return self._services.tables.replace_table_region(
+            path,
+            table_index,
+            start_row,
+            start_col,
+            values,
+            dry_run=dry_run,
+            logical=logical,
+            split_merged=split_merged,
+            auto_fit=auto_fit,
         )
-        updated = 0
-        for row_offset, row_values in enumerate(values):
-            for col_offset, cell_text in enumerate(row_values):
-                logical_row = start_row + row_offset
-                logical_col = start_col + col_offset
-                try:
-                    table.set_cell_text(
-                        logical_row,
-                        logical_col,
-                        _sanitize_cell_text(cell_text),
-                        **kwargs,
-                    )
-                except (IndexError, ValueError) as exc:
-                    message = (
-                        f"{guidance} while writing cell ({logical_row}, {logical_col})"
-                    )
-                    raise self._new_error("TABLE_CELL_OPERATION_FAILED", f"{message}: {exc}", details={"row": logical_row, "col": logical_col}) from exc
-                updated += 1
-        if auto_fit and not dry_run and updated > 0:
-            self._auto_fit_table_columns(table)
-        if not dry_run:
-            self._save_document(document, resolved)
-        return {"updatedCells": updated}
 
     def byte_preserving_patch(
         self,
@@ -2661,207 +831,9 @@ class HwpxOps:
         *,
         output: Optional[str] = None,
     ) -> Dict[str, Any]:
-        try:
-            from hwpx.patch import paragraph_patch
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._new_error(
-                "BYTE_PATCH_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.patch.paragraph_patch",
-            ) from exc
-
-        source_path = self._resolve_path(path)
-        output_precondition = None
-        if isinstance(self.storage, LocalDocumentStorage):
-            output_precondition = self.storage.capture_output_precondition(
-                output if output else source_path
-            )
-            target_path = output_precondition.path
-            local_guard = (
-                output_precondition
-                if isinstance(output_precondition, WorkspaceOutputGuard)
-                else None
-            )
-        else:
-            target_path = self._resolve_output_path(output) if output else source_path
-            local_guard = None
-        target_before = (
-            self.storage.read_guarded_bytes(local_guard)
-            if local_guard is not None and local_guard.target_existed
-            else None
+        return self._services.transactions.byte_preserving_patch(
+            path, patches, output=output
         )
-        result = paragraph_patch(source_path, patches)
-        payload = result.to_dict()
-        payload["outputPath"] = str(target_path)
-        verification_report = {
-            "ok": bool(payload["openSafety"]["ok"]) and not payload["skipped"],
-            "filePath": str(target_path),
-            "openSafety": payload["openSafety"],
-            "byteIdentical": payload["byteIdentical"],
-            "changedParts": payload["changedParts"],
-            "skipped": payload["skipped"],
-        }
-        if payload["skipped"]:
-            payload["verificationReport"] = verification_report
-            return payload
-
-        candidate_bytes = bytes(result.data)
-        verification_report = build_hwpx_verification_report(
-            candidate_bytes,
-            file_path=target_path,
-        )
-        if not verification_report["openSafety"]["ok"]:
-            raise self._new_error(
-                "BYTE_PATCH_OPEN_SAFETY_FAILED",
-                "patched HWPX failed open-safety verification: "
-                + verification_report["openSafety"]["summary"],
-            )
-
-        target_recoveries: tuple[_ExactRecoveryPublication, ...] = ()
-        if target_before is not None:
-            preserved_target = self._preserve_exact_preimages(
-                [
-                    (
-                        target_path,
-                        target_before,
-                        (
-                            local_guard.target_mode
-                            if local_guard is not None
-                            else None
-                        ),
-                    )
-                ],
-                marker="rollback-recovery",
-            )
-            if preserved_target is None:
-                raise RuntimeError(
-                    "byte patch target preimage could not be preserved"
-                )
-            target_recoveries = preserved_target
-        publication: WorkspaceOutputGuard | None = None
-        exact_backup: _ExactBackupResult | None = None
-        materialized_guard: WorkspaceOutputGuard | None = None
-        rollback_recoveries_ready = True
-        try:
-            if output_precondition is not None:
-                local_guard = self.storage.materialize_output_guard(
-                    output_precondition
-                )
-                materialized_guard = local_guard
-                # Preserve the retained public backup contract, but bind the
-                # sidecar to the exact preimage captured with the output guard.
-                exact_backup = self._rotate_and_backup_exact(
-                    target_path,
-                    target_guard=local_guard,
-                    target_bytes=target_before,
-                )
-                backup = exact_backup.report
-                publication = self.storage.atomic_publish_bytes(
-                    local_guard,
-                    candidate_bytes,
-                )
-            else:
-                backup = rotate_and_backup(target_path)
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                fd, tmp_name = tempfile.mkstemp(
-                    prefix=f".{target_path.stem}.",
-                    suffix=target_path.suffix or ".hwpx",
-                    dir=str(target_path.parent),
-                )
-                tmp_path = Path(tmp_name)
-                try:
-                    os.close(fd)
-                    tmp_path.write_bytes(candidate_bytes)
-                    os.replace(tmp_path, target_path)
-                finally:
-                    tmp_path.unlink(missing_ok=True)
-            verification_report["backup"] = backup.to_dict()
-            if backup.backup_path is not None:
-                try:
-                    verification_report["semanticDiff"] = (
-                        self._semantic_diff_bytes(
-                            target_before or b"",
-                            candidate_bytes,
-                        )
-                        if local_guard is not None
-                        else semantic_diff(backup.backup_path, target_path)
-                    )
-                except Exception as exc:  # pragma: no cover - diagnostic fallback
-                    verification_report["semanticDiff"] = {
-                        "schemaVersion": "hwpx.semantic-diff.v1",
-                        "changed": True,
-                        "summary": f"Semantic diff unavailable: {exc}",
-                        "items": [],
-                        "error": str(exc),
-                    }
-            if publication is not None:
-                # Receipt evidence is valid only while the exact published
-                # candidate and reported backup sidecars still occupy their
-                # authorized names with the exact published identities.
-                for mutation in exact_backup.mutations:
-                    self._assert_exact_sidecar_publication(
-                        mutation.publication
-                    )
-                self.storage.read_guarded_bytes(publication)
-            all_recoveries = target_recoveries + (
-                exact_backup.recoveries if exact_backup is not None else ()
-            )
-            cleaned, rollback_recoveries_ready = (
-                self._cleanup_exact_recoveries(all_recoveries)
-            )
-            if not cleaned:
-                raise RuntimeError(
-                    "byte patch recovery cleanup lost its exact claim"
-                )
-            try:
-                if publication is not None:
-                    for mutation in exact_backup.mutations:
-                        self._assert_exact_sidecar_publication(
-                            mutation.publication
-                        )
-                    self.storage.read_guarded_bytes(publication)
-            except (FileNotFoundError, OSError, RuntimeError):
-                rollback_recoveries_ready = (
-                    self._republish_exact_recoveries(all_recoveries)
-                )
-                raise
-        except BaseException:
-            target_preimage_preserved = (
-                target_before is None
-                or rollback_recoveries_ready
-            )
-            if target_preimage_preserved and publication is not None:
-                try:
-                    if local_guard is not None and local_guard.target_existed:
-                        if target_before is not None:
-                            restored_publication = self.storage.atomic_publish_bytes(
-                                publication,
-                                target_before,
-                                mode=local_guard.target_mode,
-                            )
-                            self.storage.read_guarded_bytes(
-                                restored_publication
-                            )
-                    else:
-                        self.storage.remove_guarded_output(publication)
-                except (OSError, RuntimeError):
-                    pass
-            if exact_backup is not None and target_preimage_preserved:
-                self._rollback_exact_backup_mutations(
-                    exact_backup.mutations,
-                    preimages_preserved=rollback_recoveries_ready,
-                )
-            if materialized_guard is not None:
-                self.storage.cleanup_owned_parent_directories(
-                    materialized_guard
-                )
-            raise
-        verification_report["filePath"] = str(target_path)
-        verification_report["byteIdentical"] = payload["byteIdentical"]
-        verification_report["changedParts"] = payload["changedParts"]
-        verification_report["skipped"] = payload["skipped"]
-        payload["verificationReport"] = verification_report
-        payload["openSafety"] = verification_report["openSafety"]
-        return payload
 
     def _write_patched(
         self,
@@ -2879,63 +851,14 @@ class HwpxOps:
     ) -> Dict[str, Any]:
         """Atomic temp-write + open-safety gate for a byte-preserving result
         (shared by byte_preserving_patch / apply_table_ops)."""
-        candidate_bytes = bytes(data)
-        report = build_hwpx_verification_report(
-            candidate_bytes,
-            file_path=target_path,
+        return self._services.save._write_patched(
+            target_path,
+            data,
+            payload,
+            output_guard=output_guard,
+            output_precondition=output_precondition,
+            publication_sink=publication_sink,
         )
-        if not report["openSafety"]["ok"]:
-            raise self._new_error(
-                "FORM_FILL_OPEN_SAFETY_FAILED",
-                "form-fill output failed open-safety verification: "
-                + report["openSafety"]["summary"],
-            )
-        report["filePath"] = str(target_path)
-        report["byteIdentical"] = payload["byteIdentical"]
-        report["changedParts"] = payload["changedParts"]
-        report["skipped"] = payload["skipped"]
-        payload["verificationReport"] = report
-        payload["openSafety"] = report["openSafety"]
-
-        if isinstance(self.storage, LocalDocumentStorage):
-            precondition = (
-                output_precondition
-                or output_guard
-                or self.storage.capture_output_precondition(target_path)
-            )
-            materialized_guard: WorkspaceOutputGuard | None = None
-            try:
-                materialized_guard = self.storage.materialize_output_guard(
-                    precondition
-                )
-                publication = self.storage.atomic_publish_bytes(
-                    materialized_guard,
-                    candidate_bytes,
-                )
-                if publication_sink is not None:
-                    publication_sink(publication)
-                payload["_workspacePublication"] = publication
-            except BaseException:
-                if materialized_guard is not None:
-                    self.storage.cleanup_owned_parent_directories(
-                        materialized_guard
-                    )
-                raise
-        else:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            fd, tmp_name = tempfile.mkstemp(
-                prefix=f".{target_path.stem}.",
-                suffix=target_path.suffix or ".hwpx",
-                dir=str(target_path.parent),
-            )
-            tmp_path = Path(tmp_name)
-            try:
-                os.close(fd)
-                tmp_path.write_bytes(candidate_bytes)
-                os.replace(tmp_path, target_path)
-            finally:
-                tmp_path.unlink(missing_ok=True)
-        return payload
 
     def apply_table_ops(
         self,
@@ -2960,79 +883,15 @@ class HwpxOps:
         real) but writes NOTHING — returns transcript (per-op resolution + before/
         after dims) and applied old→new texts as approval evidence for the user
         consult loop. renderCheck still works on the would-be bytes."""
-        try:
-            from hwpx.table_patch import apply_table_ops as _apply
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._new_error(
-                "TABLE_OPS_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.table_patch.apply_table_ops",
-            ) from exc
-
-        source_path = self._resolve_path(path)
-        output_precondition = None
-        if isinstance(self.storage, LocalDocumentStorage):
-            output_precondition = (
-                output_guard
-                or self.storage.capture_output_precondition(
-                    output if output else source_path
-                )
-            )
-            target_path = output_precondition.path
-        else:
-            target_path = (
-                self._resolve_path(output, must_exist=False)
-                if output and dry_run
-                else self._resolve_output_path(output)
-                if output
-                else source_path
-            )
-        result = _apply(source_path, list(ops), dry_run=dry_run)
-        payload = result.to_dict()
-        if dry_run:
-            payload["dryRun"] = True
-            payload["outputPath"] = None
-        else:
-            payload["outputPath"] = str(target_path)
-
-        if render_check and render_check != "off":
-            try:
-                from hwpx.table_patch import verify_fill
-                report = verify_fill(source_path, result.data, require=(render_check == "required"))
-                payload["renderVerdict"] = {
-                    "renderChecked": report.render_checked,
-                    "ok": report.ok,
-                    "overflowDetected": report.overflow_detected,
-                    "overlapDetected": report.overlap_detected,
-                    "pageCountChanged": report.page_count_changed,
-                    "warnings": list(report.warnings),
-                    "errors": list(report.errors),
-                }
-                if report.render_checked and not report.ok:
-                    payload["ok"] = False
-                    if render_check == "required":
-                        raise self._new_error(
-                            "RENDER_CHECK_REQUIRED_FAILED",
-                            "required render detected overflow, overlap, or layout regression",
-                        )
-            except Exception as exc:
-                if render_check == "required":
-                    raise self._new_error("RENDER_CHECK_REQUIRED_FAILED", str(exc)) from exc
-                payload["renderVerdict"] = {"renderChecked": False, "note": str(exc)}
-        # A required render is a pre-publication gate: only replace the
-        # destination after the candidate has passed it.
-        if payload.get("ok") is not False and not dry_run and (
-            not result.byte_identical
-            or target_path.resolve(strict=False) != source_path.resolve(strict=False)
-        ):
-            payload = self._write_patched(
-                target_path,
-                result.data,
-                payload,
-                output_guard=output_guard,
-                output_precondition=output_precondition,
-                publication_sink=publication_sink,
-            )
-        return payload
+        return self._services.form_fields.apply_table_ops(
+            path,
+            ops,
+            output=output,
+            render_check=render_check,
+            dry_run=dry_run,
+            output_guard=output_guard,
+            publication_sink=publication_sink,
+        )
 
     def verify_form_fill(
         self,
@@ -3043,25 +902,9 @@ class HwpxOps:
     ) -> Dict[str, Any]:
         """Render before/after in REAL Hancom and judge overflow/overlap/layout.
         Honest degrade (renderChecked=false) with no oracle unless require=true."""
-        try:
-            from hwpx.table_patch import verify_fill
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._new_error(
-                "VERIFY_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.table_patch.verify_fill",
-            ) from exc
-        after = self._resolve_path(path)
-        before = self._resolve_path(before_path)
-        report = verify_fill(before, after, require=require)
-        return {
-            "renderChecked": report.render_checked,
-            "ok": report.ok,
-            "overflowDetected": report.overflow_detected,
-            "overlapDetected": report.overlap_detected,
-            "pageCountChanged": report.page_count_changed,
-            "warnings": list(report.warnings),
-            "errors": list(report.errors),
-        }
+        return self._services.form_fields.verify_form_fill(
+            path, before_path, require=require
+        )
 
     def score_form_fill(
         self,
@@ -3081,22 +924,13 @@ class HwpxOps:
         form family, ``blankPath`` = the empty province form. A requires a real
         Hancom render (renderCheck); with no oracle A is ``unverified`` (never a
         silent pass). Set runRender=false for a fast structural-only pass."""
-        try:
-            from hwpx.formfill_quality import score_form_fill as _score
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._new_error(
-                "SCORE_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.formfill_quality.score_form_fill",
-            ) from exc
-        produced = self._resolve_path(path)
-        gold = self._resolve_path(gold_path)
-        blank = self._resolve_path(blank_path)
-        card = _score(
-            produced, gold, blank,
+        return self._services.form_fields.score_form_fill(
+            path,
+            gold_path,
+            blank_path,
             run_render=run_render,
             expected_pages=expected_pages,
         )
-        return card.to_dict()
 
     def apply_body_ops(
         self,
@@ -3117,51 +951,14 @@ class HwpxOps:
         insert_paragraph_by_clone{ref_index,count,texts?: 참조 문단 서식 verbatim
         상속} · reorder_paragraphs{start,end,order}. index는 op 실행 시점 기준.
         dryRun=true면 아무것도 쓰지 않고 transcript만(승인 근거)."""
-        try:
-            from hwpx.body_patch import apply_body_ops as _apply
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._new_error(
-                "BODY_OPS_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.body_patch.apply_body_ops",
-            ) from exc
-        source_path = self._resolve_path(path)
-        output_precondition = None
-        if isinstance(self.storage, LocalDocumentStorage):
-            output_precondition = (
-                output_guard
-                or self.storage.capture_output_precondition(
-                    output if output else source_path
-                )
-            )
-            target_path = output_precondition.path
-        else:
-            target_path = (
-                self._resolve_path(output, must_exist=False)
-                if output and dry_run
-                else self._resolve_output_path(output)
-                if output
-                else source_path
-            )
-        result = _apply(source_path, list(ops), dry_run=dry_run)
-        payload = result.to_dict()
-        if dry_run:
-            payload["dryRun"] = True
-            payload["outputPath"] = None
-        else:
-            payload["outputPath"] = str(target_path)
-            if (
-                not result.byte_identical
-                or target_path.resolve(strict=False) != source_path.resolve(strict=False)
-            ):
-                payload = self._write_patched(
-                    target_path,
-                    result.data,
-                    payload,
-                    output_guard=output_guard,
-                    output_precondition=output_precondition,
-                    publication_sink=publication_sink,
-                )
-        return payload
+        return self._services.form_fields.apply_body_ops(
+            path,
+            ops,
+            output=output,
+            dry_run=dry_run,
+            output_guard=output_guard,
+            publication_sink=publication_sink,
+        )
 
     def inspect_fill_residue(
         self,
@@ -3175,16 +972,9 @@ class HwpxOps:
         동일=prose 샘플 미교체) = ERROR. placeholder ◯◯◯/□□□=ERROR, **=각주와
         중의적이라 needs_review, 고아 마커=needs_review. ok=true는 필요조건일 뿐 —
         제출 확언은 렌더 PDF를 사람이 전 페이지 본 뒤에만."""
-        try:
-            from hwpx.fill_residue import inspect_fill_residue as _inspect
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._new_error(
-                "FILL_RESIDUE_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.fill_residue",
-            ) from exc
-        produced = self._resolve_path(path)
-        blank = self._resolve_path(blank_path) if blank_path else None
-        return _inspect(produced, blank=blank).to_dict()
+        return self._services.form_fields.inspect_fill_residue(
+            path, blank_path=blank_path
+        )
 
     def scan_form_guidance(self, path: str, *, max_items: int = 60) -> Dict[str, Any]:
         """Recon an unfamiliar form (NON-MUTATING) — universal form-fill Stage 1.
@@ -3196,56 +986,7 @@ class HwpxOps:
         tokens (◯◯◯/**/□□□), conditional-choice blocks, empty cells with neighbour
         label + charPr format context, and an honest question list. Candidates are
         proposals — destructive ops still require user approval."""
-        try:
-            from hwpx.guidance_scan import scan_form_guidance as _scan
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._new_error(
-                "GUIDANCE_SCAN_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.guidance_scan",
-            ) from exc
-        resolved = self._resolve_path(path)
-        report = _scan(resolved)
-        limit = max(1, int(max_items))
-
-        def _cand(c) -> Dict[str, Any]:
-            cell = None
-            if c.cell is not None:
-                cell = {"tableIndex": c.cell.table_index, "row": c.cell.row, "col": c.cell.col}
-            return {
-                "location": c.location,
-                "signals": c.signals,
-                "confidence": c.confidence,
-                "textPreview": c.text_preview,
-                "cell": cell,
-            }
-
-        def _cap(items) -> List[Dict[str, Any]]:
-            return [_cand(c) for c in items[:limit]]
-
-        return {
-            "legend": [
-                {
-                    "colorWord": b.color_word,
-                    "family": b.family,
-                    "exactHex": b.exact_hex,
-                    "action": b.action,
-                    "sourceText": b.source_text,
-                }
-                for b in report.legend
-            ],
-            "colorInventory": report.color_inventory,
-            "deleteCandidates": _cap(report.delete_candidates),
-            "deleteCandidatesTotal": len(report.delete_candidates),
-            "modifyCandidatesByTable": report.modify_candidates_by_table,
-            "emptyCellCandidates": _cap(report.empty_cell_candidates),
-            "emptyCellTotal": len(report.empty_cell_candidates),
-            "placeholderCandidates": _cap(report.placeholder_candidates),
-            "conditionalChoices": _cap(report.conditional_choices),
-            "questions": report.questions,
-            "stats": report.stats,
-            "limitations": report.limitations,
-            "markdownReport": report.to_markdown(),
-        }
+        return self._services.form_fields.scan_form_guidance(path, max_items=max_items)
 
     def apply_evalplan_fill(
         self,
@@ -3273,101 +1014,16 @@ class HwpxOps:
         with rubricNeedsReview (honest-defer count, never silent). Set
         renderCheck='required' to gate on a real Hancom render; pass scoreGoldPath
         (an accepted form of the same family) to also return the 5-axis scorecard."""
-        try:
-            from hwpx.evalplan_fill import (
-                parse_review_file, fill_evalplan, expected_skeleton,
-            )
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._new_error(
-                "EVALPLAN_FILL_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.evalplan_fill.fill_evalplan",
-            ) from exc
-
-        blank = self._resolve_path(path)
-        md = self._resolve_path(review_md)
-        output_precondition = None
-        if isinstance(self.storage, LocalDocumentStorage):
-            output_precondition = (
-                output_guard
-                or self.storage.capture_output_precondition(
-                    output if output else blank
-                )
-            )
-            target_path = output_precondition.path
-        else:
-            target_path = self._resolve_output_path(output) if output else blank
-        content = parse_review_file(md)
-        res = fill_evalplan(blank, content, phase="all")
-        data = res["_data"]
-
-        report = res.get("content_report", {})
-        rubric_nr = [s for s in report.get("rubrics", {}).get("skipped", [])
-                     if "NEEDS_REVIEW" in s]
-        payload: Dict[str, Any] = {
-            "ok": bool(res.get("ok")),
-            "outputPath": str(target_path),
-            "byteIdentical": bool(res.get("byteIdentical")),
-            "transcript": res.get("transcript", []),
-            "expectedSkeleton": res.get("expected_skeleton"),
-            "contentReport": report,
-            "rubricNeedsReview": len(rubric_nr),
-            "needsReviewNotes": rubric_nr,
-            "changedParts": res.get("changedParts", []),
-            "skipped": res.get("skipped", []),
-        }
-        if render_check and render_check != "off":
-            try:
-                from hwpx.table_patch import verify_fill
-                verdict = verify_fill(blank, data, require=(render_check == "required"))
-                payload["renderVerdict"] = {
-                    "renderChecked": verdict.render_checked,
-                    "ok": verdict.ok,
-                    "overflowDetected": verdict.overflow_detected,
-                    "overlapDetected": verdict.overlap_detected,
-                    "pageCountChanged": verdict.page_count_changed,
-                    "warnings": list(verdict.warnings),
-                    "errors": list(verdict.errors),
-                }
-                if verdict.render_checked and not verdict.ok:
-                    payload["ok"] = False
-                    if render_check == "required":
-                        raise self._new_error(
-                            "RENDER_CHECK_REQUIRED_FAILED",
-                            "required evalplan render detected overflow, overlap, or layout regression",
-                        )
-            except Exception as exc:
-                if render_check == "required":
-                    raise self._new_error("RENDER_CHECK_REQUIRED_FAILED", str(exc)) from exc
-                payload["renderVerdict"] = {"renderChecked": False, "note": str(exc)}
-
-        # Do not publish a partial/failed domain result. Required rendering is
-        # evaluated against candidate bytes before the atomic destination swap.
-        if payload["ok"] and (
-            not res.get("byteIdentical", True)
-            or target_path.resolve(strict=False) != blank.resolve(strict=False)
-        ):
-            payload = self._write_patched(
-                target_path,
-                data,
-                payload,
-                output_guard=output_guard,
-                output_precondition=output_precondition,
-                publication_sink=publication_sink,
-            )
-
-        if score_gold_path:
-            try:
-                from hwpx.formfill_quality import score_form_fill as _score
-                card = _score(
-                    target_path, self._resolve_path(score_gold_path), blank,
-                    content=md, expected_skeleton=expected_skeleton(content, blank),
-                    run_render=(render_check and render_check != "off"),
-                    expected_pages=expected_pages,
-                )
-                payload["scorecard"] = card.to_dict()
-            except Exception as exc:  # pragma: no cover - scoring optional
-                payload["scorecard"] = {"error": str(exc)}
-        return payload
+        return self._services.form_fields.apply_evalplan_fill(
+            path,
+            review_md,
+            output=output,
+            render_check=render_check,
+            score_gold_path=score_gold_path,
+            expected_pages=expected_pages,
+            output_guard=output_guard,
+            publication_sink=publication_sink,
+        )
 
     def split_table_cell(
         self,
@@ -3376,38 +1032,7 @@ class HwpxOps:
         row: int,
         col: int,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        tables = self._iter_tables(document)
-        try:
-            table = tables[table_index]
-        except IndexError as exc:
-            raise self._new_error("TABLE_INDEX_OUT_OF_RANGE", "tableIndex out of range", details={"tableIndex": table_index}) from exc
-        try:
-            target = table.cell(row, col)
-        except (IndexError, ValueError) as exc:
-            raise self._new_error(
-                "TABLE_CELL_INDEX_OUT_OF_RANGE",
-                "table cell coordinates out of range; enable logical addressing to verify merged grids",
-                details={"row": row, "col": col},
-            ) from exc
-        anchor_row, anchor_col = target.address
-        span_row, span_col = target.span
-        changed = span_row > 1 or span_col > 1
-        guidance = (
-            "failed to split merged cell; check indexes or split manually if logical addressing shows overlaps"
-        )
-        try:
-            table.split_merged_cell(row, col)
-        except (IndexError, ValueError) as exc:
-            raise self._new_error("TABLE_CELL_OPERATION_FAILED", f"{guidance}: {exc}") from exc
-        if changed:
-            self._save_document(document, resolved)
-        return {
-            "startRow": anchor_row,
-            "startCol": anchor_col,
-            "rowSpan": span_row,
-            "colSpan": span_col,
-        }
+        return self._services.tables.split_table_cell(path, table_index, row, col)
 
     def copy_table_between_documents(
         self,
@@ -3418,45 +1043,13 @@ class HwpxOps:
         target_section_index: Optional[int] = None,
         auto_fit: bool = False,
     ) -> Dict[str, Any]:
-        source_map = self.get_table_cell_map(source_path, source_table_index)
-        row_count = int(source_map["rowCount"])
-        column_count = int(source_map["columnCount"])
-        if row_count <= 0 or column_count <= 0:
-            raise self._new_error(
-                "TABLE_EMPTY",
-                "복사할 표 셀이 비어 있습니다.",
-                details={"tableIndex": source_table_index},
-            )
-
-        values: List[List[str]] = []
-        for row in source_map["grid"]:
-            row_values: List[str] = []
-            for cell in row:
-                row_values.append((cell.get("text") or "").strip())
-            values.append(row_values)
-
-        created = self.add_table(
+        return self._services.tables.copy_table_between_documents(
+            source_path,
+            source_table_index,
             target_path,
-            rows=row_count,
-            cols=column_count,
-            section_index=target_section_index,
+            target_section_index=target_section_index,
             auto_fit=auto_fit,
         )
-        target_table_index = int(created["tableIndex"])
-        updated = self.replace_table_region(
-            target_path,
-            table_index=target_table_index,
-            start_row=0,
-            start_col=0,
-            values=values,
-            auto_fit=auto_fit,
-        )
-        return {
-            "targetTableIndex": target_table_index,
-            "copiedCells": updated["updatedCells"],
-            "rowCount": row_count,
-            "columnCount": column_count,
-        }
 
     def add_shape(
         self,
@@ -3466,11 +1059,9 @@ class HwpxOps:
         section_index: Optional[int] = None,
         dry_run: bool = True,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        shape = document.add_shape(shape_type, section_index=section_index)
-        if not dry_run:
-            self._save_document(document, resolved)
-        return {"objectId": shape.element.get("id")}
+        return self._services.media.add_shape(
+            path, shape_type=shape_type, section_index=section_index, dry_run=dry_run
+        )
 
     def add_control(
         self,
@@ -3480,11 +1071,12 @@ class HwpxOps:
         section_index: Optional[int] = None,
         dry_run: bool = True,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        control = document.add_control(control_type=control_type, section_index=section_index)
-        if not dry_run:
-            self._save_document(document, resolved)
-        return {"objectId": control.element.get("id")}
+        return self._services.media.add_control(
+            path,
+            control_type=control_type,
+            section_index=section_index,
+            dry_run=dry_run,
+        )
 
     def insert_picture(
         self,
@@ -3501,41 +1093,19 @@ class HwpxOps:
         output: Optional[str] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        target = self._resolve_path(output, must_exist=False) if output else resolved
-        document.add_picture(
-            self._decode_image_base64(image_base64),
-            image_format,
+        return self._services.media.insert_picture(
+            path,
+            image_base64,
+            image_format=image_format,
             width=width,
             height=height,
             width_mm=width_mm,
             height_mm=height_mm,
             section_index=section_index,
             align=align,
+            output=output,
+            dry_run=dry_run,
         )
-        picture_refs = document.picture_references()
-        result: Dict[str, Any] = {
-            "ok": True,
-            "dryRun": dry_run,
-            "filename": path,
-            "outputPath": str(target),
-            "picture": picture_refs[-1] if picture_refs else None,
-            "pictureReferences": picture_refs,
-            "idIntegrity": self._id_integrity_payload(document),
-        }
-        if dry_run:
-            result.update(save_dry_run(document, target))
-            return result
-        verification = self._save_transaction_document(document, target)
-        result["verificationReport"] = verification
-        result["openSafety"] = verification.get("openSafety")
-        if "visualComplete" in verification:
-            result["visualComplete"] = verification["visualComplete"]
-        if "backup" in verification:
-            result["backup"] = verification["backup"]
-        if "semanticDiff" in verification:
-            result["semanticDiff"] = verification["semanticDiff"]
-        return result
 
     def replace_picture(
         self,
@@ -3549,41 +1119,17 @@ class HwpxOps:
         output: Optional[str] = None,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        target = self._resolve_path(output, must_exist=False) if output else resolved
-        replacement = document.replace_picture(
-            self._decode_image_base64(image_base64),
-            image_format,
+        return self._services.media.replace_picture(
+            path,
+            image_base64,
+            image_format=image_format,
             picture_index=picture_index,
             binary_item_id_ref=binary_item_id_ref,
             remove_orphaned=remove_orphaned,
+            output=output,
+            dry_run=dry_run,
         )
-        result: Dict[str, Any] = {
-            "ok": True,
-            "dryRun": dry_run,
-            "filename": path,
-            "outputPath": str(target),
-            "replacement": replacement,
-            "pictureReferences": document.picture_references(),
-            "idIntegrity": self._id_integrity_payload(document),
-        }
-        if dry_run:
-            result.update(save_dry_run(document, target))
-            return result
-        verification = self._save_transaction_document(document, target)
-        result["verificationReport"] = verification
-        result["openSafety"] = verification.get("openSafety")
-        if "visualComplete" in verification:
-            result["visualComplete"] = verification["visualComplete"]
-        if "backup" in verification:
-            result["backup"] = verification["backup"]
-        if "semanticDiff" in verification:
-            result["semanticDiff"] = verification["semanticDiff"]
-        return result
 
-    # ------------------------------------------------------------------
-    # Memo management
-    # ------------------------------------------------------------------
     def add_memo(
         self,
         path: str,
@@ -3593,14 +1139,9 @@ class HwpxOps:
         author: str | None = None,
         timestamp: str | None = None,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        memo = document.add_memo(
-            text,
-            section_index=section_index,
-            attributes={"author": author or "", "createDateTime": timestamp or datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
+        return self._services.memo_style.add_memo(
+            path, text, section_index=section_index, author=author, timestamp=timestamp
         )
-        self._save_document(document, resolved)
-        return {"memoId": memo.id}
 
     def attach_memo_field(
         self,
@@ -3608,18 +1149,9 @@ class HwpxOps:
         paragraph_index: int,
         memo_id: str,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        paragraphs = self._iter_paragraphs(document)
-        try:
-            paragraph = paragraphs[paragraph_index]
-        except IndexError as exc:
-            raise self._new_error("PARAGRAPH_INDEX_OUT_OF_RANGE", "paragraphIndex out of range", details={"paragraphIndex": paragraph_index}) from exc
-        memo = self._find_memo(document, memo_id)
-        if memo is None:
-            raise self._new_error("MEMO_NOT_FOUND", f"memo '{memo_id}' not found", details={"memoId": memo_id})
-        field_id = document.attach_memo_field(paragraph, memo)
-        self._save_document(document, resolved)
-        return {"fieldId": field_id}
+        return self._services.memo_style.attach_memo_field(
+            path, paragraph_index, memo_id
+        )
 
     def add_memo_with_anchor(
         self,
@@ -3629,21 +1161,12 @@ class HwpxOps:
         section_index: Optional[int] = None,
         memo_shape_id_ref: str | None = None,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        memo, paragraph, field_id = document.add_memo_with_anchor(
-            text,
+        return self._services.memo_style.add_memo_with_anchor(
+            path,
+            text=text,
             section_index=section_index,
             memo_shape_id_ref=memo_shape_id_ref,
         )
-        paragraphs = self._iter_paragraphs(document)
-        paragraph_index = len(paragraphs) - 1
-        paragraph_element_id = id(paragraph.element)
-        for idx, candidate in enumerate(paragraphs):
-            if id(candidate.element) == paragraph_element_id:
-                paragraph_index = idx
-                break
-        self._save_document(document, resolved)
-        return {"memoId": memo.id, "paragraphIndex": paragraph_index, "fieldId": field_id}
 
     def remove_memo(
         self,
@@ -3652,35 +1175,18 @@ class HwpxOps:
         *,
         dry_run: bool = True,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        memo = self._find_memo(document, memo_id)
-        if memo is None:
-            return {"removed": False}
-        memo.remove()
-        if not dry_run:
-            self._save_document(document, resolved)
-        return {"removed": True}
+        return self._services.memo_style.remove_memo(path, memo_id, dry_run=dry_run)
 
-    def _find_memo(self, document: HwpxDocument, memo_id: str) -> Optional[HwpxOxmlMemo]:
-        for section in document.sections:
-            for memo in section.memos:
-                if memo.id == memo_id:
-                    return memo
-        return None
+    def _find_memo(
+        self, document: HwpxDocument, memo_id: str
+    ) -> Optional[HwpxOxmlMemo]:
+        return self._services.memo_style._find_memo(document, memo_id)
 
-    # ------------------------------------------------------------------
-    # Style helpers
-    # ------------------------------------------------------------------
     def ensure_run_style(self, path: str, **run_style: Any) -> Dict[str, Any]:
-        document, _ = self._open_document(path)
-        char_id = self._ensure_char_style(document, run_style)
-        return {"charPrIDRef": char_id}
+        return self._services.memo_style.ensure_run_style(path, **run_style)
 
     def list_styles_and_bullets(self, path: str) -> Dict[str, Any]:
-        document, _ = self._open_document(path)
-        styles = [asdict(style) for style in document.styles.values() if dataclasses.is_dataclass(style)]
-        bullets = [asdict(bullet) for bullet in document.bullets.values() if dataclasses.is_dataclass(bullet)]
-        return {"styles": styles, "bullets": bullets}
+        return self._services.memo_style.list_styles_and_bullets(path)
 
     def apply_style_to_text_ranges(
         self,
@@ -3690,203 +1196,9 @@ class HwpxOps:
         *,
         dry_run: bool = True,
     ) -> Dict[str, Any]:
-        if not char_pr_id_ref:
-            raise ValueError("char_pr_id_ref must be provided")
-
-        document, resolved = self._open_document(path)
-        paragraphs = self._iter_paragraphs(document)
-
-        class _Segment:
-            __slots__ = ("element", "attr", "text")
-
-            def __init__(self, element: ET.Element, attr: str, text: str) -> None:
-                self.element = element
-                self.attr = attr
-                self.text = text
-
-            def set(self, value: str) -> None:
-                self.text = value
-                if value:
-                    setattr(self.element, self.attr, value)
-                else:
-                    setattr(self.element, self.attr, "")
-
-        def _gather_segments(element: ET.Element) -> List[_Segment]:
-            segments: List[_Segment] = []
-
-            def visit(node: ET.Element) -> None:
-                text_value = node.text or ""
-                segments.append(_Segment(node, "text", text_value))
-                for child in list(node):
-                    visit(child)
-                    tail_value = child.tail or ""
-                    segments.append(_Segment(child, "tail", tail_value))
-
-            for text_node in element.findall(f"{HP_NS}t"):
-                visit(text_node)
-            return segments
-
-        def _slice_run(run_obj: HwpxOxmlRun, start: int, end: int) -> None:
-            segments = _gather_segments(run_obj.element)
-            if not segments:
-                return
-            total_length = sum(len(segment.text) for segment in segments)
-            start = max(0, min(start, total_length))
-            end = max(0, min(end, total_length))
-            if start >= end:
-                for segment in segments:
-                    if segment.text:
-                        segment.set("")
-                run_obj.paragraph.section.mark_dirty()
-                return
-            changed = False
-            offset = 0
-            for segment in segments:
-                seg_start = offset
-                seg_end = seg_start + len(segment.text)
-                offset = seg_end
-                if end <= seg_start or start >= seg_end:
-                    if segment.text:
-                        segment.set("")
-                        changed = True
-                    continue
-                local_start = max(start, seg_start) - seg_start
-                local_end = min(end, seg_end) - seg_start
-                new_value = segment.text[local_start:local_end]
-                if segment.text != new_value:
-                    segment.set(new_value)
-                    changed = True
-            if changed:
-                run_obj.paragraph.section.mark_dirty()
-
-        def _split_run(run_obj: HwpxOxmlRun, local_start: int, local_end: int) -> None:
-            text_value = run_obj.text or ""
-            length = len(text_value)
-            if length == 0:
-                return
-            local_start = max(0, min(local_start, length))
-            local_end = max(0, min(local_end, length))
-            if local_start >= local_end:
-                return
-            if local_start == 0 and local_end == length:
-                run_obj.char_pr_id_ref = char_pr_id_ref
-                return
-
-            segments: List[Tuple[int, int, Optional[str]]] = []
-            original_char = run_obj.char_pr_id_ref
-            if local_start > 0:
-                segments.append((0, local_start, original_char))
-            segments.append((local_start, local_end, char_pr_id_ref))
-            if local_end < length:
-                segments.append((local_end, length, original_char))
-
-            parent = run_obj.paragraph.element
-            run_children = list(parent)
-            try:
-                index = run_children.index(run_obj.element)
-            except ValueError:  # pragma: no cover - defensive branch
-                return
-
-            new_elements: List[ET.Element] = []
-            for seg_start, seg_end, char_id in segments:
-                if seg_start >= seg_end:
-                    continue
-                element_copy = copy.deepcopy(run_obj.element)
-                segment_run = HwpxOxmlRun(element_copy, run_obj.paragraph)
-                _slice_run(segment_run, seg_start, seg_end)
-                if char_id is None:
-                    segment_run.char_pr_id_ref = None
-                else:
-                    segment_run.char_pr_id_ref = char_id
-                new_elements.append(element_copy)
-
-            if not new_elements:
-                parent.remove(run_obj.element)
-                run_obj.paragraph.section.mark_dirty()
-                return
-
-            for offset, element in enumerate(new_elements):
-                parent.insert(index + offset, element)
-            parent.remove(run_obj.element)
-            run_obj.paragraph.section.mark_dirty()
-
-        def _paragraph_length(paragraph: HwpxOxmlParagraph) -> int:
-            return sum(len(run.text or "") for run in paragraph.runs)
-
-        def _apply_span(paragraph: HwpxOxmlParagraph, span_start: int, span_end: int) -> bool:
-            if span_start >= span_end:
-                return False
-            applied = False
-            cursor = span_start
-            while cursor < span_end:
-                runs = list(paragraph.runs)
-                offset = 0
-                target: Tuple[HwpxOxmlRun, int, int, int] | None = None
-                for candidate in runs:
-                    text = candidate.text or ""
-                    length = len(text)
-                    run_start = offset
-                    run_end = run_start + length
-                    if run_end <= cursor:
-                        offset = run_end
-                        continue
-                    if run_start >= span_end:
-                        target = None
-                        break
-                    if length == 0:
-                        offset = run_end
-                        continue
-                    target = (candidate, run_start, run_end, length)
-                    break
-
-                if target is None:
-                    break
-
-                run_obj, run_start, run_end, length = target
-                local_start = max(0, cursor - run_start)
-                local_end = min(length, span_end - run_start)
-                if local_start >= local_end:
-                    cursor = max(cursor + 1, run_end)
-                    continue
-
-                _split_run(run_obj, local_start, local_end)
-                applied = True
-                cursor = min(span_end, run_end)
-
-            return applied
-
-        styled = 0
-        for span in spans:
-            if isinstance(span, dict):
-                paragraph_index = int(span.get("paragraph_index", -1))
-                start = int(span.get("start", 0))
-                end = int(span.get("end", 0))
-            else:
-                paragraph_index = int(getattr(span, "paragraph_index", getattr(span, "paragraphIndex", -1)))
-                start = int(getattr(span, "start", 0))
-                end = int(getattr(span, "end", 0))
-
-            if paragraph_index < 0 or paragraph_index >= len(paragraphs):
-                continue
-
-            start = max(0, start)
-            end = max(start, end)
-            if start >= end:
-                continue
-
-            paragraph = paragraphs[paragraph_index]
-            total_length = _paragraph_length(paragraph)
-            if total_length == 0 or start >= total_length:
-                continue
-            clamped_end = min(end, total_length)
-
-            if _apply_span(paragraph, start, clamped_end):
-                styled += 1
-
-        if not dry_run and styled:
-            self._save_document(document, resolved)
-
-        return {"styledSpans": styled}
+        return self._services.memo_style.apply_style_to_text_ranges(
+            path, spans, char_pr_id_ref, dry_run=dry_run
+        )
 
     def apply_style_to_paragraphs(
         self,
@@ -3896,34 +1208,15 @@ class HwpxOps:
         *,
         dry_run: bool = True,
     ) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        paragraphs = self._iter_paragraphs(document)
-        updated = 0
-        for index in paragraph_indexes:
-            if index < 0 or index >= len(paragraphs):
-                continue
-            paragraph = paragraphs[index]
-            paragraph.char_pr_id_ref = char_pr_id_ref
-            for run in paragraph.runs:
-                run.char_pr_id_ref = char_pr_id_ref
-            updated += 1
-        if not dry_run and updated:
-            self._save_document(document, resolved)
-        return {"updated": updated}
+        return self._services.memo_style.apply_style_to_paragraphs(
+            path, paragraph_indexes, char_pr_id_ref, dry_run=dry_run
+        )
 
-    # ------------------------------------------------------------------
-    # Persistence helpers
-    # ------------------------------------------------------------------
     def save(self, path: str) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        verification_report = self._save_document(document, resolved)
-        return {"ok": True, "verificationReport": verification_report}
+        return self._services.save.save(path)
 
     def save_as(self, path: str, out: str) -> Dict[str, Any]:
-        document, resolved = self._open_document(path)
-        out_path = self._resolve_output_path(out)
-        verification_report = self._save_document(document, out_path)
-        return {"outPath": str(out_path), "verificationReport": verification_report}
+        return self._services.save.save_as(path, out)
 
     def fill_template(
         self,
@@ -3934,56 +1227,30 @@ class HwpxOps:
         preserve_style: bool = True,
         split_newlines: bool = True,
     ) -> Dict[str, Any]:
-        document, _ = self._open_document(source)
-        out_path = self._resolve_output_path(output)
+        return self._services.save.fill_template(
+            source,
+            output,
+            replacements,
+            preserve_style=preserve_style,
+            split_newlines=split_newlines,
+        )
 
-        replaced_count = 0
-        for needle, replacement in replacements.items():
-            if not needle:
-                continue
-            content = replacement
-            if not split_newlines:
-                content = content.replace("\r\n", " ").replace("\n", " ")
-
-            replaced_count += document.replace_text_in_runs(needle, content)
-
-        if not preserve_style:
-            logger.debug(
-                "fill_template called with preserve_style=False, but current backend always preserves run style"
-            )
-
-        verification_report = self._save_document(document, out_path)
-        return {
-            "outPath": str(out_path),
-            "replacedCount": replaced_count,
-            "verificationReport": verification_report,
-        }
-
-    # ------------------------------------------------------------------
-    # Export helpers (python-hwpx ≥ 2.4)
-    # ------------------------------------------------------------------
     def export_text(self, path: str) -> Dict[str, Any]:
         """Export document content as plain text."""
-        document, _ = self._open_document(path)
-        return {"content": export_document(document, "text"), "format": "text"}
+        return self._services.preview_export.export_text(path)
 
     def export_html(self, path: str) -> Dict[str, Any]:
         """Export document content as HTML."""
-        document, _ = self._open_document(path)
-        return {"content": export_document(document, "html"), "format": "html"}
+        return self._services.preview_export.export_html(path)
 
     def export_markdown(self, path: str) -> Dict[str, Any]:
         """Export document content as Markdown."""
-        document, _ = self._open_document(path)
-        return {"content": export_document(document, "markdown"), "format": "markdown"}
+        return self._services.preview_export.export_markdown(path)
 
     def _preview_output_dir(self, source_path: Path, output_dir: Optional[str]) -> Path:
-        if output_dir:
-            resolved = self.storage.resolve_path(output_dir, must_exist=False)
-        else:
-            resolved = source_path.parent / f"{_preview_slug(source_path)}-preview"
-        resolved.mkdir(parents=True, exist_ok=True)
-        return resolved
+        return self._services.preview_export._preview_output_dir(
+            source_path, output_dir
+        )
 
     def _embed_screenshot_image(
         self,
@@ -3998,19 +1265,9 @@ class HwpxOps:
         Keeps the on-disk artifact regardless; only the inline payload is gated so
         an oversized page degrades to "path only" instead of bloating the response.
         """
-        if not embed_images:
-            return
-        try:
-            raw = png_path.read_bytes()
-        except OSError as exc:  # pragma: no cover - filesystem edge
-            item["imageOmitted"] = f"read_error: {exc}"
-            return
-        item["bytes"] = len(raw)
-        if max_image_bytes is not None and len(raw) > max_image_bytes:
-            item["imageOmitted"] = "exceeds_max_image_bytes"
-            return
-        item["imageBase64"] = base64.b64encode(raw).decode("ascii")
-        item["imageMime"] = "image/png"
+        return self._services.preview_export._embed_screenshot_image(
+            item, png_path, embed_images=embed_images, max_image_bytes=max_image_bytes
+        )
 
     def _capture_preview_pages(
         self,
@@ -4022,124 +1279,14 @@ class HwpxOps:
         embed_images: bool = False,
         max_image_bytes: int | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        capture_count = len(page_html_paths)
-        if max_pages is not None:
-            capture_count = min(capture_count, max(0, max_pages))
-
-        try:
-            from playwright.sync_api import sync_playwright  # type: ignore
-        except Exception as playwright_exc:
-            playwright_error = str(playwright_exc)
-        else:  # pragma: no cover - local CI normally uses Chrome CLI fallback
-            screenshots: list[dict[str, Any]] = []
-            with sync_playwright() as playwright:
-                browser = playwright.chromium.launch()
-                try:
-                    for index, html_path in enumerate(page_html_paths[:capture_count]):
-                        page_info = pages[index]
-                        width, height = _page_viewport(page_info)
-                        output_path = output_dir / f"page-{index + 1:03d}.png"
-                        browser_page = browser.new_page(
-                            viewport={"width": width, "height": height},
-                            device_scale_factor=1,
-                        )
-                        browser_page.goto(html_path.as_uri(), wait_until="load")
-                        browser_page.screenshot(path=str(output_path), full_page=True)
-                        browser_page.close()
-                        item = {
-                            "pageIndex": index,
-                            "path": self._relative_path(output_path),
-                            "backend": "playwright-chromium",
-                            "widthPx": width,
-                            "heightPx": height,
-                        }
-                        self._embed_screenshot_image(
-                            item,
-                            output_path,
-                            embed_images=embed_images,
-                            max_image_bytes=max_image_bytes,
-                        )
-                        screenshots.append(item)
-                finally:
-                    browser.close()
-            return screenshots, {
-                "requested": True,
-                "available": True,
-                "backend": "playwright-chromium",
-                "message": f"Captured {len(screenshots)} preview screenshot(s).",
-            }
-
-        chrome = _chrome_executable()
-        if chrome is None:
-            return [], {
-                "requested": True,
-                "available": False,
-                "backend": None,
-                "message": (
-                    "No screenshot backend available. Install playwright browsers "
-                    "or set HWPX_MCP_CHROME_PATH to a Chrome executable. "
-                    f"Playwright import error: {playwright_error}"
-                ),
-            }
-
-        screenshots = []
-        failures: list[str] = []
-        for index, html_path in enumerate(page_html_paths[:capture_count]):
-            page_info = pages[index]
-            width, height = _page_viewport(page_info)
-            output_path = output_dir / f"page-{index + 1:03d}.png"
-            command = [
-                chrome,
-                "--headless=new",
-                "--disable-gpu",
-                "--hide-scrollbars",
-                "--no-first-run",
-                "--no-default-browser-check",
-                f"--window-size={width},{height}",
-                f"--screenshot={output_path}",
-                html_path.as_uri(),
-            ]
-            try:
-                completed = subprocess.run(
-                    command,
-                    check=False,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=60,
-                )
-            except Exception as exc:  # pragma: no cover - environment specific
-                failures.append(f"page {index + 1}: {exc}")
-                continue
-            if completed.returncode != 0 or not output_path.exists():
-                detail = (completed.stderr or completed.stdout or "unknown error").strip()
-                failures.append(f"page {index + 1}: {detail}")
-                continue
-            item = {
-                "pageIndex": index,
-                "path": self._relative_path(output_path),
-                "backend": "chrome-headless-cli",
-                "widthPx": width,
-                "heightPx": height,
-            }
-            self._embed_screenshot_image(
-                item,
-                output_path,
-                embed_images=embed_images,
-                max_image_bytes=max_image_bytes,
-            )
-            screenshots.append(item)
-
-        message = f"Captured {len(screenshots)} preview screenshot(s) with Chrome CLI."
-        if failures:
-            message += " Failures: " + " | ".join(failures[:3])
-        return screenshots, {
-            "requested": True,
-            "available": bool(screenshots),
-            "backend": "chrome-headless-cli",
-            "executable": chrome,
-            "message": message,
-        }
+        return self._services.preview_export._capture_preview_pages(
+            page_html_paths=page_html_paths,
+            pages=pages,
+            output_dir=output_dir,
+            max_pages=max_pages,
+            embed_images=embed_images,
+            max_image_bytes=max_image_bytes,
+        )
 
     def render_preview(
         self,
@@ -4158,190 +1305,23 @@ class HwpxOps:
         defaulting to ``_DEFAULT_MAX_PREVIEW_IMAGE_BYTES``) so a caller can return
         the page as an inline image content block.
         """
-        if embed_images and max_image_bytes is None:
-            max_image_bytes = _DEFAULT_MAX_PREVIEW_IMAGE_BYTES
-        if render_hwpx_layout_preview is None:
-            raise self._new_error(
-                "RENDER_PREVIEW_UNAVAILABLE",
-                "Installed python-hwpx does not expose hwpx.tools.layout_preview.",
-                details={"importError": str(_LAYOUT_PREVIEW_IMPORT_ERROR)},
-                hint="Install the matching python-hwpx checkout/release and restart the MCP server.",
-            )
-        if mode not in {"pages", "long"}:
-            raise self._new_error(
-                "RENDER_PREVIEW_INVALID_MODE",
-                "mode must be 'pages' or 'long'",
-                details={"mode": mode},
-            )
-        if screenshot not in {"auto", "require", "off"}:
-            raise self._new_error(
-                "RENDER_PREVIEW_INVALID_SCREENSHOT_MODE",
-                "screenshot must be 'auto', 'require', or 'off'",
-                details={"screenshot": screenshot},
-            )
-
-        source_path = self._resolve_path(path)
-        output_path = self._preview_output_dir(source_path, output_dir)
-        preview = render_hwpx_layout_preview(source_path, mode=mode, title=source_path.name)
-        preview_dict = preview.as_dict()
-
-        html_path = output_path / "preview.html"
-        manifest_path = output_path / "manifest.json"
-        evidence_path = output_path / "visual-review.json"
-        html_path.write_text(preview.html, encoding="utf-8")
-
-        page_html_paths: list[Path] = []
-        page_documents = preview.page_html_documents(title=source_path.name)
-        for index, page_html in enumerate(page_documents):
-            page_html_path = output_path / f"page-{index + 1:03d}.html"
-            page_html_path.write_text(page_html, encoding="utf-8")
-            page_html_paths.append(page_html_path)
-
-        pages = []
-        for index, page in enumerate(preview_dict["pages"]):
-            item = dict(page)
-            if index < len(page_html_paths):
-                item["htmlPath"] = self._relative_path(page_html_paths[index])
-            pages.append(item)
-
-        if screenshot == "off":
-            screenshots: list[dict[str, Any]] = []
-            screenshot_engine = {
-                "requested": False,
-                "available": False,
-                "backend": None,
-                "message": "Screenshot generation was disabled by request.",
-            }
-            status = "html_only"
-        else:
-            screenshots, screenshot_engine = self._capture_preview_pages(
-                page_html_paths=page_html_paths,
-                pages=pages,
-                output_dir=output_path,
-                max_pages=max_pages,
-                embed_images=embed_images,
-                max_image_bytes=max_image_bytes,
-            )
-            requested_count = len(page_html_paths)
-            if max_pages is not None:
-                requested_count = min(requested_count, max(0, max_pages))
-            if screenshots and len(screenshots) == requested_count:
-                status = "ok"
-            elif screenshots:
-                status = "partial"
-            else:
-                status = "blocked"
-
-        screenshot_by_page = {item["pageIndex"]: item for item in screenshots}
-        for page in pages:
-            screenshot_item = screenshot_by_page.get(page["index"])
-            if screenshot_item is not None:
-                page["screenshotPath"] = screenshot_item["path"]
-
-        generated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        suggestion = None
-        if status in {"blocked", "partial"}:
-            suggestion = (
-                "Open preview.html manually or install a headless browser backend "
-                "(Playwright browsers or Chrome via HWPX_MCP_CHROME_PATH) and rerun render_preview."
-            )
-
-        visual_review = {
-            "schemaVersion": _VISUAL_REVIEW_SCHEMA_VERSION,
-            "sourcePath": self._relative_path(source_path),
-            "current": {
-                "status": "observed_pass" if status == "ok" else "blocked",
-                "method": screenshot_engine.get("backend") or "html-preview",
-                "screenshot_path": screenshots[0]["path"] if screenshots else None,
-                "notes": (
-                    "Layout preview screenshots generated. Final Hancom viewer acceptance is still required."
-                    if status == "ok"
-                    else screenshot_engine["message"]
-                ),
-            },
-            "summary": {
-                "resolved_visual_review_required": "observed_pass" if status == "ok" else "blocked",
-                "layout_preview_status": status,
-            },
-        }
-        _write_json(evidence_path, visual_review)
-
-        manifest = {
-            "schemaVersion": _PREVIEW_SCHEMA_VERSION,
-            "status": status,
-            "generatedAt": generated_at,
-            "sourcePath": self._relative_path(source_path),
-            "outputDir": self._relative_path(output_path),
-            "htmlPath": self._relative_path(html_path),
-            "manifestPath": self._relative_path(manifest_path),
-            "visualReviewPath": self._relative_path(evidence_path),
-            "mode": mode,
-            "pageCount": len(pages),
-            "pages": pages,
-            "screenshots": screenshots,
-            "screenshotEngine": screenshot_engine,
-            "warnings": list(preview.warnings),
-            "suggestion": suggestion,
-        }
-        # Keep the on-disk manifest lean — never persist inline base64 payloads.
-        disk_manifest = dict(manifest)
-        disk_manifest["screenshots"] = [
-            {key: value for key, value in shot.items() if key != "imageBase64"}
-            for shot in screenshots
-        ]
-        _write_json(manifest_path, disk_manifest)
-        return manifest
+        return self._services.preview_export.render_preview(
+            path, output_dir, mode, screenshot, max_pages, embed_images, max_image_bytes
+        )
 
     def make_blank(self, out: str) -> Dict[str, Any]:
-        document = new_document()
-        out_path = self._resolve_output_path(out)
-        verification_report = self._save_document(document, out_path)
-        return {"outPath": str(out_path), "verificationReport": verification_report}
+        return self._services.save.make_blank(out)
 
-    def convert_hwp_to_hwpx(self, source: str, output: Optional[str] = None) -> Dict[str, Any]:
-        resolved_source = self._resolve_path(source)
-        if resolved_source.suffix.lower() != ".hwp":
-            raise self._new_error("SOURCE_FILE_TYPE_INVALID", "source는 .hwp 파일이어야 합니다")
+    def convert_hwp_to_hwpx(
+        self, source: str, output: Optional[str] = None
+    ) -> Dict[str, Any]:
+        return self._services.preview_export.convert_hwp_to_hwpx(source, output)
 
-        if output:
-            resolved_output = self._resolve_output_path(output)
-        else:
-            resolved_output = resolved_source.with_suffix(".hwpx")
-
-        try:
-            result = convert_hwp_to_hwpx(str(resolved_source), str(resolved_output))
-        except HwpConversionError as exc:
-            raise self._new_error("HWP_CONVERSION_FAILED", f"HWP 변환 실패: {exc}") from exc
-
-        return {
-            "success": result.success,
-            "outputPath": result.output_path,
-            "paragraphsConverted": result.paragraphs_converted,
-            "tablesConverted": result.tables_converted,
-            "skippedElements": result.skipped_elements,
-            "warnings": result.warnings,
-            "verification": result.verification,
-            "openSafety": result.open_safety,
-        }
-
-    # ------------------------------------------------------------------
-    # Package & metadata queries
-    # ------------------------------------------------------------------
     def list_master_pages_histories_versions(self, path: str) -> Dict[str, Any]:
-        document, _ = self._open_document(path)
-        master_pages = [getattr(page, "part_name", None) for page in document.master_pages]
-        histories = [getattr(history, "part_name", None) for history in document.histories]
-        version = document.version
-        version_info = asdict(version) if version and dataclasses.is_dataclass(version) else None
-        return {
-            "masterPages": master_pages,
-            "histories": histories,
-            "versions": version_info,
-        }
+        return self._services.package_validation.list_master_pages_histories_versions(
+            path
+        )
 
-    # ------------------------------------------------------------------
-    # Object finder
-    # ------------------------------------------------------------------
     def object_find_by_tag(
         self,
         path: str,
@@ -4349,20 +1329,9 @@ class HwpxOps:
         *,
         max_results: int = 200,
     ) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        finder = create_object_finder(resolved)
-        objects = []
-        for found in finder.iter(tag=tag_name, limit=max_results):
-            element = found.element
-            objects.append(
-                {
-                    "type": element.tag,
-                    "text": element.text or "",
-                    "attrs": dict(element.attrib),
-                    "path": found.path,
-                }
-            )
-        return {"objects": objects}
+        return self._services.read_query.object_find_by_tag(
+            path, tag_name, max_results=max_results
+        )
 
     def object_find_by_attr(
         self,
@@ -4373,37 +1342,12 @@ class HwpxOps:
         *,
         max_results: int = 200,
     ) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        finder = create_object_finder(resolved)
-        tag_filter = None if element_type in {None, "", "*"} else element_type
-        attr_matcher: Any = value if value is not None else (lambda _: True)
-        objects = []
-        for found in finder.iter(tag=tag_filter, attrs={attr: attr_matcher}, limit=max_results):
-            element = found.element
-            objects.append(
-                {
-                    "type": element.tag,
-                    "text": element.text or "",
-                    "attrs": dict(element.attrib),
-                    "path": found.path,
-                }
-            )
-        return {"objects": objects}
+        return self._services.read_query.object_find_by_attr(
+            path, element_type, attr, value, max_results=max_results
+        )
 
-    # ------------------------------------------------------------------
-    # Validation & linting
-    # ------------------------------------------------------------------
     def validate_structure(self, path: str, level: str = "basic") -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        report: ValidationReport = validate_document_path(resolved)
-        issues = [
-            {
-                "part": issue.part_name,
-                "message": issue.message,
-            }
-            for issue in report.issues
-        ]
-        return {"ok": not issues, "issues": issues}
+        return self._services.package_validation.validate_structure(path, level)
 
     def lint_text_conventions(
         self,
@@ -4412,32 +1356,10 @@ class HwpxOps:
         max_line_len: Optional[int] = None,
         forbid_patterns: Optional[Sequence[str]] = None,
     ) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        patterns = [re.compile(pat) for pat in (forbid_patterns or [])]
-        warnings: List[Dict[str, Any]] = []
-        with create_text_extractor(resolved) as extractor:
-            for paragraph in extractor.iter_document_paragraphs():
-                text = paragraph.text()
-                if max_line_len is not None and len(text) > max_line_len:
-                    warnings.append(
-                        {
-                            "paragraphIndex": paragraph.index,
-                            "message": f"Paragraph exceeds {max_line_len} characters",
-                        }
-                    )
-                for pattern in patterns:
-                    if pattern.search(text):
-                        warnings.append(
-                            {
-                                "paragraphIndex": paragraph.index,
-                                "message": f"Pattern '{pattern.pattern}' found",
-                            }
-                        )
-        return {"warnings": warnings}
+        return self._services.package_validation.lint_text_conventions(
+            path, max_line_len=max_line_len, forbid_patterns=forbid_patterns
+        )
 
-    # ------------------------------------------------------------------
-    # Hardened planning helpers
-    # ------------------------------------------------------------------
     def plan_edit(
         self,
         *,
@@ -4445,20 +1367,9 @@ class HwpxOps:
         operations: Sequence[Dict[str, Any]],
         trace_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        payload = PlanEditInput.model_validate(
-            {"path": path, "operations": operations, "traceId": trace_id}
+        return self._services.planning.plan_edit(
+            path=path, operations=operations, trace_id=trace_id
         )
-        doc_path = payload.path_or_none()
-        if doc_path is not None:
-            self._ensure_planner_document(payload.doc_id, doc_path)
-        trace = payload.trace_id or f"plan-{uuid4().hex}"
-        try:
-            record = self._plan_manager.create_plan_record(
-                payload.doc_id, payload.operations, trace_id=trace
-            )
-        except PipelineError as error:
-            return self._plan_manager.error_response(payload.doc_id, trace, error)
-        return self._plan_manager.plan_response(record)
 
     def preview_edit(
         self,
@@ -4466,19 +1377,7 @@ class HwpxOps:
         plan_id: str,
         trace_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        payload = PreviewEditInput.model_validate(
-            {"planId": plan_id, "traceId": trace_id}
-        )
-        trace = payload.trace_id or payload.plan_id
-        try:
-            preview = self._plan_manager.preview_plan_record(payload.plan_id)
-        except PipelineError as error:
-            plan = self._plan_manager.get_plan_record(payload.plan_id)
-            doc_id = plan.doc_id if plan is not None else payload.plan_id
-            return self._plan_manager.error_response(
-                doc_id, trace, error, plan_id=payload.plan_id
-            )
-        return self._plan_manager.preview_response(preview)
+        return self._services.planning.preview_edit(plan_id=plan_id, trace_id=trace_id)
 
     def apply_edit(
         self,
@@ -4488,36 +1387,12 @@ class HwpxOps:
         idempotency_key: Optional[str] = None,
         trace_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        payload = ApplyEditInput.model_validate(
-            {
-                "planId": plan_id,
-                "confirm": confirm,
-                "idempotencyKey": idempotency_key,
-                "traceId": trace_id,
-            }
+        return self._services.planning.apply_edit(
+            plan_id=plan_id,
+            confirm=confirm,
+            idempotency_key=idempotency_key,
+            trace_id=trace_id,
         )
-        trace = payload.trace_id or payload.plan_id
-        try:
-            result = self._plan_manager.apply_plan_record(
-                payload.plan_id,
-                confirm=payload.confirm,
-                idempotency_key=payload.idempotency_key,
-            )
-        except PipelineError as error:
-            plan = self._plan_manager.get_plan_record(payload.plan_id)
-            doc_id = plan.doc_id if plan is not None else payload.plan_id
-            template = tools_meta.ERROR_PREVIEW_REQUIRED if error.error_code == "PREVIEW_REQUIRED" else None
-            return self._plan_manager.error_response(
-                doc_id,
-                trace,
-                error,
-                plan_id=payload.plan_id,
-                next_action=template,
-            )
-        plan_record = self._plan_manager.get_plan_record(payload.plan_id)
-        if plan_record is None:  # pragma: no cover - defensive
-            raise self._new_error("PLAN_RECORD_MISSING", "plan record missing after apply", details={"planId": payload.plan_id})
-        return self._plan_manager.apply_response(plan_record, result, trace)
 
     def search(
         self,
@@ -4528,32 +1403,9 @@ class HwpxOps:
         is_regex: bool = False,
         limit: int = 20,
     ) -> Dict[str, Any]:
-        payload = SearchInput.model_validate(
-            {
-                "path": path,
-                "pattern": pattern,
-                "scope": scope,
-                "is_regex": is_regex,
-                "limit": limit,
-            }
+        return self._services.planning.search(
+            path=path, pattern=pattern, scope=scope, is_regex=is_regex, limit=limit
         )
-        doc_path = payload.path_or_none()
-        if doc_path is not None:
-            self._ensure_planner_document(payload.doc_id, doc_path)
-        try:
-            hits = self._plan_manager.search_document(payload.doc_id, payload)
-        except PipelineError as error:
-            raise self._new_error("PIPELINE_ERROR", error.message, details={"pipelineCode": error.error_code}, hint=error.hint) from error
-        models = [
-            SearchHitModel(
-                nodeId=hit.node_id,
-                paragraphIndex=hit.paragraph_index,
-                match=hit.match,
-                context=hit.context,
-            )
-            for hit in hits
-        ]
-        return SearchOutput(matches=models).model_dump(by_alias=True)
 
     def get_context(
         self,
@@ -4562,28 +1414,9 @@ class HwpxOps:
         target: Dict[str, Any],
         window: int = 1,
     ) -> Dict[str, Any]:
-        payload = GetContextInput.model_validate(
-            {"path": path, "target": target, "window": window}
+        return self._services.planning.get_context(
+            path=path, target=target, window=window
         )
-        doc_path = payload.path_or_none()
-        if doc_path is not None:
-            self._ensure_planner_document(payload.doc_id, doc_path)
-        try:
-            view = self._plan_manager.context_window(
-                payload.doc_id, payload.target, window=payload.window
-            )
-        except PipelineError as error:
-            raise self._new_error("PIPELINE_ERROR", error.message, details={"pipelineCode": error.error_code}, hint=error.hint) from error
-        return view.model_dump(by_alias=True)
 
-    # ------------------------------------------------------------------
-    # Raw package helpers
-    # ------------------------------------------------------------------
     def package_get_xml(self, path: str, part_name: str) -> Dict[str, Any]:
-        resolved = self._resolve_path(path)
-        package = open_package(resolved)
-        element = package.get_xml(part_name)
-        from xml.etree import ElementTree as ET
-
-        xml_string = ET.tostring(element, encoding="unicode")
-        return {"xmlString": xml_string}
+        return self._services.package_validation.package_get_xml(path, part_name)

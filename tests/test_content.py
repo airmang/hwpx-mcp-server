@@ -5,7 +5,7 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-import hwpx_mcp_server.hwpx_ops as hwpx_ops_module
+import hwpx_mcp_server.ops_services.transactions as transactions_module
 import hwpx_mcp_server.server as server_module
 import hwpx_mcp_server.workspace as workspace_module
 import hwpx.patch as hwpx_patch_module
@@ -228,7 +228,7 @@ def test_byte_preserving_patch_failure_does_not_create_missing_output_parent(
     output = tmp_path / "missing-failure" / "nested" / "patched.hwpx"
     create_document(str(target))
     added = add_paragraph(str(target), "원문")
-    original_report = hwpx_ops_module.build_hwpx_verification_report
+    original_report = transactions_module.build_hwpx_verification_report
 
     def reject_candidate(source, *args, **kwargs):
         if isinstance(source, bytes) and kwargs.get("file_path") == output:
@@ -241,7 +241,7 @@ def test_byte_preserving_patch_failure_does_not_create_missing_output_parent(
         return original_report(source, *args, **kwargs)
 
     monkeypatch.setattr(
-        hwpx_ops_module,
+        transactions_module,
         "build_hwpx_verification_report",
         reject_candidate,
     )
@@ -343,7 +343,7 @@ def test_byte_preserving_patch_rejects_parent_swap_without_leaking_temp(
     storage = server_module._OPS.storage
     original_atomic_publish = storage.atomic_publish_bytes
     created_temps: list[Path] = []
-    original_mkstemp = hwpx_ops_module.tempfile.mkstemp
+    original_mkstemp = transactions_module.tempfile.mkstemp
 
     def tracked_mkstemp(*args, **kwargs):
         descriptor, name = original_mkstemp(*args, **kwargs)
@@ -356,7 +356,7 @@ def test_byte_preserving_patch_rejects_parent_swap_without_leaking_temp(
         documents.symlink_to(outside, target_is_directory=True)
         return original_atomic_publish(guard, data, **kwargs)
 
-    monkeypatch.setattr(hwpx_ops_module.tempfile, "mkstemp", tracked_mkstemp)
+    monkeypatch.setattr(transactions_module.tempfile, "mkstemp", tracked_mkstemp)
     monkeypatch.setattr(storage, "atomic_publish_bytes", swap_parent_then_publish)
 
     with pytest.raises(WorkspacePathError, match="changed"):
@@ -521,7 +521,7 @@ def test_byte_preserving_patch_never_claims_replaced_backup_publication(
     create_document(str(target))
     added = add_paragraph(str(target), "원문")
     target_before = target.read_bytes()
-    original_diff = server_module._OPS._semantic_diff_bytes
+    original_diff = server_module._OPS._services.save._semantic_diff_bytes
     replaced = False
 
     def replace_backup_after_diff(before: bytes, after: bytes) -> dict:
@@ -535,7 +535,7 @@ def test_byte_preserving_patch_never_claims_replaced_backup_publication(
         return report
 
     monkeypatch.setattr(
-        server_module._OPS,
+        server_module._OPS._services.save,
         "_semantic_diff_bytes",
         replace_backup_after_diff,
     )
@@ -596,7 +596,7 @@ def test_byte_preserving_patch_rolls_back_owned_sidecars_and_preserves_external(
         sidecar.write_bytes(payload)
     external_payload = document_bytes("external-sidecar.hwpx", "external owner")
     external_staging = tmp_path / "external-sidecar-replacement.hwpx"
-    original_diff = server_module._OPS._semantic_diff_bytes
+    original_diff = server_module._OPS._services.save._semantic_diff_bytes
     replaced = False
 
     def replace_rotated_sidecar(before: bytes, after: bytes) -> dict:
@@ -609,7 +609,7 @@ def test_byte_preserving_patch_rolls_back_owned_sidecars_and_preserves_external(
         return report
 
     monkeypatch.setattr(
-        server_module._OPS,
+        server_module._OPS._services.save,
         "_semantic_diff_bytes",
         replace_rotated_sidecar,
     )
@@ -1123,7 +1123,7 @@ def test_byte_patch_recovery_preflight_failure_does_not_mutate_target_or_backup(
         raise RuntimeError("forced recovery storage failure")
 
     monkeypatch.setattr(
-        server_module._OPS,
+        server_module._OPS._services.save,
         "_publish_exact_recovery",
         fail_recovery,
     )
@@ -1535,13 +1535,15 @@ def test_fill_by_path_saves_after_successful_mutation(
     _create_form_document(target)
 
     save_calls: list[str] = []
-    original_save = server_module.save_doc
+    from hwpx_mcp_server.handlers import _shared as handler_shared
+
+    original_save = handler_shared.save_doc
 
     def _tracking_save(doc, path: str, **kwargs) -> None:
         save_calls.append(path)
         original_save(doc, path, **kwargs)
 
-    monkeypatch.setattr(server_module, "save_doc", _tracking_save)
+    monkeypatch.setattr(handler_shared, "save_doc", _tracking_save)
 
     result = fill_by_path(str(target), {"성명 > right": "홍길동"})
 

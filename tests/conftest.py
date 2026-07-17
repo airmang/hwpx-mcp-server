@@ -91,15 +91,13 @@ def _clear_path_sandbox_for_inprocess_tests(
     from hwpx_mcp_server.storage import LocalDocumentStorage
     from hwpx_mcp_server.workspace import WorkspaceResolver
 
-    monkeypatch.setattr(
-        server_module,
-        "_OPS",
+    server_module._replace_ops(
         HwpxOps(
             storage=LocalDocumentStorage(
                 workspace_resolver=WorkspaceResolver.from_environment(),
                 auto_backup=False,
             )
-        ),
+        )
     )
 
 

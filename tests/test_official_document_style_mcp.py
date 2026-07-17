@@ -4,10 +4,11 @@ from pathlib import Path
 
 from hwpx.document import HwpxDocument
 from hwpx_mcp_server import server
+from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
 def test_official_document_style_tool_is_exposed() -> None:
-    names = set(server.mcp._tool_manager._tools.keys())
+    names = set(snapshot_runtime_tools(server.mcp))
 
     assert "inspect_official_document_style" in names
 

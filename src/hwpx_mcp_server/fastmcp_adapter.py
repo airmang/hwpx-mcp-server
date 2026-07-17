@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Narrow FastMCP compatibility seam for the canonical tool registry.
+"""Sole fail-closed FastMCP compatibility seam for the server runtime.
 
-S-079 needs to inspect the callable and JSON schemas that FastMCP actually
-registered.  FastMCP did not expose that information through a stable public
-API across the supported SDK range, so all private-manager access lives here.
-S-080 can replace this module without changing the release-facing registry.
+Ordinary registration stays on FastMCP's public API.  The SDK does not expose
+public hooks for the initialize version, the raw ``CallToolRequest`` handler,
+or callable-aware live registry snapshots, so those exact operations remain
+isolated here.  Every other module and test consumes the project-owned APIs
+below and never reaches into FastMCP implementation details.
 """
 
 from __future__ import annotations
@@ -13,13 +14,22 @@ import copy
 import functools
 import inspect
 from dataclasses import dataclass
-from typing import Annotated, Any, Callable, Mapping, get_args, get_origin
+from importlib.metadata import PackageNotFoundError, version as distribution_version
+from types import MappingProxyType
+from typing import Annotated, Any, Awaitable, Callable, Mapping, cast, get_args, get_origin
 
 import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
 from pydantic import TypeAdapter
 
 from .execution_lock import PUBLIC_MUTATION_LOCK
+
+
+SUPPORTED_MCP_RANGE = ">=1.28.1,<1.29"
+# The resolver range intentionally stays on one minor line, while this audited
+# patch allowlist prevents a newly published 1.28.x patch from being admitted
+# before its registration/error/protocol matrix has passed.
+AUDITED_MCP_PATCHES = ("1.28.1",)
 
 
 class FastMcpAdapterError(RuntimeError):
@@ -34,6 +44,102 @@ class FastMcpToolSnapshot:
     input_schema: dict[str, Any]
     output_schema: dict[str, Any]
     meta: dict[str, Any]
+
+
+StrictCallHandler = Callable[[mcp_types.CallToolRequest], Awaitable[Any]]
+
+
+def _installed_mcp_version() -> str:
+    try:
+        return distribution_version("mcp")
+    except PackageNotFoundError as exc:  # pragma: no cover - required dependency
+        raise FastMcpAdapterError("the MCP SDK distribution is unavailable") from exc
+
+
+def _require_audited_mcp_patch() -> str:
+    installed = _installed_mcp_version()
+    if installed not in AUDITED_MCP_PATCHES:
+        audited = ", ".join(AUDITED_MCP_PATCHES)
+        raise FastMcpAdapterError(
+            f"unsupported MCP SDK {installed!r}; {SUPPORTED_MCP_RANGE} is the candidate "
+            f"range, but only audited patches are admitted ({audited})"
+        )
+    return installed
+
+
+def _low_level_runtime(mcp: Any) -> tuple[Any, dict[Any, Any]]:
+    """Return the pinned low-level runtime shape or fail before mutation."""
+
+    _require_audited_mcp_patch()
+    runtime = getattr(mcp, "_mcp_server", None)
+    if runtime is None or not hasattr(runtime, "version"):
+        raise FastMcpAdapterError(
+            "FastMCP low-level runtime/version hook is unavailable for the audited SDK"
+        )
+    request_handlers = getattr(runtime, "request_handlers", None)
+    if not isinstance(request_handlers, dict):
+        raise FastMcpAdapterError(
+            "FastMCP request handler registry has an incompatible shape"
+        )
+    existing = request_handlers.get(mcp_types.CallToolRequest)
+    if not callable(existing):
+        raise FastMcpAdapterError(
+            "FastMCP CallToolRequest handler is unavailable for the audited SDK"
+        )
+    return runtime, request_handlers
+
+
+def configure_runtime(
+    mcp: Any,
+    package_version: str,
+    strict_call_handler: StrictCallHandler,
+) -> None:
+    """Set initialize version and the strict raw call handler atomically.
+
+    FastMCP 1.28.1 exposes neither operation through its public constructor or
+    decorators.  Shape and audited-patch checks happen before mutation; any
+    failed write restores the prior runtime state and raises the adapter-owned
+    error type.
+    """
+
+    if not isinstance(package_version, str) or not package_version.strip():
+        raise FastMcpAdapterError("package_version must be a non-empty string")
+    if not callable(strict_call_handler):
+        raise FastMcpAdapterError("strict_call_handler must be callable")
+
+    runtime, request_handlers = _low_level_runtime(mcp)
+    previous_version = runtime.version
+    previous_handler = request_handlers[mcp_types.CallToolRequest]
+    try:
+        runtime.version = package_version
+        request_handlers[mcp_types.CallToolRequest] = strict_call_handler
+        if runtime.version != package_version:
+            raise FastMcpAdapterError(
+                "FastMCP did not retain the configured server version"
+            )
+        if request_handlers.get(mcp_types.CallToolRequest) is not strict_call_handler:
+            raise FastMcpAdapterError("FastMCP did not retain the strict call handler")
+    except Exception as exc:
+        try:
+            runtime.version = previous_version
+            request_handlers[mcp_types.CallToolRequest] = previous_handler
+        except Exception:
+            pass
+        if isinstance(exc, FastMcpAdapterError):
+            raise
+        raise FastMcpAdapterError(
+            f"cannot configure the FastMCP runtime: {exc}"
+        ) from exc
+
+
+def runtime_server_version(mcp: Any) -> str:
+    """Return the configured initialize version without exposing SDK internals."""
+
+    runtime, _ = _low_level_runtime(mcp)
+    configured = runtime.version
+    if not isinstance(configured, str) or not configured:
+        raise FastMcpAdapterError("FastMCP runtime has no configured server version")
+    return configured
 
 
 def normalize_schema(schema: Mapping[str, Any] | None, *, input_schema: bool) -> dict[str, Any]:
@@ -346,6 +452,7 @@ def original_callable(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def _manager_tools(mcp: Any) -> dict[str, Any]:
+    _require_audited_mcp_patch()
     manager = getattr(mcp, "_tool_manager", None)
     tools = getattr(manager, "_tools", None)
     if manager is None or not isinstance(tools, dict):
@@ -363,6 +470,7 @@ def _register(
     description: str,
     meta: Mapping[str, Any],
 ) -> FastMcpToolSnapshot:
+    _require_audited_mcp_patch()
     adapted, structured_output = _registration_callable(func)
     adapted = _serialize_mutation_callable(
         adapted,
@@ -371,33 +479,55 @@ def _register(
     tool_method = getattr(mcp, "tool", None)
     if not callable(tool_method):
         raise FastMcpAdapterError("FastMCP.tool is unavailable")
-    parameters = inspect.signature(tool_method).parameters
-    kwargs: dict[str, Any] = {"name": name}
-    if "description" in parameters:
-        kwargs["description"] = description
-    if "meta" in parameters:
-        kwargs["meta"] = dict(meta)
-    if "structured_output" not in parameters:
+    try:
+        parameters = inspect.signature(tool_method).parameters
+    except (TypeError, ValueError) as exc:
+        raise FastMcpAdapterError(f"cannot inspect FastMCP.tool: {exc}") from exc
+    required_parameters = {"name", "description", "meta", "structured_output"}
+    missing_parameters = sorted(required_parameters - set(parameters))
+    if missing_parameters:
         raise FastMcpAdapterError(
-            "FastMCP.tool lacks structured_output; mcp>=1.28.1,<1.29 is required"
+            "FastMCP.tool lacks audited registration parameters: "
+            + ", ".join(missing_parameters)
         )
-    kwargs["structured_output"] = structured_output
-    tool_method(**kwargs)(adapted)
+    live_tools = _manager_tools(mcp)
+    if name in live_tools:
+        raise FastMcpAdapterError(f"FastMCP already contains tool {name!r}")
+    kwargs: dict[str, Any] = {
+        "name": name,
+        "description": description,
+        "meta": dict(meta),
+        "structured_output": structured_output,
+    }
+    cast(Callable[..., Any], tool_method)(**kwargs)(adapted)
 
     tool = _manager_tools(mcp).get(name)
     if tool is None:
         raise FastMcpAdapterError(f"FastMCP did not retain registered tool {name!r}")
-    input_json = normalize_schema(
-        getattr(tool, "parameters", None), input_schema=True
-    )
+    registered_callable = getattr(tool, "fn", None)
+    if not callable(registered_callable):
+        raise FastMcpAdapterError(f"registered tool {name!r} has no callable")
+    raw_parameters = getattr(tool, "parameters", None)
+    if not isinstance(raw_parameters, Mapping):
+        raise FastMcpAdapterError(
+            f"registered tool {name!r} has no mapping input schema"
+        )
+    registered_description = getattr(tool, "description", None)
+    if not isinstance(registered_description, str):
+        raise FastMcpAdapterError(f"registered tool {name!r} has no description")
+    registered_meta = getattr(tool, "meta", None)
+    if not isinstance(registered_meta, Mapping):
+        raise FastMcpAdapterError(f"registered tool {name!r} has no metadata mapping")
+
+    input_json = normalize_schema(raw_parameters, input_schema=True)
     input_json = _normalize_implicit_none_parameters(input_json, func)
     # Overlay catalog fragments after normalization so their original array
     # order and intentional open-object semantics remain exact.
     input_json = _restore_parameter_schema_extras(input_json, func)
     raw_output = getattr(tool, "output_schema", None)
-    if raw_output is None:
+    if not isinstance(raw_output, Mapping):
         raise FastMcpAdapterError(
-            f"FastMCP did not publish an output schema for {name!r}"
+            f"FastMCP did not publish a mapping output schema for {name!r}"
         )
     output_json = normalize_schema(raw_output, input_schema=False)
 
@@ -424,20 +554,33 @@ def _register(
     # Make the live MCP schema byte-for-byte comparable with the canonical
     # registry. CallToolResult tools advertise their source-owned structured
     # content model, never the outer MCP response envelope.
-    tool.parameters = input_json
-    if structured_output:
-        tool.output_schema = output_json
-    if hasattr(tool, "description"):
+    try:
+        tool.parameters = input_json
+        if structured_output:
+            tool.output_schema = output_json
         tool.description = description
-    if hasattr(tool, "meta") and "meta" in parameters:
         tool.meta = dict(meta)
+    except Exception as exc:
+        raise FastMcpAdapterError(
+            f"cannot normalize registered tool {name!r}: {exc}"
+        ) from exc
+    if tool.parameters != input_json or tool.description != description:
+        raise FastMcpAdapterError(
+            f"FastMCP did not retain normalized schema/description for {name!r}"
+        )
+    if structured_output and tool.output_schema != output_json:
+        raise FastMcpAdapterError(
+            f"FastMCP did not retain the normalized output schema for {name!r}"
+        )
+    if tool.meta != dict(meta):
+        raise FastMcpAdapterError(f"FastMCP did not retain metadata for {name!r}")
     return FastMcpToolSnapshot(
         name=name,
-        callable=original_callable(getattr(tool, "fn", adapted)),
-        description=str(getattr(tool, "description", description) or ""),
+        callable=original_callable(registered_callable),
+        description=tool.description,
         input_schema=input_json,
         output_schema=output_json,
-        meta=dict(getattr(tool, "meta", None) or meta),
+        meta=dict(tool.meta),
     )
 
 
@@ -459,7 +602,7 @@ def describe_callables(
     return snapshots
 
 
-def register_tool(
+def register_canonical_tool(
     mcp: Any,
     *,
     name: str,
@@ -467,44 +610,62 @@ def register_tool(
     description: str,
     meta: Mapping[str, Any],
 ) -> FastMcpToolSnapshot:
+    """Register one canonical callable through the public SDK hook."""
+
     return _register(mcp, name=name, func=func, description=description, meta=meta)
 
 
-def registered_tool_snapshots(mcp: Any) -> dict[str, FastMcpToolSnapshot]:
-    """Read the live registry, deriving effective output schema when necessary."""
+def snapshot_runtime_tools(mcp: Any) -> Mapping[str, FastMcpToolSnapshot]:
+    """Return an insertion-ordered, read-only snapshot of the live registry."""
 
     snapshots: dict[str, FastMcpToolSnapshot] = {}
-    for name, tool in sorted(_manager_tools(mcp).items()):
-        func = original_callable(getattr(tool, "fn", None))
-        if not callable(func):
+    for name, tool in _manager_tools(mcp).items():
+        if not isinstance(name, str) or not name:
+            raise FastMcpAdapterError("FastMCP retained a non-string tool name")
+        registered = getattr(tool, "fn", None)
+        if not callable(registered):
             raise FastMcpAdapterError(f"registered tool {name!r} has no callable")
-        raw_output = getattr(tool, "output_schema", None)
-        if raw_output is None:
+        func = original_callable(registered)
+        description = getattr(tool, "description", None)
+        if not isinstance(description, str):
+            raise FastMcpAdapterError(f"registered tool {name!r} has no description")
+        meta = getattr(tool, "meta", None)
+        if not isinstance(meta, Mapping):
+            raise FastMcpAdapterError(f"registered tool {name!r} has no metadata mapping")
+        raw_parameters = getattr(tool, "parameters", None)
+        if not isinstance(raw_parameters, Mapping):
             raise FastMcpAdapterError(
-                f"registered tool {name!r} has no output schema"
+                f"registered tool {name!r} has no mapping input schema"
             )
-        input_schema = normalize_schema(
-            getattr(tool, "parameters", None), input_schema=True
-        )
+        raw_output = getattr(tool, "output_schema", None)
+        if not isinstance(raw_output, Mapping):
+            raise FastMcpAdapterError(
+                f"registered tool {name!r} has no mapping output schema"
+            )
+        input_schema = normalize_schema(raw_parameters, input_schema=True)
         input_schema = _normalize_implicit_none_parameters(input_schema, func)
         input_schema = _restore_parameter_schema_extras(input_schema, func)
         snapshots[name] = FastMcpToolSnapshot(
             name=name,
             callable=func,
-            description=str(getattr(tool, "description", "") or ""),
+            description=description,
             input_schema=input_schema,
             output_schema=normalize_schema(raw_output, input_schema=False),
-            meta=dict(getattr(tool, "meta", None) or {}),
+            meta=dict(meta),
         )
-    return snapshots
+    return MappingProxyType(snapshots)
 
 
 __all__ = [
+    "AUDITED_MCP_PATCHES",
     "FastMcpAdapterError",
     "FastMcpToolSnapshot",
+    "SUPPORTED_MCP_RANGE",
+    "configure_runtime",
     "describe_callables",
     "normalize_schema",
     "original_callable",
-    "register_tool",
-    "registered_tool_snapshots",
+    "register_canonical_tool",
+    "runtime_server_version",
+    "snapshot_runtime_tools",
 ]

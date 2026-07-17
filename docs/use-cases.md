@@ -10,14 +10,14 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 
 기존에는 한글 파일을 열어서 일일이 수작업으로 처리해야 했던 일을, 이제 자연어 요청으로 자동화할 수 있습니다.
 
-4.0.0 공개 릴리스의 기본 모드 121개(고급 모드 포함 총 132개)의 도구로 문서 생성,
+4.1.0 공개 릴리스의 기본 모드 121개(고급 모드 포함 총 132개)의 도구로 문서 생성,
 선언형 document-plan 생성, 운영 계획서 품질 프로필, 검색, 치환, 표 편집,
 서식 적용, HWPX repair/recover까지 처리할 수 있습니다.
 
 현재 MCP 표면, document-plan, template-formfit, visual-review handoff
 워크플로의 문서화·테스트 기준 upstream 버전 바닥은
-`python-hwpx >= 3.1.0`입니다. 설치 표면의 계약 해시는
-`f46ec677231b3a20`입니다.
+`python-hwpx >= 3.2.0`입니다. 공개 설치 표면의 계약 해시는
+`c127914cc3f4480e`이며 대응 스킬 바닥은 `0.4.0`입니다.
 
 선언형 document-plan 생성은 `validate_document_plan`으로 먼저 검증합니다.
 `ok=false`이면 `issues[].path`와 `repairHints[]`를 따라 JSON plan을 고친 뒤
@@ -33,6 +33,12 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 destination에 한 번만 commit합니다. unified receipt의 rollback/idempotency,
 byte-preservation, reopen, privacy, openSafety와 요구된 실제 렌더 증거를 handoff에서
 확인합니다. template-formfit 쌍은 기존 자동화를 위한 호환 경로입니다.
+
+본문·표 셀·기존 구역의 단순 `BOTH` 머리글을 함께 바꿀 때는 한 번의
+`apply_document_commands` 호출에 각 canonical path command를 순서대로 넣습니다.
+서버는 하나의 revision과 직렬화에 묶어 적용하며, 어느 command든 실패하면 부분
+출력을 남기지 않습니다. rich/control 머리글은 구조 손실을 피하기 위해 fail-closed로
+거부합니다.
 
 한컴에서 열리지 않거나 ZIP 오류가 의심되는 HWPX는 원본을 덮어쓰지 않고
 `repair_hwpx`로 새 복구 복사본을 만듭니다. central directory 손상처럼 일반
@@ -225,7 +231,7 @@ hwpx-mcp-server
 
 업스트림 버전 참고:
 - `Python >= 3.10`
-- `python-hwpx >= 3.1.0`
+- `python-hwpx >= 3.2.0`
 
 MCP 설정 예시:
 

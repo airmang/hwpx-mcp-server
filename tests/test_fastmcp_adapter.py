@@ -9,11 +9,17 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict
 
+import hwpx_mcp_server.fastmcp_adapter as adapter
 from hwpx_mcp_server.fastmcp_adapter import (
+    AUDITED_MCP_PATCHES,
     FastMcpAdapterError,
+    SUPPORTED_MCP_RANGE,
+    configure_runtime,
     describe_callables,
     normalize_schema,
-    register_tool,
+    register_canonical_tool,
+    runtime_server_version,
+    snapshot_runtime_tools,
 )
 
 
@@ -95,7 +101,13 @@ def test_implicit_none_is_rejected_by_the_live_argument_model() -> None:
         return {"value": value}
 
     mcp = FastMCP("implicit-none-test")
-    register_tool(mcp, name="legacy", func=legacy, description="legacy", meta={})
+    register_canonical_tool(
+        mcp,
+        name="legacy",
+        func=legacy,
+        description="legacy",
+        meta={},
+    )
 
     with pytest.raises(ToolError, match="valid string"):
         asyncio.run(mcp.call_tool("legacy", {"value": None}))
@@ -121,3 +133,94 @@ def test_any_default_none_drops_redundant_null_union() -> None:
     )["unrestricted"].input_schema["properties"]["value"]
 
     assert schema == {"default": None, "title": "Value"}
+
+
+def test_compatibility_range_and_audited_patch_are_explicit() -> None:
+    assert SUPPORTED_MCP_RANGE == ">=1.28.1,<1.29"
+    assert AUDITED_MCP_PATCHES == ("1.28.1",)
+
+
+def test_runtime_configuration_exposes_owned_version_api() -> None:
+    mcp = FastMCP("runtime-configuration-test")
+
+    async def strict_handler(_request: mcp_types.CallToolRequest) -> Any:
+        return None
+
+    configure_runtime(mcp, "9.8.7", strict_handler)
+
+    assert runtime_server_version(mcp) == "9.8.7"
+
+
+@pytest.mark.parametrize("version", ["1.28.0", "1.28.2", "1.29.0", "2.0.0a1"])
+def test_unaudited_sdk_versions_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    version: str,
+) -> None:
+    monkeypatch.setattr(adapter, "_installed_mcp_version", lambda: version)
+
+    with pytest.raises(FastMcpAdapterError, match="only audited patches"):
+        snapshot_runtime_tools(FastMCP("unaudited-version-test"))
+
+
+def test_runtime_configuration_rejects_incompatible_shape() -> None:
+    async def strict_handler(_request: mcp_types.CallToolRequest) -> Any:
+        return None
+
+    with pytest.raises(FastMcpAdapterError, match="low-level runtime"):
+        configure_runtime(object(), "1.0.0", strict_handler)
+
+
+def test_runtime_snapshot_preserves_registration_order_and_is_read_only() -> None:
+    mcp = FastMCP("runtime-snapshot-test")
+
+    def second(value: str) -> dict[str, str]:
+        return {"value": value}
+
+    def first(value: str) -> dict[str, str]:
+        return {"value": value}
+
+    register_canonical_tool(
+        mcp,
+        name="second",
+        func=second,
+        description="second",
+        meta={},
+    )
+    register_canonical_tool(
+        mcp,
+        name="first",
+        func=first,
+        description="first",
+        meta={},
+    )
+
+    snapshots = snapshot_runtime_tools(mcp)
+
+    assert tuple(snapshots) == ("second", "first")
+    assert snapshots["second"].callable is second
+    with pytest.raises(TypeError):
+        snapshots["third"] = snapshots["second"]  # type: ignore[index]
+
+
+def test_duplicate_canonical_registration_fails_closed() -> None:
+    mcp = FastMCP("duplicate-registration-test")
+
+    def tool() -> dict[str, str]:
+        return {"status": "ok"}
+
+    register_canonical_tool(
+        mcp,
+        name="tool",
+        func=tool,
+        description="tool",
+        meta={},
+    )
+
+    with pytest.raises(FastMcpAdapterError, match="already contains tool"):
+        register_canonical_tool(
+            mcp,
+            name="tool",
+            func=tool,
+            description="tool",
+            meta={},
+        )

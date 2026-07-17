@@ -319,6 +319,7 @@ def test_server_render_client_wires_mtls_identity_from_environment(
     monkeypatch, tmp_path
 ):
     from hwpx_mcp_server import server as mcp_server
+    from hwpx_mcp_server.handlers import _shared as handler_shared
 
     captured = {}
 
@@ -327,7 +328,7 @@ def test_server_render_client_wires_mtls_identity_from_environment(
             captured["url"] = url
             captured.update(kwargs)
 
-    monkeypatch.setattr(mcp_server, "RemoteRenderClientV2", CapturingClient)
+    monkeypatch.setattr(handler_shared, "RemoteRenderClientV2", CapturingClient)
     monkeypatch.setenv("HWPX_RENDER_QUEUE_URL", "https://10.0.0.8:9443")
     monkeypatch.setenv("HWPX_RENDER_QUEUE_SECRET", "signed-secret")
     monkeypatch.setenv("HWPX_RENDER_CA_FILE", str(tmp_path / "ca.pem"))
@@ -405,13 +406,14 @@ def test_authenticated_remote_submit_poll_cancel_health_and_artifact_fetch(
     assert client.get(job.job_id).binds(job)
     assert client.fetch_artifact(job.job_id, pdf_hash) == pdf
     from hwpx_mcp_server import server as mcp_server
+    from hwpx_mcp_server.handlers import quality_render as quality_render_handler
 
-    original = mcp_server._render_client
-    mcp_server._render_client = lambda: client
+    original = quality_render_handler._render_client
+    quality_render_handler._render_client = lambda: client
     try:
         downloaded = mcp_server.render_status(job.job_id, str(tmp_path / "downloaded"))
     finally:
-        mcp_server._render_client = original
+        quality_render_handler._render_client = original
     assert Path(downloaded["savedArtifacts"][0]["path"]).read_bytes() == pdf
     assert Path(downloaded["savedArtifacts"][1]["path"]).read_bytes() == png
     with pytest.raises(Exception):

@@ -20,14 +20,19 @@ from typing import Any, Callable, Mapping
 
 from .fastmcp_adapter import (
     describe_callables,
-    register_tool,
-    registered_tool_snapshots,
+    register_canonical_tool,
+    snapshot_runtime_tools,
 )
 
 
-MIN_PYTHON_HWPX = "3.1.0"
-MIN_MCP_VERSION = "4.0.0"
-MIN_SKILL_VERSION = "0.3.0"
+MIN_PYTHON_HWPX = "3.2.0"
+MIN_MCP_VERSION = "4.1.0"
+MIN_SKILL_VERSION = "0.4.0"
+# Frozen release receipt for non-runtime services. Runtime construction still
+# recomputes and verifies the bound callable/schema contract through
+# ``contract_hash()``; this constant prevents those services from importing the
+# runtime composer merely to stamp the approved release receipt.
+RELEASED_CONTRACT_HASH = "c127914cc3f4480e"
 
 
 class ToolClassification(str, Enum):
@@ -639,7 +644,7 @@ def _availability_reason_payload(reason: AvailabilityReason | None) -> dict[str,
 
 
 def _tool_payload(spec: ToolSpec, bound: BoundToolSpec | None = None) -> dict[str, Any]:
-    payload = {
+    payload: dict[str, Any] = {
         "name": spec.name,
         "domain": spec.domain,
         "profile": spec.profile.value,
@@ -680,16 +685,13 @@ _BOUND_TOOL_REGISTRY: RegisteredToolRegistry | None = None
 
 
 def bound_tool_registry() -> RegisteredToolRegistry:
-    """Return the complete installed registry, importing the server lazily if needed."""
+    """Return the complete installed registry after explicit runtime initialization."""
 
-    global _BOUND_TOOL_REGISTRY
     if _BOUND_TOOL_REGISTRY is None:
-        # Importing the console server completes binding at its deterministic
-        # registration point.  This keeps scripts and direct contract consumers
-        # on the same schema truth without a second hand-maintained inventory.
-        from . import server as _server  # noqa: F401
-    if _BOUND_TOOL_REGISTRY is None:
-        raise RuntimeError("canonical ToolSpec registry is not bound")
+        raise RuntimeError(
+            "canonical ToolSpec registry is not bound; initialize "
+            "hwpx_mcp_server.runtime first"
+        )
     return _BOUND_TOOL_REGISTRY
 
 
@@ -837,7 +839,7 @@ def register_fastmcp_tools(
             if item.spec.classification is ToolClassification.DEPRECATED
             else item.function
         )
-        register_tool(
+        register_canonical_tool(
             mcp,
             name=item.spec.name,
             func=function,
@@ -858,10 +860,11 @@ def register_fastmcp_tools(
 def validate_registered_tools(mcp: Any, registry: RegisteredToolRegistry) -> dict[str, Any]:
     """Compare live names, callable identity, description, and both schemas."""
 
-    actual_by_name = registered_tool_snapshots(mcp)
+    actual_by_name = snapshot_runtime_tools(mcp)
     expected_by_name = registry.by_name()
     expected_names = registry.names
     actual_names = tuple(actual_by_name)
+    order_mismatch = actual_names != expected_names
     callable_mismatches: list[str] = []
     input_schema_mismatches: list[str] = []
     output_schema_mismatches: list[str] = []
@@ -895,6 +898,7 @@ def validate_registered_tools(mcp: Any, registry: RegisteredToolRegistry) -> dic
                 output_schema_mismatches,
                 description_mismatches,
                 unavailable,
+                order_mismatch,
             )
         ),
         "missing": missing,
@@ -904,6 +908,7 @@ def validate_registered_tools(mcp: Any, registry: RegisteredToolRegistry) -> dic
         "outputSchemaMismatches": output_schema_mismatches,
         "descriptionMismatches": description_mismatches,
         "unavailable": unavailable,
+        "orderMismatch": order_mismatch,
         "expectedOrder": list(expected_names),
         "actualOrder": list(actual_names),
     }
@@ -927,6 +932,7 @@ __all__ = [
     "MIN_PYTHON_HWPX",
     "MIN_SKILL_VERSION",
     "RegisteredToolRegistry",
+    "RELEASED_CONTRACT_HASH",
     "SchemaBinding",
     "TOOL_SPECS",
     "ToolAvailability",

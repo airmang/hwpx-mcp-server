@@ -5,6 +5,7 @@ from pathlib import Path
 import hwpx_mcp_server.server as server
 from hwpx.tools.package_validator import validate_package
 from hwpx.tools.validator import validate_document
+from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
 def _government_plan() -> dict:
@@ -83,7 +84,7 @@ def _comparable_create_payload(payload: dict) -> dict:
 
 
 def test_government_report_tool_is_exposed() -> None:
-    names = set(server.mcp._tool_manager._tools.keys())
+    names = set(snapshot_runtime_tools(server.mcp))
 
     assert {
         "create_government_report_document",

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from hwpx_mcp_server.core.document import open_doc, save_doc
+from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
 PHASE1_TOOLS = {
@@ -65,7 +66,7 @@ def server_module(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_default_toolset_exposes_phase1_and_hides_advanced(server_module) -> None:
-    names = set(server_module.mcp._tool_manager._tools.keys())
+    names = set(snapshot_runtime_tools(server_module.mcp))
 
     assert PHASE1_TOOLS.issubset(names)
     assert TABLE_NAVIGATION_TOOLS.issubset(names)
@@ -79,7 +80,7 @@ def test_advanced_toolset_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
     import hwpx_mcp_server.server as server
 
     reloaded = importlib.reload(server)
-    names = set(reloaded.mcp._tool_manager._tools.keys())
+    names = set(snapshot_runtime_tools(reloaded.mcp))
 
     assert ADVANCED_TOOLS.issubset(names)
 
@@ -169,7 +170,7 @@ def test_table_navigation_tools_stay_filename_based(server_module) -> None:
     forbidden_keys = {"doc_id", "docId", "document", "path", "handleId", "sessionId", "session"}
 
     for tool_name in TABLE_NAVIGATION_TOOLS:
-        schema = server_module.mcp._tool_manager._tools[tool_name].parameters
+        schema = snapshot_runtime_tools(server_module.mcp)[tool_name].input_schema
         properties = set(schema.get("properties", {}))
 
         assert "filename" in properties
@@ -180,7 +181,7 @@ def test_form_field_tools_stay_filename_based(server_module) -> None:
     forbidden_keys = {"doc_id", "docId", "document", "path", "handleId", "sessionId", "session"}
 
     for tool_name in FORM_FIELD_TOOLS:
-        schema = server_module.mcp._tool_manager._tools[tool_name].parameters
+        schema = snapshot_runtime_tools(server_module.mcp)[tool_name].input_schema
         properties = set(schema.get("properties", {}))
 
         assert "filename" in properties
