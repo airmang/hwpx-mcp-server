@@ -136,8 +136,33 @@ def test_any_default_none_drops_redundant_null_union() -> None:
 
 
 def test_compatibility_range_and_audited_patch_are_explicit() -> None:
-    assert SUPPORTED_MCP_RANGE == ">=1.28.1,<1.29"
+    assert SUPPORTED_MCP_RANGE == "==1.28.1"
     assert AUDITED_MCP_PATCHES == ("1.28.1",)
+
+
+def test_resolver_pin_and_audited_set_admit_the_same_versions() -> None:
+    """Install-time admission must equal runtime admission (S-081 FR-1).
+
+    The historical failure mode: the resolver admitted a future 1.28.x patch
+    that the runtime allowlist then rejected at startup. An exact ``==`` pin to
+    exactly the audited patches makes that state unrepresentable.
+    """
+
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - python < 3.11
+        import tomli as tomllib
+    from pathlib import Path
+
+    pyproject = tomllib.loads(
+        (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text("utf-8")
+    )
+    mcp_specs = [d for d in pyproject["project"]["dependencies"] if d.startswith("mcp")]
+    assert mcp_specs == [f"mcp{SUPPORTED_MCP_RANGE}"]
+    # Exact-pin shape, and the pinned version is the audited set.
+    assert SUPPORTED_MCP_RANGE.startswith("==")
+    assert SUPPORTED_MCP_RANGE[2:] in AUDITED_MCP_PATCHES
+    assert len(AUDITED_MCP_PATCHES) == 1
 
 
 def test_runtime_configuration_exposes_owned_version_api() -> None:

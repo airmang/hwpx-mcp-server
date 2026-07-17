@@ -36,7 +36,10 @@ HANDLER_OWNERS = {
     "hwpx_mcp_server.handlers.quality_render": 16,
     "hwpx_mcp_server.handlers.workflow": 7,
 }
-ALLOWED_IMPORT_CYCLES = {
+# S-081 extracted the shared render contracts into a leaf module; the package
+# import graph is now a clean DAG and must stay one.
+ALLOWED_IMPORT_CYCLES: set[frozenset[str]] = set()
+_REMOVED_IMPORT_CYCLES = {
     frozenset(
         {
             "hwpx_mcp_server.workflow.render_queue",
@@ -205,8 +208,10 @@ def _cyclic_components(graph: dict[str, set[str]]) -> set[frozenset[str]]:
     return cycles
 
 
-def test_package_import_cycles_are_limited_to_frozen_render_pair() -> None:
-    assert _cyclic_components(_package_import_graph()) == ALLOWED_IMPORT_CYCLES
+def test_package_import_graph_is_a_clean_dag() -> None:
+    cycles = _cyclic_components(_package_import_graph())
+    assert cycles == ALLOWED_IMPORT_CYCLES
+    assert not (cycles & _REMOVED_IMPORT_CYCLES)
 
 
 def test_live_order_mismatch_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:

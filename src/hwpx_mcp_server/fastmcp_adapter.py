@@ -25,10 +25,10 @@ from pydantic import TypeAdapter
 from .execution_lock import PUBLIC_MUTATION_LOCK
 
 
-SUPPORTED_MCP_RANGE = ">=1.28.1,<1.29"
-# The resolver range intentionally stays on one minor line, while this audited
-# patch allowlist prevents a newly published 1.28.x patch from being admitted
-# before its registration/error/protocol matrix has passed.
+# The package resolver pin and this audited allowlist MUST admit the same
+# set: anything pip can install must also start. Admitting a new patch is an
+# explicit re-audit (docs/mcp-sdk-reaudit.md) that updates both together.
+SUPPORTED_MCP_RANGE = "==1.28.1"
 AUDITED_MCP_PATCHES = ("1.28.1",)
 
 
@@ -61,8 +61,9 @@ def _require_audited_mcp_patch() -> str:
     if installed not in AUDITED_MCP_PATCHES:
         audited = ", ".join(AUDITED_MCP_PATCHES)
         raise FastMcpAdapterError(
-            f"unsupported MCP SDK {installed!r}; {SUPPORTED_MCP_RANGE} is the candidate "
-            f"range, but only audited patches are admitted ({audited})"
+            f"unsupported MCP SDK {installed!r}; the package pins mcp"
+            f"{SUPPORTED_MCP_RANGE} and only audited patches are admitted "
+            f"({audited}) — see docs/mcp-sdk-reaudit.md"
         )
     return installed
 
@@ -548,7 +549,7 @@ def _register(
         if output_json != expected_output:
             raise FastMcpAdapterError(
                 f"FastMCP did not honor the Annotated CallToolResult output model "
-                f"for {name!r}; mcp>=1.28.1,<1.29 is required"
+                f"for {name!r}; mcp{SUPPORTED_MCP_RANGE} is required"
             )
 
     # Make the live MCP schema byte-for-byte comparable with the canonical

@@ -22,7 +22,14 @@ from .render_security import (
     RenderSecurityViolation,
     validate_render_input,
 )
-from .rendering import RenderJobV2, RenderReceiptV2, RenderStatus
+# Shared contracts come from the leaf module (S-081 cycle removal);
+# sign_submission is re-exported for existing importers of this module.
+from .render_contracts import (  # noqa: F401 - compatibility re-export
+    RenderJobV2,
+    RenderReceiptV2,
+    RenderStatus,
+    sign_submission,
+)
 
 
 class RenderQueueError(RuntimeError):
@@ -41,13 +48,6 @@ def _iso(value: datetime) -> str:
 
 def _dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
-
-
-def sign_submission(secret: bytes, job: RenderJobV2) -> str:
-    """Sign only immutable request metadata; document bytes are bound by SHA-256."""
-
-    message = job.model_dump_json(exclude_none=False).encode("utf-8")
-    return "sha256=" + hmac.new(secret, message, hashlib.sha256).hexdigest()
 
 
 def authenticate_submission(secret: bytes, job: RenderJobV2, signature: str) -> None:

@@ -59,7 +59,7 @@ def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
     assert "python-hwpx>=3.2.0" in dependencies
     assert optional_dependencies["oracle"] == ["python-hwpx[visual]>=3.2.0"]
     assert optional_dependencies["vision"] == ["python-hwpx[visual]>=3.2.0"]
-    assert "mcp>=1.28.1,<1.29" in dependencies
+    assert "mcp==1.28.1" in dependencies
     assert "pydantic>=2.11,<3" in dependencies
 
 

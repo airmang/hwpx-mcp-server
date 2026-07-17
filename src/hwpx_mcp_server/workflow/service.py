@@ -710,8 +710,7 @@ class WorkflowService:
     def _findings(stop_reason: str | None) -> list[dict[str, str]]:
         return [{"code": stop_reason, "severity": "review"}] if stop_reason else []
 
-    @staticmethod
-    def _abstention_receipt(family: str, reason: str) -> dict[str, Any]:
+    def _abstention_receipt(self, family: str, reason: str) -> dict[str, Any]:
         return {
             "schemaVersion": WORKFLOW_SCHEMA_VERSION,
             "workflowId": None,
@@ -730,7 +729,7 @@ class WorkflowService:
                 "mcp": _package_version("hwpx-mcp-server"),
                 "pythonHwpx": _package_version("python-hwpx"),
             },
-            "toolSpecHash": RELEASED_CONTRACT_HASH,
+            "toolSpecHash": self.tool_spec_hash,
             "stopReason": reason,
         }
 

@@ -18,11 +18,18 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "hwpx_mcp_server"
 SERVICES_ROOT = PACKAGE_ROOT / "ops_services"
 
-EXPECTED_PACKAGE_CYCLES = (
-    (
-        "hwpx_mcp_server.workflow.render_queue",
-        "hwpx_mcp_server.workflow.rendering",
-    ),
+# S-081 removed the last cycle (render contracts extracted to a leaf module);
+# the baseline is now exactly zero and must stay there.
+EXPECTED_PACKAGE_CYCLES: tuple[tuple[str, ...], ...] = ()
+
+# Modules allowed to import the mcp SDK at all. Everything else must reach the
+# SDK through these seams (the audited adapter owns every private access), so a
+# novel private-internal dependency cannot appear outside this list unnoticed.
+EXPECTED_SDK_IMPORTERS = (
+    "hwpx_mcp_server.fastmcp_adapter",
+    "hwpx_mcp_server.handlers.quality_render",
+    "hwpx_mcp_server.runtime",
+    "hwpx_mcp_server.runtime_services",
 )
 
 EXPECTED_SERVICE_LINES = {
@@ -245,6 +252,26 @@ def _private_accesses() -> tuple[tuple[str, str, str], ...]:
     return tuple(sorted(accesses))
 
 
+def _sdk_importers() -> tuple[str, ...]:
+    """Package modules that import the ``mcp`` SDK (any form, any depth)."""
+
+    importers: set[str] = set()
+    for module, path in _package_modules().items():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                if any(
+                    alias.name == "mcp" or alias.name.startswith("mcp.")
+                    for alias in node.names
+                ):
+                    importers.add(module)
+            elif isinstance(node, ast.ImportFrom) and not node.level:
+                base = node.module or ""
+                if base == "mcp" or base.startswith("mcp."):
+                    importers.add(module)
+    return tuple(sorted(importers))
+
+
 def _c901_diagnostics() -> tuple[tuple[str, str, int], ...]:
     completed = subprocess.run(
         [sys.executable, "-m", "ruff", "check", "--select", "C901", "--output-format", "json", *C901_PATHS],
@@ -268,6 +295,7 @@ def _c901_diagnostics() -> tuple[tuple[str, str, int], ...]:
 
 EXPECTED_RATCHETS: dict[str, Any] = {
     "package_cycles": EXPECTED_PACKAGE_CYCLES,
+    "sdk_importers": EXPECTED_SDK_IMPORTERS,
     "service_lines": EXPECTED_SERVICE_LINES,
     "facade_lines": EXPECTED_FACADE_LINES,
     "private_accesses": EXPECTED_PRIVATE_ACCESSES,
@@ -278,6 +306,7 @@ EXPECTED_RATCHETS: dict[str, Any] = {
 def capture_ratchets() -> dict[str, Any]:
     return {
         "package_cycles": _cyclic_components(_package_import_graph()),
+        "sdk_importers": _sdk_importers(),
         "service_lines": _line_counts(
             SERVICES_ROOT, tuple(sorted(EXPECTED_SERVICE_LINES))
         ),

@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Changed
+- Pins the MCP SDK exactly (`mcp==1.28.1`) so the package resolver admits the
+  same set the runtime allowlist (`AUDITED_MCP_PATCHES`) admits: anything pip
+  can install now also starts. Admitting a new SDK patch is an explicit
+  re-audit documented in `docs/mcp-sdk-reaudit.md`.
+- Removes the last package import cycle: the shared v2 render contracts
+  (`RenderStatus`, `RenderJobV2`, `RenderReceiptV2`, `sign_submission`) moved
+  to the leaf module `workflow/render_contracts.py`; `workflow/rendering` and
+  `workflow/render_queue` re-export them unchanged. The architecture ratchet
+  cycle baseline is now exactly zero, and a new SDK-import allowlist ratchet
+  fails when any module outside the audited seams imports the `mcp` SDK.
+- Optional real-Hancom verification now honors the core oracle controls:
+  `HWPX_ORACLE_STRUCTURAL_ONLY=1` never enters GUI automation, and
+  `HWPX_ORACLE_BUDGET_SECONDS` propagates one external deadline into every
+  oracle subprocess timeout (python-hwpx >= 3.3.0 reachability probe applies).
+
+### Fixed
+- Workflow abstention receipts now carry the injected `tool_spec_hash` instead
+  of the frozen released constant, keeping both receipt paths consistent when a
+  divergent contract is injected.
+
 ## [4.1.0] - 2026-07-17
 
 ### Added

@@ -195,6 +195,26 @@ def test_must_abstain_is_a_durable_idempotent_no_tool_workflow(tmp_path: Path):
     assert events[-1].payload["noMutation"] is True
 
 
+def test_abstention_receipt_uses_the_injected_tool_spec_hash(tmp_path: Path):
+    """S-081: both receipt paths must report the same injected contract hash."""
+
+    source = tmp_path / "abstain-source.hwpx"
+    source.write_bytes(b"synthetic HWPX fixture")
+    service = WorkflowService(
+        namespace([]),
+        store=WorkflowStore(tmp_path / "hash-seam.sqlite3"),
+        tool_spec_hash="feedfacecafe0000",
+    )
+    receipt = service.start(
+        family=WorkFamily.MUST_ABSTAIN.value,
+        idempotency_key="must-abstain-hash-seam",
+        source_path=str(source),
+        output_path=str(tmp_path / "abstain-output.hwpx"),
+        parameters={},
+    )
+    assert receipt["toolSpecHash"] == "feedfacecafe0000"
+
+
 def test_known_template_coordinate_mode_accepts_only_frozen_fill_cells(
     tmp_path: Path,
 ) -> None:
