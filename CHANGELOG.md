@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-07-18
+
 ### Changed
 - Pins the MCP SDK exactly (`mcp==1.28.1`) so the package resolver admits the
   same set the runtime allowlist (`AUDITED_MCP_PATCHES`) admits: anything pip

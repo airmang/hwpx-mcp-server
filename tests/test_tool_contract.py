@@ -149,14 +149,14 @@ def test_artifact_materializing_render_tools_are_marked_mutating() -> None:
 
 def test_release_contract_versions_counts_and_hash_are_exact() -> None:
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
-        "3.2.0",
-        "4.1.0",
-        "0.4.0",
+        "3.3.0",
+        "4.2.0",
+        "0.5.0",
     )
     assert len(expected_tool_names(advanced=False)) == 121
     assert len(expected_tool_names(advanced=True)) == 132
     assert len(skill_required_tool_names()) == 28
-    assert RELEASED_CONTRACT_HASH == contract_hash() == "c127914cc3f4480e"
+    assert RELEASED_CONTRACT_HASH == contract_hash() == "f909a00fe4590c64"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 

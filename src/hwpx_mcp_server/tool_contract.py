@@ -25,14 +25,14 @@ from .fastmcp_adapter import (
 )
 
 
-MIN_PYTHON_HWPX = "3.2.0"
-MIN_MCP_VERSION = "4.1.0"
-MIN_SKILL_VERSION = "0.4.0"
+MIN_PYTHON_HWPX = "3.3.0"
+MIN_MCP_VERSION = "4.2.0"
+MIN_SKILL_VERSION = "0.5.0"
 # Frozen release receipt for non-runtime services. Runtime construction still
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "c127914cc3f4480e"
+RELEASED_CONTRACT_HASH = "f909a00fe4590c64"
 
 
 class ToolClassification(str, Enum):
