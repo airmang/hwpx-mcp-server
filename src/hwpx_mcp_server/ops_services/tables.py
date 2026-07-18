@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import math
-import re
 import re as _re
 from typing import Any, Dict, List, Optional, Sequence
 from xml.etree import ElementTree as ET
@@ -17,6 +16,12 @@ from ..upstream import (
     default_cell_width,
 )
 
+from ._border_fill import (
+    _build_border_fill_element,
+    _find_matching_border_fill,
+    _resolve_border_fill_spec,
+    _shortcut_border_fill_id,
+)
 from .context import DocumentContext
 from .save_policy import SavePolicy
 from .memo_style import MemoStyleService
@@ -142,18 +147,15 @@ class TableService:
         normalized_border_color = self._styles._normalize_color(border_color)
         normalized_fill_color = self._styles._normalize_color(fill_color)
 
-        if normalized_style == "none" and not any(
-            [normalized_border_color, normalized_fill_color, border_width]
-        ):
-            return "0"
-
-        if (
-            normalized_style in {None, "solid"}
-            and normalized_border_color is None
-            and normalized_fill_color is None
-            and border_width is None
-        ):
-            return document.oxml.ensure_basic_border_fill()
+        shortcut = _shortcut_border_fill_id(
+            document,
+            normalized_style,
+            normalized_border_color,
+            normalized_fill_color,
+            border_width,
+        )
+        if shortcut is not None:
+            return shortcut
 
         if not document.headers:
             raise self._context._new_error(
@@ -162,51 +164,12 @@ class TableService:
             )
 
         header = document.headers[0]
-
-        border_type = "NONE" if normalized_style == "none" else "SOLID"
-
-        def normalize_length(value: Optional[str | float | int], default: str) -> str:
-            if value is None:
-                return default
-            if isinstance(value, (int, float)):
-                return f"{value:g} mm"
-            text = str(value).strip()
-            if not text:
-                return default
-            match = re.fullmatch(r"([0-9]+(?:\\.[0-9]+)?)\\s*([A-Za-z]+)?", text)
-            if match:
-                number, unit = match.groups()
-                unit = (unit or "mm").lower()
-                return f"{number} {unit}"
-            return text
-
-        if border_type == "NONE":
-            width_default = "0 mm"
-            diag_default = "0 mm"
-        else:
-            width_default = "0.12 mm"
-            diag_default = "0.1 mm"
-
-        width_value = normalize_length(border_width, width_default)
-        if border_width is not None:
-            diagonal_width_value = normalize_length(border_width, width_default)
-        else:
-            diagonal_width_value = normalize_length(None, diag_default)
-
-        def normalize_length_token(value: Optional[str]) -> str:
-            if not value:
-                return ""
-            return re.sub(r"\s+", "", str(value)).lower()
-
-        width_token = normalize_length_token(width_value)
-        diagonal_width_token = normalize_length_token(diagonal_width_value)
-
-        edge_color: str | None = normalized_border_color
-        diagonal_color: str | None = normalized_border_color
-        if border_type == "SOLID":
-            edge_color = normalized_border_color or "#000000"
-            diagonal_color = edge_color
-        # Non-solid borders retain the optional normalized color.
+        spec = _resolve_border_fill_spec(
+            normalized_style,
+            normalized_border_color,
+            normalized_fill_color,
+            border_width,
+        )
 
         ref_list = header.element.find(f"{HH_NS}refList")
         if ref_list is None:
@@ -220,88 +183,9 @@ class TableService:
             )
             header.mark_dirty()
 
-        def matches(existing: ET.Element) -> bool:
-            if (existing.get("threeD") or "0") != "0":
-                return False
-            if (existing.get("shadow") or "0") != "0":
-                return False
-            if (existing.get("centerLine") or "NONE").upper() != "NONE":
-                return False
-            if (existing.get("breakCellSeparateLine") or "0") != "0":
-                return False
-
-            for slash_name in ("slash", "backSlash"):
-                slash = existing.find(f"{HH_NS}{slash_name}")
-                if slash is None:
-                    return False
-                if (slash.get("type") or "NONE").upper() != "NONE":
-                    return False
-                if slash.get("Crooked", "0") != "0":
-                    return False
-                if slash.get("isCounter", "0") != "0":
-                    return False
-
-            for child_name in (
-                "leftBorder",
-                "rightBorder",
-                "topBorder",
-                "bottomBorder",
-            ):
-                border_child = existing.find(f"{HH_NS}{child_name}")
-                if border_child is None:
-                    return False
-                if (border_child.get("type") or "").upper() != border_type:
-                    return False
-                if normalize_length_token(border_child.get("width")) != width_token:
-                    return False
-                if edge_color is not None:
-                    if (border_child.get("color") or "").upper() != edge_color:
-                        return False
-                else:
-                    if border_child.get("color") not in (None, ""):
-                        return False
-
-            diagonal_child = existing.find(f"{HH_NS}diagonal")
-            if diagonal_child is None:
-                return False
-            expected_diagonal_type = "SOLID" if border_type == "SOLID" else "NONE"
-            if (diagonal_child.get("type") or "").upper() != expected_diagonal_type:
-                return False
-            if (
-                normalize_length_token(diagonal_child.get("width"))
-                != diagonal_width_token
-            ):
-                return False
-            if diagonal_color is not None:
-                if (diagonal_child.get("color") or "").upper() != diagonal_color:
-                    return False
-            else:
-                if diagonal_child.get("color") not in (None, ""):
-                    return False
-
-            fill_brush = existing.find(f"{HH_NS}fillBrush")
-            if normalized_fill_color is None:
-                if fill_brush is not None:
-                    return False
-            else:
-                if fill_brush is None:
-                    return False
-                solid_brush = fill_brush.find(f"{HH_NS}solidBrush")
-                if solid_brush is None:
-                    return False
-                if (solid_brush.get("type") or "SOLID").upper() != "SOLID":
-                    return False
-                if (solid_brush.get("color") or "").upper() != normalized_fill_color:
-                    return False
-
-            return True
-
-        for candidate in border_fills_element.findall(f"{HH_NS}borderFill"):
-            identifier = candidate.get("id")
-            if not identifier:
-                continue
-            if matches(candidate):
-                return identifier
+        matched = _find_matching_border_fill(border_fills_element, spec)
+        if matched is not None:
+            return matched
 
         # Upstream still does not expose a public border-fill creation API.
         # Keep the private helper usage isolated here until python-hwpx offers one.
@@ -312,52 +196,7 @@ class TableService:
             )
 
         new_id = header._allocate_border_fill_id(border_fills_element)
-        border_fill_element = ET.SubElement(
-            border_fills_element,
-            f"{HH_NS}borderFill",
-            {
-                "id": new_id,
-                "threeD": "0",
-                "shadow": "0",
-                "centerLine": "NONE",
-                "breakCellSeparateLine": "0",
-            },
-        )
-
-        for slash_name in ("slash", "backSlash"):
-            ET.SubElement(
-                border_fill_element,
-                f"{HH_NS}{slash_name}",
-                {"type": "NONE", "Crooked": "0", "isCounter": "0"},
-            )
-
-        def append_border(
-            name: str, *, width: str, color: Optional[str], kind: str
-        ) -> None:
-            attrs = {"type": kind}
-            if width:
-                attrs["width"] = width
-            if color is not None:
-                attrs["color"] = color
-            ET.SubElement(border_fill_element, f"{HH_NS}{name}", attrs)
-
-        for side in ("leftBorder", "rightBorder", "topBorder", "bottomBorder"):
-            append_border(side, width=width_value, color=edge_color, kind=border_type)
-
-        append_border(
-            "diagonal",
-            width=diagonal_width_value,
-            color=diagonal_color,
-            kind="SOLID" if border_type == "SOLID" else "NONE",
-        )
-
-        if normalized_fill_color is not None:
-            fill_brush = ET.SubElement(border_fill_element, f"{HH_NS}fillBrush")
-            ET.SubElement(
-                fill_brush,
-                f"{HH_NS}solidBrush",
-                {"type": "SOLID", "color": normalized_fill_color, "alpha": "255"},
-            )
+        _build_border_fill_element(border_fills_element, new_id, spec)
 
         if hasattr(header, "_update_border_fills_item_count"):
             header._update_border_fills_item_count(border_fills_element)

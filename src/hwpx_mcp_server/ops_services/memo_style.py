@@ -26,6 +26,192 @@ from .save_policy import SavePolicy
 logger = logging.getLogger("hwpx_mcp_server.hwpx_ops")
 
 
+class _Segment:
+    __slots__ = ("element", "attr", "text")
+
+    def __init__(self, element: ET.Element, attr: str, text: str) -> None:
+        self.element = element
+        self.attr = attr
+        self.text = text
+
+    def set(self, value: str) -> None:
+        self.text = value
+        if value:
+            setattr(self.element, self.attr, value)
+        else:
+            setattr(self.element, self.attr, "")
+
+
+def _gather_segments(element: ET.Element) -> List[_Segment]:
+    segments: List[_Segment] = []
+
+    def visit(node: ET.Element) -> None:
+        text_value = node.text or ""
+        segments.append(_Segment(node, "text", text_value))
+        for child in list(node):
+            visit(child)
+            tail_value = child.tail or ""
+            segments.append(_Segment(child, "tail", tail_value))
+
+    for text_node in element.findall(f"{HP_NS}t"):
+        visit(text_node)
+    return segments
+
+
+def _slice_run(run_obj: HwpxOxmlRun, start: int, end: int) -> None:
+    segments = _gather_segments(run_obj.element)
+    if not segments:
+        return
+    total_length = sum(len(segment.text) for segment in segments)
+    start = max(0, min(start, total_length))
+    end = max(0, min(end, total_length))
+    if start >= end:
+        for segment in segments:
+            if segment.text:
+                segment.set("")
+        run_obj.paragraph.section.mark_dirty()
+        return
+    changed = False
+    offset = 0
+    for segment in segments:
+        seg_start = offset
+        seg_end = seg_start + len(segment.text)
+        offset = seg_end
+        if end <= seg_start or start >= seg_end:
+            if segment.text:
+                segment.set("")
+                changed = True
+            continue
+        local_start = max(start, seg_start) - seg_start
+        local_end = min(end, seg_end) - seg_start
+        new_value = segment.text[local_start:local_end]
+        if segment.text != new_value:
+            segment.set(new_value)
+            changed = True
+    if changed:
+        run_obj.paragraph.section.mark_dirty()
+
+
+def _split_run(
+    run_obj: HwpxOxmlRun, local_start: int, local_end: int, char_pr_id_ref: str
+) -> None:
+    text_value = run_obj.text or ""
+    length = len(text_value)
+    if length == 0:
+        return
+    local_start = max(0, min(local_start, length))
+    local_end = max(0, min(local_end, length))
+    if local_start >= local_end:
+        return
+    if local_start == 0 and local_end == length:
+        run_obj.char_pr_id_ref = char_pr_id_ref
+        return
+
+    segments: List[Tuple[int, int, Optional[str]]] = []
+    original_char = run_obj.char_pr_id_ref
+    if local_start > 0:
+        segments.append((0, local_start, original_char))
+    segments.append((local_start, local_end, char_pr_id_ref))
+    if local_end < length:
+        segments.append((local_end, length, original_char))
+
+    parent = run_obj.paragraph.element
+    run_children = list(parent)
+    try:
+        index = run_children.index(run_obj.element)
+    except ValueError:  # pragma: no cover - defensive branch
+        return
+
+    new_elements: List[ET.Element] = []
+    for seg_start, seg_end, char_id in segments:
+        if seg_start >= seg_end:
+            continue
+        element_copy = copy.deepcopy(run_obj.element)
+        segment_run = HwpxOxmlRun(element_copy, run_obj.paragraph)
+        _slice_run(segment_run, seg_start, seg_end)
+        if char_id is None:
+            segment_run.char_pr_id_ref = None
+        else:
+            segment_run.char_pr_id_ref = char_id
+        new_elements.append(element_copy)
+
+    if not new_elements:
+        parent.remove(run_obj.element)
+        run_obj.paragraph.section.mark_dirty()
+        return
+
+    for offset, element in enumerate(new_elements):
+        parent.insert(index + offset, element)
+    parent.remove(run_obj.element)
+    run_obj.paragraph.section.mark_dirty()
+
+
+def _paragraph_length(paragraph: HwpxOxmlParagraph) -> int:
+    return sum(len(run.text or "") for run in paragraph.runs)
+
+
+def _apply_span(
+    paragraph: HwpxOxmlParagraph,
+    span_start: int,
+    span_end: int,
+    char_pr_id_ref: str,
+) -> bool:
+    if span_start >= span_end:
+        return False
+    applied = False
+    cursor = span_start
+    while cursor < span_end:
+        runs = list(paragraph.runs)
+        offset = 0
+        target: Tuple[HwpxOxmlRun, int, int, int] | None = None
+        for candidate in runs:
+            text = candidate.text or ""
+            length = len(text)
+            run_start = offset
+            run_end = run_start + length
+            if run_end <= cursor:
+                offset = run_end
+                continue
+            if run_start >= span_end:
+                target = None
+                break
+            if length == 0:
+                offset = run_end
+                continue
+            target = (candidate, run_start, run_end, length)
+            break
+
+        if target is None:
+            break
+
+        run_obj, run_start, run_end, length = target
+        local_start = max(0, cursor - run_start)
+        local_end = min(length, span_end - run_start)
+        if local_start >= local_end:
+            cursor = max(cursor + 1, run_end)
+            continue
+
+        _split_run(run_obj, local_start, local_end, char_pr_id_ref)
+        applied = True
+        cursor = min(span_end, run_end)
+
+    return applied
+
+
+def _span_bounds(span: Any) -> Tuple[int, int, int]:
+    if isinstance(span, dict):
+        paragraph_index = int(span.get("paragraph_index", -1))
+        start = int(span.get("start", 0))
+        end = int(span.get("end", 0))
+    else:
+        paragraph_index = int(
+            getattr(span, "paragraph_index", getattr(span, "paragraphIndex", -1))
+        )
+        start = int(getattr(span, "start", 0))
+        end = int(getattr(span, "end", 0))
+    return paragraph_index, start, end
+
+
 class MemoStyleService:
     def __init__(self, context: DocumentContext, save: SavePolicy) -> None:
         self._context = context
@@ -241,181 +427,9 @@ class MemoStyleService:
         document, resolved = self._context._open_document(path)
         paragraphs = self._context._iter_paragraphs(document)
 
-        class _Segment:
-            __slots__ = ("element", "attr", "text")
-
-            def __init__(self, element: ET.Element, attr: str, text: str) -> None:
-                self.element = element
-                self.attr = attr
-                self.text = text
-
-            def set(self, value: str) -> None:
-                self.text = value
-                if value:
-                    setattr(self.element, self.attr, value)
-                else:
-                    setattr(self.element, self.attr, "")
-
-        def _gather_segments(element: ET.Element) -> List[_Segment]:
-            segments: List[_Segment] = []
-
-            def visit(node: ET.Element) -> None:
-                text_value = node.text or ""
-                segments.append(_Segment(node, "text", text_value))
-                for child in list(node):
-                    visit(child)
-                    tail_value = child.tail or ""
-                    segments.append(_Segment(child, "tail", tail_value))
-
-            for text_node in element.findall(f"{HP_NS}t"):
-                visit(text_node)
-            return segments
-
-        def _slice_run(run_obj: HwpxOxmlRun, start: int, end: int) -> None:
-            segments = _gather_segments(run_obj.element)
-            if not segments:
-                return
-            total_length = sum(len(segment.text) for segment in segments)
-            start = max(0, min(start, total_length))
-            end = max(0, min(end, total_length))
-            if start >= end:
-                for segment in segments:
-                    if segment.text:
-                        segment.set("")
-                run_obj.paragraph.section.mark_dirty()
-                return
-            changed = False
-            offset = 0
-            for segment in segments:
-                seg_start = offset
-                seg_end = seg_start + len(segment.text)
-                offset = seg_end
-                if end <= seg_start or start >= seg_end:
-                    if segment.text:
-                        segment.set("")
-                        changed = True
-                    continue
-                local_start = max(start, seg_start) - seg_start
-                local_end = min(end, seg_end) - seg_start
-                new_value = segment.text[local_start:local_end]
-                if segment.text != new_value:
-                    segment.set(new_value)
-                    changed = True
-            if changed:
-                run_obj.paragraph.section.mark_dirty()
-
-        def _split_run(run_obj: HwpxOxmlRun, local_start: int, local_end: int) -> None:
-            text_value = run_obj.text or ""
-            length = len(text_value)
-            if length == 0:
-                return
-            local_start = max(0, min(local_start, length))
-            local_end = max(0, min(local_end, length))
-            if local_start >= local_end:
-                return
-            if local_start == 0 and local_end == length:
-                run_obj.char_pr_id_ref = char_pr_id_ref
-                return
-
-            segments: List[Tuple[int, int, Optional[str]]] = []
-            original_char = run_obj.char_pr_id_ref
-            if local_start > 0:
-                segments.append((0, local_start, original_char))
-            segments.append((local_start, local_end, char_pr_id_ref))
-            if local_end < length:
-                segments.append((local_end, length, original_char))
-
-            parent = run_obj.paragraph.element
-            run_children = list(parent)
-            try:
-                index = run_children.index(run_obj.element)
-            except ValueError:  # pragma: no cover - defensive branch
-                return
-
-            new_elements: List[ET.Element] = []
-            for seg_start, seg_end, char_id in segments:
-                if seg_start >= seg_end:
-                    continue
-                element_copy = copy.deepcopy(run_obj.element)
-                segment_run = HwpxOxmlRun(element_copy, run_obj.paragraph)
-                _slice_run(segment_run, seg_start, seg_end)
-                if char_id is None:
-                    segment_run.char_pr_id_ref = None
-                else:
-                    segment_run.char_pr_id_ref = char_id
-                new_elements.append(element_copy)
-
-            if not new_elements:
-                parent.remove(run_obj.element)
-                run_obj.paragraph.section.mark_dirty()
-                return
-
-            for offset, element in enumerate(new_elements):
-                parent.insert(index + offset, element)
-            parent.remove(run_obj.element)
-            run_obj.paragraph.section.mark_dirty()
-
-        def _paragraph_length(paragraph: HwpxOxmlParagraph) -> int:
-            return sum(len(run.text or "") for run in paragraph.runs)
-
-        def _apply_span(
-            paragraph: HwpxOxmlParagraph, span_start: int, span_end: int
-        ) -> bool:
-            if span_start >= span_end:
-                return False
-            applied = False
-            cursor = span_start
-            while cursor < span_end:
-                runs = list(paragraph.runs)
-                offset = 0
-                target: Tuple[HwpxOxmlRun, int, int, int] | None = None
-                for candidate in runs:
-                    text = candidate.text or ""
-                    length = len(text)
-                    run_start = offset
-                    run_end = run_start + length
-                    if run_end <= cursor:
-                        offset = run_end
-                        continue
-                    if run_start >= span_end:
-                        target = None
-                        break
-                    if length == 0:
-                        offset = run_end
-                        continue
-                    target = (candidate, run_start, run_end, length)
-                    break
-
-                if target is None:
-                    break
-
-                run_obj, run_start, run_end, length = target
-                local_start = max(0, cursor - run_start)
-                local_end = min(length, span_end - run_start)
-                if local_start >= local_end:
-                    cursor = max(cursor + 1, run_end)
-                    continue
-
-                _split_run(run_obj, local_start, local_end)
-                applied = True
-                cursor = min(span_end, run_end)
-
-            return applied
-
         styled = 0
         for span in spans:
-            if isinstance(span, dict):
-                paragraph_index = int(span.get("paragraph_index", -1))
-                start = int(span.get("start", 0))
-                end = int(span.get("end", 0))
-            else:
-                paragraph_index = int(
-                    getattr(
-                        span, "paragraph_index", getattr(span, "paragraphIndex", -1)
-                    )
-                )
-                start = int(getattr(span, "start", 0))
-                end = int(getattr(span, "end", 0))
+            paragraph_index, start, end = _span_bounds(span)
 
             if paragraph_index < 0 or paragraph_index >= len(paragraphs):
                 continue
@@ -431,7 +445,7 @@ class MemoStyleService:
                 continue
             clamped_end = min(end, total_length)
 
-            if _apply_span(paragraph, start, clamped_end):
+            if _apply_span(paragraph, start, clamped_end, char_pr_id_ref):
                 styled += 1
 
         if not dry_run and styled:

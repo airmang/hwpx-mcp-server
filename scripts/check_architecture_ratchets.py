@@ -33,17 +33,18 @@ EXPECTED_SDK_IMPORTERS = (
 )
 
 EXPECTED_SERVICE_LINES = {
+    "_border_fill.py": 283,
     "content_layout.py": 322,
     "context.py": 195,
     "form_fields.py": 525,
     "media.py": 178,
-    "memo_style.py": 463,
+    "memo_style.py": 477,
     "package_validation.py": 166,
     "planning.py": 201,
     "preview_export.py": 453,
     "read_query.py": 601,
     "save_policy.py": 601,
-    "tables.py": 687,
+    "tables.py": 526,
     "transactions.py": 606,
 }
 
@@ -115,7 +116,6 @@ EXPECTED_C901 = (
     ("src/hwpx_mcp_server/handlers/tracked_changes.py", "add_tracked_edit", 12),
     ("src/hwpx_mcp_server/ops_services/form_fields.py", "apply_evalplan_fill", 11),
     ("src/hwpx_mcp_server/ops_services/memo_style.py", "_split_run", 12),
-    ("src/hwpx_mcp_server/ops_services/memo_style.py", "apply_style_to_text_ranges", 48),
     ("src/hwpx_mcp_server/ops_services/preview_export.py", "render_preview", 15),
     ("src/hwpx_mcp_server/ops_services/read_query.py", "analyze_template_structure", 13),
     ("src/hwpx_mcp_server/ops_services/read_query.py", "find", 20),
@@ -123,8 +123,6 @@ EXPECTED_C901 = (
     ("src/hwpx_mcp_server/ops_services/read_query.py", "read_text", 12),
     ("src/hwpx_mcp_server/ops_services/save_policy.py", "_rotate_and_backup_exact", 12),
     ("src/hwpx_mcp_server/ops_services/tables.py", "_auto_fit_table_columns", 16),
-    ("src/hwpx_mcp_server/ops_services/tables.py", "_ensure_table_border_fill", 57),
-    ("src/hwpx_mcp_server/ops_services/tables.py", "matches", 29),
     ("src/hwpx_mcp_server/ops_services/transactions.py", "_apply_transaction_operation", 20),
     ("src/hwpx_mcp_server/ops_services/transactions.py", "byte_preserving_patch", 23),
     ("src/hwpx_mcp_server/ops_services/transactions.py", "undo_last_edit", 20),

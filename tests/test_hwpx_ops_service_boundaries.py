@@ -276,7 +276,7 @@ def test_services_are_bounded_concrete_classes_with_an_acyclic_import_graph() ->
     service_modules = {
         path.stem
         for path in SERVICES_ROOT.glob("*.py")
-        if path.stem not in {"__init__", "composition"}
+        if path.stem not in {"__init__", "composition", "_border_fill"}
     }
     assert service_modules == {
         "content_layout",
