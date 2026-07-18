@@ -149,7 +149,7 @@ class PreviewExportService:
             capture_count = min(capture_count, max(0, max_pages))
 
         try:
-            from playwright.sync_api import sync_playwright
+            from playwright.sync_api import sync_playwright  # pyright: ignore[reportMissingImports] - optional dependency, guarded
         except Exception as playwright_exc:
             playwright_error = str(playwright_exc)
         else:  # pragma: no cover - local CI normally uses Chrome CLI fallback

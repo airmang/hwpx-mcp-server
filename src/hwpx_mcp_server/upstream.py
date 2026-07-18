@@ -21,11 +21,11 @@ patch_python_hwpx()
 from hwpx import ObjectFinder
 from hwpx.document import (
     HwpxDocument,
-    HwpxOxmlMemo,
-    HwpxOxmlParagraph,
-    HwpxOxmlRun,
-    HwpxOxmlTable,
 )
+from hwpx.oxml.memo import HwpxOxmlMemo
+from hwpx.oxml.paragraph import HwpxOxmlParagraph
+from hwpx.oxml.run import HwpxOxmlRun
+from hwpx.oxml.table import HwpxOxmlTable
 from hwpx.opc.package import HwpxPackage
 from hwpx.templates import blank_document_bytes
 from hwpx.tools.text_extractor import AnnotationOptions, TextExtractor

@@ -952,3 +952,25 @@ def test_read_text_supports_a_registered_handle_path(ops_with_sample):
     result = ops.read_text(registered_path, limit=2)
 
     assert result["textChunk"]
+
+
+def test_get_tables_by_handle_reports_logical_column_count(tmp_path):
+    """S-082 regression: HwpxOxmlTable has column_count, not .columns — the old
+    code crashed on any handle-registered document that contains a table."""
+
+    workdir = tmp_path / "workspace"
+    workdir.mkdir()
+    target = workdir / "tables-handle.hwpx"
+    document = HwpxDocument.new()
+    document.add_table(rows=2, cols=3)
+    document.save_to_path(target)
+
+    ops = HwpxOps(base_directory=workdir, auto_backup=False)
+    handle = ops._register_handle(
+        "tables-handle.hwpx", ops._services.context._resolve_path("tables-handle.hwpx")
+    )
+    result = ops.get_tables_by_handle(handle.handle_id)
+    assert result["tables"], "expected at least one table entry"
+    entry = result["tables"][0]
+    assert entry["rowCount"] == 2
+    assert entry["columnCount"] == 3

@@ -85,7 +85,7 @@ class DocumentContext:
     def _register_handle(self, path: str, resolved: Path) -> RegisteredHandle:
         relative = self._relative_path(resolved)
         handle_id = self._make_handle_id(relative)
-        handle = RegisteredHandle(handleId=handle_id, path=relative)
+        handle = RegisteredHandle(type="handle", handleId=handle_id, path=relative)
         self._registered_handles[handle_id] = handle
         return handle
 

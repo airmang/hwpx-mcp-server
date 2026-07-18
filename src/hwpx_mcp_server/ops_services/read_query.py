@@ -83,7 +83,7 @@ class ReadQueryService:
             TableResourceEntry(
                 tableIndex=index,
                 rowCount=len(table.rows),
-                columnCount=len(table.columns),
+                columnCount=table.column_count,
             )
             for index, table in enumerate(tables)
         ]

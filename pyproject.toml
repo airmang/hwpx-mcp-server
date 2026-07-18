@@ -103,44 +103,47 @@ show_error_codes = true
 [tool.pyright]
 pythonVersion = "3.10"
 typeCheckingMode = "basic"
+# S-082: pyright now covers the same surface as mypy. The former exclusion
+# ("legacy dynamic python-hwpx objects") became stale after the S-080
+# decomposition and typing work — the whole set measures zero errors in basic
+# mode. New modules must enter BOTH gates or carry an itemized exclusion here.
 include = [
+    "src/hwpx_mcp_server/handlers",
+    "src/hwpx_mcp_server/ops_services",
     "src/hwpx_mcp_server/runtime.py",
     "src/hwpx_mcp_server/runtime_services.py",
     "src/hwpx_mcp_server/fastmcp_adapter.py",
     "src/hwpx_mcp_server/tool_bindings.py",
-    "src/hwpx_mcp_server/tool_contract.py",
     "src/hwpx_mcp_server/server.py",
-    "src/hwpx_mcp_server/handlers/_shared.py",
-    "src/hwpx_mcp_server/ops_services/composition.py",
-]
-# Public ToolSpec signatures are schema-frozen, while concrete operations still
-# depend on legacy dynamic python-hwpx objects. Mypy covers both areas above;
-# pyright is intentionally limited to the central runtime and composition seams.
-exclude = [
-    "src/hwpx_mcp_server/handlers/agent_document.py",
-    "src/hwpx_mcp_server/handlers/authoring.py",
-    "src/hwpx_mcp_server/handlers/content_edit.py",
-    "src/hwpx_mcp_server/handlers/form_fill.py",
-    "src/hwpx_mcp_server/handlers/layout_style.py",
-    "src/hwpx_mcp_server/handlers/quality_render.py",
-    "src/hwpx_mcp_server/handlers/read_export.py",
-    "src/hwpx_mcp_server/handlers/specialized.py",
-    "src/hwpx_mcp_server/handlers/tracked_changes.py",
-    "src/hwpx_mcp_server/handlers/workflow.py",
-    "src/hwpx_mcp_server/form_fill.py",
     "src/hwpx_mcp_server/hwpx_ops.py",
-    "src/hwpx_mcp_server/ops_services/content_layout.py",
-    "src/hwpx_mcp_server/ops_services/context.py",
-    "src/hwpx_mcp_server/ops_services/form_fields.py",
-    "src/hwpx_mcp_server/ops_services/media.py",
-    "src/hwpx_mcp_server/ops_services/memo_style.py",
-    "src/hwpx_mcp_server/ops_services/package_validation.py",
-    "src/hwpx_mcp_server/ops_services/planning.py",
-    "src/hwpx_mcp_server/ops_services/preview_export.py",
-    "src/hwpx_mcp_server/ops_services/read_query.py",
-    "src/hwpx_mcp_server/ops_services/save_policy.py",
-    "src/hwpx_mcp_server/ops_services/tables.py",
-    "src/hwpx_mcp_server/ops_services/transactions.py",
+    "src/hwpx_mcp_server/form_fill.py",
+    "src/hwpx_mcp_server/tool_contract.py",
     "src/hwpx_mcp_server/workflow/service.py",
 ]
 reportMissingTypeStubs = false
+
+# Itemized residual exclusions (S-082). Every file below stays under mypy
+# (implicit_optional=true); pyright is deferred for exactly one of two reasons:
+# [schema-frozen] tool-facing signatures use implicit-Optional defaults that
+#   generate the advertised FastMCP input schemas — rewriting them to explicit
+#   Optional changes the published contract and belongs to a contract-changing
+#   release, not a typing ramp.
+# [dynamic-seam] calls cross into dynamic python-hwpx object seams (Path/str,
+#   bool/FitPolicy coercions tolerated at runtime) — needs a typed core seam
+#   before pyright basic can pass without lying.
+exclude = [
+    "src/hwpx_mcp_server/handlers/agent_document.py",   # schema-frozen
+    "src/hwpx_mcp_server/handlers/authoring.py",        # schema-frozen
+    "src/hwpx_mcp_server/handlers/content_edit.py",     # schema-frozen
+    "src/hwpx_mcp_server/handlers/form_fill.py",        # schema-frozen
+    "src/hwpx_mcp_server/handlers/layout_style.py",     # schema-frozen
+    "src/hwpx_mcp_server/handlers/quality_render.py",   # schema-frozen
+    "src/hwpx_mcp_server/handlers/read_export.py",      # schema-frozen
+    "src/hwpx_mcp_server/handlers/specialized.py",      # schema-frozen
+    "src/hwpx_mcp_server/handlers/workflow.py",         # schema-frozen
+    "src/hwpx_mcp_server/ops_services/form_fields.py",  # dynamic-seam
+    "src/hwpx_mcp_server/ops_services/save_policy.py",  # dynamic-seam
+    "src/hwpx_mcp_server/ops_services/tables.py",       # dynamic-seam (FitPolicy)
+    "src/hwpx_mcp_server/ops_services/transactions.py", # dynamic-seam
+    "src/hwpx_mcp_server/workflow/service.py",          # dynamic-seam
+]
