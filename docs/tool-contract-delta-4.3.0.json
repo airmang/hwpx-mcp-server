@@ -69,7 +69,16 @@
       "apply_template_formfit",
       "fill_form_field"
     ],
-    "note": "The three tier-1 facades stay registered and functional in 4.3.0. Shipped skill guides route to the canonical form-fill trio (analyze_form_fill / apply_form_fill / verify_form_fill); demotion to deprecated is deferred to the next major after observing consumption."
+    "note": "The three tier-1 facades stay registered and functional in 4.3.0. Shipped skill guides route to the canonical form-fill trio (analyze_form_fill / apply_form_fill / verify_form_fill); demotion to deprecated is deferred to the next major after observing consumption.",
+    "intentionalGuideRemnants": [
+      "hwpx-skill SKILL.md router: not-primary-path compatibility note listing fill_form_field / fill_by_path / find_cell_by_label / formfit pair",
+      "hwpx-skill references/workflows-forms.md: compatibility-facade boundary table rows labelled tier-1 observation",
+      "hwpx-skill references/api.md: template-formfit compatibility note with signatures for existing baseline automations",
+      "hwpx-skill examples/08_template_formfit.py: labelled compatibility regression gate (quickcheck --template-formfit)",
+      "hwpx-skill examples/08_mcp_canonical_form_fill.md: compatibility appendix pointing legacy formfit callers at the observation policy",
+      "hwpx-skill README.md forms section: canonical-first description labelling fill_form_field as the single native-field compatibility path",
+      "generated contract documents (tool-contract.generated.*): regenerate from the MCP registry and keep replacement guidance for the nine remaining facades"
+    ]
   },
   "proof": "Holding version coordinates fixed, the canonical payload delta is confined to the five classification fields of the two promoted tools plus baselineClassification.counts; grafting those back reproduces the 4.2.1 payload byte-identically (hash fff2c9093ca4677b). Script output: .harness evidence p1/delta-proof-output.txt (workspace)."
 }

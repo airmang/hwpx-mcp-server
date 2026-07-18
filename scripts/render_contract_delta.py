@@ -50,6 +50,24 @@ FROZEN_TARGET: dict[str, Any] = {
     "contractHash": "f46ec677231b3a20",
 }
 FROZEN_BINDING_HASH = "0deefdad1aa81a68"
+# The eleven compatibility facades exactly as classified at the 4.0.0 release.
+# 4.3.0 promoted apply_table_ops/apply_body_ops to public, so this historical
+# receipt keeps its own frozen list instead of deriving it from the live
+# registry (history must not mutate with later reclassifications).
+_CANONICAL_FORM_FILL = ("analyze_form_fill", "apply_form_fill", "verify_form_fill")
+FROZEN_COMPATIBILITY_FACADES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("apply_table_ops", _CANONICAL_FORM_FILL),
+    ("apply_body_ops", _CANONICAL_FORM_FILL),
+    ("fill_form_field", _CANONICAL_FORM_FILL),
+    ("fill_by_path", _CANONICAL_FORM_FILL),
+    ("analyze_template_formfit", _CANONICAL_FORM_FILL),
+    ("apply_template_formfit", _CANONICAL_FORM_FILL),
+    ("apply_evalplan_fill", _CANONICAL_FORM_FILL),
+    ("create_government_report_document", ("create_document_from_plan",)),
+    ("create_proposal_document", ("create_document_from_plan",)),
+    ("create_comparison_table_document", ("create_document_from_plan",)),
+    ("apply_edits", ("apply_document_commands",)),
+)
 
 
 def _by_classification(classification: ToolClassification) -> list[Any]:
@@ -75,7 +93,7 @@ def build_payload() -> dict[str, Any]:
     target = _target()
     registry = bound_tool_registry()
     internal = _by_classification(ToolClassification.INTERNAL)
-    compatibility = _by_classification(ToolClassification.COMPATIBILITY)
+    live_compatibility = _by_classification(ToolClassification.COMPATIBILITY)
     deprecated = _by_classification(ToolClassification.DEPRECATED)
     removed_names = {spec.name for spec in internal}
     active_names = {spec.name for spec in TOOL_SPECS}
@@ -94,8 +112,17 @@ def build_payload() -> dict[str, Any]:
             errors.append(f"{key}: expected {expected}, got {target[key]}")
     if len(internal) != 4 or removed_names & active_names:
         errors.append("the four internal fixture-QA names must be absent from the installed contract")
-    if len(compatibility) != 11 or any(not spec.replacement_tools for spec in compatibility):
-        errors.append("all eleven compatibility facades require replacement guidance")
+    if len(FROZEN_COMPATIBILITY_FACADES) != 11 or any(
+        not replacements for _, replacements in FROZEN_COMPATIBILITY_FACADES
+    ):
+        errors.append("all eleven 4.0.0 compatibility facades require replacement guidance")
+    live_names = {spec.name for spec in live_compatibility}
+    frozen_names = {name for name, _ in FROZEN_COMPATIBILITY_FACADES}
+    if not live_names <= frozen_names:
+        errors.append(
+            "live compatibility facades outside the frozen 4.0.0 set: "
+            f"{sorted(live_names - frozen_names)}"
+        )
     if len(deprecated) != 5 or any(not spec.replacement_tools for spec in deprecated):
         errors.append("all five transition deprecations require replacement guidance")
     if runtime_hits:
@@ -135,10 +162,10 @@ def build_payload() -> dict[str, Any]:
             "aliases": [],
             "facades": [
                 {
-                    "name": spec.name,
-                    "replacementTools": list(spec.replacement_tools),
+                    "name": name,
+                    "replacementTools": list(replacements),
                 }
-                for spec in compatibility
+                for name, replacements in FROZEN_COMPATIBILITY_FACADES
             ],
             "deprecatedStubs": [
                 {

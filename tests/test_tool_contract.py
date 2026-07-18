@@ -546,7 +546,7 @@ def test_generated_versioned_contract_delta_is_current() -> None:
     }
     assert {item["name"] for item in payload["removedTools"]} == INTERNAL_FIXTURE_QA_TOOLS
     assert all(item["alias"] is None for item in payload["removedTools"])
-    assert len(payload["compatibility"]["facades"]) == 9
+    assert len(payload["compatibility"]["facades"]) == 11
     assert len(payload["compatibility"]["deprecatedStubs"]) == 5
     assert payload["compatibility"]["aliases"] == []
     assert payload["compatibility"]["ghostRegistrations"] == []
