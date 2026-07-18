@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-07-18
+
+### Changed
+- Promotes `apply_table_ops` and `apply_body_ops` from `compatibility` to
+  `public`. Both are directly consumed as core primitives of the universal
+  form-fill workflow, so the public classification states the truth; their
+  `replacementTools` guidance is cleared. The installed surface stays exactly
+  121 default / 132 advanced / 28 skill-required; baseline classification
+  moves to 110 public / 9 compatibility. The contract hash moves to
+  `f82caecbcfc742e9`; the delta is proven classification-only by payload
+  substitution in `docs/tool-contract-delta-4.3.0.json`.
+- Starts the tier-1 facade observation release: shipped skill guides now
+  route `analyze_template_formfit` / `apply_template_formfit` /
+  `fill_form_field` traffic to the canonical
+  `analyze_form_fill`/`apply_form_fill`/`verify_form_fill` trio. The three
+  tools stay registered and functional; demotion to `deprecated` is deferred
+  to the next major after observing consumption.
+- Raises the core floor to `python-hwpx>=3.3.1` (release-train alignment).
+
+### Fixed
+- `get_tables_by_handle` crashed with `AttributeError` on any document that
+  contains a table, because it read the non-existent `table.columns`
+  attribute; it now reads `column_count` and carries a regression test. Found
+  by the Pyright ramp below.
+
+### Internal
+- Decomposes the worst-complexity handlers behaviour-preservingly:
+  `_ensure_table_border_fill` (C901 57→≤10, via the private leaf
+  `ops_services/_border_fill.py`), `apply_style_to_text_ranges` (48→≤10), and
+  `matches` (29→split). The complexity ratchet baselines are lowered to match.
+- Extends Pyright to the full mypy surface (8→22 of 36 files) with itemized
+  exclusions: 9 `[schema-frozen]` handlers (implicit-Optional is the FastMCP
+  schema source; explicit-Optional conversion belongs to a contract-changing
+  release) and 5 `[dynamic-seam]` files pending a typed core seam.
+
 ## [4.2.1] - 2026-07-18
 
 ### Fixed

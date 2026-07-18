@@ -25,14 +25,14 @@ from .fastmcp_adapter import (
 )
 
 
-MIN_PYTHON_HWPX = "3.3.0"
-MIN_MCP_VERSION = "4.2.1"
+MIN_PYTHON_HWPX = "3.3.1"
+MIN_MCP_VERSION = "4.3.0"
 MIN_SKILL_VERSION = "0.5.0"
 # Frozen release receipt for non-runtime services. Runtime construction still
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "fff2c9093ca4677b"
+RELEASED_CONTRACT_HASH = "f82caecbcfc742e9"
 
 
 class ToolClassification(str, Enum):
@@ -213,10 +213,8 @@ _ADVANCED_PROFILE = _ADVANCED_CLASSIFICATION | {"plan_edit", "preview_edit", "ap
 
 _COMPATIBILITY_REPLACEMENTS: dict[str, tuple[str, ...]] = {
     "analyze_template_formfit": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
-    "apply_body_ops": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
     "apply_edits": ("apply_document_commands",),
     "apply_evalplan_fill": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
-    "apply_table_ops": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
     "apply_template_formfit": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
     "create_comparison_table_document": ("create_document_from_plan",),
     "create_government_report_document": ("create_document_from_plan",),
@@ -571,8 +569,8 @@ TOOL_SPECS = tuple(spec for spec in BASELINE_TOOL_SPECS if spec.installed)
 def _validate_classification() -> None:
     counts = classification_counts()
     expected = {
-        ToolClassification.PUBLIC.value: 108,
-        ToolClassification.COMPATIBILITY.value: 11,
+        ToolClassification.PUBLIC.value: 110,
+        ToolClassification.COMPATIBILITY.value: 9,
         ToolClassification.ADVANCED.value: 8,
         ToolClassification.DEPRECATED.value: 5,
         ToolClassification.INTERNAL.value: 4,

@@ -62,10 +62,8 @@ INTERNAL_FIXTURE_QA_TOOLS = {
 }
 COMPATIBILITY_TOOLS = {
     "analyze_template_formfit",
-    "apply_body_ops",
     "apply_edits",
     "apply_evalplan_fill",
-    "apply_table_ops",
     "apply_template_formfit",
     "create_comparison_table_document",
     "create_government_report_document",
@@ -149,14 +147,14 @@ def test_artifact_materializing_render_tools_are_marked_mutating() -> None:
 
 def test_release_contract_versions_counts_and_hash_are_exact() -> None:
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
-        "3.3.0",
-        "4.2.1",
+        "3.3.1",
+        "4.3.0",
         "0.5.0",
     )
     assert len(expected_tool_names(advanced=False)) == 121
     assert len(expected_tool_names(advanced=True)) == 132
     assert len(skill_required_tool_names()) == 28
-    assert RELEASED_CONTRACT_HASH == contract_hash() == "fff2c9093ca4677b"
+    assert RELEASED_CONTRACT_HASH == contract_hash() == "f82caecbcfc742e9"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 
@@ -164,8 +162,8 @@ def test_baseline_classification_is_disjoint_exact_and_exhaustive() -> None:
     assert len(BASELINE_TOOL_SPECS) == 136
     assert len({spec.name for spec in BASELINE_TOOL_SPECS}) == 136
     assert classification_counts() == {
-        "public": 108,
-        "compatibility": 11,
+        "public": 110,
+        "compatibility": 9,
         "advanced": 8,
         "deprecated": 5,
         "internal": 4,
@@ -548,7 +546,7 @@ def test_generated_versioned_contract_delta_is_current() -> None:
     }
     assert {item["name"] for item in payload["removedTools"]} == INTERNAL_FIXTURE_QA_TOOLS
     assert all(item["alias"] is None for item in payload["removedTools"])
-    assert len(payload["compatibility"]["facades"]) == 11
+    assert len(payload["compatibility"]["facades"]) == 9
     assert len(payload["compatibility"]["deprecatedStubs"]) == 5
     assert payload["compatibility"]["aliases"] == []
     assert payload["compatibility"]["ghostRegistrations"] == []
