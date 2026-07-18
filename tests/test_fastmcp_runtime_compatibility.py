@@ -10,7 +10,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_CONTRACT_HASH = "f909a00fe4590c64"
+EXPECTED_CONTRACT_HASH = "fff2c9093ca4677b"
 
 
 @pytest.mark.parametrize(

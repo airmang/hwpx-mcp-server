@@ -2,7 +2,22 @@
 
 ## [Unreleased]
 
-## [4.2.0] - 2026-07-18
+## [4.2.1] - 2026-07-18
+
+### Fixed
+- Repoints the hermetic CI core checkout pin from the python-hwpx 3.2.0 release
+  commit to the 3.3.0 release commit. The `v4.2.0` prepublish failed on this
+  stale pin before publication, so no 4.2.0 PyPI artifact or GitHub Release
+  exists; the tag is preserved as failure history and 4.2.1 is the actual
+  public release. The contract hash moves to `fff2c9093ca4677b` because
+  `MIN_MCP_VERSION` is part of the canonical payload; the tool surface stays
+  exactly 121 default / 132 advanced / 28 skill-required.
+
+### Note
+- The feature content of 4.2.1 is identical to the unpublished 4.2.0 entry
+  below.
+
+## [4.2.0] - 2026-07-18 (tag preserved; not published)
 
 ### Changed
 - Pins the MCP SDK exactly (`mcp==1.28.1`) so the package resolver admits the
