@@ -130,7 +130,10 @@ reportMissingTypeStubs = false
 #   release, not a typing ramp.
 # [dynamic-seam] calls cross into dynamic python-hwpx object seams (Path/str,
 #   bool/FitPolicy coercions tolerated at runtime) — needs a typed core seam
-#   before pyright basic can pass without lying.
+#   before pyright basic can pass without lying. S-084 re-measured all five
+#   against the decomposed core: 32 errors (form_fields 4, save_policy 8,
+#   tables 2, transactions 11, workflow/service.py 7 — Optional subscripts and
+#   Path/str seams), so the itemized defer stands unchanged.
 exclude = [
     "src/hwpx_mcp_server/handlers/agent_document.py",   # schema-frozen
     "src/hwpx_mcp_server/handlers/authoring.py",        # schema-frozen
