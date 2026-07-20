@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [4.3.1] - 2026-07-20
+
+### Fixed
+- workspace 루트가 설정되지 않았을 때의 cwd 폴백이 GUI MCP 클라이언트의
+  퇴화 cwd(Windows Claude Desktop의 `C:\Windows\System32`, macOS의 `/`)를
+  workspace로 삼아 — Windows에서는 모든 실제 경로가 거부되고 macOS에서는
+  전체 파일시스템이 열리는 — 두 오동작을 모두 막습니다. 이제 퇴화 cwd가
+  감지되면 `HWPX_MCP_WORKSPACE_ROOTS` 설정 예시를 담은 명확한
+  `WORKSPACE_ROOT_INVALID` 오류를 반환하고, 서버는 기동을 유지해
+  `mcp_server_health`로 원인을 확인할 수 있습니다. (#73, #77)
+
+
 ### Fixed
 - The implicit cwd workspace fallback no longer silently adopts a degenerate
   current directory. GUI MCP clients launch the server from the filesystem root
