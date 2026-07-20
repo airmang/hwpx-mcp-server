@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -825,3 +825,109 @@ def test_process_cwd_is_bounded_fallback(tmp_path: Path, monkeypatch: pytest.Mon
 def test_filesystem_root_authorization_is_rejected(root: Path) -> None:
     with pytest.raises(WorkspaceConfigurationError):
         WorkspaceResolver.from_roots([root])
+
+
+def test_degenerate_filesystem_root_cwd_fallback_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(WORKSPACE_ROOTS_ENV, raising=False)
+    monkeypatch.delenv(LEGACY_SANDBOX_ROOT_ENV, raising=False)
+    with pytest.raises(WorkspaceConfigurationError) as excinfo:
+        WorkspaceResolver.from_environment(cwd=Path(Path("/").anchor))
+    message = str(excinfo.value)
+    assert WORKSPACE_ROOTS_ENV in message
+    # The message must be actionable: it names the env var and shows an example.
+    assert "for example" in message
+    assert excinfo.value.code == "WORKSPACE_ROOT_INVALID"
+
+
+@pytest.mark.parametrize(
+    ("workspace", "expected"),
+    [
+        (PureWindowsPath(r"C:\Windows\System32"), True),
+        (PureWindowsPath(r"C:\Windows"), True),
+        (PureWindowsPath(r"C:\WINDOWS\System32\drivers"), True),
+        (PureWindowsPath("C:\\"), True),
+        (PureWindowsPath(r"C:\Docs\reports"), False),
+        (PureWindowsPath(r"D:\projects\hwpx"), False),
+    ],
+)
+def test_is_degenerate_cwd_detects_windows_system_directory(
+    workspace: PureWindowsPath, expected: bool
+) -> None:
+    # Structured to be testable on POSIX: PureWindowsPath plus an explicit
+    # system root exercise the Windows rule without running on Windows.
+    system_root = PureWindowsPath(r"C:\Windows")
+    assert (
+        workspace_module._is_degenerate_cwd(workspace, system_root=system_root)
+        is expected
+    )
+
+
+def test_is_degenerate_cwd_posix_only_flags_filesystem_root() -> None:
+    assert workspace_module._is_degenerate_cwd(Path("/"), system_root=None) is True
+    assert (
+        workspace_module._is_degenerate_cwd(Path("/srv/docs"), system_root=None)
+        is False
+    )
+
+
+def test_windows_system_directory_cwd_fallback_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(WORKSPACE_ROOTS_ENV, raising=False)
+    monkeypatch.delenv(LEGACY_SANDBOX_ROOT_ENV, raising=False)
+    # Force the Windows system-root fence on POSIX so from_environment itself
+    # rejects a System32 cwd (the real Windows Claude Desktop launch directory).
+    monkeypatch.setattr(
+        workspace_module,
+        "_windows_system_root",
+        lambda: PureWindowsPath(r"C:\Windows"),
+    )
+    with pytest.raises(WorkspaceConfigurationError) as excinfo:
+        WorkspaceResolver.from_environment(cwd=PureWindowsPath(r"C:\Windows\System32"))
+    assert WORKSPACE_ROOTS_ENV in str(excinfo.value)
+
+
+def test_explicit_roots_still_accepted_when_cwd_would_be_degenerate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Explicit configuration must remain unchanged even from a degenerate cwd.
+    monkeypatch.setenv(WORKSPACE_ROOTS_ENV, str(tmp_path))
+    resolver = WorkspaceResolver.from_environment(cwd=Path(Path("/").anchor))
+    assert resolver.roots == (tmp_path,)
+    assert resolver.source == WORKSPACE_ROOTS_ENV
+
+
+def test_unconfigured_degenerate_cwd_storage_defers_until_use(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hwpx_mcp_server.storage import LocalDocumentStorage
+
+    monkeypatch.delenv(WORKSPACE_ROOTS_ENV, raising=False)
+    monkeypatch.delenv(LEGACY_SANDBOX_ROOT_ENV, raising=False)
+    monkeypatch.chdir(Path("/").anchor)
+
+    # Construction must not raise: the server has to boot so that
+    # mcp_server_health and per-call errors stay reachable on an unconfigured
+    # degenerate cwd. The actionable error is deferred to first use.
+    storage = LocalDocumentStorage(auto_backup=False)
+
+    with pytest.raises(WorkspaceConfigurationError) as excinfo:
+        storage.resolve_path("doc.hwpx")
+    assert excinfo.value.code == "WORKSPACE_ROOT_INVALID"
+    with pytest.raises(WorkspaceConfigurationError):
+        _ = storage.workspace
+
+
+def test_explicit_invalid_env_root_fails_fast_not_deferred(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hwpx_mcp_server.storage import LocalDocumentStorage
+
+    monkeypatch.delenv(LEGACY_SANDBOX_ROOT_ENV, raising=False)
+    monkeypatch.setenv(WORKSPACE_ROOTS_ENV, str(tmp_path / "does-not-exist"))
+    # Explicit configuration errors surface at construction (fail fast); only the
+    # unconfigured cwd fallback is deferred.
+    with pytest.raises(WorkspaceConfigurationError):
+        LocalDocumentStorage(auto_backup=False)

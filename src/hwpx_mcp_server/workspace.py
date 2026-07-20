@@ -13,7 +13,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, replace
 from functools import lru_cache
-from pathlib import Path
+from pathlib import Path, PurePath, PureWindowsPath
 from typing import Iterable
 
 
@@ -306,6 +306,39 @@ def _normalize_roots(values: Iterable[str | os.PathLike[str]]) -> tuple[Path, ..
     return tuple(roots)
 
 
+def _windows_system_root() -> PureWindowsPath | None:
+    """Return the Windows system directory to fence off, or ``None`` elsewhere."""
+
+    if os.name != "nt":
+        return None
+    return PureWindowsPath(os.environ.get("SystemRoot", r"C:\Windows"))
+
+
+def _is_degenerate_cwd(
+    workspace: PurePath,
+    *,
+    system_root: PureWindowsPath | None,
+) -> bool:
+    """Return whether a cwd fallback root is an unusable degenerate location.
+
+    A degenerate root is the filesystem root itself (a path that is its own
+    parent), or — when *system_root* is provided — the Windows system directory
+    or a descendant of it. GUI MCP clients launch servers from such directories
+    (``/`` on macOS, ``C:\\Windows\\System32`` on Windows), which must never
+    become an implicit workspace root. Passing *system_root* explicitly keeps
+    the Windows rule testable on POSIX via ``PureWindowsPath``.
+    """
+
+    if workspace == workspace.parent:
+        return True
+    if system_root is not None:
+        candidate_parts = tuple(part.lower() for part in PureWindowsPath(workspace).parts)
+        system_parts = tuple(part.lower() for part in system_root.parts)
+        if system_parts and candidate_parts[: len(system_parts)] == system_parts:
+            return True
+    return False
+
+
 @dataclass(frozen=True, slots=True)
 class WorkspaceResolver:
     """Resolve relative and absolute paths inside one or more authorized roots."""
@@ -328,6 +361,14 @@ class WorkspaceResolver:
             return cls(_normalize_roots([legacy]), LEGACY_SANDBOX_ROOT_ENV)
 
         process_workspace = cwd or Path.cwd()
+        if _is_degenerate_cwd(process_workspace, system_root=_windows_system_root()):
+            raise WorkspaceConfigurationError(
+                f"the process working directory {os.fspath(process_workspace)!r} is not a "
+                f"usable HWPX workspace root; set {WORKSPACE_ROOTS_ENV} to one or more "
+                "existing document directories "
+                f'(for example {WORKSPACE_ROOTS_ENV}="~/Documents" on macOS/Linux '
+                f'or {WORKSPACE_ROOTS_ENV}="C:\\hwpx" on Windows)'
+            )
         return cls(_normalize_roots([process_workspace]), "process-cwd")
 
     @classmethod

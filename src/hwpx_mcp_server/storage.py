@@ -12,7 +12,7 @@ import zipfile
 from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Protocol, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Protocol, Tuple, cast
 from urllib import error, parse, request
 
 try:  # python-hwpx >= 2.10.3
@@ -34,6 +34,9 @@ else:
 from . import quality as quality_contract
 from .upstream import HwpxDocument, open_document, validate_document_path
 from .workspace import (
+    LEGACY_SANDBOX_ROOT_ENV,
+    WORKSPACE_ROOTS_ENV,
+    WorkspaceConfigurationError,
     WorkspaceMissingParentGuard,
     WorkspaceOutputGuard,
     WorkspaceResolver,
@@ -100,14 +103,42 @@ class LocalDocumentStorage:
     ) -> None:
         if workspace_resolver is not None and base_directory is not None:
             raise ValueError("base_directory and workspace_resolver are mutually exclusive")
-        self.workspace = workspace_resolver or (
-            WorkspaceResolver.from_roots([base_directory])
-            if base_directory is not None
-            else WorkspaceResolver.from_environment()
+        self._deferred_workspace_error: WorkspaceConfigurationError | None = None
+        if workspace_resolver is not None:
+            self._workspace: WorkspaceResolver | None = workspace_resolver
+        elif base_directory is not None:
+            self._workspace = WorkspaceResolver.from_roots([base_directory])
+        else:
+            # Implicit cwd fallback. When neither HWPX_MCP_WORKSPACE_ROOTS nor the
+            # legacy root is configured and the cwd is degenerate (e.g. a GUI MCP
+            # client launched from C:\Windows\System32 or /), defer the actionable
+            # error to first use so import and startup do not crash and
+            # mcp_server_health can still report the misconfiguration.
+            try:
+                self._workspace = WorkspaceResolver.from_environment()
+            except WorkspaceConfigurationError as exc:
+                if (
+                    os.environ.get(WORKSPACE_ROOTS_ENV) is not None
+                    or os.environ.get(LEGACY_SANDBOX_ROOT_ENV) is not None
+                ):
+                    raise
+                self._workspace = None
+                self._deferred_workspace_error = exc
+        self.base_directory = (
+            self._workspace.primary_root
+            if self._workspace is not None
+            else Path(os.devnull)
         )
-        self.base_directory = self.workspace.primary_root
         self._auto_backup = auto_backup
         self._logger = logger or logging.getLogger(__name__)
+
+    @property
+    def workspace(self) -> WorkspaceResolver:
+        if self._workspace is None:
+            # A degenerate/unconfigured cwd fallback deferred this error so the
+            # server could boot; surface it now as a clean WORKSPACE_ROOT_INVALID.
+            raise cast(WorkspaceConfigurationError, self._deferred_workspace_error)
+        return self._workspace
 
     def resolve_path(self, path: str, *, must_exist: bool = True) -> Path:
         return self.workspace.resolve(path, must_exist=must_exist)
