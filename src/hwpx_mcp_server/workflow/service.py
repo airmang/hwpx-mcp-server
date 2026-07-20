@@ -514,6 +514,12 @@ class WorkflowService:
         encoded_size = len(canonical_json(result).encode("utf-8"))
         if encoded_size <= 32 * 1024:
             return {"inline": result, "reference": None}
+        if metadata is None:
+            # get_action_result above already proved the row exists and is
+            # unexpired; action_result_metadata queries the same row, so this
+            # branch is unreachable in practice. Fail closed to the same empty
+            # envelope the missing-result paths return instead of subscripting.
+            return {"inline": None, "reference": None}
         return {
             "inline": None,
             "reference": {
@@ -534,6 +540,11 @@ class WorkflowService:
                 raise KeyError("workflow has no primary result")
         result = self.store.get_action_result(workflow_id, action_hash)
         metadata = self.store.action_result_metadata(workflow_id, action_hash)
+        if metadata is None:
+            # Same row as get_action_result above (already unexpired), so this
+            # is unreachable in practice; raise the same KeyError the store uses
+            # for an unavailable result rather than subscript None.
+            raise KeyError((workflow_id, action_hash))
         return {
             "workflowId": workflow_id,
             "actionHash": action_hash,
@@ -602,7 +613,7 @@ class WorkflowService:
             None,
         )
         if submitted is None:
-            receipt = self.render_client.submit(job, Path(record.work_order.output_path))
+            receipt = self.render_client.submit(job, Path(record.work_order.output_path or ""))
             record, _, _ = self.store.append_event(
                 record.workflow_id, "render.submitted", expected_state=record.state,
                 expected_version=record.state_version,

@@ -516,7 +516,7 @@ class FormFieldService:
                     blank,
                     content=md,
                     expected_skeleton=expected_skeleton(content, blank),
-                    run_render=(render_check and render_check != "off"),
+                    run_render=bool(render_check and render_check != "off"),
                     expected_pages=expected_pages,
                 )
                 payload["scorecard"] = card.to_dict()

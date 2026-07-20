@@ -186,7 +186,7 @@ class SavePolicy:
         """Revalidate either an exact file publication or guarded absence."""
 
         if guard.target_existed:
-            self._context.storage.read_guarded_bytes(guard)
+            self._context._local_storage().read_guarded_bytes(guard)
             return
         observed = self._capture_exact_sidecar_guard(guard.path)
         if (
@@ -215,6 +215,7 @@ class SavePolicy:
     ) -> _ExactRecoveryPublication:
         """Publish recovery bytes without overwriting an existing sidecar."""
 
+        storage = self._context._local_storage()
         safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", base_path.name)[:48]
         name_digest = hashlib.sha256(os.fsencode(base_path.name)).hexdigest()[:12]
         for _ in range(max_candidates):
@@ -228,12 +229,12 @@ class SavePolicy:
             if guard.target_existed:
                 continue
             try:
-                publication = self._context.storage.atomic_publish_bytes(
+                publication = storage.atomic_publish_bytes(
                     guard,
                     data,
                     mode=mode,
                 )
-                self._context.storage.read_guarded_bytes(publication)
+                storage.read_guarded_bytes(publication)
                 return _ExactRecoveryPublication(
                     base_path=base_path,
                     data=data,
@@ -278,10 +279,11 @@ class SavePolicy:
     ) -> tuple[bool, bool]:
         """Remove proven recoveries, republishing all if any cleanup loses CAS."""
 
+        storage = self._context._local_storage()
         for recovery in recoveries:
             try:
-                self._context.storage.read_guarded_bytes(recovery.publication)
-                self._context.storage.remove_guarded_output(recovery.publication)
+                storage.read_guarded_bytes(recovery.publication)
+                storage.remove_guarded_output(recovery.publication)
             except (FileNotFoundError, OSError, RuntimeError):
                 return False, self._republish_exact_recoveries(recoveries)
         return True, True
@@ -454,6 +456,7 @@ class SavePolicy:
             if recoveries is None:
                 return
 
+        storage = self._context._local_storage()
         for mutation in reversed(mutations):
             try:
                 self._assert_exact_sidecar_publication(mutation.publication)
@@ -461,9 +464,9 @@ class SavePolicy:
                 continue
             try:
                 if mutation.before_bytes is None:
-                    self._context.storage.remove_guarded_output(mutation.publication)
+                    storage.remove_guarded_output(mutation.publication)
                 else:
-                    self._context.storage.atomic_publish_bytes(
+                    storage.atomic_publish_bytes(
                         mutation.publication,
                         mutation.before_bytes,
                         mode=mutation.before_guard.target_mode,

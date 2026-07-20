@@ -385,7 +385,15 @@ class TransactionService:
             # Roll back only while both swap candidates are still ours. The
             # A/B recovery sidecars above remain available regardless of how
             # either publication changes during the following writes.
-            if target_owned and backup_owned:
+            # target_owned/backup_owned are only ever set once the matching
+            # publication is non-None, so the explicit checks below never alter
+            # the branch — they re-express that invariant for the type checker.
+            if (
+                target_owned
+                and backup_owned
+                and target_publication is not None
+                and backup_publication is not None
+            ):
                 try:
                     self._context.storage.atomic_publish_bytes(
                         target_publication,
@@ -436,7 +444,7 @@ class TransactionService:
             )
             local_guard = None
         target_before = (
-            self._context.storage.read_guarded_bytes(local_guard)
+            self._context._local_storage().read_guarded_bytes(local_guard)
             if local_guard is not None and local_guard.target_existed
             else None
         )
@@ -488,7 +496,8 @@ class TransactionService:
         rollback_recoveries_ready = True
         try:
             if output_precondition is not None:
-                local_guard = self._context.storage.materialize_output_guard(
+                local_storage = self._context._local_storage()
+                local_guard = local_storage.materialize_output_guard(
                     output_precondition
                 )
                 materialized_guard = local_guard
@@ -500,7 +509,7 @@ class TransactionService:
                     target_bytes=target_before,
                 )
                 backup = exact_backup.report
-                publication = self._context.storage.atomic_publish_bytes(
+                publication = local_storage.atomic_publish_bytes(
                     local_guard,
                     candidate_bytes,
                 )
@@ -544,7 +553,7 @@ class TransactionService:
                 # authorized names with the exact published identities.
                 for mutation in cast(_ExactBackupResult, exact_backup).mutations:
                     self._save._assert_exact_sidecar_publication(mutation.publication)
-                self._context.storage.read_guarded_bytes(publication)
+                self._context._local_storage().read_guarded_bytes(publication)
             all_recoveries = target_recoveries + (
                 exact_backup.recoveries if exact_backup is not None else ()
             )
@@ -559,7 +568,7 @@ class TransactionService:
                         self._save._assert_exact_sidecar_publication(
                             mutation.publication
                         )
-                    self._context.storage.read_guarded_bytes(publication)
+                    self._context._local_storage().read_guarded_bytes(publication)
             except (FileNotFoundError, OSError, RuntimeError):
                 rollback_recoveries_ready = self._save._republish_exact_recoveries(
                     all_recoveries
@@ -570,21 +579,22 @@ class TransactionService:
                 target_before is None or rollback_recoveries_ready
             )
             if target_preimage_preserved and publication is not None:
+                local_storage = self._context._local_storage()
                 try:
                     if local_guard is not None and local_guard.target_existed:
                         if target_before is not None:
                             restored_publication = (
-                                self._context.storage.atomic_publish_bytes(
+                                local_storage.atomic_publish_bytes(
                                     publication,
                                     target_before,
                                     mode=local_guard.target_mode,
                                 )
                             )
-                            self._context.storage.read_guarded_bytes(
+                            local_storage.read_guarded_bytes(
                                 restored_publication
                             )
                     else:
-                        self._context.storage.remove_guarded_output(publication)
+                        local_storage.remove_guarded_output(publication)
                 except (OSError, RuntimeError):
                     pass
             if exact_backup is not None and target_preimage_preserved:
@@ -593,7 +603,7 @@ class TransactionService:
                     preimages_preserved=rollback_recoveries_ready,
                 )
             if materialized_guard is not None:
-                self._context.storage.cleanup_owned_parent_directories(
+                self._context._local_storage().cleanup_owned_parent_directories(
                     materialized_guard
                 )
             raise

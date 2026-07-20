@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Internal
+- Brings the five former `[dynamic-seam]` files (`ops_services/{form_fields,
+  save_policy,tables,transactions}.py` and `workflow/service.py`) into the
+  Pyright gate (S-088 P2), typing-first: `DocumentStorage.save_document` gains
+  the universal `quality` kwarg; the Local-only guarded exact-sidecar publication
+  is narrowed to `LocalDocumentStorage` at the consumers; the table addressing
+  kwargs use a `TypedDict`. Behavior is preserved and the tool contract hash is
+  unchanged. Only the 9 `[schema-frozen]` handlers remain excluded from Pyright.
+
 ## [4.3.2] - 2026-07-21
 
 ### Notes

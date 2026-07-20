@@ -86,7 +86,9 @@ class DocumentStorage(Protocol):
     def open_document(self, path: str) -> Tuple[HwpxDocument, Path]:
         """Open the document located at *path* and return it with the resolved path."""
 
-    def save_document(self, document: HwpxDocument, target: Path) -> Dict[str, Any]:
+    def save_document(
+        self, document: HwpxDocument, target: Path, *, quality: Any = None
+    ) -> Dict[str, Any]:
         """Persist *document* to *target* using backend specific rules."""
 
 

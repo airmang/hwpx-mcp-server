@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from ..hwp_support import HwpBinaryError, extract_hwp_text
 from ..core.locator import RegisteredHandle
 from ..core.context import default_session_lifecycle_policy
-from ..storage import DocumentStorage
+from ..storage import DocumentStorage, LocalDocumentStorage
 from ..workspace import (
     WorkspacePathError,
 )
@@ -42,6 +42,24 @@ class DocumentContext:
     @property
     def registered_handles(self) -> Dict[str, RegisteredHandle]:
         return self._registered_handles
+
+    def _local_storage(self) -> LocalDocumentStorage:
+        """Return :attr:`storage` narrowed to the local filesystem backend.
+
+        Guarded exact-sidecar publication (``atomic_publish_bytes`` /
+        ``read_guarded_bytes`` / ``remove_guarded_output`` /
+        ``materialize_output_guard`` / ``cleanup_owned_parent_directories``) is a
+        filesystem-workspace capability only :class:`LocalDocumentStorage`
+        provides; non-local backends route through their own fallback paths.
+        Every caller reaches these methods only after an ``isinstance`` gate or
+        ``_capture_exact_sidecar_guard`` has already established the local
+        backend, so this re-expresses that invariant for the type checker and
+        fails closed with the same error the sidecar machinery already raises.
+        """
+        storage = self.storage
+        if not isinstance(storage, LocalDocumentStorage):
+            raise TypeError("exact sidecar operations require local storage")
+        return storage
 
     def _new_error(
         self,
