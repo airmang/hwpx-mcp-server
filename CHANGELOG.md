@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+- `render_preview` gains an additive optional `viewer` parameter (default
+  `false`). When `true`, the manifest carries a self-contained scrollable
+  document viewer under `structuredContent.viewer` — a sticky top bar, live
+  page indicator, continuous scroll, and equations rendered as native MathML
+  (with `python-hwpx[preview]`; the core chain fails closed to a LaTeX/script
+  code block otherwise, never a silent drop). The viewer HTML is written to a
+  workspace-guarded `viewer.html` and returned inline under a byte cap that
+  degrades to path-only. `viewer.equationRendering` reports honest
+  MathML/latex/script fallback counts. The parameter is orthogonal to
+  rasterization; pair with `screenshot="off"` for the lightweight text path.
+  Non-HWPX inputs and out-of-workspace writes are rejected by the existing
+  guards. The contract hash moves to `c89cbc5f98eb5367`; the delta is proven
+  additive-only (one tool, one optional input parameter plus one optional
+  output field) in `docs/tool-contract-delta-4.4.0.json`.
+
 ## [4.3.2] - 2026-07-21
 
 ### Notes

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "hwpx.tool-contract-delta.v2",
+  "release": "4.4.0",
+  "changeKind": "additive-optional-parameter",
+  "releaseStatus": "pre-release-proof",
+  "note": "S-092 P3. Pre-release receipt: RELEASED_CONTRACT_HASH stays frozen at the 4.3.x value; the live surface carries PENDING_CONTRACT_HASH. The released constant flips only when the release train ships 4.4.0 (P5). No version bump in this branch.",
+  "baseline": {
+    "versions": {
+      "pythonHwpx": "3.3.1",
+      "mcpServer": "4.3.2",
+      "skill": "0.5.0"
+    },
+    "defaultToolCount": 121,
+    "advancedToolCount": 132,
+    "skillRequiredToolCount": 28,
+    "classificationCounts": {
+      "public": 110,
+      "compatibility": 9,
+      "advanced": 8,
+      "deprecated": 5,
+      "internal": 4
+    },
+    "contractHash": "f82caecbcfc742e9"
+  },
+  "target": {
+    "versions": {
+      "pythonHwpx": "3.3.1",
+      "mcpServer": "4.4.0",
+      "skill": "0.5.0"
+    },
+    "defaultToolCount": 121,
+    "advancedToolCount": 132,
+    "skillRequiredToolCount": 28,
+    "classificationCounts": {
+      "public": 110,
+      "compatibility": 9,
+      "advanced": 8,
+      "deprecated": 5,
+      "internal": 4
+    },
+    "contractHash": "c89cbc5f98eb5367"
+  },
+  "delta": {
+    "defaultToolCount": 0,
+    "advancedToolCount": 0,
+    "skillRequiredToolCount": 0,
+    "removedTools": [],
+    "addedTools": [],
+    "promotedTools": [],
+    "profileMoves": []
+  },
+  "changedTools": [
+    {
+      "name": "render_preview",
+      "domain": "verify_quality",
+      "classification": "public",
+      "classificationChanged": false,
+      "profileChanged": false,
+      "mutatesChanged": false,
+      "skillRequiredChanged": false,
+      "changedFields": ["inputSchema", "outputSchema"],
+      "addedInputParameters": [
+        {
+          "name": "viewer",
+          "type": "boolean",
+          "default": false,
+          "required": false
+        }
+      ],
+      "addedOutputFields": [
+        {
+          "name": "viewer",
+          "type": "object",
+          "required": false,
+          "model": "RenderPreviewViewer",
+          "description": "Self-contained scrollable document viewer (equations as native MathML when python-hwpx[preview] is present) with honest fidelity-tier counts; emitted only when viewer=true."
+        }
+      ]
+    }
+  ],
+  "coreDependency": {
+    "capability": "hwpx.tools.document_viewer.render_document_viewer + hwpx.equation ([preview] extra for MathML)",
+    "floorBumped": false,
+    "failClosed": "viewer=true against a core build without the viewer raises RENDER_PREVIEW_VIEWER_UNAVAILABLE; MathML absence fails closed to a LaTeX/script code block (never a silent drop). MIN_PYTHON_HWPX stays 3.3.1 in this branch."
+  },
+  "proof": "Holding version coordinates, classification, counts, domains, and every other tool fixed, the canonical payload delta is confined to render_preview: its inputSchema gains one optional boolean property (viewer, default false) and its outputSchema gains one optional object property (viewer -> RenderPreviewViewer $def). No tool is added, removed, renamed, or reclassified; mutation/profile/skill-required flags are unchanged. Regenerating the ToolSpec docs moved exactly one row: docs/tool-contract.md changed only the render_preview schema-hash cell plus the header contract hash; docs/tool-contract.generated.json changed no tool 'name' entry and only added the viewer input/output schema fragments plus the top-level contractHash. Contract hash f82caecbcfc742e9 -> c89cbc5f98eb5367."
+}
