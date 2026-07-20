@@ -91,13 +91,18 @@ pip install "hwpx-mcp-server[ingest]"
   "mcpServers": {
     "hwpx": {
       "command": "uvx",
-      "args": ["hwpx-mcp-server"]
+      "args": ["hwpx-mcp-server"],
+      "env": {
+        "HWPX_MCP_WORKSPACE_ROOTS": "[\"~/Documents\"]"
+      }
     }
   }
 }
 ```
 
-환경 변수를 넘길 때는 `env` 블록을 추가합니다.
+`HWPX_MCP_WORKSPACE_ROOTS`에는 문서가 있는 폴더(절대경로 또는 `~`)를 지정하세요. Windows는 `"[\"C:\\\\hwpx\"]"`처럼 씁니다. 값을 비워 두면 서버는 실행 위치(cwd)를 root로 쓰려 하지만, Claude Desktop 같은 GUI 클라이언트는 서버를 시스템 디렉터리(Windows `C:\Windows\System32`, macOS `/`)에서 띄우므로 이런 degenerate cwd는 거부되고 모든 문서 경로가 막힙니다. 그래서 처음부터 이 값을 설정하는 것을 권장합니다.
+
+환경 변수를 더 넘길 때는 `env` 블록에 항목을 추가합니다.
 
 ```json
 {
@@ -106,9 +111,9 @@ pip install "hwpx-mcp-server[ingest]"
       "command": "uvx",
       "args": ["hwpx-mcp-server"],
       "env": {
+        "HWPX_MCP_WORKSPACE_ROOTS": "[\"~/Documents\"]",
         "HWPX_MCP_MAX_CHARS": "12000",
         "HWPX_MCP_ADVANCED": "0",
-        "HWPX_MCP_WORKSPACE_ROOTS": "[\"/absolute/path/to/workspace\"]",
         "LOG_LEVEL": "INFO"
       }
     }
@@ -174,7 +179,7 @@ pip install "hwpx-mcp-server[ingest]"
 | `HWPX_MCP_MAX_CHARS` | 텍스트 반환 도구 기본 최대 길이 | `10000` |
 | `HWPX_MCP_AUTOBACKUP` | `1`이면 저장 전 `.bak` 백업 생성 | `1` |
 | `HWPX_MCP_ADVANCED` | `1`이면 고급 도구 활성화 | `0` |
-| `HWPX_MCP_WORKSPACE_ROOTS` | 허용할 workspace 절대경로의 JSON 배열(복수 root 지원). 상대경로는 첫 root 기준 | unset(프로세스 cwd) |
+| `HWPX_MCP_WORKSPACE_ROOTS` | 허용할 workspace 절대경로의 JSON 배열(복수 root 지원). 상대경로는 첫 root 기준 | unset → 프로세스 cwd. 단 cwd가 degenerate(파일시스템 루트, Windows 시스템 디렉터리)면 `WORKSPACE_ROOT_INVALID`로 거부하니 이 값 설정을 권장 |
 | `HWPX_MCP_SANDBOX_ROOT` | 단일 root 구버전 호환 변수. 새 설정에서는 `HWPX_MCP_WORKSPACE_ROOTS` 사용 | unset |
 | `HWPX_MCP_FETCH_TIMEOUT_SECONDS` | URL 기반 HWPX fetch timeout | `20.0` |
 | `HWPX_MCP_ALLOW_PRIVATE_NETWORK` | `1`이면 신뢰된 사설/루프백 HTTPS 대상 허용. 링크로컬·metadata·예약 주소는 계속 차단 | `0` |

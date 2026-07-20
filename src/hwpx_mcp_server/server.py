@@ -17,7 +17,6 @@ from .tool_bindings import TOOL_BINDINGS
 from .workspace import (
     WORKSPACE_ROOTS_ENV,
     WorkspaceConfigurationError,
-    WorkspaceResolver,
 )
 
 
@@ -230,20 +229,17 @@ def main(argv: list[str] | None = None) -> None:
     if args.workspace_root:
         os.environ[WORKSPACE_ROOTS_ENV] = json.dumps(args.workspace_root)
     try:
-        resolver = WorkspaceResolver.from_environment()
+        storage = LocalDocumentStorage(auto_backup=False)
     except WorkspaceConfigurationError as exc:
+        # Explicit HWPX_MCP_WORKSPACE_ROOTS / --workspace-root configuration is
+        # invalid: fail fast so the operator fixes the value. An unconfigured
+        # degenerate cwd instead defers inside LocalDocumentStorage so the server
+        # still boots and every document tool call reports WORKSPACE_ROOT_INVALID.
         parser.error(
             f"invalid HWPX workspace configuration: {exc}. "
             f"Set {WORKSPACE_ROOTS_ENV} to existing project directories or launch from the project workspace."
         )
-    _replace_ops(
-        HwpxOps(
-            storage=LocalDocumentStorage(
-                workspace_resolver=resolver,
-                auto_backup=False,
-            )
-        )
-    )
+    _replace_ops(HwpxOps(storage=storage))
 
     selected_transport = args.transport
     if selected_transport == "http":

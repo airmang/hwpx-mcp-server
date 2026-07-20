@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Fixed
+- The implicit cwd workspace fallback no longer silently adopts a degenerate
+  current directory. GUI MCP clients launch the server from the filesystem root
+  (`/` on macOS) or the Windows system directory (`C:\Windows\System32`), which
+  made every real document path rejected as "outside the authorized workspace
+  roots" (unusable for unconfigured Windows users) or — at the filesystem root —
+  unbounded, defeating the fail-closed design. When neither
+  `HWPX_MCP_WORKSPACE_ROOTS` nor the legacy `HWPX_MCP_SANDBOX_ROOT` is configured
+  and the cwd is degenerate, `WorkspaceResolver.from_environment` now raises
+  `WORKSPACE_ROOT_INVALID` with an actionable message naming
+  `HWPX_MCP_WORKSPACE_ROOTS` and a short example. Explicit configuration
+  behaviour is unchanged. (#73, refs #56)
+
+### Changed
+- An unconfigured degenerate cwd no longer crashes import or startup:
+  `LocalDocumentStorage` defers the error so the server still boots,
+  `mcp_server_health` reports the misconfiguration, and each document tool call
+  returns the clean `WORKSPACE_ROOT_INVALID`. Explicit configuration errors
+  still fail fast at startup.
+- The README Claude Desktop / MCP client quickstart now sets
+  `HWPX_MCP_WORKSPACE_ROOTS` from the start so new users avoid the cwd fallback.
+
 ## [4.3.0] - 2026-07-18
 
 ### Changed
