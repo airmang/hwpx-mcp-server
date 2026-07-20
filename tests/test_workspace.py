@@ -14,6 +14,7 @@ from hwpx_mcp_server.workspace import (
     WorkspaceConfigurationError,
     WorkspacePathError,
     WorkspaceResolver,
+    _normalize_path_input,
 )
 
 
@@ -30,6 +31,30 @@ def test_relative_absolute_and_multi_root_resolution(tmp_path: Path) -> None:
     assert resolver.resolve(secondary / "inside.hwpx") == secondary / "inside.hwpx"
     assert resolver.display_path(primary / "inside.hwpx") == "inside.hwpx"
     assert resolver.display_path(secondary / "inside.hwpx") == str(secondary / "inside.hwpx")
+
+
+def test_workspace_path_input_normalization(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    document = root / "inside document.hwpx"
+    document.write_bytes(b"document")
+    resolver = WorkspaceResolver.from_roots([root])
+
+    assert resolver.resolve(f'"{document.as_uri()}"') == document.resolve()
+    assert (
+        _normalize_path_input(
+            r"file:///C:/Users/example/Documents/inside%20document.hwpx",
+            windows=True,
+        )
+        == r"C:\Users\example\Documents\inside document.hwpx"
+    )
+    assert (
+        _normalize_path_input(
+            r"'C:/Users/example\Documents/inside document.hwpx'",
+            windows=True,
+        )
+        == r"C:\Users\example\Documents\inside document.hwpx"
+    )
 
 
 def test_missing_output_parent_is_created_inside_root(tmp_path: Path) -> None:

@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path, PurePath, PureWindowsPath
 from typing import Iterable
+from urllib.parse import unquote, urlsplit
 
 
 WORKSPACE_ROOTS_ENV = "HWPX_MCP_WORKSPACE_ROOTS"
@@ -306,6 +307,28 @@ def _normalize_roots(values: Iterable[str | os.PathLike[str]]) -> tuple[Path, ..
     return tuple(roots)
 
 
+def _normalize_path_input(
+    value: str | os.PathLike[str], *, windows: bool | None = None
+) -> str:
+    """Normalize common local-path forms before workspace authorization."""
+
+    text = os.fspath(value).strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
+        text = text[1:-1].strip()
+
+    parsed = urlsplit(text)
+    if parsed.scheme.lower() == "file":
+        path = unquote(parsed.path)
+        text = f"//{parsed.netloc}{path}" if parsed.netloc else path
+
+    use_windows = os.name == "nt" if windows is None else windows
+    if use_windows:
+        if len(text) >= 3 and text[0] == "/" and text[1].isalpha() and text[2] == ":":
+            text = text[1:]
+        text = text.replace("/", "\\")
+    return text
+
+
 def _windows_system_root() -> PureWindowsPath | None:
     """Return the Windows system directory to fence off, or ``None`` elsewhere."""
 
@@ -385,7 +408,7 @@ class WorkspaceResolver:
         return self.roots[0]
 
     def _candidate(self, value: str | os.PathLike[str]) -> Path:
-        text = os.fspath(value)
+        text = _normalize_path_input(value)
         if not text or not text.strip() or "\0" in text:
             raise WorkspacePathError(
                 "workspace path must be a non-empty filesystem path",
