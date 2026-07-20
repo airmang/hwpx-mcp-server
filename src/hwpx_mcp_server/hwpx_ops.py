@@ -1297,6 +1297,7 @@ class HwpxOps:
         max_pages: Optional[int] = None,
         embed_images: bool = False,
         max_image_bytes: Optional[int] = None,
+        viewer: bool = False,
     ) -> Dict[str, Any]:
         """Generate layout-aware HTML and optional PNG preview artifacts.
 
@@ -1304,9 +1305,20 @@ class HwpxOps:
         an ``imageBase64``/``imageMime`` payload (bounded by *max_image_bytes*,
         defaulting to ``_DEFAULT_MAX_PREVIEW_IMAGE_BYTES``) so a caller can return
         the page as an inline image content block.
+
+        When *viewer* is true, the manifest also carries a self-contained
+        scrollable document viewer under ``viewer`` (equations as native MathML
+        with ``python-hwpx[preview]``).
         """
         return self._services.preview_export.render_preview(
-            path, output_dir, mode, screenshot, max_pages, embed_images, max_image_bytes
+            path,
+            output_dir,
+            mode,
+            screenshot,
+            max_pages,
+            embed_images,
+            max_image_bytes,
+            viewer,
         )
 
     def make_blank(self, out: str) -> Dict[str, Any]:

@@ -25,6 +25,7 @@ from hwpx_mcp_server.tool_contract import (
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
+    PENDING_CONTRACT_HASH,
     RELEASED_CONTRACT_HASH,
     ToolClassification,
     ToolAvailability,
@@ -154,7 +155,11 @@ def test_release_contract_versions_counts_and_hash_are_exact() -> None:
     assert len(expected_tool_names(advanced=False)) == 121
     assert len(expected_tool_names(advanced=True)) == 132
     assert len(skill_required_tool_names()) == 28
-    assert RELEASED_CONTRACT_HASH == contract_hash() == "f82caecbcfc742e9"
+    # Pre-release surface change: the render_preview viewer parameter moves the
+    # live contract hash to PENDING_CONTRACT_HASH while the frozen released
+    # receipt stays put until the release train collapses the two (P5).
+    assert RELEASED_CONTRACT_HASH == "f82caecbcfc742e9"
+    assert contract_hash() == PENDING_CONTRACT_HASH == "c89cbc5f98eb5367"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 

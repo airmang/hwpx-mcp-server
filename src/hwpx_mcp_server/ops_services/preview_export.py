@@ -12,7 +12,7 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, Mapping, Optional, Sequence
 
 from ..hwp_converter import HwpConversionError, convert_hwp_to_hwpx
 from ..upstream import (
@@ -33,11 +33,29 @@ except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
 else:
     _LAYOUT_PREVIEW_IMPORT_ERROR = None
 
+try:  # python-hwpx >= document viewer feature ([preview] extra for MathML)
+    from hwpx.tools.document_viewer import (
+        render_document_viewer as render_hwpx_document_viewer,
+    )
+except Exception as exc:  # pragma: no cover - depends on installed python-hwpx
+    render_hwpx_document_viewer = None
+    _DOCUMENT_VIEWER_IMPORT_ERROR: Exception | None = exc
+else:
+    _DOCUMENT_VIEWER_IMPORT_ERROR = None
+
+try:  # optional MathML converter (python-hwpx[preview])
+    from hwpx.equation import latex2mathml_available as _latex2mathml_available
+except Exception:  # pragma: no cover - depends on installed python-hwpx
+    _latex2mathml_available = None
+
 _PREVIEW_SCHEMA_VERSION = "hwpx.render-preview.v1"
 _VISUAL_REVIEW_SCHEMA_VERSION = "hwpx.visual-review.v1"
 # Cap for inline-embedded preview PNGs (per page). Oversized pages keep their
 # on-disk path but skip the base64 payload so a response can't balloon.
 _DEFAULT_MAX_PREVIEW_IMAGE_BYTES = 6 * 1024 * 1024
+# Cap for the inline viewer HTML copy. The viewer is always written to disk, so
+# an oversized document degrades to "path only" instead of bloating the response.
+_DEFAULT_MAX_VIEWER_HTML_BYTES = 2 * 1024 * 1024
 _CSS_PX_PER_MM = 96 / 25.4
 _CHROME_CANDIDATES = (
     "chromium",
@@ -78,6 +96,56 @@ def _write_json(path: Path, payload: Dict[str, Any]) -> None:
     path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+
+
+# The core equation renderer stamps every equation span with a ``data-eq-mode``
+# marker (``mathml`` on success, ``latex``/``script`` on the fail-closed
+# fallbacks). Counting those markers gives an honest fidelity summary without a
+# new core API.
+_EQ_MODE_KEYS: dict[str, str] = {
+    "mathml": "mathml",
+    "latex": "latexFallback",
+    "script": "scriptFallback",
+}
+
+
+def _count_equation_modes(html: str) -> dict[str, int]:
+    """Summarize equation render fidelity by counting ``data-eq-mode`` markers."""
+
+    return {
+        key: html.count(f'data-eq-mode="{mode}"') for mode, key in _EQ_MODE_KEYS.items()
+    }
+
+
+def _equation_tier(counts: Mapping[str, int]) -> str:
+    """Honest worst-case equation tier for the fidelity label."""
+
+    if sum(counts.values()) == 0:
+        return "none"
+    if counts.get("scriptFallback"):
+        return "script-fallback"
+    if counts.get("latexFallback"):
+        return "latex-fallback"
+    return "mathml"
+
+
+def _lean_disk_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
+    """Copy *manifest* for on-disk persistence without the inline payloads.
+
+    The manifest.json never carries the base64 page PNGs or the inline viewer
+    HTML — those live in the response (and, for the viewer, in ``viewer.html``).
+    """
+    disk_manifest = dict(manifest)
+    disk_manifest["screenshots"] = [
+        {key: value for key, value in shot.items() if key != "imageBase64"}
+        for shot in manifest.get("screenshots", [])
+    ]
+    viewer_block = manifest.get("viewer")
+    if isinstance(viewer_block, dict):
+        disk_manifest["viewer"] = {
+            key: value for key, value in viewer_block.items() if key != "html"
+        }
+    return disk_manifest
 
 
 class PreviewExportService:
@@ -265,6 +333,61 @@ class PreviewExportService:
             "message": message,
         }
 
+    def _build_viewer_block(
+        self,
+        source_path: Path,
+        mode: str,
+        output_path: Path,
+        *,
+        max_viewer_bytes: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Render the self-contained scrollable document viewer for the manifest.
+
+        The viewer HTML is always written to ``viewer.html`` inside the resolved
+        (workspace-guarded) output directory; the inline ``html`` copy is dropped
+        when it exceeds *max_viewer_bytes* (default
+        ``_DEFAULT_MAX_VIEWER_HTML_BYTES``) so a response cannot balloon.
+        """
+        if render_hwpx_document_viewer is None:
+            raise self._context._new_error(
+                "RENDER_PREVIEW_VIEWER_UNAVAILABLE",
+                "Installed python-hwpx does not expose hwpx.tools.document_viewer.",
+                details={"importError": str(_DOCUMENT_VIEWER_IMPORT_ERROR)},
+                hint="Install python-hwpx[preview] and restart the MCP server.",
+            )
+        cap = (
+            max_viewer_bytes
+            if max_viewer_bytes is not None
+            else _DEFAULT_MAX_VIEWER_HTML_BYTES
+        )
+        viewer = render_hwpx_document_viewer(
+            source_path, title=source_path.name, mode=mode
+        )
+        html = viewer.html
+        byte_size = len(html.encode("utf-8"))
+        viewer_path = output_path / "viewer.html"
+        viewer_path.write_text(html, encoding="utf-8")
+
+        equation_rendering = _count_equation_modes(html)
+        library_available = bool(_latex2mathml_available and _latex2mathml_available())
+        block: Dict[str, Any] = {
+            "viewerPath": self._context._relative_path(viewer_path),
+            "byteSize": byte_size,
+            "pageCount": viewer.page_count,
+            "warnings": list(viewer.preview.warnings),
+            "fidelityTier": (
+                "text-approx-pagination; "
+                f"equations={_equation_tier(equation_rendering)}"
+            ),
+            "equationLibrary": "latex2mathml" if library_available else "absent",
+            "equationRendering": equation_rendering,
+        }
+        if byte_size > cap:
+            block["htmlOmitted"] = "exceeds_max_viewer_bytes"
+        else:
+            block["html"] = html
+        return block
+
     def render_preview(
         self,
         path: str,
@@ -274,6 +397,8 @@ class PreviewExportService:
         max_pages: Optional[int] = None,
         embed_images: bool = False,
         max_image_bytes: Optional[int] = None,
+        viewer: bool = False,
+        max_viewer_bytes: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Generate layout-aware HTML and optional PNG preview artifacts.
 
@@ -281,6 +406,12 @@ class PreviewExportService:
         an ``imageBase64``/``imageMime`` payload (bounded by *max_image_bytes*,
         defaulting to ``_DEFAULT_MAX_PREVIEW_IMAGE_BYTES``) so a caller can return
         the page as an inline image content block.
+
+        When *viewer* is true, a self-contained scrollable document viewer
+        (equations rendered as native MathML when ``python-hwpx[preview]`` is
+        installed) is added to the manifest under ``viewer``. The viewer is
+        orthogonal to rasterization; pair it with ``screenshot="off"`` for the
+        lightweight text path.
         """
         if embed_images and max_image_bytes is None:
             max_image_bytes = _DEFAULT_MAX_PREVIEW_IMAGE_BYTES
@@ -411,13 +542,12 @@ class PreviewExportService:
             "warnings": list(preview.warnings),
             "suggestion": suggestion,
         }
-        # Keep the on-disk manifest lean — never persist inline base64 payloads.
-        disk_manifest = dict(manifest)
-        disk_manifest["screenshots"] = [
-            {key: value for key, value in shot.items() if key != "imageBase64"}
-            for shot in screenshots
-        ]
-        _write_json(manifest_path, disk_manifest)
+        if viewer:
+            manifest["viewer"] = self._build_viewer_block(
+                source_path, mode, output_path, max_viewer_bytes=max_viewer_bytes
+            )
+        # Keep the on-disk manifest lean — never persist inline base64/HTML payloads.
+        _write_json(manifest_path, _lean_disk_manifest(manifest))
         return manifest
 
     def convert_hwp_to_hwpx(

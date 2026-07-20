@@ -41,7 +41,7 @@ EXPECTED_SERVICE_LINES = {
     "memo_style.py": 477,
     "package_validation.py": 166,
     "planning.py": 201,
-    "preview_export.py": 453,
+    "preview_export.py": 583,
     "read_query.py": 601,
     "save_policy.py": 601,
     "tables.py": 526,
@@ -49,7 +49,7 @@ EXPECTED_SERVICE_LINES = {
 }
 
 EXPECTED_FACADE_LINES = {
-    "hwpx_ops.py": 1422,
+    "hwpx_ops.py": 1434,
     "server.py": 272,
 }
 
@@ -116,7 +116,7 @@ EXPECTED_C901 = (
     ("src/hwpx_mcp_server/handlers/tracked_changes.py", "add_tracked_edit", 12),
     ("src/hwpx_mcp_server/ops_services/form_fields.py", "apply_evalplan_fill", 11),
     ("src/hwpx_mcp_server/ops_services/memo_style.py", "_split_run", 12),
-    ("src/hwpx_mcp_server/ops_services/preview_export.py", "render_preview", 15),
+    ("src/hwpx_mcp_server/ops_services/preview_export.py", "render_preview", 16),
     ("src/hwpx_mcp_server/ops_services/read_query.py", "analyze_template_structure", 13),
     ("src/hwpx_mcp_server/ops_services/read_query.py", "find", 20),
     ("src/hwpx_mcp_server/ops_services/read_query.py", "get_paragraphs", 11),

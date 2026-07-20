@@ -171,12 +171,20 @@ def render_preview(
     max_pages: int | None = None,
     embed_images: bool = True,
     max_image_bytes: int | None = None,
+    viewer: bool = False,
 ) -> Annotated[mcp_types.CallToolResult, RenderPreviewOutput]:
     """레이아웃 충실 HTML과 headless browser PNG 프리뷰 산출물을 생성합니다.
 
     embed_images 가 참이면 각 페이지 PNG 를 인라인 이미지 콘텐츠 블록으로 함께
     반환해 (한컴/ComputerUse 없이) 모델이 레이아웃을 직접 볼 수 있습니다. 구조화
     매니페스트(JSON)는 structuredContent 로 그대로 유지됩니다.
+
+    viewer 가 참이면 매니페스트에 자체완결 스크롤 문서 뷰어(수식은
+    python-hwpx[preview] 설치 시 네이티브 MathML)를 workspace 안의
+    viewer.html 로 쓰고 structuredContent.viewer 로 함께 반환합니다. 뷰어는
+    래스터화와 독립이므로 가벼운 텍스트 경로에는 screenshot="off" 와 함께
+    쓰세요. viewer.equationRendering 은 MathML/latex/script 폴백 개수로 충실도
+    티어를 정직하게 표면화합니다.
     """
     manifest = RUNTIME_SERVICES.ops.render_preview(
         path=filename,
@@ -186,6 +194,7 @@ def render_preview(
         max_pages=max_pages,
         embed_images=embed_images,
         max_image_bytes=max_image_bytes,
+        viewer=viewer,
     )
 
     images: list[mcp_types.ImageContent] = []
