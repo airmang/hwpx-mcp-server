@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "4.3.2"
+version = "4.4.0"
 description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
@@ -123,17 +123,16 @@ include = [
 reportMissingTypeStubs = false
 
 # Itemized residual exclusions (S-082). Every file below stays under mypy
-# (implicit_optional=true); pyright is deferred for exactly one of two reasons:
+# (implicit_optional=true); pyright is deferred for exactly one reason:
 # [schema-frozen] tool-facing signatures use implicit-Optional defaults that
 #   generate the advertised FastMCP input schemas — rewriting them to explicit
 #   Optional changes the published contract and belongs to a contract-changing
 #   release, not a typing ramp.
-# [dynamic-seam] calls cross into dynamic python-hwpx object seams (Path/str,
-#   bool/FitPolicy coercions tolerated at runtime) — needs a typed core seam
-#   before pyright basic can pass without lying. S-084 re-measured all five
-#   against the decomposed core: 32 errors (form_fields 4, save_policy 8,
-#   tables 2, transactions 11, workflow/service.py 7 — Optional subscripts and
-#   Path/str seams), so the itemized defer stands unchanged.
+# The former [dynamic-seam] set (ops_services/{form_fields,save_policy,tables,
+#   transactions}.py and workflow/service.py) is resolved (S-088 P2): the core
+#   Path/str seam is typed and the guarded exact-sidecar publication is narrowed
+#   to LocalDocumentStorage at the consumers, so all five now pass pyright basic
+#   inside the gate with no exclusion.
 exclude = [
     "src/hwpx_mcp_server/handlers/agent_document.py",   # schema-frozen
     "src/hwpx_mcp_server/handlers/authoring.py",        # schema-frozen
@@ -144,9 +143,4 @@ exclude = [
     "src/hwpx_mcp_server/handlers/read_export.py",      # schema-frozen
     "src/hwpx_mcp_server/handlers/specialized.py",      # schema-frozen
     "src/hwpx_mcp_server/handlers/workflow.py",         # schema-frozen
-    "src/hwpx_mcp_server/ops_services/form_fields.py",  # dynamic-seam
-    "src/hwpx_mcp_server/ops_services/save_policy.py",  # dynamic-seam
-    "src/hwpx_mcp_server/ops_services/tables.py",       # dynamic-seam (FitPolicy)
-    "src/hwpx_mcp_server/ops_services/transactions.py", # dynamic-seam
-    "src/hwpx_mcp_server/workflow/service.py",          # dynamic-seam
 ]

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import math
 import re as _re
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, TypedDict
 from xml.etree import ElementTree as ET
 
 from ..upstream import (
@@ -27,6 +27,19 @@ from .save_policy import SavePolicy
 from .memo_style import MemoStyleService
 
 logger = logging.getLogger("hwpx_mcp_server.hwpx_ops")
+
+
+class _CellAddressingKwargs(TypedDict, total=False):
+    """Optional addressing flags forwarded to ``HwpxOxmlTable.set_cell_text``.
+
+    Restricting the mapping to these two keys keeps ``**kwargs`` from being read
+    as also supplying ``fit`` (a ``FitPolicy | None`` parameter), which a bare
+    ``Dict[str, bool]`` would imply.
+    """
+
+    logical: bool
+    split_merged: bool
+
 
 _CELL_TEXT_ILLEGAL = _re.compile(r"[\x00-\x08\x09\x0b\x0c\x0d\x0e-\x1f\ufffe\uffff]")
 
@@ -351,7 +364,7 @@ class TableService:
                 "tableIndex out of range",
                 details={"tableIndex": table_index},
             ) from exc
-        kwargs: Dict[str, bool] = {}
+        kwargs: _CellAddressingKwargs = {}
         if logical is not None:
             kwargs["logical"] = logical
         if split_merged is not None:
@@ -395,7 +408,7 @@ class TableService:
                 "tableIndex out of range",
                 details={"tableIndex": table_index},
             ) from exc
-        kwargs: Dict[str, bool] = {}
+        kwargs: _CellAddressingKwargs = {}
         if logical is not None:
             kwargs["logical"] = logical
         if split_merged is not None:

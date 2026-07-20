@@ -32,7 +32,7 @@ MIN_SKILL_VERSION = "0.5.0"
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "f82caecbcfc742e9"
+RELEASED_CONTRACT_HASH = "c89cbc5f98eb5367"
 # Pre-release live-surface receipt. This branch adds one additive optional
 # parameter (``render_preview.viewer``) plus its optional ``viewer`` output
 # block, which moves the live ``contract_hash()`` off the frozen released hash.
@@ -40,7 +40,6 @@ RELEASED_CONTRACT_HASH = "f82caecbcfc742e9"
 # docs/tool-contract-delta-4.4.0.json); until then the surface-changing branch
 # records the pending hash here so the tests that pin ``contract_hash()`` follow
 # the live surface without prematurely claiming the release receipt.
-PENDING_CONTRACT_HASH = "c89cbc5f98eb5367"
 
 
 class ToolClassification(str, Enum):
@@ -937,7 +936,6 @@ __all__ = [
     "MIN_MCP_VERSION",
     "MIN_PYTHON_HWPX",
     "MIN_SKILL_VERSION",
-    "PENDING_CONTRACT_HASH",
     "RegisteredToolRegistry",
     "RELEASED_CONTRACT_HASH",
     "SchemaBinding",

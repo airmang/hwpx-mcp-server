@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-07-21
+
 ### Added
 - `render_preview` gains an additive optional `viewer` parameter (default
   `false`). When `true`, the manifest carries a self-contained scrollable
@@ -17,6 +19,15 @@
   guards. The contract hash moves to `c89cbc5f98eb5367`; the delta is proven
   additive-only (one tool, one optional input parameter plus one optional
   output field) in `docs/tool-contract-delta-4.4.0.json`.
+
+### Internal
+- Brings the five former `[dynamic-seam]` files (`ops_services/{form_fields,
+  save_policy,tables,transactions}.py` and `workflow/service.py`) into the
+  Pyright gate, typing-first: `DocumentStorage.save_document` gains
+  the universal `quality` kwarg; the Local-only guarded exact-sidecar publication
+  is narrowed to `LocalDocumentStorage` at the consumers; the table addressing
+  kwargs use a `TypedDict`. Behavior is preserved. Only the 9 `[schema-frozen]`
+  handlers remain excluded from Pyright.
 
 ## [4.3.2] - 2026-07-21
 

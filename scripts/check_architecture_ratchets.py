@@ -35,7 +35,7 @@ EXPECTED_SDK_IMPORTERS = (
 EXPECTED_SERVICE_LINES = {
     "_border_fill.py": 283,
     "content_layout.py": 322,
-    "context.py": 195,
+    "context.py": 213,
     "form_fields.py": 525,
     "media.py": 178,
     "memo_style.py": 477,
@@ -43,9 +43,9 @@ EXPECTED_SERVICE_LINES = {
     "planning.py": 201,
     "preview_export.py": 583,
     "read_query.py": 601,
-    "save_policy.py": 601,
-    "tables.py": 526,
-    "transactions.py": 606,
+    "save_policy.py": 604,
+    "tables.py": 539,
+    "transactions.py": 616,
 }
 
 EXPECTED_FACADE_LINES = {

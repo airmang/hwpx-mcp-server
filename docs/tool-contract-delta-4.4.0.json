@@ -2,8 +2,8 @@
   "schemaVersion": "hwpx.tool-contract-delta.v2",
   "release": "4.4.0",
   "changeKind": "additive-optional-parameter",
-  "releaseStatus": "pre-release-proof",
-  "note": "S-092 P3. Pre-release receipt: RELEASED_CONTRACT_HASH stays frozen at the 4.3.x value; the live surface carries PENDING_CONTRACT_HASH. The released constant flips only when the release train ships 4.4.0 (P5). No version bump in this branch.",
+  "releaseStatus": "released",
+  "note": "S-092 P3. Released in 4.4.0.",
   "baseline": {
     "versions": {
       "pythonHwpx": "3.3.1",
@@ -58,7 +58,10 @@
       "profileChanged": false,
       "mutatesChanged": false,
       "skillRequiredChanged": false,
-      "changedFields": ["inputSchema", "outputSchema"],
+      "changedFields": [
+        "inputSchema",
+        "outputSchema"
+      ],
       "addedInputParameters": [
         {
           "name": "viewer",
