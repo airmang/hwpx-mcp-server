@@ -55,7 +55,7 @@ def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
     dependencies = project["project"]["dependencies"]
     optional_dependencies = project["project"]["optional-dependencies"]
 
-    assert project["project"]["version"] == "4.4.0"
+    assert project["project"]["version"] == "4.4.1"
     assert "python-hwpx>=3.3.1" in dependencies
     assert optional_dependencies["oracle"] == ["python-hwpx[visual]>=3.3.1"]
     assert optional_dependencies["vision"] == ["python-hwpx[visual]>=3.3.1"]

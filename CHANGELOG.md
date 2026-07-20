@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
-## [4.4.0] - 2026-07-21
+## [4.4.1] - 2026-07-21
+
+### Notes
+- `v4.4.0`은 릴리스 게이트 실패로 미발행 보존 태그입니다(prepublish가 core를
+  `[preview]` extra 없이 설치해 MathML 성공경로 테스트가 정직 실패 — 워크플로
+  설치 라인 수정으로 복구). PyPI 산출물은 존재하지 않습니다.
+
+## [4.4.0] - 2026-07-21 (미발행)
 
 ### Added
 - `render_preview` gains an additive optional `viewer` parameter (default
