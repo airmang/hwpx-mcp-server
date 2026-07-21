@@ -5,6 +5,7 @@
   </p>
   <p align="center">
     <a href="https://pypi.org/project/hwpx-mcp-server/"><img src="https://img.shields.io/pypi/v/hwpx-mcp-server?color=blue&label=PyPI" alt="PyPI"></a>
+    <a href="https://pypi.org/project/hwpx-mcp-server/"><img src="https://img.shields.io/pypi/dm/hwpx-mcp-server" alt="Downloads"></a>
     <a href="https://pypi.org/project/hwpx-mcp-server/"><img src="https://img.shields.io/pypi/pyversions/hwpx-mcp-server" alt="Python"></a>
     <a href="https://github.com/airmang/hwpx-mcp-server/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/airmang/hwpx-mcp-server/tests.yml?branch=main&label=tests" alt="Tests"></a>
     <a href="https://github.com/airmang/hwpx-mcp-server/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License"></a>
