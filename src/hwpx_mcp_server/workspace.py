@@ -310,16 +310,51 @@ def _normalize_roots(values: Iterable[str | os.PathLike[str]]) -> tuple[Path, ..
 def _normalize_path_input(
     value: str | os.PathLike[str], *, windows: bool | None = None
 ) -> str:
-    """Normalize common local-path forms before workspace authorization."""
+    """Normalize common local-path forms before workspace authorization.
 
-    text = os.fspath(value).strip()
-    if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
-        text = text[1:-1].strip()
+    Ordinary filesystem path names are preserved byte-for-byte: only explicit
+    transport decoration (surrounding quotes and ``file:`` URIs) is unwrapped.
+    A path such as ``" report.hwpx "`` with meaningful surrounding whitespace is
+    therefore never silently redirected to a different, unspaced file.
+    """
 
-    parsed = urlsplit(text)
-    if parsed.scheme.lower() == "file":
+    text = os.fspath(value)
+
+    # Unwrap surrounding quotes only. Quotes are transport decoration, so the
+    # whitespace immediately inside them is decoration too and may be trimmed;
+    # the quoted payload itself is preserved.
+    stripped = text.strip()
+    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
+        text = stripped[1:-1].strip()
+
+    # Only treat the input as a URI when it actually carries the ``file`` scheme.
+    # Running URI parsing over ordinary paths is what previously mangled valid
+    # names, so unscheme'd input flows through untouched.
+    if text[:5].lower() == "file:":
+        try:
+            parsed = urlsplit(text)
+        except ValueError as exc:
+            # A malformed authority (e.g. ``file://[invalid]/x``) makes urlsplit
+            # raise; map it onto the typed workspace error contract instead of
+            # leaking an untyped parser exception, without echoing the input.
+            raise WorkspacePathError(
+                "workspace path is not a valid file URI",
+                code="WORKSPACE_PATH_INVALID",
+                reason="malformed_file_uri",
+            ) from exc
         path = unquote(parsed.path)
-        text = f"//{parsed.netloc}{path}" if parsed.netloc else path
+        authority = parsed.netloc
+        # An empty or ``localhost`` authority denotes the local host: resolve to
+        # the plain path. A non-local authority names a remote host, which is
+        # not an addressable local workspace path, so reject it explicitly
+        # rather than silently localizing or mangling it into a UNC reference.
+        if authority and authority.lower() != "localhost":
+            raise WorkspacePathError(
+                "workspace path names a non-local file URI authority",
+                code="WORKSPACE_PATH_INVALID",
+                reason="non_local_file_uri_authority",
+            )
+        text = path
 
     use_windows = os.name == "nt" if windows is None else windows
     if use_windows:

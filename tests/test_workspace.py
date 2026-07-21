@@ -57,6 +57,57 @@ def test_workspace_path_input_normalization(tmp_path: Path) -> None:
     )
 
 
+def test_ordinary_spaced_path_name_is_preserved(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    unspaced = root / "report.hwpx"
+    spaced = root / " report.hwpx "
+    unspaced.write_bytes(b"unspaced")
+    spaced.write_bytes(b"spaced")
+    resolver = WorkspaceResolver.from_roots([root])
+
+    # An ordinary path with meaningful surrounding whitespace must resolve to
+    # the byte-identical file, not be silently redirected to the unspaced one.
+    assert _normalize_path_input(" report.hwpx ") == " report.hwpx "
+    assert resolver.resolve(" report.hwpx ") == spaced
+    assert resolver.resolve("report.hwpx") == unspaced
+
+
+def test_file_uri_localhost_authority_resolves_local(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    document = root / "inside.hwpx"
+    document.write_bytes(b"document")
+    resolver = WorkspaceResolver.from_roots([root])
+
+    abs_path = str(document)
+    # Both an empty authority (file:///abs) and a localhost authority
+    # (file://localhost/abs) denote the same local file.
+    assert _normalize_path_input(f"file://{abs_path}") == abs_path
+    assert _normalize_path_input(f"file://localhost{abs_path}") == abs_path
+    assert _normalize_path_input(f"file://LOCALHOST{abs_path}") == abs_path
+    assert resolver.resolve(f"file://localhost{abs_path}") == document.resolve()
+    assert resolver.resolve(document.as_uri()) == document.resolve()
+
+
+def test_file_uri_non_local_authority_is_rejected() -> None:
+    # A remote host authority is not an addressable local workspace path; it
+    # must raise the typed contract rather than be localized or mangled.
+    with pytest.raises(WorkspacePathError) as excinfo:
+        _normalize_path_input("file://remotehost/inside.hwpx")
+    assert excinfo.value.code == "WORKSPACE_PATH_INVALID"
+    assert excinfo.value.reason == "non_local_file_uri_authority"
+
+
+def test_malformed_file_uri_raises_workspace_path_error() -> None:
+    with pytest.raises(WorkspacePathError) as excinfo:
+        _normalize_path_input("file://[invalid]/inside.hwpx")
+    assert excinfo.value.code == "WORKSPACE_PATH_INVALID"
+    assert excinfo.value.reason == "malformed_file_uri"
+    # The submitted path must not be exposed in the safe details.
+    assert "inside.hwpx" not in json.dumps(excinfo.value.safe_details())
+
+
 def test_missing_output_parent_is_created_inside_root(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
