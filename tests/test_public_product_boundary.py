@@ -55,10 +55,10 @@ def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
     dependencies = project["project"]["dependencies"]
     optional_dependencies = project["project"]["optional-dependencies"]
 
-    assert project["project"]["version"] == "4.4.1"
-    assert "python-hwpx>=3.3.1" in dependencies
-    assert optional_dependencies["oracle"] == ["python-hwpx[visual]>=3.3.1"]
-    assert optional_dependencies["vision"] == ["python-hwpx[visual]>=3.3.1"]
+    assert project["project"]["version"] == "5.0.0"
+    assert "python-hwpx>=4.0.0" in dependencies
+    assert optional_dependencies["oracle"] == ["python-hwpx[visual]>=4.0.0"]
+    assert optional_dependencies["vision"] == ["python-hwpx[visual]>=4.0.0"]
     assert "mcp==1.28.1" in dependencies
     assert "pydantic>=2.11,<3" in dependencies
 
@@ -102,9 +102,9 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
     assert len(advanced) == 127
     assert len(skill_required_tool_names()) == 28
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
-        "3.3.1",
-        "4.3.0",
-        "0.5.0",
+        "4.0.0",
+        "5.0.0",
+        "0.7.0",
     )
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(default)
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(advanced)

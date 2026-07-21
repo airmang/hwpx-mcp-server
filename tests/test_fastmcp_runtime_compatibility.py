@@ -8,14 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.tool_contract import PENDING_CONTRACT_HASH
+from hwpx_mcp_server.tool_contract import RELEASED_CONTRACT_HASH
 
 
 ROOT = Path(__file__).resolve().parents[1]
-# Pre-release (5.0.0 major boundary): removing the five transition stubs and
-# demoting the three template-formfit facades moves the live surface onto the
-# pending hash; the frozen released receipt flips only at the release train (P5).
-EXPECTED_CONTRACT_HASH = PENDING_CONTRACT_HASH
+EXPECTED_CONTRACT_HASH = RELEASED_CONTRACT_HASH
 
 
 @pytest.mark.parametrize(

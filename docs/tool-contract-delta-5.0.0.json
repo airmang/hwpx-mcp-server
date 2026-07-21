@@ -2,8 +2,8 @@
   "schemaVersion": "hwpx.tool-contract-delta.v2",
   "release": "5.0.0",
   "changeKind": "breaking-removal-and-reclassification",
-  "releaseStatus": "pending",
-  "note": "S-091 P3. Major-boundary removal + demotion. Pending the 5.0.0 release train (P5); pythonHwpx/skill target floors are provisional and finalized by the release train.",
+  "releaseStatus": "released",
+  "note": "Major-boundary removal + demotion, finalized by the 5.0.0 release train (paired stack: python-hwpx 4.0.0, skill 0.7.0).",
   "migrationReference": "docs/deprecation-5.0.0.md",
   "baseline": {
     "versions": {
@@ -25,9 +25,9 @@
   },
   "target": {
     "versions": {
-      "pythonHwpx": "3.3.1",
+      "pythonHwpx": "4.0.0",
       "mcpServer": "5.0.0",
-      "skill": "0.5.0"
+      "skill": "0.7.0"
     },
     "defaultToolCount": 119,
     "advancedToolCount": 127,
@@ -39,7 +39,7 @@
       "deprecated": 3,
       "internal": 4
     },
-    "contractHash": "c9a451a7c003752a"
+    "contractHash": "c2cd81fdb3089bae"
   },
   "delta": {
     "defaultToolCount": -2,

@@ -22,7 +22,7 @@ jobs:
           repository: airmang/python-hwpx
           # Exact public python-hwpx 3.3.1 release commit, verified before the
           # dependency-ordered hwpx-mcp-server 4.3.0 publication.
-          ref: 16f0827dc44962df840f3700a70bce9744df6ef7
+          ref: 62ba2563515ee345662aa427fa6f111aaed9d8c7
           path: python-hwpx
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

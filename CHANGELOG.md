@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [5.0.0] - 2026-07-21
 
 ### Removed (breaking, 5.0.0 major boundary)
 - The five one-transition stubs `plan_edit`, `preview_edit`, `apply_edit`,
