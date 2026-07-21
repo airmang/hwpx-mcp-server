@@ -25,7 +25,8 @@ from hwpx_mcp_server.tool_contract import (
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
-        RELEASED_CONTRACT_HASH,
+    PENDING_CONTRACT_HASH,
+    RELEASED_CONTRACT_HASH,
     ToolClassification,
     ToolAvailability,
     bind_tool_specs,
@@ -61,15 +62,12 @@ INTERNAL_FIXTURE_QA_TOOLS = {
     "visual_repair_fixture",
 }
 COMPATIBILITY_TOOLS = {
-    "analyze_template_formfit",
     "apply_edits",
     "apply_evalplan_fill",
-    "apply_template_formfit",
     "create_comparison_table_document",
     "create_government_report_document",
     "create_proposal_document",
     "fill_by_path",
-    "fill_form_field",
 }
 ADVANCED_TOOLS = {
     "lint_text_conventions",
@@ -81,7 +79,14 @@ ADVANCED_TOOLS = {
     "score_form_fill",
     "validate_structure",
 }
+# 5.0.0 (S-091): the five transition stubs are removed and the three
+# template-formfit facades demote from compatibility to deprecated.
 DEPRECATED_TOOLS = {
+    "analyze_template_formfit",
+    "apply_template_formfit",
+    "fill_form_field",
+}
+REMOVED_TRANSITION_STUBS = {
     "analyze_quality_generation",
     "apply_edit",
     "apply_quality_generation",
@@ -117,7 +122,12 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert RENDER_TOOLS <= set(server._fastmcp_tool_names())
     assert INTERNAL_FIXTURE_QA_TOOLS.isdisjoint(server._fastmcp_tool_names())
     assert AGENT_DOCUMENT_TOOLS <= set(server._fastmcp_tool_names())
-    assert len(expected_tool_names(advanced=False)) == 121
+    # 5.0.0: the removed transition stubs are absent from every profile, with no
+    # alias or ghost registration standing in for them.
+    assert REMOVED_TRANSITION_STUBS.isdisjoint(server._fastmcp_tool_names())
+    assert REMOVED_TRANSITION_STUBS.isdisjoint(expected_tool_names(advanced=True))
+    assert REMOVED_TRANSITION_STUBS.isdisjoint({spec.name for spec in BASELINE_TOOL_SPECS})
+    assert len(expected_tool_names(advanced=False)) == 119
     workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
     assert len(workflow_domains) == 1
     assert set(workflow_domains[0].tools) == WORKFLOW_TOOLS
@@ -151,25 +161,27 @@ def test_release_contract_versions_counts_and_hash_are_exact() -> None:
         "4.3.0",
         "0.5.0",
     )
-    assert len(expected_tool_names(advanced=False)) == 121
-    assert len(expected_tool_names(advanced=True)) == 132
+    assert len(expected_tool_names(advanced=False)) == 119
+    assert len(expected_tool_names(advanced=True)) == 127
     assert len(skill_required_tool_names()) == 28
-    # Pre-release surface change: the render_preview viewer parameter moves the
-    # live contract hash to RELEASED_CONTRACT_HASH while the frozen released
+    # Pre-release surface change (5.0.0 major boundary): removing the five
+    # transition stubs and demoting the three template-formfit facades moves the
+    # live contract hash to PENDING_CONTRACT_HASH while the frozen released
     # receipt stays put until the release train collapses the two (P5).
     assert RELEASED_CONTRACT_HASH == "c89cbc5f98eb5367"
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "c89cbc5f98eb5367"
+    assert PENDING_CONTRACT_HASH == "c9a451a7c003752a"
+    assert contract_hash() == PENDING_CONTRACT_HASH == "c9a451a7c003752a"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 
 def test_baseline_classification_is_disjoint_exact_and_exhaustive() -> None:
-    assert len(BASELINE_TOOL_SPECS) == 136
-    assert len({spec.name for spec in BASELINE_TOOL_SPECS}) == 136
+    assert len(BASELINE_TOOL_SPECS) == 131
+    assert len({spec.name for spec in BASELINE_TOOL_SPECS}) == 131
     assert classification_counts() == {
         "public": 110,
-        "compatibility": 9,
+        "compatibility": 6,
         "advanced": 8,
-        "deprecated": 5,
+        "deprecated": 3,
         "internal": 4,
     }
     internal = {
@@ -389,7 +401,7 @@ print(json.dumps({
     )
     payload = json.loads(result.stdout)
     assert payload["actual"] == payload["expected"]
-    assert len(payload["actual"]) == 132
+    assert len(payload["actual"]) == 127
     assert payload["valid"] is True
 
 
@@ -509,7 +521,7 @@ def test_generated_mcp_contract_is_current() -> None:
     payload = json.loads(
         (ROOT / "docs" / "tool-contract.generated.json").read_text(encoding="utf-8")
     )
-    assert payload["baselineToolCount"] == 136
+    assert payload["baselineToolCount"] == 131
     assert payload["classificationCounts"] == classification_counts()
     assert payload["contractHash"] == contract_hash()
 

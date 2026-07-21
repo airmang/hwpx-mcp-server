@@ -7,122 +7,15 @@ from hwpx_mcp_server import server
 from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
-def _idea() -> dict:
-    return {
-        "title": "2026년 AI 중점학교 신청서 및 운영계획서",
-        "organization": "매원초등학교",
-        "author": "AI 교육 운영팀",
-        "date": "2026",
-        "idea_brief": (
-            "초등학생의 AI 기초 소양과 교원의 AI 활용 수업 설계 역량을 함께 높이는 "
-            "AI 중점학교 운영 계획을 작성한다."
-        ),
-        "sections": [
-            {
-                "title": "추진 배경 및 필요성",
-                "paragraphs": ["AI 기초 소양 교육을 학교 교육과정 안에서 체계화해야 합니다."],
-                "bullets": ["학생 맞춤형 AI 체험 기회 확대", "교원 수업 설계 역량 강화"],
-            },
-            {
-                "title": "운영 목표",
-                "paragraphs": ["교육과정, 동아리, 교원 연수를 연결한 운영 체계를 구축합니다."],
-                "bullets": ["AI 융합 수업 모델 개발", "학년군별 프로젝트 운영"],
-            },
-            {
-                "title": "세부 운영 계획",
-                "paragraphs": ["준비, 실행, 성과 공유 단계로 나누어 운영합니다."],
-                "bullets": ["1학기 기반 조성", "2학기 운영 및 성과 확산"],
-            },
-        ],
-        "budget_items": [{"item": "AI 교육 운영비", "amount": "계획 수립 후 확정", "note": "수업 및 산출물 제작"}],
-        "expected_outcomes": ["학생 AI 소양 강화", "학교 단위 AI 교육 운영 모델 확보"],
-        "closing": "본 계획을 바탕으로 AI 중점학교 운영을 성실히 추진하겠습니다.",
-    }
-
-
-def test_quality_generation_tools_are_exposed() -> None:
+def test_quality_generation_tools_are_removed_from_the_mcp_surface() -> None:
+    # The analyze_quality_generation/apply_quality_generation MCP tools were
+    # removed at the 5.0.0 major boundary (S-091). The generation engine lives on
+    # in hwpx_mcp_server.quality_generation (exercised directly below); the
+    # replacement product path is create_document_from_plan + inspect_document_quality.
     names = set(snapshot_runtime_tools(server.mcp))
 
-    assert {"analyze_quality_generation", "apply_quality_generation"}.issubset(names)
-
-
-def test_analyze_quality_generation_is_non_mutating_and_does_not_require_quality_sample(tmp_path) -> None:
-    form = tmp_path / "form.hwpx"
-    destination = tmp_path / "generated.hwpx"
-    server.create_document(str(form))
-    before = form.read_bytes()
-
-    analysis = server.analyze_quality_generation(
-        form_filename=str(form),
-        idea_brief=_idea(),
-        destination_filename=str(destination),
-    )
-
-    assert analysis["quality_sample_required"] is False
-    assert analysis["inputs"]["form"]["path"] == str(form)
-    assert analysis["inputs"]["destination"]["path"] == str(destination)
-    assert analysis["mutated"] is False
-    assert analysis["next_tool"] == "apply_quality_generation"
-    assert form.read_bytes() == before
-    assert not destination.exists()
-
-
-def test_apply_quality_generation_creates_validated_output_with_revision_history(tmp_path) -> None:
-    form = tmp_path / "form.hwpx"
-    destination = tmp_path / "generated.hwpx"
-    server.create_document(str(form))
-    analysis = server.analyze_quality_generation(
-        form_filename=str(form),
-        idea_brief=_idea(),
-        destination_filename=str(destination),
-    )
-
-    result = server.apply_quality_generation(analysis=analysis, confirm=True)
-
-    assert result["quality_sample_required"] is False
-    assert result["destination"]["created"] is True
-    assert destination.exists()
-    assert result["validation"]["reopened"] is True
-    assert result["validation"]["validate_package"]["ok"] is True
-    assert result["validation"]["validate_document"]["ok"] is True
-    assert result["validation"]["openSafety"]["ok"] is True
-    assert result["revision_history"]
-    assert result["quality"]["rubric_average"] >= 4.0
-
-
-def test_apply_quality_generation_preserves_existing_destination_when_open_safety_blocks(
-    tmp_path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    form = tmp_path / "form.hwpx"
-    destination = tmp_path / "generated.hwpx"
-    server.create_document(str(form))
-    server.create_document(str(destination))
-    original = destination.read_bytes()
-    analysis = server.analyze_quality_generation(
-        form_filename=str(form),
-        idea_brief=_idea(),
-        destination_filename=str(destination),
-    )
-
-    def blocked_validation(_path: str) -> dict:
-        return {
-            "reopened": False,
-            "validate_package": {"ok": False, "errors": []},
-            "validate_document": {"ok": False, "errors": []},
-            "openSafety": {
-                "ok": False,
-                "summary": "forced quality-generation failure",
-            },
-        }
-
-    monkeypatch.setattr(quality_generation_module, "_runtime_validation", blocked_validation)
-
-    with pytest.raises(RuntimeError, match="quality-generation output failed open-safety"):
-        server.apply_quality_generation(analysis=analysis, confirm=True)
-
-    assert destination.read_bytes() == original
-    assert not list(tmp_path.glob(".generated.*.hwpx"))
+    assert "analyze_quality_generation" not in names
+    assert "apply_quality_generation" not in names
 
 
 def test_quality_generation_validation_fails_closed_without_package_validator(

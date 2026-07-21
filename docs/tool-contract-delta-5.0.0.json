@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "hwpx.tool-contract-delta.v2",
+  "release": "5.0.0",
+  "changeKind": "breaking-removal-and-reclassification",
+  "releaseStatus": "pending",
+  "note": "S-091 P3. Major-boundary removal + demotion. Pending the 5.0.0 release train (P5); pythonHwpx/skill target floors are provisional and finalized by the release train.",
+  "migrationReference": "docs/deprecation-5.0.0.md",
+  "baseline": {
+    "versions": {
+      "pythonHwpx": "3.3.1",
+      "mcpServer": "4.4.1",
+      "skill": "0.5.0"
+    },
+    "defaultToolCount": 121,
+    "advancedToolCount": 132,
+    "skillRequiredToolCount": 28,
+    "classificationCounts": {
+      "public": 110,
+      "compatibility": 9,
+      "advanced": 8,
+      "deprecated": 5,
+      "internal": 4
+    },
+    "contractHash": "c89cbc5f98eb5367"
+  },
+  "target": {
+    "versions": {
+      "pythonHwpx": "3.3.1",
+      "mcpServer": "5.0.0",
+      "skill": "0.5.0"
+    },
+    "defaultToolCount": 119,
+    "advancedToolCount": 127,
+    "skillRequiredToolCount": 28,
+    "classificationCounts": {
+      "public": 110,
+      "compatibility": 6,
+      "advanced": 8,
+      "deprecated": 3,
+      "internal": 4
+    },
+    "contractHash": "c9a451a7c003752a"
+  },
+  "delta": {
+    "defaultToolCount": -2,
+    "advancedToolCount": -5,
+    "skillRequiredToolCount": 0,
+    "baselineToolCount": -5
+  },
+  "removedTools": [
+    {
+      "name": "plan_edit",
+      "classification": "deprecated",
+      "destination": "removed",
+      "alias": null,
+      "replacementTools": [
+        "apply_document_commands"
+      ],
+      "migrationReference": "docs/deprecation-5.0.0.md"
+    },
+    {
+      "name": "preview_edit",
+      "classification": "deprecated",
+      "destination": "removed",
+      "alias": null,
+      "replacementTools": [
+        "apply_document_commands"
+      ],
+      "migrationReference": "docs/deprecation-5.0.0.md"
+    },
+    {
+      "name": "apply_edit",
+      "classification": "deprecated",
+      "destination": "removed",
+      "alias": null,
+      "replacementTools": [
+        "apply_document_commands"
+      ],
+      "migrationReference": "docs/deprecation-5.0.0.md"
+    },
+    {
+      "name": "analyze_quality_generation",
+      "classification": "deprecated",
+      "destination": "removed",
+      "alias": null,
+      "replacementTools": [
+        "create_document_from_plan",
+        "create_proposal_document",
+        "inspect_document_quality"
+      ],
+      "migrationReference": "docs/deprecation-5.0.0.md"
+    },
+    {
+      "name": "apply_quality_generation",
+      "classification": "deprecated",
+      "destination": "removed",
+      "alias": null,
+      "replacementTools": [
+        "create_document_from_plan",
+        "create_proposal_document",
+        "inspect_document_quality"
+      ],
+      "migrationReference": "docs/deprecation-5.0.0.md"
+    }
+  ],
+  "classificationChanges": [
+    {
+      "name": "analyze_template_formfit",
+      "from": "compatibility",
+      "to": "deprecated",
+      "replacementTools": [
+        "analyze_form_fill",
+        "apply_form_fill",
+        "verify_form_fill"
+      ]
+    },
+    {
+      "name": "apply_template_formfit",
+      "from": "compatibility",
+      "to": "deprecated",
+      "replacementTools": [
+        "analyze_form_fill",
+        "apply_form_fill",
+        "verify_form_fill"
+      ]
+    },
+    {
+      "name": "fill_form_field",
+      "from": "compatibility",
+      "to": "deprecated",
+      "replacementTools": [
+        "analyze_form_fill",
+        "apply_form_fill",
+        "verify_form_fill"
+      ]
+    }
+  ],
+  "compatibility": {
+    "aliases": [],
+    "ghostRegistrations": []
+  },
+  "proof": "The five one-transition stubs (plan_edit, preview_edit, apply_edit, analyze_quality_generation, apply_quality_generation) are removed from the canonical ToolSpec registry, the explicit tool bindings, the FastMCP server aliases, and the workflow TRANSACTIONAL_EDIT allowlist — no alias and no ghost wrapper stands in for them (S-078 policy). The three template-formfit facades (analyze_template_formfit, apply_template_formfit, fill_form_field) keep their handlers and behaviour but demote from COMPATIBILITY to DEPRECATED, carrying the one-transition deprecation guidance toward analyze/apply/verify_form_fill. Baseline classification drops from 136 to 131 (compatibility 9->6, deprecated 5->3); installed advanced surface 132->127; default surface 121->119; skill-required 28 unchanged. Contract hash c89cbc5f98eb5367 -> c9a451a7c003752a. render_contract_delta.py cross-checks this receipt against the live registry: the removed names are absent from every installed profile and the demoted names resolve to DEPRECATED."
+}

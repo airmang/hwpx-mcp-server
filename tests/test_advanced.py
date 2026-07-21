@@ -2,7 +2,6 @@ import importlib
 
 import pytest
 
-from hwpx_mcp_server.core.document import open_doc
 from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 
 
@@ -47,7 +46,6 @@ def test_advanced_tools_hidden_by_default(monkeypatch):
     tool_names = set(snapshot_runtime_tools(reloaded.mcp))
 
     assert "package_parts" not in tool_names
-    assert "plan_edit" not in tool_names
 
     monkeypatch.setenv("HWPX_MCP_ADVANCED", "1")
     importlib.reload(reloaded)
@@ -67,39 +65,7 @@ def test_object_find_by_attr_matches_any_value_when_attr_value_omitted(tmp_path)
     assert all("pageBreak" in obj["attrs"] for obj in result["objects"])
 
 
-def test_plan_edit_preview_apply_verification_flow(tmp_path):
-    import hwpx_mcp_server.server as server
-    server = importlib.reload(server)
-
-    target = tmp_path / "test.hwpx"
-    server.create_document(str(target))
-    server.add_paragraph(str(target), "verification target text")
-
-    plan = server.plan_edit(str(target), "target text")
-    assert plan["ok"] is True
-
-    plan_id = plan["data"]["plan"]["planId"]
-    preview = server.preview_edit(str(target), plan_id)
-    apply_result = server.apply_edit(str(target), plan_id)
-
-    assert preview["ok"] is True
-    assert preview["data"]["preview"]["diff"][0]["before"] == "verification target text"
-    assert preview["data"]["preview"]["diff"][0]["after"] == "verification target text"
-    assert apply_result["ok"] is True
-    assert apply_result["data"]["apply"]["applied"] is True
-
-
-def test_plan_edit_accepts_text_from_memo_annotated_paragraph(tmp_path):
-    import hwpx_mcp_server.server as server
-    server = importlib.reload(server)
-
-    target = tmp_path / "test.hwpx"
-    server.create_document(str(target))
-    server.add_paragraph(str(target), "memo verification target")
-    server.add_memo(str(target), 1, "check memo")
-
-    assert "memo verification target" in open_doc(str(target)).paragraphs[1].text
-
-    plan = server.plan_edit(str(target), "memo verification target")
-
-    assert plan["ok"] is True
+# The plan_edit/preview_edit/apply_edit verification-flow tools were removed at
+# the 5.0.0 major boundary (S-091); the underlying verification-plan engine is
+# still exercised directly through HwpxOps in tests/test_hwpx_ops.py. Their MCP
+# surface absence is asserted in tests/test_tool_contract.py.

@@ -49,9 +49,6 @@ ADVANCED_TOOLS = {
     "package_get_text",
     "object_find_by_tag",
     "object_find_by_attr",
-    "plan_edit",
-    "preview_edit",
-    "apply_edit",
     "validate_structure",
     "lint_text_conventions",
 }

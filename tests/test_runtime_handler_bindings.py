@@ -28,9 +28,9 @@ HANDLER_OWNERS = {
     "hwpx_mcp_server.handlers.agent_document": 5,
     "hwpx_mcp_server.handlers.read_export": 21,
     "hwpx_mcp_server.handlers.authoring": 15,
-    "hwpx_mcp_server.handlers.content_edit": 23,
+    "hwpx_mcp_server.handlers.content_edit": 20,
     "hwpx_mcp_server.handlers.layout_style": 17,
-    "hwpx_mcp_server.handlers.form_fill": 17,
+    "hwpx_mcp_server.handlers.form_fill": 15,
     "hwpx_mcp_server.handlers.tracked_changes": 1,
     "hwpx_mcp_server.handlers.specialized": 10,
     "hwpx_mcp_server.handlers.quality_render": 16,
@@ -53,8 +53,8 @@ def test_all_tool_specs_have_one_explicit_immutable_handler_owner() -> None:
     assert isinstance(TOOL_BINDINGS, MappingProxyType)
     assert tuple(TOOL_BINDINGS) == expected_tool_order(advanced=True)
     assert tuple(TOOL_BINDINGS) == tuple(spec.callable_name for spec in TOOL_SPECS)
-    assert len(TOOL_BINDINGS) == 132
-    assert len({id(function) for function in TOOL_BINDINGS.values()}) == 132
+    assert len(TOOL_BINDINGS) == 127
+    assert len({id(function) for function in TOOL_BINDINGS.values()}) == 127
     assert Counter(function.__module__ for function in TOOL_BINDINGS.values()) == Counter(
         HANDLER_OWNERS
     )

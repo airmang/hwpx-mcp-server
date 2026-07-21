@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Typed, deterministic contract for the installed FastMCP tool surface.
 
-``BASELINE_TOOL_SPECS`` records the complete 3.0.0 census, including tools that
-became internal in 4.0.0.  ``TOOL_SPECS`` is the only installed/public surface.
+``BASELINE_TOOL_SPECS`` records the current classification baseline, including
+the fixture-QA tools that became internal in 4.0.0 (the 3.0.0 census minus the
+practice tools removed in 4.0.0 and the transition stubs removed at the 5.0.0
+major boundary).  ``TOOL_SPECS`` is the only installed/public surface.
 Registration, capability reporting, generated documentation, health checks, and
 the versioned contract delta all consume these objects instead of maintaining
 parallel name lists.
@@ -33,17 +35,20 @@ MIN_SKILL_VERSION = "0.5.0"
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
 RELEASED_CONTRACT_HASH = "c89cbc5f98eb5367"
-# Pre-release live-surface receipt. This branch adds one additive optional
-# parameter (``render_preview.viewer``) plus its optional ``viewer`` output
-# block, which moves the live ``contract_hash()`` off the frozen released hash.
-# The released constant only flips at the release train (see
-# docs/tool-contract-delta-4.4.0.json); until then the surface-changing branch
-# records the pending hash here so the tests that pin ``contract_hash()`` follow
-# the live surface without prematurely claiming the release receipt.
+# Pre-release live-surface receipt for the 5.0.0 major boundary (S-091). This
+# branch removes the five transition stubs (plan_edit/preview_edit/apply_edit,
+# analyze_quality_generation/apply_quality_generation) and demotes the three
+# template-formfit facades from COMPATIBILITY to DEPRECATED, which moves the live
+# ``contract_hash()`` off the frozen released hash. The released constant only
+# flips at the release train (see docs/tool-contract-delta-5.0.0.json); until
+# then the surface-changing branch records the pending hash here so the tests
+# that pin ``contract_hash()`` follow the live surface without prematurely
+# claiming the release receipt.
+PENDING_CONTRACT_HASH = "c9a451a7c003752a"
 
 
 class ToolClassification(str, Enum):
-    """Product decision for one name in the 3.0.0 136-tool baseline."""
+    """Product decision for one name in the 131-tool classification baseline."""
 
     PUBLIC = "public"
     COMPATIBILITY = "compatibility"
@@ -216,34 +221,25 @@ _ADVANCED_CLASSIFICATION = {
     "score_form_fill",
 }
 
-_ADVANCED_PROFILE = _ADVANCED_CLASSIFICATION | {"plan_edit", "preview_edit", "apply_edit"}
+_ADVANCED_PROFILE = _ADVANCED_CLASSIFICATION
 
 _COMPATIBILITY_REPLACEMENTS: dict[str, tuple[str, ...]] = {
-    "analyze_template_formfit": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
     "apply_edits": ("apply_document_commands",),
     "apply_evalplan_fill": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
-    "apply_template_formfit": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
     "create_comparison_table_document": ("create_document_from_plan",),
     "create_government_report_document": ("create_document_from_plan",),
     "create_proposal_document": ("create_document_from_plan",),
     "fill_by_path": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
-    "fill_form_field": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
 }
 
+# 5.0.0 major boundary (S-091): the three template-formfit facades demote from
+# COMPATIBILITY to DEPRECATED. Their handlers and behaviour are unchanged; they
+# now carry the one-transition deprecation guidance toward the canonical
+# analyze/apply/verify_form_fill trio, exactly like the former stub group.
 _DEPRECATED_REPLACEMENTS: dict[str, tuple[str, ...]] = {
-    "analyze_quality_generation": (
-        "create_document_from_plan",
-        "create_proposal_document",
-        "inspect_document_quality",
-    ),
-    "apply_edit": ("apply_document_commands",),
-    "apply_quality_generation": (
-        "create_document_from_plan",
-        "create_proposal_document",
-        "inspect_document_quality",
-    ),
-    "plan_edit": ("apply_document_commands",),
-    "preview_edit": ("apply_document_commands",),
+    "analyze_template_formfit": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
+    "apply_template_formfit": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
+    "fill_form_field": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
 }
 
 _INTERNAL_QA_TOOLS = {
@@ -294,13 +290,13 @@ _MUTATING_TOOLS = {
     "start_workflow", "continue_workflow", "approve_workflow_decision",
     "cancel_workflow", "resume_workflow",
     "apply_table_ops", "apply_body_ops", "fill_form_field", "fill_by_path",
-    "apply_form_fill", "apply_template_formfit", "apply_quality_generation",
+    "apply_form_fill", "apply_template_formfit",
     "apply_evalplan_fill",
     "create_document", "create_document_from_plan", "copy_document",
     "create_government_report_document", "create_proposal_document",
     "create_comparison_table_document", "register_template",
     "add_heading", "add_paragraph", "insert_paragraph", "delete_paragraph",
-    "add_page_break", "apply_edits", "plan_edit", "apply_edit", "undo_last_edit",
+    "add_page_break", "apply_edits", "undo_last_edit",
     "replace_by_anchor", "replace_in_paragraph", "search_and_replace", "batch_replace",
     "byte_preserving_patch", "insert_picture", "replace_picture",
     "add_table", "set_table_cell_text", "merge_table_cells", "split_table_cell",
@@ -388,7 +384,7 @@ BASELINE_DOMAIN_SPECS: tuple[DomainSpec, ...] = (
             "scan_form_guidance", "apply_table_ops", "apply_body_ops", "inspect_fill_residue",
             "verify_form_fill", "list_form_fields", "fill_form_field", "find_cell_by_label",
             "fill_by_path", "analyze_form_fill", "apply_form_fill", "analyze_template_formfit",
-            "apply_template_formfit", "analyze_quality_generation", "apply_quality_generation",
+            "apply_template_formfit",
             "apply_evalplan_fill", "score_form_fill",
         ),
     ),
@@ -412,7 +408,7 @@ BASELINE_DOMAIN_SPECS: tuple[DomainSpec, ...] = (
         "기존 문서를 고치거나 byte-preserving 수술을 적용할 때.",
         (
             "add_heading", "add_paragraph", "insert_paragraph", "delete_paragraph", "add_page_break",
-            "apply_edits", "plan_edit", "preview_edit", "apply_edit", "undo_last_edit",
+            "apply_edits", "undo_last_edit",
             "replace_by_anchor", "replace_in_paragraph", "search_and_replace", "batch_replace",
             "byte_preserving_patch", "insert_picture", "replace_picture",
         ),
@@ -577,17 +573,17 @@ def _validate_classification() -> None:
     counts = classification_counts()
     expected = {
         ToolClassification.PUBLIC.value: 110,
-        ToolClassification.COMPATIBILITY.value: 9,
+        ToolClassification.COMPATIBILITY.value: 6,
         ToolClassification.ADVANCED.value: 8,
-        ToolClassification.DEPRECATED.value: 5,
+        ToolClassification.DEPRECATED.value: 3,
         ToolClassification.INTERNAL.value: 4,
     }
-    if len(BASELINE_TOOL_SPECS) != 136 or counts != expected:
+    if len(BASELINE_TOOL_SPECS) != 131 or counts != expected:
         raise RuntimeError(
-            f"136-tool classification must be disjoint and exhaustive: {counts!r} != {expected!r}"
+            f"131-tool classification must be disjoint and exhaustive: {counts!r} != {expected!r}"
         )
-    if len(TOOL_SPECS) != 132:
-        raise RuntimeError(f"installed advanced surface must contain 132 tools, got {len(TOOL_SPECS)}")
+    if len(TOOL_SPECS) != 127:
+        raise RuntimeError(f"installed advanced surface must contain 127 tools, got {len(TOOL_SPECS)}")
     if sum(spec.skill_required for spec in TOOL_SPECS) != 28:
         raise RuntimeError(
             "installed surface must contain exactly 28 skill-required tools"
@@ -936,6 +932,7 @@ __all__ = [
     "MIN_MCP_VERSION",
     "MIN_PYTHON_HWPX",
     "MIN_SKILL_VERSION",
+    "PENDING_CONTRACT_HASH",
     "RegisteredToolRegistry",
     "RELEASED_CONTRACT_HASH",
     "SchemaBinding",

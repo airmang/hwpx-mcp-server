@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Annotated
 
 from pydantic import Field
-from hwpx import (
+# Import the template-formfit callables from their submodule rather than the
+# hwpx top level: at the core 4.0.0 boundary the top-level re-exports become
+# deprecated shims that emit a DeprecationWarning on access, and these MCP tools
+# (now DEPRECATED but still functional) must not trigger a runtime warning. The
+# submodule path is stable across core 3.3.1 and 4.0.0.
+from hwpx.template_formfit import (
     analyze_template_formfit as analyze_hwpx_template_formfit,
     apply_template_formfit as apply_hwpx_template_formfit,
 )
@@ -46,10 +51,6 @@ from ..form_output_models import (
     ApplyFormFillOutput,
     ApplyTableOpsOutput,
     VerifyFormFillOutput,
-)
-from ..quality_generation import (
-    analyze_quality_generation_workflow,
-    apply_quality_generation_workflow,
 )
 from ..utils.helpers import resolve_path
 from ..runtime_services import RUNTIME_SERVICES
@@ -129,44 +130,6 @@ def apply_template_formfit(
         destination=resolve_path(destination_filename)
         if destination_filename
         else None,
-        confirm=confirm,
-    )
-
-
-def analyze_quality_generation(
-    form_filename: str,
-    idea_brief: str | dict,
-    destination_filename: str = None,
-    quality_profile: str = "korean_ai_school_application_v1",
-    options: dict = None,
-) -> dict:
-    """양식+아이디어만으로 고품질 HWPX 생성을 준비하는 비파괴 분석을 수행합니다."""
-    return analyze_quality_generation_workflow(
-        form_filename=form_filename,
-        idea_brief=idea_brief,
-        destination_filename=destination_filename,
-        quality_profile=quality_profile,
-        options=options,
-    )
-
-
-def apply_quality_generation(
-    plan_id: str = None,
-    analysis: dict = None,
-    form_filename: str = None,
-    destination_filename: str = None,
-    idea_brief: str | dict = None,  # type: ignore[assignment]  # Frozen ToolSpec default.
-    max_revision_rounds: int = 1,
-    confirm: bool = True,
-) -> dict:
-    """MCP 품질 파이프라인으로 HWPX를 생성하고 검수/개선 루프 결과를 반환합니다."""
-    return apply_quality_generation_workflow(
-        plan_id=plan_id,
-        analysis=analysis,
-        form_filename=form_filename,
-        destination_filename=destination_filename,
-        idea_brief=idea_brief,
-        max_revision_rounds=max_revision_rounds,
         confirm=confirm,
     )
 
@@ -631,8 +594,6 @@ __all__ = [
     "apply_form_fill",
     "analyze_template_formfit",
     "apply_template_formfit",
-    "analyze_quality_generation",
-    "apply_quality_generation",
     "apply_evalplan_fill",
     "score_form_fill",
 ]

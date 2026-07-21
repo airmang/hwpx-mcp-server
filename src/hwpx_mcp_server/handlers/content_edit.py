@@ -31,7 +31,6 @@ from ..mutation_models import (
     operation_payloads,
 )
 from ..upstream import (
-    create_text_extractor,
     repair_pathological_text_spacing,
 )
 from ..utils.helpers import resolve_path
@@ -49,31 +48,6 @@ from ._shared import (
     _with_dry_run_verification,
     _with_save_verification,
 )
-
-
-def _build_verification_plan_operation(path: str, instruction: str) -> dict[str, Any]:
-    needle = (instruction or "").strip()
-    if not needle:
-        raise ValueError("instruction cannot be empty")
-
-    with create_text_extractor(path) as extractor:
-        for paragraph in extractor.iter_document_paragraphs():
-            text = paragraph.text(preserve_breaks=True)
-            if needle not in text:
-                continue
-            # FastMCP currently exposes only a single instruction string here.
-            # Anchor the hardened pipeline on the first matching paragraph and
-            # keep the replacement as a no-op so preview/apply remain truthful.
-            return {
-                "target": {"sectionIndex": 0, "paraIndex": paragraph.index},
-                "match": text,
-                "replacement": text,
-                "limit": 1,
-                "dryRun": True,
-                "atomic": True,
-            }
-
-    raise ValueError("instruction text was not found in the document")
 
 
 def table_compute(
@@ -1083,25 +1057,6 @@ def format_table(
     )
 
 
-def plan_edit(filename: str, instruction: str) -> dict:
-    """[고급] instruction 기준 검증용 편집 계획을 생성합니다."""
-    path = resolve_path(filename)
-    operation = _build_verification_plan_operation(path, instruction)
-    return RUNTIME_SERVICES.ops.plan_edit(path=path, operations=[operation])
-
-
-def preview_edit(filename: str, plan_id: str) -> dict:
-    """[고급] plan_edit 결과 미리보기를 조회합니다."""
-    del filename
-    return RUNTIME_SERVICES.ops.preview_edit(plan_id=plan_id)
-
-
-def apply_edit(filename: str, plan_id: str) -> dict:
-    """[고급] 검증 계획을 적용합니다. 원본 HWPX는 직접 수정하지 않습니다."""
-    del filename
-    return RUNTIME_SERVICES.ops.apply_edit(plan_id=plan_id, confirm=True)
-
-
 __all__ = [
     "add_heading",
     "add_paragraph",
@@ -1109,9 +1064,6 @@ __all__ = [
     "delete_paragraph",
     "add_page_break",
     "apply_edits",
-    "plan_edit",
-    "preview_edit",
-    "apply_edit",
     "undo_last_edit",
     "replace_by_anchor",
     "replace_in_paragraph",

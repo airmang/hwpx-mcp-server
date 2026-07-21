@@ -28,9 +28,6 @@ FAMILY_TOOL_ALLOWLISTS: dict[WorkFamily, frozenset[str]] = {
     WorkFamily.TRANSACTIONAL_EDIT: frozenset(
         {
             "get_document_info",
-            "plan_edit",
-            "preview_edit",
-            "apply_edit",
             "apply_edits",
             "undo_last_edit",
             "doc_diff",

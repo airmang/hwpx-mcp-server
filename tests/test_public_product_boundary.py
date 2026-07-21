@@ -98,8 +98,8 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
     advanced = expected_tool_names(advanced=True)
     live = set(server._fastmcp_tool_names())
 
-    assert len(default) == 121
-    assert len(advanced) == 132
+    assert len(default) == 119
+    assert len(advanced) == 127
     assert len(skill_required_tool_names()) == 28
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
         "3.3.1",
@@ -121,8 +121,8 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
 
     health = server.mcp_server_health()
     assert health["toolSurface"]["status"] == "ok"
-    assert health["toolSurface"]["expectedFastMcpToolCount"] == 121
-    assert health["toolSurface"]["actualFastMcpToolCount"] == 121
+    assert health["toolSurface"]["expectedFastMcpToolCount"] == 119
+    assert health["toolSurface"]["actualFastMcpToolCount"] == 119
     assert health["toolSurface"]["contractHash"] == contract_hash()
     assert health["toolSurface"]["missingExpectedTools"] == []
     assert health["toolSurface"]["unexpectedRegisteredTools"] == []

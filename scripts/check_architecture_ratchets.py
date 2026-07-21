@@ -50,7 +50,7 @@ EXPECTED_SERVICE_LINES = {
 
 EXPECTED_FACADE_LINES = {
     "hwpx_ops.py": 1434,
-    "server.py": 272,
+    "server.py": 267,
 }
 
 PRIVATE_ATTRIBUTES = ("_mcp_server", "_tool_manager", "_tools")

@@ -5873,8 +5873,8 @@
       "name": "fill_form_field",
       "domain": "form_fill",
       "profile": "default",
-      "classification": "compatibility",
-      "lifecycle": "compatibility",
+      "classification": "deprecated",
+      "lifecycle": "deprecated",
       "availabilityRequirement": {
         "dependency": "python-hwpx",
         "minimumVersion": "3.3.1",
@@ -5884,7 +5884,7 @@
       "declaredAvailability": "available",
       "availability": "available",
       "availabilityReason": null,
-      "decisionReason": "transition facade over a canonical typed engine",
+      "decisionReason": "one-transition stub with explicit replacement guidance",
       "replacementTools": [
         "analyze_form_fill",
         "apply_form_fill",
@@ -5896,7 +5896,7 @@
       "mutates": true,
       "tags": [
         "form_fill",
-        "compatibility",
+        "deprecated",
         "mutation"
       ],
       "description": "네이티브 누름틀/FORM 필드 하나를 채우고 open-safety 검증 증거를 반환합니다.",
@@ -9968,8 +9968,8 @@
       "name": "analyze_template_formfit",
       "domain": "form_fill",
       "profile": "default",
-      "classification": "compatibility",
-      "lifecycle": "compatibility",
+      "classification": "deprecated",
+      "lifecycle": "deprecated",
       "availabilityRequirement": {
         "dependency": "python-hwpx",
         "minimumVersion": "3.3.1",
@@ -9979,7 +9979,7 @@
       "declaredAvailability": "available",
       "availability": "available",
       "availabilityReason": null,
-      "decisionReason": "transition facade over a canonical typed engine",
+      "decisionReason": "one-transition stub with explicit replacement guidance",
       "replacementTools": [
         "analyze_form_fill",
         "apply_form_fill",
@@ -9991,7 +9991,7 @@
       "mutates": false,
       "tags": [
         "form_fill",
-        "compatibility"
+        "deprecated"
       ],
       "description": "P6 baseline 기반 양식 보존 생성 계획을 비파괴 분석합니다.",
       "signature": "(source_filename: 'str', baseline: 'dict | str', content: 'dict', destination_filename: 'str' = None, options: 'dict' = None) -> 'dict'",
@@ -10053,8 +10053,8 @@
       "name": "apply_template_formfit",
       "domain": "form_fill",
       "profile": "default",
-      "classification": "compatibility",
-      "lifecycle": "compatibility",
+      "classification": "deprecated",
+      "lifecycle": "deprecated",
       "availabilityRequirement": {
         "dependency": "python-hwpx",
         "minimumVersion": "3.3.1",
@@ -10064,7 +10064,7 @@
       "declaredAvailability": "available",
       "availability": "available",
       "availabilityReason": null,
-      "decisionReason": "transition facade over a canonical typed engine",
+      "decisionReason": "one-transition stub with explicit replacement guidance",
       "replacementTools": [
         "analyze_form_fill",
         "apply_form_fill",
@@ -10076,7 +10076,7 @@
       "mutates": true,
       "tags": [
         "form_fill",
-        "compatibility",
+        "deprecated",
         "mutation"
       ],
       "description": "양식 보존 생성 계획을 복사본 destination에만 적용하고 검증합니다.",
@@ -10135,182 +10135,6 @@
       "outputSchema": {
         "additionalProperties": true,
         "title": "apply_template_formfitDictOutput",
-        "type": "object",
-        "properties": {}
-      }
-    },
-    {
-      "name": "analyze_quality_generation",
-      "domain": "form_fill",
-      "profile": "default",
-      "classification": "deprecated",
-      "lifecycle": "deprecated",
-      "availabilityRequirement": {
-        "dependency": "python-hwpx",
-        "minimumVersion": "3.3.1",
-        "optional": false,
-        "extra": null
-      },
-      "declaredAvailability": "available",
-      "availability": "available",
-      "availabilityReason": null,
-      "decisionReason": "one-transition stub with explicit replacement guidance",
-      "replacementTools": [
-        "create_document_from_plan",
-        "create_proposal_document",
-        "inspect_document_quality"
-      ],
-      "skillRequired": false,
-      "callableName": "analyze_quality_generation",
-      "schemaBinding": "python-signature",
-      "mutates": false,
-      "tags": [
-        "form_fill",
-        "deprecated"
-      ],
-      "description": "양식+아이디어만으로 고품질 HWPX 생성을 준비하는 비파괴 분석을 수행합니다.",
-      "signature": "(form_filename: 'str', idea_brief: 'str | dict', destination_filename: 'str' = None, quality_profile: 'str' = 'korean_ai_school_application_v1', options: 'dict' = None) -> 'dict'",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "destination_filename": {
-            "default": null,
-            "title": "Destination Filename",
-            "type": "string"
-          },
-          "form_filename": {
-            "title": "Form Filename",
-            "type": "string"
-          },
-          "idea_brief": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "additionalProperties": true,
-                "properties": {},
-                "type": "object"
-              }
-            ],
-            "title": "Idea Brief"
-          },
-          "options": {
-            "additionalProperties": true,
-            "default": null,
-            "properties": {},
-            "title": "Options",
-            "type": "object"
-          },
-          "quality_profile": {
-            "default": "korean_ai_school_application_v1",
-            "title": "Quality Profile",
-            "type": "string"
-          }
-        },
-        "required": [
-          "form_filename",
-          "idea_brief"
-        ],
-        "title": "analyze_quality_generationArguments",
-        "type": "object"
-      },
-      "outputSchema": {
-        "additionalProperties": true,
-        "title": "analyze_quality_generationDictOutput",
-        "type": "object",
-        "properties": {}
-      }
-    },
-    {
-      "name": "apply_quality_generation",
-      "domain": "form_fill",
-      "profile": "default",
-      "classification": "deprecated",
-      "lifecycle": "deprecated",
-      "availabilityRequirement": {
-        "dependency": "python-hwpx",
-        "minimumVersion": "3.3.1",
-        "optional": false,
-        "extra": null
-      },
-      "declaredAvailability": "available",
-      "availability": "available",
-      "availabilityReason": null,
-      "decisionReason": "one-transition stub with explicit replacement guidance",
-      "replacementTools": [
-        "create_document_from_plan",
-        "create_proposal_document",
-        "inspect_document_quality"
-      ],
-      "skillRequired": false,
-      "callableName": "apply_quality_generation",
-      "schemaBinding": "python-signature",
-      "mutates": true,
-      "tags": [
-        "form_fill",
-        "deprecated",
-        "mutation"
-      ],
-      "description": "MCP 품질 파이프라인으로 HWPX를 생성하고 검수/개선 루프 결과를 반환합니다.",
-      "signature": "(plan_id: 'str' = None, analysis: 'dict' = None, form_filename: 'str' = None, destination_filename: 'str' = None, idea_brief: 'str | dict' = None, max_revision_rounds: 'int' = 1, confirm: 'bool' = True) -> 'dict'",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "analysis": {
-            "additionalProperties": true,
-            "default": null,
-            "properties": {},
-            "title": "Analysis",
-            "type": "object"
-          },
-          "confirm": {
-            "default": true,
-            "title": "Confirm",
-            "type": "boolean"
-          },
-          "destination_filename": {
-            "default": null,
-            "title": "Destination Filename",
-            "type": "string"
-          },
-          "form_filename": {
-            "default": null,
-            "title": "Form Filename",
-            "type": "string"
-          },
-          "idea_brief": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "additionalProperties": true,
-                "properties": {},
-                "type": "object"
-              }
-            ],
-            "default": null,
-            "title": "Idea Brief"
-          },
-          "max_revision_rounds": {
-            "default": 1,
-            "title": "Max Revision Rounds",
-            "type": "integer"
-          },
-          "plan_id": {
-            "default": null,
-            "title": "Plan Id",
-            "type": "string"
-          }
-        },
-        "required": [],
-        "title": "apply_quality_generationArguments",
-        "type": "object"
-      },
-      "outputSchema": {
-        "additionalProperties": true,
-        "title": "apply_quality_generationDictOutput",
         "type": "object",
         "properties": {}
       }
@@ -12863,173 +12687,6 @@
       "outputSchema": {
         "additionalProperties": true,
         "title": "apply_editsDictOutput",
-        "type": "object",
-        "properties": {}
-      }
-    },
-    {
-      "name": "plan_edit",
-      "domain": "edit",
-      "profile": "advanced",
-      "classification": "deprecated",
-      "lifecycle": "deprecated",
-      "availabilityRequirement": {
-        "dependency": "python-hwpx",
-        "minimumVersion": "3.3.1",
-        "optional": false,
-        "extra": null
-      },
-      "declaredAvailability": "profile-gated",
-      "availability": "available",
-      "availabilityReason": null,
-      "decisionReason": "one-transition stub with explicit replacement guidance",
-      "replacementTools": [
-        "apply_document_commands"
-      ],
-      "skillRequired": false,
-      "callableName": "plan_edit",
-      "schemaBinding": "python-signature",
-      "mutates": true,
-      "tags": [
-        "edit",
-        "deprecated",
-        "mutation"
-      ],
-      "description": "[고급] instruction 기준 검증용 편집 계획을 생성합니다.",
-      "signature": "(filename: 'str', instruction: 'str') -> 'dict'",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "filename": {
-            "title": "Filename",
-            "type": "string"
-          },
-          "instruction": {
-            "title": "Instruction",
-            "type": "string"
-          }
-        },
-        "required": [
-          "filename",
-          "instruction"
-        ],
-        "title": "plan_editArguments",
-        "type": "object"
-      },
-      "outputSchema": {
-        "additionalProperties": true,
-        "title": "plan_editDictOutput",
-        "type": "object",
-        "properties": {}
-      }
-    },
-    {
-      "name": "preview_edit",
-      "domain": "edit",
-      "profile": "advanced",
-      "classification": "deprecated",
-      "lifecycle": "deprecated",
-      "availabilityRequirement": {
-        "dependency": "python-hwpx",
-        "minimumVersion": "3.3.1",
-        "optional": false,
-        "extra": null
-      },
-      "declaredAvailability": "profile-gated",
-      "availability": "available",
-      "availabilityReason": null,
-      "decisionReason": "one-transition stub with explicit replacement guidance",
-      "replacementTools": [
-        "apply_document_commands"
-      ],
-      "skillRequired": false,
-      "callableName": "preview_edit",
-      "schemaBinding": "python-signature",
-      "mutates": false,
-      "tags": [
-        "edit",
-        "deprecated"
-      ],
-      "description": "[고급] plan_edit 결과 미리보기를 조회합니다.",
-      "signature": "(filename: 'str', plan_id: 'str') -> 'dict'",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "filename": {
-            "title": "Filename",
-            "type": "string"
-          },
-          "plan_id": {
-            "title": "Plan Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "filename",
-          "plan_id"
-        ],
-        "title": "preview_editArguments",
-        "type": "object"
-      },
-      "outputSchema": {
-        "additionalProperties": true,
-        "title": "preview_editDictOutput",
-        "type": "object",
-        "properties": {}
-      }
-    },
-    {
-      "name": "apply_edit",
-      "domain": "edit",
-      "profile": "advanced",
-      "classification": "deprecated",
-      "lifecycle": "deprecated",
-      "availabilityRequirement": {
-        "dependency": "python-hwpx",
-        "minimumVersion": "3.3.1",
-        "optional": false,
-        "extra": null
-      },
-      "declaredAvailability": "profile-gated",
-      "availability": "available",
-      "availabilityReason": null,
-      "decisionReason": "one-transition stub with explicit replacement guidance",
-      "replacementTools": [
-        "apply_document_commands"
-      ],
-      "skillRequired": false,
-      "callableName": "apply_edit",
-      "schemaBinding": "python-signature",
-      "mutates": true,
-      "tags": [
-        "edit",
-        "deprecated",
-        "mutation"
-      ],
-      "description": "[고급] 검증 계획을 적용합니다. 원본 HWPX는 직접 수정하지 않습니다.",
-      "signature": "(filename: 'str', plan_id: 'str') -> 'dict'",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "filename": {
-            "title": "Filename",
-            "type": "string"
-          },
-          "plan_id": {
-            "title": "Plan Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "filename",
-          "plan_id"
-        ],
-        "title": "apply_editArguments",
-        "type": "object"
-      },
-      "outputSchema": {
-        "additionalProperties": true,
-        "title": "apply_editDictOutput",
         "type": "object",
         "properties": {}
       }
@@ -18162,12 +17819,12 @@
   ],
   "baselineClassification": {
     "schemaVersion": "hwpx.tool-classification.v1",
-    "baselineToolCount": 136,
+    "baselineToolCount": 131,
     "counts": {
       "public": 110,
-      "compatibility": 9,
+      "compatibility": 6,
       "advanced": 8,
-      "deprecated": 5,
+      "deprecated": 3,
       "internal": 4
     },
     "tools": [
@@ -19318,8 +18975,8 @@
         "name": "fill_form_field",
         "domain": "form_fill",
         "profile": "default",
-        "classification": "compatibility",
-        "lifecycle": "compatibility",
+        "classification": "deprecated",
+        "lifecycle": "deprecated",
         "availabilityRequirement": {
           "dependency": "python-hwpx",
           "minimumVersion": "3.3.1",
@@ -19329,7 +18986,7 @@
         "declaredAvailability": "available",
         "availability": "available",
         "availabilityReason": null,
-        "decisionReason": "transition facade over a canonical typed engine",
+        "decisionReason": "one-transition stub with explicit replacement guidance",
         "replacementTools": [
           "analyze_form_fill",
           "apply_form_fill",
@@ -19341,7 +18998,7 @@
         "mutates": true,
         "tags": [
           "form_fill",
-          "compatibility",
+          "deprecated",
           "mutation"
         ]
       },
@@ -19459,8 +19116,8 @@
         "name": "analyze_template_formfit",
         "domain": "form_fill",
         "profile": "default",
-        "classification": "compatibility",
-        "lifecycle": "compatibility",
+        "classification": "deprecated",
+        "lifecycle": "deprecated",
         "availabilityRequirement": {
           "dependency": "python-hwpx",
           "minimumVersion": "3.3.1",
@@ -19470,7 +19127,7 @@
         "declaredAvailability": "available",
         "availability": "available",
         "availabilityReason": null,
-        "decisionReason": "transition facade over a canonical typed engine",
+        "decisionReason": "one-transition stub with explicit replacement guidance",
         "replacementTools": [
           "analyze_form_fill",
           "apply_form_fill",
@@ -19482,15 +19139,15 @@
         "mutates": false,
         "tags": [
           "form_fill",
-          "compatibility"
+          "deprecated"
         ]
       },
       {
         "name": "apply_template_formfit",
         "domain": "form_fill",
         "profile": "default",
-        "classification": "compatibility",
-        "lifecycle": "compatibility",
+        "classification": "deprecated",
+        "lifecycle": "deprecated",
         "availabilityRequirement": {
           "dependency": "python-hwpx",
           "minimumVersion": "3.3.1",
@@ -19500,7 +19157,7 @@
         "declaredAvailability": "available",
         "availability": "available",
         "availabilityReason": null,
-        "decisionReason": "transition facade over a canonical typed engine",
+        "decisionReason": "one-transition stub with explicit replacement guidance",
         "replacementTools": [
           "analyze_form_fill",
           "apply_form_fill",
@@ -19508,67 +19165,6 @@
         ],
         "skillRequired": false,
         "callableName": "apply_template_formfit",
-        "schemaBinding": "python-signature",
-        "mutates": true,
-        "tags": [
-          "form_fill",
-          "compatibility",
-          "mutation"
-        ]
-      },
-      {
-        "name": "analyze_quality_generation",
-        "domain": "form_fill",
-        "profile": "default",
-        "classification": "deprecated",
-        "lifecycle": "deprecated",
-        "availabilityRequirement": {
-          "dependency": "python-hwpx",
-          "minimumVersion": "3.3.1",
-          "optional": false,
-          "extra": null
-        },
-        "declaredAvailability": "available",
-        "availability": "available",
-        "availabilityReason": null,
-        "decisionReason": "one-transition stub with explicit replacement guidance",
-        "replacementTools": [
-          "create_document_from_plan",
-          "create_proposal_document",
-          "inspect_document_quality"
-        ],
-        "skillRequired": false,
-        "callableName": "analyze_quality_generation",
-        "schemaBinding": "python-signature",
-        "mutates": false,
-        "tags": [
-          "form_fill",
-          "deprecated"
-        ]
-      },
-      {
-        "name": "apply_quality_generation",
-        "domain": "form_fill",
-        "profile": "default",
-        "classification": "deprecated",
-        "lifecycle": "deprecated",
-        "availabilityRequirement": {
-          "dependency": "python-hwpx",
-          "minimumVersion": "3.3.1",
-          "optional": false,
-          "extra": null
-        },
-        "declaredAvailability": "available",
-        "availability": "available",
-        "availabilityReason": null,
-        "decisionReason": "one-transition stub with explicit replacement guidance",
-        "replacementTools": [
-          "create_document_from_plan",
-          "create_proposal_document",
-          "inspect_document_quality"
-        ],
-        "skillRequired": false,
-        "callableName": "apply_quality_generation",
         "schemaBinding": "python-signature",
         "mutates": true,
         "tags": [
@@ -20212,113 +19808,6 @@
           "compatibility",
           "mutation",
           "skill-required"
-        ]
-      },
-      {
-        "name": "plan_edit",
-        "domain": "edit",
-        "profile": "advanced",
-        "classification": "deprecated",
-        "lifecycle": "deprecated",
-        "availabilityRequirement": {
-          "dependency": "python-hwpx",
-          "minimumVersion": "3.3.1",
-          "optional": false,
-          "extra": null
-        },
-        "declaredAvailability": "profile-gated",
-        "availability": "profile-gated",
-        "availabilityReason": {
-          "code": "PROFILE_DISABLED",
-          "message": "set HWPX_MCP_ADVANCED=1 before server import",
-          "dependency": null,
-          "requiredVersion": null,
-          "installedVersion": null,
-          "installHint": null
-        },
-        "decisionReason": "one-transition stub with explicit replacement guidance",
-        "replacementTools": [
-          "apply_document_commands"
-        ],
-        "skillRequired": false,
-        "callableName": "plan_edit",
-        "schemaBinding": "python-signature",
-        "mutates": true,
-        "tags": [
-          "edit",
-          "deprecated",
-          "mutation"
-        ]
-      },
-      {
-        "name": "preview_edit",
-        "domain": "edit",
-        "profile": "advanced",
-        "classification": "deprecated",
-        "lifecycle": "deprecated",
-        "availabilityRequirement": {
-          "dependency": "python-hwpx",
-          "minimumVersion": "3.3.1",
-          "optional": false,
-          "extra": null
-        },
-        "declaredAvailability": "profile-gated",
-        "availability": "profile-gated",
-        "availabilityReason": {
-          "code": "PROFILE_DISABLED",
-          "message": "set HWPX_MCP_ADVANCED=1 before server import",
-          "dependency": null,
-          "requiredVersion": null,
-          "installedVersion": null,
-          "installHint": null
-        },
-        "decisionReason": "one-transition stub with explicit replacement guidance",
-        "replacementTools": [
-          "apply_document_commands"
-        ],
-        "skillRequired": false,
-        "callableName": "preview_edit",
-        "schemaBinding": "python-signature",
-        "mutates": false,
-        "tags": [
-          "edit",
-          "deprecated"
-        ]
-      },
-      {
-        "name": "apply_edit",
-        "domain": "edit",
-        "profile": "advanced",
-        "classification": "deprecated",
-        "lifecycle": "deprecated",
-        "availabilityRequirement": {
-          "dependency": "python-hwpx",
-          "minimumVersion": "3.3.1",
-          "optional": false,
-          "extra": null
-        },
-        "declaredAvailability": "profile-gated",
-        "availability": "profile-gated",
-        "availabilityReason": {
-          "code": "PROFILE_DISABLED",
-          "message": "set HWPX_MCP_ADVANCED=1 before server import",
-          "dependency": null,
-          "requiredVersion": null,
-          "installedVersion": null,
-          "installHint": null
-        },
-        "decisionReason": "one-transition stub with explicit replacement guidance",
-        "replacementTools": [
-          "apply_document_commands"
-        ],
-        "skillRequired": false,
-        "callableName": "apply_edit",
-        "schemaBinding": "python-signature",
-        "mutates": true,
-        "tags": [
-          "edit",
-          "deprecated",
-          "mutation"
         ]
       },
       {
@@ -21953,15 +21442,15 @@
       }
     ]
   },
-  "contractHash": "c89cbc5f98eb5367",
-  "defaultToolCount": 121,
-  "advancedToolCount": 132,
-  "baselineToolCount": 136,
+  "contractHash": "c9a451a7c003752a",
+  "defaultToolCount": 119,
+  "advancedToolCount": 127,
+  "baselineToolCount": 131,
   "classificationCounts": {
     "public": 110,
-    "compatibility": 9,
+    "compatibility": 6,
     "advanced": 8,
-    "deprecated": 5,
+    "deprecated": 3,
     "internal": 4
   },
   "skillRequiredTools": [
