@@ -2,6 +2,37 @@
 
 ## [Unreleased]
 
+### Removed (breaking, 5.0.0 major boundary)
+- The five one-transition stubs `plan_edit`, `preview_edit`, `apply_edit`,
+  `analyze_quality_generation`, and `apply_quality_generation` are removed from
+  the tool registry, the explicit bindings, the FastMCP server aliases, and the
+  workflow `TRANSACTIONAL_EDIT` allowlist. No alias and no ghost wrapper stands
+  in for them (S-078 policy). Migrate per `docs/deprecation-5.0.0.md`:
+  `apply_document_commands` (dry-run for the old plan/preview semantics) for the
+  edit trio, and `create_document_from_plan` + `inspect_document_quality` for
+  quality generation.
+
+### Changed (breaking, 5.0.0 major boundary)
+- The three template-formfit facades `analyze_template_formfit`,
+  `apply_template_formfit`, and `fill_form_field` demote from
+  `COMPATIBILITY` to `DEPRECATED`. Their handlers and behaviour are unchanged;
+  they now carry the one-transition deprecation guidance toward the canonical
+  `analyze_form_fill`/`apply_form_fill`/`verify_form_fill` trio and are slated
+  for removal at the next major boundary.
+- Baseline classification drops 136 → 131 (compatibility 9 → 6, deprecated
+  5 → 3); the installed advanced surface is 132 → 127, the default surface
+  121 → 119, and skill-required stays 28. The contract hash moves
+  `c89cbc5f98eb5367` → `c9a451a7c003752a`; the delta is recorded in
+  `docs/tool-contract-delta-5.0.0.json` and cross-checked against the live
+  registry by `scripts/render_contract_delta.py`.
+
+### Internal
+- `handlers/form_fill.py` now imports the template-formfit callables from the
+  `hwpx.template_formfit` submodule instead of the `hwpx` top level. At the core
+  4.0.0 boundary the top-level re-exports become deprecated shims that warn on
+  access; the demoted-but-functional MCP tools must not emit a runtime warning.
+  The submodule path is stable across core 3.3.1 and 4.0.0.
+
 ## [4.4.1] - 2026-07-21
 
 ### Notes

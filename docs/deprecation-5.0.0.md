@@ -17,6 +17,17 @@ authored in S-082 while the stubs remain fully functional.
 | `analyze_quality_generation` | `create_document_from_plan` + `inspect_document_quality` | Analysis is a read of the plan schema plus the quality inspector; no separate pre-analysis pass is needed. |
 | `apply_quality_generation` | `create_document_from_plan` (+ `create_proposal_document` for proposal presets) | Plan-driven generation carries the quality policy directly. |
 
+## Concurrent decision (S-091): template-formfit facade demotion
+
+This document was authored in S-082 for the stub removal only. At the 5.0.0
+boundary the owner also demoted three compatibility facades —
+`analyze_template_formfit`, `apply_template_formfit`, `fill_form_field` — from
+`COMPATIBILITY` to `DEPRECATED` (handlers unchanged; one-transition guidance
+toward `analyze_form_fill`/`apply_form_fill`/`verify_form_fill`). So the live
+`DEPRECATED` count is **5 → 3**, not 5 → 0, and `COMPATIBILITY` is 9 → 6. The
+demotion is recorded alongside the removal in
+`docs/tool-contract-delta-5.0.0.json`.
+
 ## Removal checklist (execute at 5.0.0, one release)
 
 1. Remove the five ToolSpecs and their handler bindings; counts change
@@ -31,9 +42,11 @@ authored in S-082 while the stubs remain fully functional.
    skill bundle guidance and eval tasks (see workspace
    `docs/2026-07-18-facade-decision-table.md`); every reference must migrate
    to the replacement tools in the same release.
-4. Update `tests/test_tool_contract.py` classification counts
-   (deprecated 5 → 0) and the `render_contract_delta.py` structural checks
-   that assert "five transition deprecations".
+4. Update `tests/test_tool_contract.py` classification counts (deprecated
+   5 → 3 after the facade demotion above; baseline 136 → 131) and the
+   `render_contract_delta.py` structural checks that assert "five transition
+   deprecations" (frozen to the historical 4.0.0 set so the 4.0.0 receipt does
+   not drift once the live registry no longer holds these stubs).
 5. Bundle a 5.0.0 migration section in the skill CHANGELOG pointing here.
 
 ## What must NOT ride along

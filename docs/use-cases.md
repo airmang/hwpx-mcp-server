@@ -10,7 +10,7 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 
 기존에는 한글 파일을 열어서 일일이 수작업으로 처리해야 했던 일을, 이제 자연어 요청으로 자동화할 수 있습니다.
 
-4.3.0 공개 릴리스의 기본 모드 121개(고급 모드 포함 총 132개)의 도구로 문서 생성,
+5.0.0 major 경계의 기본 모드 119개(고급 모드 포함 총 127개)의 도구로 문서 생성,
 선언형 document-plan 생성, 운영 계획서 품질 프로필, 검색, 치환, 표 편집,
 서식 적용, HWPX repair/recover까지 처리할 수 있습니다.
 
@@ -281,7 +281,7 @@ Current workflow boundary:
 - There is no active public `fill_template` tool on the FastMCP surface.
 - There is no active public `save` / `save_as` tool on the FastMCP surface; mutating tools persist immediately, so use `copy_document` when you need a reviewable output path.
 - Use `copy_document` first when you need a reviewable or low-risk edit path because mutating tools persist immediately.
-- Use advanced mode for package inspection and validation steps: `package_parts`, `package_get_xml`, `package_get_text`, and `validate_structure`. Use `apply_document_commands` for new heterogeneous atomic edit flows; `plan_edit`, `preview_edit`, and `apply_edit` are deprecated transition stubs.
+- Use advanced mode for package inspection and validation steps: `package_parts`, `package_get_xml`, `package_get_text`, and `validate_structure`. Use `apply_document_commands` for new heterogeneous atomic edit flows; the `plan_edit`/`preview_edit`/`apply_edit` and `analyze_quality_generation`/`apply_quality_generation` transition stubs were removed at the 5.0.0 major boundary (use `create_document_from_plan` + `inspect_document_quality` for quality generation).
 
 Layer ownership:
 

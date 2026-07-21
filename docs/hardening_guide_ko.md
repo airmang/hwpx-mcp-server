@@ -3,24 +3,28 @@
 ## 공개 계약과 프로필
 
 - 도구 등록, 입력·출력 스키마, health/capability 표면과 생성 문서는 하나의
-  `ToolSpec` 레지스트리에서 만들어집니다. 4.3.0 공개 릴리스는 기본 121개, 고급 모드 포함
-  132개 도구와 28개 skill-required 도구를 유지하며 계약 해시는
-  `f82caecbcfc742e9`입니다. 최소 좌표는 core `3.3.1`, MCP `4.3.0`, skill
+  `ToolSpec` 레지스트리에서 만들어집니다. 5.0.0 major 경계는 기본 119개, 고급 모드
+  포함 127개 도구와 28개 skill-required 도구를 유지하며 계약 해시는
+  `c9a451a7c003752a`입니다(전환 stub 5종 제거 + template-formfit facade 3종
+  deprecated 강등). 직전 4.4.1 공개 릴리스는 기본 121개·고급 132개·해시
+  `c89cbc5f98eb5367`였습니다. 최소 좌표는 core `3.3.1`, MCP `4.3.0`, skill
   `0.5.0`입니다.
-- 4.0.0의 `f46ec677231b3a20`, 4.1.0의 `c127914cc3f4480e`, 4.2.1의 `fff2c9093ca4677b`는 역사적 계약입니다. 최소 버전 좌표도 canonical
-  payload에 포함되므로 도구 이름·순서·스키마가 같더라도 4.3.0 해시와 섞어 쓰면
-  안 됩니다. `mcp_server_health`가 좌표나 해시 skew를 보고하면 쓰기를 진행하지
-  마세요.
+- 4.0.0의 `f46ec677231b3a20`, 4.1.0의 `c127914cc3f4480e`, 4.2.1의 `fff2c9093ca4677b`,
+  4.3.0의 `f82caecbcfc742e9`, 4.4.x의 `c89cbc5f98eb5367`는 역사적 계약입니다. 최소
+  버전 좌표도 canonical payload에 포함되므로 도구 이름·순서·스키마가 같더라도 다른
+  릴리스 해시와 섞어 쓰면 안 됩니다. `mcp_server_health`가 좌표나 해시 skew를
+  보고하면 쓰기를 진행하지 마세요.
 - 스키마는 JSON Schema 2020-12 기준이며 `$defs`, `$ref`, `anyOf`를 사용할 수
   있습니다. 실제 호스트에 노출되는 계약은 `docs/tool-contract.generated.json`과
   `docs/tool-contract.md`에서 확인합니다.
-- 기본 프로필을 운영 표면으로 사용하세요. package inspection, 저수준 검증과 전환기
-  편집 도구가 꼭 필요한 경우에만 `HWPX_MCP_ADVANCED=1`을 설정하고 호스트를 다시
+- 기본 프로필을 운영 표면으로 사용하세요. package inspection과 저수준 검증
+  도구가 꼭 필요한 경우에만 `HWPX_MCP_ADVANCED=1`을 설정하고 호스트를 다시
   시작합니다.
-- `plan_edit` → `preview_edit` → `apply_edit`는 고급 모드의 deprecated 전환
-  표면입니다. 신규 자동화는 `apply_document_commands` 또는 목적별 canonical form 도구를
-  우선합니다. 존재하지 않는 `HWPX_MCP_HARDENING`, `search`, `get_context` 도구에
-  의존하면 안 됩니다.
+- `plan_edit` → `preview_edit` → `apply_edit`와 `analyze_quality_generation` /
+  `apply_quality_generation`는 5.0.0 major 경계에서 **제거**되었습니다(별칭·유령
+  래퍼 없음). 신규 자동화는 `apply_document_commands`, 문서 생성은
+  `create_document_from_plan`(+ `inspect_document_quality`)을 사용합니다. 존재하지
+  않는 `HWPX_MCP_HARDENING`, `search`, `get_context` 도구에 의존하면 안 됩니다.
 
 ## 작업공간·네트워크 경계
 
