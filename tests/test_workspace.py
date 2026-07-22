@@ -43,17 +43,17 @@ def test_workspace_path_input_normalization(tmp_path: Path) -> None:
     assert resolver.resolve(f'"{document.as_uri()}"') == document.resolve()
     assert (
         _normalize_path_input(
-            r"file:///C:/Users/example/Documents/inside%20document.hwpx",
+            r"file:///C:/workspace/Documents/inside%20document.hwpx",
             windows=True,
         )
-        == r"C:\Users\example\Documents\inside document.hwpx"
+        == r"C:\workspace\Documents\inside document.hwpx"
     )
     assert (
         _normalize_path_input(
-            r"'C:/Users/example\Documents/inside document.hwpx'",
+            r"'C:/workspace\Documents/inside document.hwpx'",
             windows=True,
         )
-        == r"C:\Users\example\Documents\inside document.hwpx"
+        == r"C:\workspace\Documents\inside document.hwpx"
     )
 
 
@@ -70,6 +70,8 @@ def test_ordinary_spaced_path_name_is_preserved(tmp_path: Path) -> None:
     # the byte-identical file, not be silently redirected to the unspaced one.
     assert _normalize_path_input(" report.hwpx ") == " report.hwpx "
     assert resolver.resolve(" report.hwpx ") == spaced
+    assert _normalize_path_input('" report.hwpx "') == " report.hwpx "
+    assert resolver.resolve('" report.hwpx "') == spaced
     assert resolver.resolve("report.hwpx") == unspaced
 
 
