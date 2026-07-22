@@ -284,8 +284,13 @@ def apply_evalplan_fill(
     render_check: str = "off",
     score_gold_path: str | None = None,
     expected_pages: int | None = None,
+    phase: str = "all",
 ) -> ApplyEvalplanFillOutput:
-    """빈 평가계획 양식과 검토용 Markdown을 바이트 보존 채움본으로 만듭니다."""
+    """빈 평가계획 양식과 검토용 Markdown을 바이트 보존 채움본으로 만듭니다.
+
+    phase: "structural"|"all"(기본)|"clean". "clean"은 채움 뒤 core의 결정론적
+    정리(제목/교사/정의적 채움·지시문 스캐폴딩 prune·빨강 제거·파랑→검정·캡션 strip)까지
+    한 번에 실행해 제출 가능한 채움본을 돌려줍니다(정리 리포트=contentReport.finalize)."""
 
     quality_contract.assert_write_capability()
     source = Path(resolve_path(filename))
@@ -299,6 +304,7 @@ def apply_evalplan_fill(
             RUNTIME_SERVICES.ops.apply_evalplan_fill(
                 str(source),
                 resolve_path(review_md),
+                phase=phase,
                 output=str(target) if output else None,
                 render_check=render_check,
                 score_gold_path=resolve_path(score_gold_path)

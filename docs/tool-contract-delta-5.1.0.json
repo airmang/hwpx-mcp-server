@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "hwpx.tool-contract-delta.v2",
+  "release": "5.1.0",
+  "changeKind": "additive-optional-parameter",
+  "releaseStatus": "pending",
+  "note": "S-095 HLP productization. apply_evalplan_fill gains a phase selector so the driver-free clean path (fill + core finalize) is reachable through the MCP surface in one call. The live contract_hash() has moved to PENDING_CONTRACT_HASH; RELEASED_CONTRACT_HASH stays frozen at the 5.0.0 receipt until the release train collapses the two. Not yet released.",
+  "baseline": {
+    "versions": {
+      "pythonHwpx": "4.0.0",
+      "mcpServer": "5.0.0",
+      "skill": "0.7.0"
+    },
+    "defaultToolCount": 119,
+    "advancedToolCount": 127,
+    "skillRequiredToolCount": 28,
+    "classificationCounts": {
+      "public": 110,
+      "compatibility": 6,
+      "advanced": 8,
+      "deprecated": 3,
+      "internal": 4
+    },
+    "contractHash": "c2cd81fdb3089bae"
+  },
+  "target": {
+    "versions": {
+      "pythonHwpx": "4.0.0",
+      "mcpServer": "5.1.0",
+      "skill": "0.7.0"
+    },
+    "defaultToolCount": 119,
+    "advancedToolCount": 127,
+    "skillRequiredToolCount": 28,
+    "classificationCounts": {
+      "public": 110,
+      "compatibility": 6,
+      "advanced": 8,
+      "deprecated": 3,
+      "internal": 4
+    },
+    "contractHash": "41a685020447bd8b"
+  },
+  "delta": {
+    "defaultToolCount": 0,
+    "advancedToolCount": 0,
+    "skillRequiredToolCount": 0,
+    "removedTools": [],
+    "addedTools": [],
+    "promotedTools": [],
+    "profileMoves": []
+  },
+  "changedTools": [
+    {
+      "name": "apply_evalplan_fill",
+      "domain": "form_fill",
+      "classification": "compatibility",
+      "classificationChanged": false,
+      "profileChanged": false,
+      "mutatesChanged": false,
+      "skillRequiredChanged": false,
+      "changedFields": [
+        "inputSchema"
+      ],
+      "addedInputParameters": [
+        {
+          "name": "phase",
+          "type": "string",
+          "default": "all",
+          "required": false,
+          "enum": ["structural", "all", "clean"],
+          "description": "How far the recipe runs. 'structural' = confident deletions only; 'all' (default; the prior behaviour) = structural + per-region content fills; 'clean' = 'all' plus core's deterministic post-fill cleanup (title/teacher/정의적 fills, instruction-scaffolding + orphan prune, red-strip, blue->black recolor, caption strip), surfaced under contentReport.finalize. An invalid phase fails closed with EVALPLAN_PHASE_INVALID."
+        }
+      ],
+      "addedOutputFields": []
+    }
+  ],
+  "coreDependency": {
+    "capability": "hwpx.evalplan_fill.fill_evalplan(phase='clean') + finalize_evalplan",
+    "floorBumped": false,
+    "failClosed": "phase not in {structural, all, clean} raises EVALPLAN_PHASE_INVALID before any core call. phase='clean' is inert against a core build whose fill_evalplan lacks the clean branch (it degrades to 'all'); MIN_PYTHON_HWPX stays 4.0.0 in this branch. The released constant only flips at the release train."
+  },
+  "proof": "Holding version coordinates, classification, counts, domains, and every other tool fixed, the canonical payload delta is confined to apply_evalplan_fill: its inputSchema gains one optional string property (phase, default 'all'), which is not added to the required list. No tool is added, removed, renamed, or reclassified; the output schema is unchanged (contentReport is a free-form object that already carries the new finalize report); mutation/profile/skill-required flags are unchanged. Contract hash c2cd81fdb3089bae -> 41a685020447bd8b (recorded as PENDING_CONTRACT_HASH until release)."
+}

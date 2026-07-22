@@ -388,11 +388,14 @@ class FormFieldService:
             "markdownReport": report.to_markdown(),
         }
 
+    _EVALPLAN_PHASES = ("structural", "all", "clean")
+
     def apply_evalplan_fill(
         self,
         path: str,
         review_md: str,
         *,
+        phase: str = "all",
         output: Optional[str] = None,
         render_check: str = "off",
         score_gold_path: Optional[str] = None,
@@ -410,10 +413,22 @@ class FormFieldService:
         2015-개정 and 2022-개정 form families (auto-detected from the blank + review).
 
         ``path`` = blank form, ``reviewMd`` = the structured review markdown
-        (Ⅰ 운영계획 + [1]~[11]). Returns the produced path + per-region contentReport
-        with rubricNeedsReview (honest-defer count, never silent). Set
-        renderCheck='required' to gate on a real Hancom render; pass scoreGoldPath
-        (an accepted form of the same family) to also return the 5-axis scorecard."""
+        (Ⅰ 운영계획 + [1]~[11]). ``phase`` selects how far the recipe runs:
+        ``"structural"`` = confident deletions only, ``"all"`` (default; the prior
+        behaviour) = structural + per-region content fills, ``"clean"`` = ``"all"``
+        plus core's deterministic post-fill cleanup (title/teacher/정의적 fills,
+        instruction-scaffolding + orphan prune, red-strip, blue->black recolor,
+        caption strip) that yields a submittable 채움본 with no bespoke driver; the
+        cleanup report is surfaced under ``contentReport.finalize``. Returns the
+        produced path + per-region contentReport with rubricNeedsReview (honest-defer
+        count, never silent). Set renderCheck='required' to gate on a real Hancom
+        render; pass scoreGoldPath (an accepted form of the same family) to also
+        return the 5-axis scorecard."""
+        if phase not in self._EVALPLAN_PHASES:
+            raise self._context._new_error(
+                "EVALPLAN_PHASE_INVALID",
+                f"phase must be one of {self._EVALPLAN_PHASES}, got {phase!r}",
+            )
         try:
             from hwpx.evalplan_fill import (
                 parse_review_file,
@@ -442,7 +457,7 @@ class FormFieldService:
                 self._context._resolve_output_path(output) if output else blank
             )
         content = parse_review_file(md)
-        res = fill_evalplan(blank, content, phase="all")
+        res = fill_evalplan(blank, content, phase=phase)
         data = res["_data"]
 
         report = res.get("content_report", {})

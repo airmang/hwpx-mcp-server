@@ -18,10 +18,10 @@ if str(SRC) not in sys.path:
 from hwpx_mcp_server import runtime as _runtime  # noqa: E402,F401
 from hwpx_mcp_server.tool_contract import (  # noqa: E402
     BASELINE_TOOL_SPECS,
+    RELEASED_CONTRACT_HASH,
     TOOL_SPECS,
     ToolClassification,
     bound_tool_registry,
-    contract_hash,
 )
 
 
@@ -245,6 +245,13 @@ def validate_major_boundary_receipt() -> None:
     the removal it records must be real: the five stubs are gone from every
     installed name and the three demoted facades are now DEPRECATED. The renderer
     verifies that here so the receipt cannot claim a removal the code did not make.
+
+    The receipt's ``target.contractHash`` is the frozen 5.0.0 boundary hash, so it
+    is cross-checked against the frozen ``RELEASED_CONTRACT_HASH`` receipt, not the
+    live ``contract_hash()``. An additive pre-release surface change (recorded as
+    ``PENDING_CONTRACT_HASH``) legitimately moves the live hash forward without
+    mutating this historical 5.0.0 boundary; the release train collapses PENDING
+    into RELEASED and supersedes this receipt.
     """
 
     payload = json.loads(MAJOR_BOUNDARY_RECEIPT.read_text(encoding="utf-8"))
@@ -283,9 +290,9 @@ def validate_major_boundary_receipt() -> None:
             errors.append(f"{item.get('name')} must record compatibility -> deprecated")
 
     target_hash = payload.get("target", {}).get("contractHash")
-    if target_hash != contract_hash():
+    if target_hash != RELEASED_CONTRACT_HASH:
         errors.append(
-            f"target.contractHash {target_hash!r} != live contract hash {contract_hash()!r}"
+            f"target.contractHash {target_hash!r} != frozen released hash {RELEASED_CONTRACT_HASH!r}"
         )
 
     if errors:

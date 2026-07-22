@@ -25,6 +25,7 @@ from hwpx_mcp_server.tool_contract import (
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
+    PENDING_CONTRACT_HASH,
     RELEASED_CONTRACT_HASH,
     ToolClassification,
     ToolAvailability,
@@ -163,8 +164,11 @@ def test_release_contract_versions_counts_and_hash_are_exact() -> None:
     assert len(expected_tool_names(advanced=False)) == 119
     assert len(expected_tool_names(advanced=True)) == 127
     assert len(skill_required_tool_names()) == 28
+    # Pre-release surface change: the apply_evalplan_fill phase parameter moves
+    # the live contract hash to PENDING_CONTRACT_HASH while the frozen released
+    # receipt stays put until the release train collapses the two.
     assert RELEASED_CONTRACT_HASH == "c2cd81fdb3089bae"
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "c2cd81fdb3089bae"
+    assert contract_hash() == PENDING_CONTRACT_HASH == "41a685020447bd8b"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 
@@ -430,6 +434,7 @@ def test_recovered_tool_schemas_preserve_public_argument_names() -> None:
         "render_check",
         "score_gold_path",
         "expected_pages",
+        "phase",
     } == inputs["apply_evalplan_fill"]
     assert {
         "family",

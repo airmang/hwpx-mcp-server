@@ -133,6 +133,60 @@ def test_apply_evalplan_fill_one_shot(tmp_path):
 @pytest.mark.skipif(
     not BLANK.exists(), reason="public blank-form fixture not available"
 )
+def test_apply_evalplan_fill_default_phase_is_all_no_finalize(tmp_path):
+    """The default (no phase) preserves the prior 'all' behaviour: content is
+    filled but core's finalize cleanup does not run, so contentReport has no
+    'finalize' block. Proves the new parameter is additive/non-destructive."""
+    shutil.copy(BLANK, tmp_path / "blank.hwpx")
+    (tmp_path / "review.md").write_text(SYNTHETIC_MD, encoding="utf-8")
+    ops = HwpxOps(base_directory=tmp_path)
+    out = ops.apply_evalplan_fill("blank.hwpx", "review.md", output="filled.hwpx")
+
+    assert out["ok"] is True
+    assert "finalize" not in out["contentReport"]
+
+
+@pytest.mark.skipif(
+    not BLANK.exists(), reason="public blank-form fixture not available"
+)
+def test_apply_evalplan_fill_clean_phase_runs_finalize(tmp_path):
+    """phase='clean' routes through core fill_evalplan(phase='clean'), so the
+    deterministic post-fill cleanup runs and its report is surfaced under
+    contentReport.finalize (the one-call driver-free clean path)."""
+    shutil.copy(BLANK, tmp_path / "blank.hwpx")
+    (tmp_path / "review.md").write_text(SYNTHETIC_MD, encoding="utf-8")
+    ops = HwpxOps(base_directory=tmp_path)
+    out = ops.apply_evalplan_fill(
+        "blank.hwpx", "review.md", output="filled.hwpx", phase="clean"
+    )
+
+    assert out["ok"] is True
+    assert (out.get("openSafety") or {}).get("ok") is True  # opens in Hancom
+    finalize = out["contentReport"]["finalize"]
+    # finalize report shape from core (title/teacher/정의적 + prune counts)
+    assert set(finalize).issuperset({"deleted", "title", "teacher", "affective_rows"})
+    assert finalize["title"] is True  # synthetic MD carries a title
+    assert (tmp_path / "filled.hwpx").exists()
+
+
+def test_apply_evalplan_fill_invalid_phase_fails_closed(tmp_path):
+    """An unknown phase fails closed with a clear error before any core call and
+    publishes nothing."""
+    shutil.copy(BLANK, tmp_path / "blank.hwpx")
+    (tmp_path / "review.md").write_text(SYNTHETIC_MD, encoding="utf-8")
+    before = (tmp_path / "blank.hwpx").read_bytes()
+    ops = HwpxOps(base_directory=tmp_path)
+    with pytest.raises(HwpxOperationError, match="phase must be one of"):
+        ops.apply_evalplan_fill(
+            "blank.hwpx", "review.md", output="filled.hwpx", phase="bogus"
+        )
+    assert (tmp_path / "blank.hwpx").read_bytes() == before
+    assert not (tmp_path / "filled.hwpx").exists()
+
+
+@pytest.mark.skipif(
+    not BLANK.exists(), reason="public blank-form fixture not available"
+)
 def test_evalplan_server_preserves_domain_semantics_with_common_receipt(tmp_path):
     blank = tmp_path / "blank.hwpx"
     review = tmp_path / "review.md"

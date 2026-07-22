@@ -993,6 +993,7 @@ class HwpxOps:
         path: str,
         review_md: str,
         *,
+        phase: str = "all",
         output: Optional[str] = None,
         render_check: str = "off",
         score_gold_path: Optional[str] = None,
@@ -1010,13 +1011,17 @@ class HwpxOps:
         2015-개정 and 2022-개정 form families (auto-detected from the blank + review).
 
         ``path`` = blank form, ``reviewMd`` = the structured review markdown
-        (Ⅰ 운영계획 + [1]~[11]). Returns the produced path + per-region contentReport
-        with rubricNeedsReview (honest-defer count, never silent). Set
+        (Ⅰ 운영계획 + [1]~[11]). ``phase`` = ``"structural"`` | ``"all"`` (default) |
+        ``"clean"``; ``"clean"`` additionally runs core's deterministic post-fill
+        cleanup so a submittable 채움본 comes back in one call (report under
+        ``contentReport.finalize``). Returns the produced path + per-region
+        contentReport with rubricNeedsReview (honest-defer count, never silent). Set
         renderCheck='required' to gate on a real Hancom render; pass scoreGoldPath
         (an accepted form of the same family) to also return the 5-axis scorecard."""
         return self._services.form_fields.apply_evalplan_fill(
             path,
             review_md,
+            phase=phase,
             output=output,
             render_check=render_check,
             score_gold_path=score_gold_path,
