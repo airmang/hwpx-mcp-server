@@ -2,7 +2,7 @@
   "schemaVersion": "hwpx.tool-contract-delta.v2",
   "release": "5.1.0",
   "changeKind": "additive-optional-parameter",
-  "releaseStatus": "pending",
+  "releaseStatus": "released",
   "note": "S-095 HLP productization. apply_evalplan_fill gains a phase selector so the driver-free clean path (fill + core finalize) is reachable through the MCP surface in one call. The live contract_hash() has moved to PENDING_CONTRACT_HASH; RELEASED_CONTRACT_HASH stays frozen at the 5.0.0 receipt until the release train collapses the two. Not yet released.",
   "baseline": {
     "versions": {
@@ -24,9 +24,9 @@
   },
   "target": {
     "versions": {
-      "pythonHwpx": "4.0.0",
+      "pythonHwpx": "4.2.0",
       "mcpServer": "5.1.0",
-      "skill": "0.7.0"
+      "skill": "0.8.0"
     },
     "defaultToolCount": 119,
     "advancedToolCount": 127,
@@ -38,7 +38,7 @@
       "deprecated": 3,
       "internal": 4
     },
-    "contractHash": "41a685020447bd8b"
+    "contractHash": "429cb6706323e762"
   },
   "delta": {
     "defaultToolCount": 0,
@@ -67,7 +67,11 @@
           "type": "string",
           "default": "all",
           "required": false,
-          "enum": ["structural", "all", "clean"],
+          "enum": [
+            "structural",
+            "all",
+            "clean"
+          ],
           "description": "How far the recipe runs. 'structural' = confident deletions only; 'all' (default; the prior behaviour) = structural + per-region content fills; 'clean' = 'all' plus core's deterministic post-fill cleanup (title/teacher/정의적 fills, instruction-scaffolding + orphan prune, red-strip, blue->black recolor, caption strip), surfaced under contentReport.finalize. An invalid phase fails closed with EVALPLAN_PHASE_INVALID."
         }
       ],

@@ -25,7 +25,6 @@ from hwpx_mcp_server.tool_contract import (
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
-    PENDING_CONTRACT_HASH,
     RELEASED_CONTRACT_HASH,
     ToolClassification,
     ToolAvailability,
@@ -157,18 +156,15 @@ def test_artifact_materializing_render_tools_are_marked_mutating() -> None:
 
 def test_release_contract_versions_counts_and_hash_are_exact() -> None:
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
-        "4.0.0",
-        "5.0.0",
-        "0.7.0",
+        "4.2.0",
+        "5.1.0",
+        "0.8.0",
     )
     assert len(expected_tool_names(advanced=False)) == 119
     assert len(expected_tool_names(advanced=True)) == 127
     assert len(skill_required_tool_names()) == 28
-    # Pre-release surface change: the apply_evalplan_fill phase parameter moves
-    # the live contract hash to PENDING_CONTRACT_HASH while the frozen released
-    # receipt stays put until the release train collapses the two.
-    assert RELEASED_CONTRACT_HASH == "c2cd81fdb3089bae"
-    assert contract_hash() == PENDING_CONTRACT_HASH == "41a685020447bd8b"
+    assert RELEASED_CONTRACT_HASH == "429cb6706323e762"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "429cb6706323e762"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 

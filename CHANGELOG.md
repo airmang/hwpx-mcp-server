@@ -1,5 +1,16 @@
 # Changelog
 
+## [5.1.0] - 2026-07-22
+
+### Added
+- `apply_evalplan_fill`에 `phase` 파라미터를 추가했습니다 —
+  `"structural"|"all"(기본, 기존 동작)|"clean"`. `"clean"`은 채움 뒤 core의
+  결정론적 양식 정리(제목·교사·정의적 채움, 양식 지시문·외래 샘플 prune, 빨강 제거,
+  파랑→검정, 표 꼬리 캡션 strip)까지 한 호출로 수행해, 별도 정리 스크립트 없이
+  실제 도교육청 평가계획 양식을 잔존물 없이 채웁니다. 기본값 `"all"`은 비파괴입니다.
+  (core `python-hwpx>=4.2.0`의 `fill_evalplan(phase="clean")` 필요.)
+- 계약 델타: docs/tool-contract-delta-5.1.0.json. 계약 해시 c2cd81fdb3089bae → 429cb6706323e762.
+
 ## [5.0.0] - 2026-07-21
 
 ### Removed (breaking, 5.0.0 major boundary)

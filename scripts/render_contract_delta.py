@@ -18,7 +18,6 @@ if str(SRC) not in sys.path:
 from hwpx_mcp_server import runtime as _runtime  # noqa: E402,F401
 from hwpx_mcp_server.tool_contract import (  # noqa: E402
     BASELINE_TOOL_SPECS,
-    RELEASED_CONTRACT_HASH,
     TOOL_SPECS,
     ToolClassification,
     bound_tool_registry,
@@ -289,10 +288,16 @@ def validate_major_boundary_receipt() -> None:
         if (item.get("from"), item.get("to")) != ("compatibility", "deprecated"):
             errors.append(f"{item.get('name')} must record compatibility -> deprecated")
 
+    # The 5.0.0 boundary receipt is historical: its target hash is the frozen
+    # 5.0.0 contract hash and never tracks the live RELEASED_CONTRACT_HASH, which
+    # moves forward on every additive minor (e.g. 5.1.0). The structural
+    # invariants above (stubs removed, facades DEPRECATED) still validate against
+    # the live registry.
+    frozen_5_0_0_hash = "c2cd81fdb3089bae"
     target_hash = payload.get("target", {}).get("contractHash")
-    if target_hash != RELEASED_CONTRACT_HASH:
+    if target_hash != frozen_5_0_0_hash:
         errors.append(
-            f"target.contractHash {target_hash!r} != frozen released hash {RELEASED_CONTRACT_HASH!r}"
+            f"target.contractHash {target_hash!r} != frozen 5.0.0 hash {frozen_5_0_0_hash!r}"
         )
 
     if errors:

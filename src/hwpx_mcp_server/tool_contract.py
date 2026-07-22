@@ -27,22 +27,14 @@ from .fastmcp_adapter import (
 )
 
 
-MIN_PYTHON_HWPX = "4.0.0"
-MIN_MCP_VERSION = "5.0.0"
-MIN_SKILL_VERSION = "0.7.0"
+MIN_PYTHON_HWPX = "4.2.0"
+MIN_MCP_VERSION = "5.1.0"
+MIN_SKILL_VERSION = "0.8.0"
 # Frozen release receipt for non-runtime services. Runtime construction still
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "c2cd81fdb3089bae"
-# Pre-release live-surface receipt. This branch adds one additive optional
-# parameter (``apply_evalplan_fill.phase``; default "all" preserves the prior
-# behaviour), which moves the live ``contract_hash()`` off the frozen released
-# hash. The released constant only flips at the release train (see
-# docs/tool-contract-delta-5.1.0.json); until then the surface-changing branch
-# records the pending hash here so the tests that pin ``contract_hash()`` follow
-# the live surface without prematurely claiming the release receipt.
-PENDING_CONTRACT_HASH = "41a685020447bd8b"
+RELEASED_CONTRACT_HASH = "429cb6706323e762"
 
 
 class ToolClassification(str, Enum):
@@ -930,7 +922,6 @@ __all__ = [
     "MIN_MCP_VERSION",
     "MIN_PYTHON_HWPX",
     "MIN_SKILL_VERSION",
-    "PENDING_CONTRACT_HASH",
     "RegisteredToolRegistry",
     "RELEASED_CONTRACT_HASH",
     "SchemaBinding",

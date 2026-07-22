@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hwpx-mcp-server"
-version = "5.0.0"
+version = "5.1.0"
 description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "python-hwpx>=4.0.0", # typed multi-story compiler and transactional document safety
+    "python-hwpx>=4.2.0", # typed multi-story compiler and transactional document safety
 
     "pydantic>=2.11,<3",
     "cryptography>=42.0",
