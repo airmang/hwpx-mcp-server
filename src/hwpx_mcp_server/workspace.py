@@ -320,12 +320,11 @@ def _normalize_path_input(
 
     text = os.fspath(value)
 
-    # Unwrap surrounding quotes only. Quotes are transport decoration, so the
-    # whitespace immediately inside them is decoration too and may be trimmed;
-    # the quoted payload itself is preserved.
+    # Unwrap surrounding quotes only. Whitespace outside the quote wrapper is
+    # transport decoration, while the quoted payload itself is preserved.
     stripped = text.strip()
     if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
-        text = stripped[1:-1].strip()
+        text = stripped[1:-1]
 
     # Only treat the input as a URI when it actually carries the ``file`` scheme.
     # Running URI parsing over ordinary paths is what previously mangled valid
