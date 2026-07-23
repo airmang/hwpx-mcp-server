@@ -40,6 +40,7 @@ from pydantic import (
 )
 
 from .execution_lock import PUBLIC_MUTATION_LOCK
+from .office.rendering import resolve_hancom_backend
 from .storage import build_hwpx_open_safety_report
 from .utils.helpers import resolve_path
 from .workspace import (
@@ -592,7 +593,7 @@ class _WorkspaceSavePipeline(SavePipeline):
         precondition: WorkspaceOutputGuard | WorkspaceMissingParentGuard,
         failure_preimage: _FailurePreimagePreserver,
     ) -> None:
-        super().__init__()
+        super().__init__(oracle_factory=resolve_hancom_backend)
         self._workspace_resolver = resolver
         self._workspace_precondition = precondition
         self._failure_preimage = failure_preimage

@@ -75,6 +75,9 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"hwpx_mcp_server.office.house_style" = ["data/*.json"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 addopts = "-q"
@@ -91,6 +94,7 @@ files = [
     "src/hwpx_mcp_server/server.py",
     "src/hwpx_mcp_server/hwpx_ops.py",
     "src/hwpx_mcp_server/form_fill.py",
+    "src/hwpx_mcp_server/office",
     "src/hwpx_mcp_server/tool_contract.py",
     "src/hwpx_mcp_server/workflow/service.py",
 ]
@@ -117,6 +121,7 @@ include = [
     "src/hwpx_mcp_server/server.py",
     "src/hwpx_mcp_server/hwpx_ops.py",
     "src/hwpx_mcp_server/form_fill.py",
+    "src/hwpx_mcp_server/office",
     "src/hwpx_mcp_server/tool_contract.py",
     "src/hwpx_mcp_server/workflow/service.py",
 ]

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "hwpx.house-style-genres/v0",
+  "generated": "2026-07-23",
+  "_usage": "장르 구조 문법(감각 데이터). 스킬(두뇌)이 per-doc 인스턴스화하고, 게이트는 이 데이터에 대해 검사한다. 판단 하드코딩 금지 — 값의 prov는 'layer:근거', layer ∈ harvest(실물 수확 N=3)|template(도교육청 서식 inline)|owner",
+  "genres": {
+    "operating_plan": {
+      "label": "운영계획서 (기관·사업·정책 운영 계획)",
+      "when": "기관/사업/정책 운영 계획. 개조식. 정부·공공 장르",
+      "typography": {
+        "inherits": "report",
+        "prov": ["template:도교육청 서식 inline(헤더 HY헤드라인M 14/본문 휴먼명조 13/160%)와 뱅크 report 교차일치"],
+        "roles": {
+          "section_chip_number": {"font": "HY헤드라인M", "sizePt": 14, "bold": true, "align": "center", "onAccent": true, "prov": ["harvest:섹션칩 번호칸 accent 배경"]},
+          "section_chip_title": {"font": "HY헤드라인M", "sizePt": 14, "bold": true, "prov": ["harvest:섹션칩 제목"]},
+          "org_box_label": {"font": "휴먼명조", "sizePt": 11, "align": "center", "prov": ["harvest:조직도 박스 라벨"]}
+        }
+      },
+      "grammar": {
+        "sequence": ["title_band", "issuer", "slogan?", "section+"],
+        "section": {"divider": "section_chip", "body": "prose_body", "embeds": "embedded_block*"},
+        "blockTypes": {
+          "title_band": {"desc": "1x1 boxed title 「…」 운영 계획, 가운데·큰 글자", "required": true},
+          "issuer": {"desc": "발신 기관명", "required": true},
+          "slogan": {"desc": "인용 슬로건/태그라인", "required": false},
+          "section_chip": {"desc": "섹션 구분자 1x3 [번호box][gap][제목] 또는 inline", "required": true},
+          "prose_body": {"desc": "개조식 계층 ○/-/□/①/➡/※", "required": true},
+          "org_chart": {"desc": "표-기반 박스 조직도(병합 박스+셀 테두리 커넥터). 드로잉 아님(2026-07-23 실측)", "required": false},
+          "comparison": {"desc": "AS-IS➡TO-BE 표", "required": false},
+          "data_table": {"desc": "현황/예산/spec 표", "required": false},
+          "faq": {"desc": "순/질의/응답 3열 표", "required": false}
+        },
+        "variableSlots": {
+          "numbering": {"options": ["roman", "arabic"], "default": "roman", "desc": "섹션 번호 체계 Ⅰ~ vs 1.~"},
+          "chipStyle": {"options": ["box", "inline"], "default": "box", "desc": "섹션칩 렌더 색박스 vs inline"},
+          "bulletGlyph": {"options": ["○", "ㅇ"], "default": "○"},
+          "accentColor": {"desc": "섹션칩·강조 accent 1색(문서마다 변주)", "example": "#3366CC"},
+          "headerImage": {"desc": "타이틀 밴드/첫 단 로고·엠블럼(변주, 입력 파라미터)"}
+        },
+        "prov": ["harvest:N=3 실물(앵커+형제2) 공유 문법", "owner:형 공유·표면 변주 확증 2026-07-22"]
+      }
+    }
+  }
+}

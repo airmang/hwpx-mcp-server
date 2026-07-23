@@ -235,7 +235,10 @@ def save_through_pipeline(document: Any, output_path: Any, *, quality: Any = Non
         policy = resolve_policy(quality)
     else:
         policy = quality
-    report = document.save_report(output_path, quality=policy)
+    from .office.rendering import bind_document_rendering
+
+    with bind_document_rendering(document):
+        report = document.save_report(output_path, quality=policy)
     if not report.ok:
         raise QualityGateError(report)
     return report

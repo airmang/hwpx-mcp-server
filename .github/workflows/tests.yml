@@ -48,6 +48,7 @@ jobs:
             src/hwpx_mcp_server/server.py \
             src/hwpx_mcp_server/hwpx_ops.py \
             src/hwpx_mcp_server/form_fill.py \
+            src/hwpx_mcp_server/office \
             src/hwpx_mcp_server/tool_contract.py \
             src/hwpx_mcp_server/workflow/service.py \
             scripts/check_architecture_ratchets.py \
