@@ -48,8 +48,6 @@ ALLOWED_AUTHORING_CORE_IMPORTS = (
 )
 TEMPORARY_AUTHORING_CORE_IMPORTS = (
     "hwpx.tools.mail_merge",
-    "hwpx.tools.official_lint",
-    "hwpx.tools.page_guard",
     "hwpx.visual",
 )
 FROZEN_CORE_AUTHORING_IMPORTS = (
@@ -60,6 +58,21 @@ FROZEN_CORE_AUTHORING_IMPORTS = (
     "hwpx.tools.advanced_generators",
     "hwpx.tools.style_profile",
     "hwpx.tools.template_analyzer",
+)
+CANONICAL_POLICY_ROOTS = {
+    "src/hwpx_mcp_server/office/compliance": (
+        "hwpx.document",
+    ),
+    "src/hwpx_mcp_server/office/quality": (
+        "hwpx",
+    ),
+    "src/hwpx_mcp_server/office/utilities": (),
+}
+FROZEN_CORE_POLICY_IMPORTS = (
+    "hwpx.tools.official_lint",
+    "hwpx.tools.pii",
+    "hwpx.tools.page_guard",
+    "hwpx.tools.table_compute",
 )
 
 
@@ -72,6 +85,38 @@ def _imports(path: Path) -> list[str]:
         elif isinstance(node, ast.ImportFrom) and node.module:
             names.append(node.module)
     return names
+
+
+def _policy_owner_import_violation(
+    relative: str,
+    imported: str,
+) -> str | None:
+    for root, allowed_imports in CANONICAL_POLICY_ROOTS.items():
+        if relative == f"{root}.py" or relative.startswith(f"{root}/"):
+            if any(
+                imported == frozen
+                or imported.startswith(f"{frozen}.")
+                for frozen in FROZEN_CORE_POLICY_IMPORTS
+            ):
+                return (
+                    "canonical policy owner imports frozen core compatibility "
+                    f"copy: {relative} -> {imported}"
+                )
+            if imported == "hwpx" or imported.startswith("hwpx."):
+                if not any(
+                    imported == allowed
+                    or (
+                        allowed != "hwpx"
+                        and imported.startswith(f"{allowed}.")
+                    )
+                    for allowed in allowed_imports
+                ):
+                    return (
+                        "canonical policy owner uses unapproved core seam: "
+                        f"{relative} -> {imported}"
+                    )
+            return None
+    return None
 
 
 def evaluate(root: Path) -> dict[str, Any]:
@@ -130,6 +175,15 @@ def evaluate(root: Path) -> dict[str, Any]:
                     "MCP production imports frozen core authoring copy: "
                     f"{relative} -> {imported}"
                 )
+            if any(
+                imported == frozen
+                or imported.startswith(f"{frozen}.")
+                for frozen in FROZEN_CORE_POLICY_IMPORTS
+            ):
+                violations.append(
+                    "MCP production imports frozen core policy copy: "
+                    f"{relative} -> {imported}"
+                )
             if relative.startswith(f"{CANONICAL_AGENT_ROOT}/") and (
                 imported == "hwpx" or imported.startswith("hwpx.")
             ):
@@ -155,6 +209,12 @@ def evaluate(root: Path) -> dict[str, Any]:
                         "canonical authoring uses unapproved core seam: "
                         f"{relative} -> {imported}"
                     )
+            policy_violation = _policy_owner_import_violation(
+                relative,
+                imported,
+            )
+            if policy_violation is not None:
+                violations.append(policy_violation)
 
     return {
         "ok": not violations,
@@ -168,6 +228,11 @@ def evaluate(root: Path) -> dict[str, Any]:
         "allowedAuthoringCoreImports": list(ALLOWED_AUTHORING_CORE_IMPORTS),
         "temporaryAuthoringCoreImports": list(TEMPORARY_AUTHORING_CORE_IMPORTS),
         "frozenCoreAuthoringImports": list(FROZEN_CORE_AUTHORING_IMPORTS),
+        "canonicalPolicyRoots": {
+            root: list(imports)
+            for root, imports in CANONICAL_POLICY_ROOTS.items()
+        },
+        "frozenCorePolicyImports": list(FROZEN_CORE_POLICY_IMPORTS),
         "legacyDirectRenderDiscovery": sorted(LEGACY_DIRECT_RENDER_DISCOVERY),
         "violations": violations,
     }

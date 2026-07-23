@@ -5,10 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from hwpx import (
-    table_compute as build_hwpx_table_compute,
-)
-
+from .. import quality as quality_contract
 from ..core.content import (
     add_heading_to_doc,
     add_page_break_to_doc,
@@ -25,16 +22,16 @@ from ..core.content import (
 from ..core.document import open_doc
 from ..core.locations import location_from_anchor, resolve_paragraph_reference
 from ..core.search import _replace_in_runs, batch_replace_in_doc, replace_in_doc
-from .. import quality as quality_contract
 from ..mutation_models import (
     EditOperation,
     operation_payloads,
 )
+from ..office.utilities import table_compute as build_hwpx_table_compute
+from ..runtime_services import RUNTIME_SERVICES
 from ..upstream import (
     repair_pathological_text_spacing,
 )
 from ..utils.helpers import resolve_path
-from ..runtime_services import RUNTIME_SERVICES
 from ._shared import (
     _decode_image_base64,
     _id_integrity_payload,

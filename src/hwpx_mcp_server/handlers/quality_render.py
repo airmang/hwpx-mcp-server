@@ -13,20 +13,27 @@ from typing import Annotated, Any
 import mcp.types as mcp_types
 from hwpx import (
     doc_diff as build_hwpx_doc_diff,
-    inspect_official_document_style as inspect_hwpx_official_document_style,
+)
+from hwpx import (
     inspect_reference_consistency as inspect_hwpx_reference_consistency,
 )
+
+from ..fastmcp_adapter import snapshot_runtime_tools
 from ..office.authoring import (
     inspect_operating_plan_quality as inspect_operating_plan_document_quality,
 )
 from ..office.authoring.presets import (
     inspect_proposal_quality as inspect_proposal_document_quality,
 )
-
+from ..office.compliance import (
+    inspect_official_document_style as inspect_hwpx_official_document_style,
+)
 from ..preview_output_models import RenderPreviewOutput
-from ..fastmcp_adapter import snapshot_runtime_tools
+from ..runtime_services import RUNTIME_SERVICES
 from ..tool_contract import (
     contract_hash as tool_contract_hash,
+)
+from ..tool_contract import (
     expected_tool_names,
     expected_tool_order,
     skill_required_tool_names,
@@ -40,7 +47,6 @@ from ..workspace import (
     WorkspaceConfigurationError,
     WorkspaceResolver,
 )
-from ..runtime_services import RUNTIME_SERVICES
 from ._shared import (
     _capability_block,
     _diff_sources,
@@ -51,7 +57,6 @@ from ._shared import (
     _render_client,
     _with_document_state,
 )
-
 
 _DEFAULT_FETCH_TIMEOUT_SECONDS = 20.0
 

@@ -17,13 +17,12 @@ from urllib.request import Request
 
 from hwpx.ingest import DocumentIngestError, DocumentIngestor
 from hwpx.tools import read_fidelity as _read_fidelity
-from hwpx.tools.pii import DEFAULT_POLICY, mask_pii
 
 from ..core.content import (
     collect_full_text,
     get_paragraph_text_from_doc,
-    get_table_map_in_doc,
     get_table_data,
+    get_table_map_in_doc,
 )
 from ..core.document import open_doc
 from ..core.formatting import (
@@ -31,17 +30,17 @@ from ..core.formatting import (
 )
 from ..core.search import find_in_doc
 from ..network_policy import NetworkPolicy, NetworkPolicyError, open_url
+from ..office.compliance import DEFAULT_POLICY, mask_pii
+from ..runtime_services import RUNTIME_SERVICES
 from ..upstream import (
     HP_NS,
     open_document,
 )
 from ..utils.helpers import default_max_chars, resolve_path, truncate_response
-from ..runtime_services import RUNTIME_SERVICES
 from ._shared import (
     _env_float,
     _with_document_state,
 )
-
 
 _OUTPUT_MODES = {"full", "chunks"}
 

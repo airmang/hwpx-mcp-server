@@ -13,7 +13,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import Any
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "hwpx_mcp_server"
 SERVICES_ROOT = PACKAGE_ROOT / "ops_services"
@@ -100,6 +99,9 @@ C901_PATHS = (
     "src/hwpx_mcp_server/form_fill.py",
     "src/hwpx_mcp_server/office/agent",
     "src/hwpx_mcp_server/office/authoring",
+    "src/hwpx_mcp_server/office/compliance",
+    "src/hwpx_mcp_server/office/quality",
+    "src/hwpx_mcp_server/office/utilities",
     "src/hwpx_mcp_server/tool_contract.py",
     "src/hwpx_mcp_server/workflow/service.py",
 )
@@ -145,6 +147,15 @@ EXPECTED_C901 = (
     ("src/hwpx_mcp_server/office/authoring/builder/core.py", "lower", 18),
     ("src/hwpx_mcp_server/office/authoring/presets/proposal.py", "create_proposal_document", 11),
     ("src/hwpx_mcp_server/office/authoring/template_analyzer.py", "main", 11),
+    (
+        "src/hwpx_mcp_server/office/compliance/official_lint.py",
+        "_paragraphs_from_document_plan",
+        14,
+    ),
+    ("src/hwpx_mcp_server/office/compliance/pii.py", "detect_pii", 13),
+    ("src/hwpx_mcp_server/office/compliance/pii.py", "mask_value", 14),
+    ("src/hwpx_mcp_server/office/quality/page_guard.py", "collect_metrics", 13),
+    ("src/hwpx_mcp_server/office/quality/page_guard.py", "compare_metrics", 16),
     ("src/hwpx_mcp_server/ops_services/form_fields.py", "apply_evalplan_fill", 12),
     ("src/hwpx_mcp_server/ops_services/memo_style.py", "_split_run", 12),
     ("src/hwpx_mcp_server/ops_services/preview_export.py", "render_preview", 16),

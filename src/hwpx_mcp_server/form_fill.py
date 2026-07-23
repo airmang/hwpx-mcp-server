@@ -8,7 +8,6 @@ mutation, re-read, and validation evidence.
 from __future__ import annotations
 
 import copy
-from difflib import SequenceMatcher
 import hashlib
 import json
 import os
@@ -17,12 +16,14 @@ import shutil
 import tempfile
 import uuid
 import zipfile
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Literal
 from xml.etree import ElementTree as ET
 
-from hwpx.tools.pii import DEFAULT_POLICY, mask_pii
 from pydantic import BaseModel, ConfigDict, Field
+
+from .office.compliance import DEFAULT_POLICY, mask_pii
 
 try:  # python-hwpx >= 2.10.3
     from hwpx.tools.package_validator import validate_package

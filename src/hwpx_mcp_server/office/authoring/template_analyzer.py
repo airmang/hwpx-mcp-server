@@ -11,7 +11,8 @@ from xml.etree import ElementTree as ET
 from hwpx.opc.package import HwpxPackage
 from hwpx.opc.relationships import parse_manifest_relationships
 from hwpx.tools.archive_cli import unpack_hwpx
-from hwpx.tools.page_guard import DocumentMetrics, collect_metrics
+
+from ..quality import DocumentMetrics, collect_metrics
 
 _HH_NS = "http://www.hancom.co.kr/hwpml/2011/head"
 _HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"

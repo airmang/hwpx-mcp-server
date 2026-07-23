@@ -9,31 +9,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Mapping, cast, overload
 
-from .builder import (
-    Bullet as BuilderBullet,
-    Document as BuilderDocument,
-    Footer as BuilderFooter,
-    Header as BuilderHeader,
-    Heading as BuilderHeading,
-    Image as BuilderImage,
-    Margins as BuilderMargins,
-    Metadata as BuilderMetadata,
-    NumberedList as BuilderNumberedList,
-    PageBreak as BuilderPageBreak,
-    PageNumber as BuilderPageNumber,
-    PageSize as BuilderPageSize,
-    Paragraph as BuilderParagraph,
-    Run as BuilderRun,
-    Section as BuilderSection,
-    Table as BuilderTable,
-    approval_box as BuilderApprovalBox,
-)
-from .builder.core import NativeToc as BuilderNativeToc, Toc as BuilderToc
 from hwpx.document import HwpxDocument
 from hwpx.oxml.namespaces import HP as _HP
 from hwpx.tools.package_validator import validate_package
-from hwpx.tools.table_cleanup import normalize_cell_text
-from .advanced_generators import build_image_grid
 from hwpx.tools.report_utils import (
     calculate_age,
     calculate_ratios,
@@ -43,6 +21,62 @@ from hwpx.tools.report_utils import (
     format_number_commas,
     normalize_korean_date,
 )
+from hwpx.tools.table_cleanup import normalize_cell_text
+
+from .advanced_generators import build_image_grid
+from .builder import (
+    Bullet as BuilderBullet,
+)
+from .builder import (
+    Document as BuilderDocument,
+)
+from .builder import (
+    Footer as BuilderFooter,
+)
+from .builder import (
+    Header as BuilderHeader,
+)
+from .builder import (
+    Heading as BuilderHeading,
+)
+from .builder import (
+    Image as BuilderImage,
+)
+from .builder import (
+    Margins as BuilderMargins,
+)
+from .builder import (
+    Metadata as BuilderMetadata,
+)
+from .builder import (
+    NumberedList as BuilderNumberedList,
+)
+from .builder import (
+    PageBreak as BuilderPageBreak,
+)
+from .builder import (
+    PageNumber as BuilderPageNumber,
+)
+from .builder import (
+    PageSize as BuilderPageSize,
+)
+from .builder import (
+    Paragraph as BuilderParagraph,
+)
+from .builder import (
+    Run as BuilderRun,
+)
+from .builder import (
+    Section as BuilderSection,
+)
+from .builder import (
+    Table as BuilderTable,
+)
+from .builder import (
+    approval_box as BuilderApprovalBox,
+)
+from .builder.core import NativeToc as BuilderNativeToc
+from .builder.core import Toc as BuilderToc
 
 DOCUMENT_PLAN_SCHEMA_VERSION = "hwpx.document_plan.v1"
 DOCUMENT_PLAN_V2_SCHEMA_VERSION = "hwpx.document_plan.v2"
@@ -1049,7 +1083,8 @@ def _bridge_to_design_plan(plan: Mapping[str, Any], profile_id: str):
     these survive a Hancom render).
     """
 
-    from .design.plan import Block as _Block, DocumentPlan as _DesignPlan
+    from .design.plan import Block as _Block
+    from .design.plan import DocumentPlan as _DesignPlan
 
     blocks: list = []
     for raw in plan.get("blocks") or []:
@@ -1332,7 +1367,7 @@ def inspect_document_authoring_quality(
             document_type = str(normalized_plan.metadata.get("document_type", "") or "")
         gongmun_structure: dict[str, Any] | None = None
         if _DOCTYPE_TO_PROFILE.get(document_type.strip()) == "official_notice":
-            from hwpx.tools.official_lint import (
+            from ..compliance import (
                 inspect_official_document_style as _gongmun_lint,
             )
 

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "hwpx-mcp.compliance-quality-utilities-owner/v1",
+  "canonicalOwners": {
+    "hwpx.tools.official_lint": "hwpx_mcp_server.office.compliance.official_lint",
+    "hwpx.tools.pii": "hwpx_mcp_server.office.compliance.pii",
+    "hwpx.tools.page_guard": "hwpx_mcp_server.office.quality.page_guard",
+    "hwpx.tools.table_compute": "hwpx_mcp_server.office.utilities.table_compute"
+  },
+  "packageRoots": {
+    "compliance": "src/hwpx_mcp_server/office/compliance",
+    "quality": "src/hwpx_mcp_server/office/quality",
+    "utilities": "src/hwpx_mcp_server/office/utilities"
+  },
+  "sourceCompatibilityOwner": "python-hwpx 4.x",
+  "source": {
+    "head": "ac88d5fb1a015de1217577090d62e92c36cf4d8a",
+    "pythonFiles": 4,
+    "loc": 1622,
+    "manifestSha256": "d97db5cac702059ce4297f10ca108c6e2a162ba84b93bd5fe1a914a27877ad1f"
+  },
+  "canonical": {
+    "pythonFiles": 7,
+    "loc": 1684,
+    "manifestSha256": "74112864e78e032e39bf0859f24a77b9aa519756f6c5700c85dd08c26ebf67c6",
+    "packageFileCounts": {
+      "compliance": 3,
+      "quality": 2,
+      "utilities": 2
+    }
+  },
+  "approvedCoreImports": {
+    "compliance": ["hwpx.document"],
+    "quality": ["hwpx"],
+    "utilities": []
+  },
+  "approvedCoreSymbols": {
+    "hwpx.document": ["HwpxDocument"],
+    "hwpx": ["HwpxPackage"]
+  },
+  "forbiddenCoreCompatibilityImports": [
+    "hwpx.tools.official_lint",
+    "hwpx.tools.pii",
+    "hwpx.tools.page_guard",
+    "hwpx.tools.table_compute"
+  ],
+  "productionConsumersToRoute": [
+    "hwpx_mcp_server.handlers.quality_render",
+    "hwpx_mcp_server.handlers.specialized",
+    "hwpx_mcp_server.handlers.read_export",
+    "hwpx_mcp_server.handlers.content_edit",
+    "hwpx_mcp_server.form_fill",
+    "hwpx_mcp_server.office.authoring",
+    "hwpx_mcp_server.office.authoring.template_analyzer"
+  ],
+  "policyInjection": {
+    "formFill": "hwpx_mcp_server.office.compliance.DEFAULT_POLICY",
+    "mailMerge": "pass masking_policy=hwpx_mcp_server.office.compliance.DEFAULT_POLICY to the core merge primitive"
+  },
+  "coreRetainedPrimitives": [
+    "HwpxDocument",
+    "HwpxPackage",
+    "generic HWPX package, XML, traversal, serialization, and preservation behavior"
+  ],
+  "compatibilityPolicy": {
+    "coreLine": "4.x",
+    "featureWork": "MCP canonical owner only",
+    "mirrors": "correctness-or-security-only with parity test and receipt",
+    "removalGate": "public observation followed by separately approved core major"
+  },
+  "toolContract": {
+    "default": 119,
+    "advanced": 127,
+    "skillRequired": 28,
+    "hash": "429cb6706323e762"
+  }
+}

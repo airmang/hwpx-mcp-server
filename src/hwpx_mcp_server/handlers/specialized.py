@@ -11,6 +11,8 @@ from typing import Any
 
 from hwpx import (
     inspect_mail_merge_placeholders as inspect_hwpx_mail_merge_placeholders,
+)
+from hwpx import (
     mail_merge as build_hwpx_mail_merge,
 )
 from hwpx.exam import (
@@ -25,18 +27,22 @@ from hwpx.form_fit.wordbox import (
     extract_image_boxes,
     render_glyph_boxes,
 )
-from hwpx.tools.pii import DEFAULT_POLICY, detect_pii, mask_value
 from hwpx.visual.oracle import NullOracle, resolve_oracle
 
-from ..office.authoring.advanced_generators import (
-    build_image_grid as build_hwpx_image_grid,
-    build_meeting_nameplates as build_hwpx_meeting_nameplates,
-    build_organization_chart as build_hwpx_organization_chart,
-)
 from ..core.content import (
     collect_full_text,
 )
 from ..core.document import open_doc
+from ..office.authoring.advanced_generators import (
+    build_image_grid as build_hwpx_image_grid,
+)
+from ..office.authoring.advanced_generators import (
+    build_meeting_nameplates as build_hwpx_meeting_nameplates,
+)
+from ..office.authoring.advanced_generators import (
+    build_organization_chart as build_hwpx_organization_chart,
+)
+from ..office.compliance import DEFAULT_POLICY, detect_pii, mask_value
 from ..storage import (
     build_hwpx_open_safety_report,
 )
@@ -136,6 +142,7 @@ def mail_merge(
         split_newlines=split_newlines,
         fit_policy=fit_policy,
         max_lines=max_lines,
+        masking_policy=DEFAULT_POLICY,
     )
     open_safety = _mail_merge_open_safety_summary(report)
     report["openSafety"] = open_safety
