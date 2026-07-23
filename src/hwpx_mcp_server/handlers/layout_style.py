@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from hwpx import (
+from ..office.authoring.style_profile import (
     apply_style_profile_to_plan as apply_hwpx_style_profile_to_plan,
     compare_style_profiles as compare_hwpx_style_profiles,
     extract_style_profile as extract_hwpx_style_profile,

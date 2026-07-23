@@ -332,9 +332,27 @@ def test_form_tool_outputs_publish_typed_receipts_in_live_contract() -> None:
         ] is False
 
 
-def test_missing_required_core_symbol_is_startup_fatal_and_never_ghost_registered() -> (
+def test_missing_required_canonical_symbol_is_startup_fatal_and_never_ghost_registered() -> (
     None
 ):
+    code = """
+import hwpx_mcp_server.office.authoring as authoring
+delattr(authoring, 'create_document_from_plan')
+import hwpx_mcp_server.server  # noqa: F401
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=ROOT,
+        env=dict(os.environ),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "create_document_from_plan" in result.stderr
+
+
+def test_missing_frozen_core_authoring_symbol_does_not_break_mcp_startup() -> None:
     code = """
 import hwpx
 delattr(hwpx, 'create_document_from_plan')
@@ -348,8 +366,7 @@ import hwpx_mcp_server.server  # noqa: F401
         capture_output=True,
         check=False,
     )
-    assert result.returncode != 0
-    assert "create_document_from_plan" in result.stderr
+    assert result.returncode == 0, result.stderr + result.stdout
 
 
 def test_health_detects_live_schema_skew(monkeypatch) -> None:

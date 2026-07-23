@@ -154,7 +154,7 @@ def add_heading_to_doc(doc: HwpxDocument, text: str, level: int = 1) -> int:
     if stripped.startswith("#"):
         stripped = stripped.lstrip("#").strip()
 
-    from hwpx.authoring import DocumentStylePreset
+    from ..office.authoring import DocumentStylePreset
 
     tokens = DocumentStylePreset().ensure_tokens(doc)
     char_ref = tokens.get(f"gov_heading_{safe_level}") or tokens.get("heading")

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "hwpx-mcp.authoring-runtime-owner/v1",
+  "canonicalOwner": "hwpx_mcp_server.office.authoring",
+  "sourceCompatibilityOwner": "python-hwpx 4.x",
+  "source": {
+    "head": "aff36e145006b6e1acaffbb554d5ff10fa3797ec",
+    "pythonFiles": 16,
+    "loc": 7554,
+    "manifestSha256": "fb8a36922bb5b516dd84fec36bb9de079e651e1c87a5df78e1acd0a606c75b42"
+  },
+  "canonical": {
+    "pythonFiles": 16,
+    "loc": 7582,
+    "manifestSha256": "c4b5df99510eba8d90b9a19029eec2ee4775a82c110bf46c92ddca8276c20058",
+    "profileAssets": 23,
+    "profileBytes": 77471,
+    "profileManifestSha256": "ed58b46112baae3436bd263058673ddf8bfcd6477811389e088a0d4222bcc6ec"
+  },
+  "productionConsumers": [
+    "hwpx_mcp_server.core.content",
+    "hwpx_mcp_server.handlers._shared",
+    "hwpx_mcp_server.handlers.authoring",
+    "hwpx_mcp_server.handlers.layout_style",
+    "hwpx_mcp_server.handlers.quality_render",
+    "hwpx_mcp_server.handlers.specialized",
+    "hwpx_mcp_server.quality_generation"
+  ],
+  "approvedCoreImports": [
+    "hwpx.document",
+    "hwpx.opc.package",
+    "hwpx.opc.relationships",
+    "hwpx.oxml.namespaces",
+    "hwpx.quality",
+    "hwpx.tools.archive_cli",
+    "hwpx.tools.id_integrity",
+    "hwpx.tools.idempotence",
+    "hwpx.tools.package_reconcile",
+    "hwpx.tools.package_validator",
+    "hwpx.tools.report_utils",
+    "hwpx.tools.table_cleanup",
+    "hwpx.tools.toc_author",
+    "hwpx.tools.validator"
+  ],
+  "temporaryProgramDependencies": {
+    "hwpx.tools.official_lint": "S-100",
+    "hwpx.tools.page_guard": "S-100",
+    "hwpx.visual": "S-104",
+    "hwpx.tools.mail_merge": "S-105"
+  },
+  "forbiddenCoreCompatibilityImports": [
+    "hwpx.authoring",
+    "hwpx.builder",
+    "hwpx.design",
+    "hwpx.presets",
+    "hwpx.tools.advanced_generators",
+    "hwpx.tools.style_profile",
+    "hwpx.tools.template_analyzer"
+  ],
+  "compatibilityPolicy": {
+    "coreLine": "4.x",
+    "featureWork": "MCP canonical owner only",
+    "mirrors": "correctness-or-security-only with parity test and receipt",
+    "removalGate": "public observation followed by separately approved core major"
+  },
+  "toolContract": {
+    "default": 119,
+    "advanced": 127,
+    "skillRequired": 28,
+    "hash": "429cb6706323e762"
+  }
+}

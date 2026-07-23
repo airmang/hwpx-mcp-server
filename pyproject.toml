@@ -77,6 +77,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "hwpx_mcp_server.office.house_style" = ["data/*.json"]
+"hwpx_mcp_server.office.authoring.design" = ["profiles/*/*", "profiles/*/fragments/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

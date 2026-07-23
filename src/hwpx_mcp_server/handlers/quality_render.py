@@ -14,10 +14,12 @@ import mcp.types as mcp_types
 from hwpx import (
     doc_diff as build_hwpx_doc_diff,
     inspect_official_document_style as inspect_hwpx_official_document_style,
-    inspect_operating_plan_quality as inspect_operating_plan_document_quality,
     inspect_reference_consistency as inspect_hwpx_reference_consistency,
 )
-from hwpx.presets import (
+from ..office.authoring import (
+    inspect_operating_plan_quality as inspect_operating_plan_document_quality,
+)
+from ..office.authoring.presets import (
     inspect_proposal_quality as inspect_proposal_document_quality,
 )
 

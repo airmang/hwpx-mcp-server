@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from hwpx import (
+from ..office.authoring import (
     inspect_document_authoring_quality as inspect_authoring_document_quality,
 )
 from hwpx.tools.id_integrity import check_id_integrity

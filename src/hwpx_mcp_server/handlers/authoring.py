@@ -11,18 +11,22 @@ from typing import Any
 
 from hwpx import (
     build_comparison_table_plan as build_hwpx_comparison_table_plan,
+)
+from ..office.authoring import (
     create_document_from_plan as build_document_from_plan,
-    describe_template as describe_hwpx_template,
     get_document_plan_schema as get_hwpx_document_plan_schema,
     inspect_document_authoring_quality as inspect_authoring_document_quality,
-    list_templates as list_hwpx_templates,
     normalize_document_plan as normalize_hwpx_document_plan,
-    register_template as register_hwpx_template,
     validate_document_plan as validate_hwpx_document_plan,
 )
-from hwpx.presets import (
+from ..office.authoring.presets import (
     create_proposal_document as build_proposal_document,
     inspect_proposal_quality as inspect_proposal_document_quality,
+)
+from ..office.authoring.style_profile import (
+    describe_template as describe_hwpx_template,
+    list_templates as list_hwpx_templates,
+    register_template as register_hwpx_template,
 )
 from hwpx.tools import report_utils as hwpx_report_utils
 from hwpx.tools.report_parser import (

@@ -32,7 +32,7 @@ from .upstream import new_document, validate_document_path
 from .utils.helpers import resolve_path
 
 try:  # python-hwpx >= proposal preset feature
-    from hwpx.presets import (
+    from .office.authoring.presets import (
         create_proposal_document,
         inspect_proposal_quality,
     )

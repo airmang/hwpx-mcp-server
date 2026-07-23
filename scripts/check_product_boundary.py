@@ -20,6 +20,8 @@ LEGACY_DIRECT_RENDER_DISCOVERY = frozenset(
 CANONICAL_RENDER_BINDING = "src/hwpx_mcp_server/office/rendering.py"
 CANONICAL_AGENT_ROOT = "src/hwpx_mcp_server/office/agent"
 CANONICAL_AGENT_FILE_COUNT = 19
+CANONICAL_AUTHORING_ROOT = "src/hwpx_mcp_server/office/authoring"
+CANONICAL_AUTHORING_FILE_COUNT = 16
 ALLOWED_AGENT_CORE_IMPORTS = (
     "hwpx.document",
     "hwpx.mutation_report",
@@ -27,6 +29,37 @@ ALLOWED_AGENT_CORE_IMPORTS = (
     "hwpx.quality",
     "hwpx.table_patch",
     "hwpx.tools.package_validator",
+)
+ALLOWED_AUTHORING_CORE_IMPORTS = (
+    "hwpx.document",
+    "hwpx.opc.package",
+    "hwpx.opc.relationships",
+    "hwpx.oxml.namespaces",
+    "hwpx.quality",
+    "hwpx.tools.archive_cli",
+    "hwpx.tools.id_integrity",
+    "hwpx.tools.idempotence",
+    "hwpx.tools.package_reconcile",
+    "hwpx.tools.package_validator",
+    "hwpx.tools.report_utils",
+    "hwpx.tools.table_cleanup",
+    "hwpx.tools.toc_author",
+    "hwpx.tools.validator",
+)
+TEMPORARY_AUTHORING_CORE_IMPORTS = (
+    "hwpx.tools.mail_merge",
+    "hwpx.tools.official_lint",
+    "hwpx.tools.page_guard",
+    "hwpx.visual",
+)
+FROZEN_CORE_AUTHORING_IMPORTS = (
+    "hwpx.authoring",
+    "hwpx.builder",
+    "hwpx.design",
+    "hwpx.presets",
+    "hwpx.tools.advanced_generators",
+    "hwpx.tools.style_profile",
+    "hwpx.tools.template_analyzer",
 )
 
 
@@ -56,6 +89,13 @@ def evaluate(root: Path) -> dict[str, Any]:
             "canonical agent owner must contain exactly "
             f"{CANONICAL_AGENT_FILE_COUNT} Python files: {CANONICAL_AGENT_ROOT}"
         )
+    authoring_files = sorted((root / CANONICAL_AUTHORING_ROOT).rglob("*.py"))
+    if len(authoring_files) != CANONICAL_AUTHORING_FILE_COUNT:
+        violations.append(
+            "canonical authoring owner must contain exactly "
+            f"{CANONICAL_AUTHORING_FILE_COUNT} Python files: "
+            f"{CANONICAL_AUTHORING_ROOT}"
+        )
 
     for path in files:
         relative = path.relative_to(root).as_posix()
@@ -82,6 +122,14 @@ def evaluate(root: Path) -> dict[str, Any]:
                 violations.append(
                     f"MCP production imports frozen core agent copy: {relative} -> {imported}"
                 )
+            if any(
+                imported == frozen or imported.startswith(f"{frozen}.")
+                for frozen in FROZEN_CORE_AUTHORING_IMPORTS
+            ):
+                violations.append(
+                    "MCP production imports frozen core authoring copy: "
+                    f"{relative} -> {imported}"
+                )
             if relative.startswith(f"{CANONICAL_AGENT_ROOT}/") and (
                 imported == "hwpx" or imported.startswith("hwpx.")
             ):
@@ -92,6 +140,21 @@ def evaluate(root: Path) -> dict[str, Any]:
                     violations.append(
                         f"canonical agent uses unapproved core seam: {relative} -> {imported}"
                     )
+            if relative.startswith(f"{CANONICAL_AUTHORING_ROOT}/") and (
+                imported == "hwpx" or imported.startswith("hwpx.")
+            ):
+                approved = (
+                    ALLOWED_AUTHORING_CORE_IMPORTS
+                    + TEMPORARY_AUTHORING_CORE_IMPORTS
+                )
+                if not any(
+                    imported == allowed or imported.startswith(f"{allowed}.")
+                    for allowed in approved
+                ):
+                    violations.append(
+                        "canonical authoring uses unapproved core seam: "
+                        f"{relative} -> {imported}"
+                    )
 
     return {
         "ok": not violations,
@@ -100,6 +163,11 @@ def evaluate(root: Path) -> dict[str, Any]:
         "canonicalAgentRoot": CANONICAL_AGENT_ROOT,
         "canonicalAgentPythonFiles": len(agent_files),
         "allowedAgentCoreImports": list(ALLOWED_AGENT_CORE_IMPORTS),
+        "canonicalAuthoringRoot": CANONICAL_AUTHORING_ROOT,
+        "canonicalAuthoringPythonFiles": len(authoring_files),
+        "allowedAuthoringCoreImports": list(ALLOWED_AUTHORING_CORE_IMPORTS),
+        "temporaryAuthoringCoreImports": list(TEMPORARY_AUTHORING_CORE_IMPORTS),
+        "frozenCoreAuthoringImports": list(FROZEN_CORE_AUTHORING_IMPORTS),
         "legacyDirectRenderDiscovery": sorted(LEGACY_DIRECT_RENDER_DISCOVERY),
         "violations": violations,
     }

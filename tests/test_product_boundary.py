@@ -24,6 +24,7 @@ def test_real_tree_satisfies_mcp_boundary() -> None:
     report = boundary.evaluate(ROOT)
     assert report["ok"], report["violations"]
     assert report["canonicalAgentPythonFiles"] == 19
+    assert report["canonicalAuthoringPythonFiles"] == 16
 
 
 def test_new_direct_render_discovery_fails_closed(tmp_path) -> None:
@@ -62,4 +63,40 @@ def test_frozen_core_agent_import_fails_closed(tmp_path) -> None:
     assert not report["ok"]
     assert any(
         "imports frozen core agent copy" in item for item in report["violations"]
+    )
+
+
+def test_frozen_core_authoring_import_fails_closed(tmp_path) -> None:
+    source = _minimal_tree(tmp_path)
+    module = source / "handlers" / "authoring.py"
+    module.parent.mkdir()
+    module.write_text(
+        "from hwpx.authoring import create_document_from_plan\n",
+        encoding="utf-8",
+    )
+
+    report = boundary.evaluate(tmp_path)
+
+    assert not report["ok"]
+    assert any(
+        "imports frozen core authoring copy" in item
+        for item in report["violations"]
+    )
+
+
+def test_canonical_authoring_unapproved_core_seam_fails_closed(tmp_path) -> None:
+    source = _minimal_tree(tmp_path)
+    package = source / "office" / "authoring"
+    package.mkdir()
+    (package / "__init__.py").write_text(
+        "from hwpx.form_fill import fill_form\n",
+        encoding="utf-8",
+    )
+
+    report = boundary.evaluate(tmp_path)
+
+    assert not report["ok"]
+    assert any(
+        "canonical authoring uses unapproved core seam" in item
+        for item in report["violations"]
     )
