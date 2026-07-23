@@ -104,6 +104,13 @@ implicit_optional = true
 warn_unused_ignores = true
 show_error_codes = true
 
+[[tool.mypy.overrides]]
+module = "hwpx_mcp_server.office.agent.*"
+# The canonical transplant retains upstream cross-check comments used by
+# Pyright and by the frozen core mirror.  Mypy does not consume several of
+# those codes, so keep the comments without turning them into false failures.
+warn_unused_ignores = false
+
 [tool.pyright]
 pythonVersion = "3.10"
 typeCheckingMode = "basic"

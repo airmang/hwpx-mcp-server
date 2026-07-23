@@ -23,6 +23,7 @@ def _minimal_tree(root: Path) -> Path:
 def test_real_tree_satisfies_mcp_boundary() -> None:
     report = boundary.evaluate(ROOT)
     assert report["ok"], report["violations"]
+    assert report["canonicalAgentPythonFiles"] == 19
 
 
 def test_new_direct_render_discovery_fails_closed(tmp_path) -> None:
@@ -49,3 +50,16 @@ def test_skill_implementation_import_fails_closed(tmp_path) -> None:
 
     assert not report["ok"]
     assert any("imports skill implementation" in item for item in report["violations"])
+
+
+def test_frozen_core_agent_import_fails_closed(tmp_path) -> None:
+    source = _minimal_tree(tmp_path)
+    module = source / "agent_document.py"
+    module.write_text("from hwpx.agent import HwpxAgentDocument\n", encoding="utf-8")
+
+    report = boundary.evaluate(tmp_path)
+
+    assert not report["ok"]
+    assert any(
+        "imports frozen core agent copy" in item for item in report["violations"]
+    )

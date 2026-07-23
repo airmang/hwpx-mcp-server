@@ -8,6 +8,7 @@ OXML owner.
 
 - workflow, genre, profile, and office-policy services;
 - typed application plans and deterministic orchestration;
+- the canonical semantic agent runtime under `office.agent`;
 - PII and compliance decisions;
 - Hancom discovery and render-backend binding;
 - workspace authorization and model-facing error contracts.
@@ -30,3 +31,9 @@ sites fail the product-boundary check.
 Moving released core workflows here is a compatibility project, not a copy
 project. Each move needs one owner, a primitive seam, a 4.x migration path, and
 an explicit later removal gate.
+
+`hwpx_mcp_server.office.agent` is the canonical owner of the released semantic
+agent runtime. MCP production modules must not import the frozen core
+`hwpx.agent` compatibility copy. The canonical runtime may use only the
+approved public core seams for documents, OXML, mutation reports, quality,
+table targeting, and package open-safety validation.

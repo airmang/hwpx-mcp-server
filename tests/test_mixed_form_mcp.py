@@ -24,7 +24,11 @@ import hwpx_mcp_server.mixed_form as mixed_form_adapter
 import hwpx_mcp_server.server as server
 import hwpx_mcp_server.workspace as workspace_module
 from hwpx import HwpxDocument, validate_editor_open_safety
-from hwpx.agent import AgentContractError, HwpxAgentDocument, mixed_form_json_schemas
+from hwpx_mcp_server.office.agent import (
+    AgentContractError,
+    HwpxAgentDocument,
+    mixed_form_json_schemas,
+)
 from hwpx.oxml.namespaces import HP
 from hwpx_mcp_server.tool_contract import bound_tool_registry
 from hwpx_mcp_server.mixed_form import (

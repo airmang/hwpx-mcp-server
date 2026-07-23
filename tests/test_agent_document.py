@@ -6,8 +6,15 @@ from pathlib import Path
 import anyio
 
 from hwpx import HwpxDocument
-from hwpx.agent import AGENT_BATCH_RESULT_SCHEMA, HwpxAgentDocument, agent_json_schemas
-from hwpx.agent.blueprint import BLUEPRINT_REPLAY_RESULT_SCHEMA, blueprint_json_schemas
+from hwpx_mcp_server.office.agent import (
+    AGENT_BATCH_RESULT_SCHEMA,
+    HwpxAgentDocument,
+    agent_json_schemas,
+)
+from hwpx_mcp_server.office.agent.blueprint import (
+    BLUEPRINT_REPLAY_RESULT_SCHEMA,
+    blueprint_json_schemas,
+)
 from hwpx.oxml import HwpxOxmlDocument
 from hwpx_mcp_server import server
 

@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Thin transport adapter for the python-hwpx semantic agent facade.
+"""Thin transport adapter for the canonical MCP semantic agent runtime.
 
 This module deliberately owns no path grammar, selector parser, document
-projection, or mutation compiler.  Those semantics stay in ``hwpx.agent`` so
-the CLI and MCP surfaces cannot drift apart.
+projection, or mutation compiler. Those semantics live in
+``hwpx_mcp_server.office.agent``; the frozen core 4.x compatibility copy is
+verified against it by the parity corpus.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from typing import Annotated, Any, Iterator, Literal
 
 from pydantic import Field
 
-from hwpx.agent import (
+from hwpx_mcp_server.office.agent import (
     AGENT_BATCH_SCHEMA,
     AgentBatchResult,
     AgentContractError,
@@ -27,7 +28,7 @@ from hwpx.agent import (
     catalog_hash,
     human_help,
 )
-from hwpx.agent.blueprint import (
+from hwpx_mcp_server.office.agent.blueprint import (
     BLUEPRINT_REPLAY_RESULT_SCHEMA,
     BlueprintReplayResult,
     blueprint_catalog,

@@ -10,7 +10,7 @@ from typing import Any, cast
 
 import mcp.types as mcp_types
 from mcp.server.fastmcp import FastMCP
-from hwpx.agent import AgentContractError
+from hwpx_mcp_server.office.agent import AgentContractError
 
 from . import __version__
 from . import quality as quality_contract

@@ -18,6 +18,16 @@ LEGACY_DIRECT_RENDER_DISCOVERY = frozenset(
     }
 )
 CANONICAL_RENDER_BINDING = "src/hwpx_mcp_server/office/rendering.py"
+CANONICAL_AGENT_ROOT = "src/hwpx_mcp_server/office/agent"
+CANONICAL_AGENT_FILE_COUNT = 19
+ALLOWED_AGENT_CORE_IMPORTS = (
+    "hwpx.document",
+    "hwpx.mutation_report",
+    "hwpx.oxml",
+    "hwpx.quality",
+    "hwpx.table_patch",
+    "hwpx.tools.package_validator",
+)
 
 
 def _imports(path: Path) -> list[str]:
@@ -40,6 +50,12 @@ def evaluate(root: Path) -> dict[str, Any]:
         violations.append("MCP repository must not own or vendor src/hwpx")
     if not (root / CANONICAL_RENDER_BINDING).is_file():
         violations.append(f"missing canonical render binding: {CANONICAL_RENDER_BINDING}")
+    agent_files = sorted((root / CANONICAL_AGENT_ROOT).rglob("*.py"))
+    if len(agent_files) != CANONICAL_AGENT_FILE_COUNT:
+        violations.append(
+            "canonical agent owner must contain exactly "
+            f"{CANONICAL_AGENT_FILE_COUNT} Python files: {CANONICAL_AGENT_ROOT}"
+        )
 
     for path in files:
         relative = path.relative_to(root).as_posix()
@@ -62,11 +78,28 @@ def evaluate(root: Path) -> dict[str, Any]:
                 violations.append(
                     f"new direct render discovery bypasses office adapter: {relative}"
                 )
+            if imported == "hwpx.agent" or imported.startswith("hwpx.agent."):
+                violations.append(
+                    f"MCP production imports frozen core agent copy: {relative} -> {imported}"
+                )
+            if relative.startswith(f"{CANONICAL_AGENT_ROOT}/") and (
+                imported == "hwpx" or imported.startswith("hwpx.")
+            ):
+                if not any(
+                    imported == allowed or imported.startswith(f"{allowed}.")
+                    for allowed in ALLOWED_AGENT_CORE_IMPORTS
+                ):
+                    violations.append(
+                        f"canonical agent uses unapproved core seam: {relative} -> {imported}"
+                    )
 
     return {
         "ok": not violations,
         "pythonFiles": len(files),
         "canonicalRenderBinding": CANONICAL_RENDER_BINDING,
+        "canonicalAgentRoot": CANONICAL_AGENT_ROOT,
+        "canonicalAgentPythonFiles": len(agent_files),
+        "allowedAgentCoreImports": list(ALLOWED_AGENT_CORE_IMPORTS),
         "legacyDirectRenderDiscovery": sorted(LEGACY_DIRECT_RENDER_DISCOVERY),
         "violations": violations,
     }

@@ -3,7 +3,7 @@
 
 The adapter deliberately does not edit HWPX packages.  It validates the public
 wire model, resolves workspace paths, and delegates planning and execution to
-``python-hwpx``'s single mixed-form compiler/executor.
+the canonical ``hwpx_mcp_server.office.agent`` mixed-form compiler/executor.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Annotated, Any, Callable, Literal, TypeAlias
 
-from hwpx.agent import (
+from hwpx_mcp_server.office.agent import (
     MIXED_FORM_COMPILED_PLAN_SCHEMA,
     MIXED_FORM_PLAN_SCHEMA,
     HwpxAgentDocument,
