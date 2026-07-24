@@ -14,10 +14,13 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 선언형 document-plan 생성, 운영 계획서 품질 프로필, 검색, 치환, 표 편집,
 서식 적용, HWPX repair/recover까지 처리할 수 있습니다.
 
-현재 MCP 표면, document-plan, template-formfit, visual-review handoff
-워크플로의 문서화·테스트 기준 upstream 버전 바닥은
-`python-hwpx >= 3.3.1`입니다. 공개 설치 표면의 계약 해시는
-`f82caecbcfc742e9`이며 대응 스킬 바닥은 `0.5.0`입니다.
+현재 MCP 표면, document-plan, form-fill, visual-review handoff 워크플로의
+문서화·테스트 기준 upstream 버전 바닥은 `python-hwpx >= 4.2.0`입니다.
+현재 설치 계약의 정본은 기본 119개/고급 127개/스킬 필수 28개,
+해시 `429cb6706323e762`이며 대응 스킬 바닥은 `0.8.0`입니다.
+호환·deprecated 도구는
+2026-10-31까지 모두 유지하며, 신규 호출의 canonical 경로와 rollback은
+[compatibility observation](compatibility-observation.md)을 따릅니다.
 
 선언형 document-plan 생성은 `validate_document_plan`으로 먼저 검증합니다.
 `ok=false`이면 `issues[].path`와 `repairHints[]`를 따라 JSON plan을 고친 뒤

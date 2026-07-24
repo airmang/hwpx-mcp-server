@@ -8,6 +8,11 @@ Scope for this pass:
 - keep document/package semantics in Python code, not in markdown
 - use skills as thin orchestration over the current tool inventory
 
+Existing compatibility/deprecated callers remain supported during the public
+observation window. The exhaustive retained-tool table, canonical replacements,
+and rollback procedure are in
+[`compatibility-observation.md`](compatibility-observation.md).
+
 ## Current Tool Coverage
 
 `HWPX_MCP_ADVANCED=1` is required for package inspection and low-level validation. The canonical heterogeneous edit entry point, `apply_document_commands`, is available in the default profile.

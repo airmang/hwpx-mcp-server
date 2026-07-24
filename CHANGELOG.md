@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Documentation
+- Published the 2026-07-24 through 2026-10-31 compatibility/deprecation
+  observation. All 6 compatibility and 3 deprecated tools remain installed;
+  the opening decision is `extend` for every surface and removal count is zero.
+  The guide records canonical replacements, clean-install parity, rollback, and
+  the separately approved next-major removal gate. ToolSpec remains exactly
+  `119/127/28 @ 429cb6706323e762`.
+
 ## [5.1.0] - 2026-07-22
 
 ### Added
