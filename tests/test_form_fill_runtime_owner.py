@@ -48,8 +48,8 @@ def test_canonical_form_fill_inventory_is_complete() -> None:
     ).encode()
     expected = OWNER["canonical"]
 
-    assert len(rows) == expected["pythonFiles"] == 14
-    assert sum(int(row["loc"]) for row in rows) == expected["loc"] == 6327
+    assert len(rows) == expected["pythonFiles"] == 15
+    assert sum(int(row["loc"]) for row in rows) == expected["loc"] == 6336
     assert hashlib.sha256(payload).hexdigest() == expected["manifestSha256"]
     assert len(canonical.__all__) == 25
 

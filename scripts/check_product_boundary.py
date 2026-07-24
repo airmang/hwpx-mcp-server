@@ -71,20 +71,16 @@ FROZEN_CORE_POLICY_IMPORTS = (
     "hwpx.tools.table_compute",
 )
 CANONICAL_FORM_FILL_ROOT = "src/hwpx_mcp_server/office/form_fill"
-CANONICAL_FORM_FILL_FILE_COUNT = 14
+CANONICAL_FORM_FILL_FILE_COUNT = 15
 ALLOWED_FORM_FILL_CORE_IMPORTS = (
     "hwpx.document",
-    "hwpx.evalplan_fill",
     "hwpx.oxml.namespaces",
     "hwpx.quality",
     "hwpx.table_patch",
     "hwpx.tools.package_validator",
     "hwpx.tools.validator",
 )
-TEMPORARY_FORM_FILL_CORE_IMPORTS = (
-    # S-102 moves the eval-plan parser; S-101 may consume it but cannot enlarge it.
-    "hwpx.evalplan_fill",
-)
+TEMPORARY_FORM_FILL_CORE_IMPORTS: tuple[str, ...] = ()
 FROZEN_CORE_FORM_FILL_IMPORTS = (
     "hwpx.fill_residue",
     "hwpx.form_fill",
@@ -93,6 +89,14 @@ FROZEN_CORE_FORM_FILL_IMPORTS = (
     "hwpx.guidance_scan",
     "hwpx.template_formfit",
 )
+CANONICAL_EVALPLAN_ROOT = "src/hwpx_mcp_server/office/evalplan"
+CANONICAL_EVALPLAN_FILE_COUNT = 2
+ALLOWED_EVALPLAN_CORE_IMPORTS = (
+    "hwpx.body_patch",
+    "hwpx.patch",
+    "hwpx.table_patch",
+)
+FROZEN_CORE_EVALPLAN_IMPORTS = ("hwpx.evalplan_fill",)
 
 
 def _imports(path: Path) -> list[str]:
@@ -163,6 +167,35 @@ def _form_fill_owner_import_violation(
     return None
 
 
+def _evalplan_owner_import_violation(
+    relative: str,
+    imported: str,
+) -> str | None:
+    if not (
+        relative == f"{CANONICAL_EVALPLAN_ROOT}.py"
+        or relative.startswith(f"{CANONICAL_EVALPLAN_ROOT}/")
+    ):
+        return None
+    if any(
+        imported == frozen or imported.startswith(f"{frozen}.")
+        for frozen in FROZEN_CORE_EVALPLAN_IMPORTS
+    ):
+        return (
+            "canonical evalplan owner imports frozen core compatibility "
+            f"copy: {relative} -> {imported}"
+        )
+    if imported == "hwpx" or imported.startswith("hwpx."):
+        if not any(
+            imported == allowed or imported.startswith(f"{allowed}.")
+            for allowed in ALLOWED_EVALPLAN_CORE_IMPORTS
+        ):
+            return (
+                "canonical evalplan owner uses unapproved core seam: "
+                f"{relative} -> {imported}"
+            )
+    return None
+
+
 def evaluate(root: Path) -> dict[str, Any]:
     violations: list[str] = []
     source = root / SOURCE_ROOT
@@ -193,6 +226,13 @@ def evaluate(root: Path) -> dict[str, Any]:
             "canonical form-fill owner must contain exactly "
             f"{CANONICAL_FORM_FILL_FILE_COUNT} Python files: "
             f"{CANONICAL_FORM_FILL_ROOT}"
+        )
+    evalplan_files = sorted((root / CANONICAL_EVALPLAN_ROOT).rglob("*.py"))
+    if len(evalplan_files) != CANONICAL_EVALPLAN_FILE_COUNT:
+        violations.append(
+            "canonical evalplan owner must contain exactly "
+            f"{CANONICAL_EVALPLAN_FILE_COUNT} Python files: "
+            f"{CANONICAL_EVALPLAN_ROOT}"
         )
 
     for path in files:
@@ -246,6 +286,14 @@ def evaluate(root: Path) -> dict[str, Any]:
                     "MCP production imports frozen core form-fill copy: "
                     f"{relative} -> {imported}"
                 )
+            if any(
+                imported == frozen or imported.startswith(f"{frozen}.")
+                for frozen in FROZEN_CORE_EVALPLAN_IMPORTS
+            ):
+                violations.append(
+                    "MCP production imports frozen core evalplan copy: "
+                    f"{relative} -> {imported}"
+                )
             if relative.startswith(f"{CANONICAL_AGENT_ROOT}/") and (
                 imported == "hwpx" or imported.startswith("hwpx.")
             ):
@@ -282,6 +330,12 @@ def evaluate(root: Path) -> dict[str, Any]:
             )
             if form_fill_violation is not None:
                 violations.append(form_fill_violation)
+            evalplan_violation = _evalplan_owner_import_violation(
+                relative,
+                imported,
+            )
+            if evalplan_violation is not None:
+                violations.append(evalplan_violation)
 
     return {
         "ok": not violations,
@@ -304,6 +358,10 @@ def evaluate(root: Path) -> dict[str, Any]:
         "allowedFormFillCoreImports": list(ALLOWED_FORM_FILL_CORE_IMPORTS),
         "temporaryFormFillCoreImports": list(TEMPORARY_FORM_FILL_CORE_IMPORTS),
         "frozenCoreFormFillImports": list(FROZEN_CORE_FORM_FILL_IMPORTS),
+        "canonicalEvalplanRoot": CANONICAL_EVALPLAN_ROOT,
+        "canonicalEvalplanPythonFiles": len(evalplan_files),
+        "allowedEvalplanCoreImports": list(ALLOWED_EVALPLAN_CORE_IMPORTS),
+        "frozenCoreEvalplanImports": list(FROZEN_CORE_EVALPLAN_IMPORTS),
         "legacyDirectRenderDiscovery": sorted(LEGACY_DIRECT_RENDER_DISCOVERY),
         "violations": violations,
     }

@@ -9,9 +9,9 @@
     "manifestSha256": "9fa54af13942549af74600a841117589fac4eb21c12c659c0b345c48746aae6e"
   },
   "canonical": {
-    "pythonFiles": 14,
-    "loc": 6327,
-    "manifestSha256": "0dfedb17ab28d228e894d9cddbdac60084b27f0775c4797a0c41ed4c6bb5bdae"
+    "pythonFiles": 15,
+    "loc": 6336,
+    "manifestSha256": "3ea2bc86ebca2cbe30a40a24cb6cfc0e11273517a151463dbe6957d75036a5f4"
   },
   "moduleMap": {
     "hwpx.fill_residue": "hwpx_mcp_server.office.form_fill.fill_residue",
@@ -23,6 +23,7 @@
   },
   "plannedPackageFiles": [
     "__init__.py",
+    "classification.py",
     "fill_residue.py",
     "guidance.py",
     "quality.py",
@@ -39,16 +40,13 @@
   ],
   "approvedCoreImports": [
     "hwpx.document",
-    "hwpx.evalplan_fill",
     "hwpx.oxml.namespaces",
     "hwpx.quality",
     "hwpx.table_patch",
     "hwpx.tools.package_validator",
     "hwpx.tools.validator"
   ],
-  "temporaryCoreImports": {
-    "hwpx.evalplan_fill": "S-102 moves eval-plan parsing; S-101 may consume the frozen parser without feature growth"
-  },
+  "temporaryCoreImports": {},
   "forbiddenCoreCompatibilityImports": [
     "hwpx.fill_residue",
     "hwpx.form_fill",

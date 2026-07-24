@@ -418,15 +418,15 @@ class FormFieldService:
                 f"phase must be one of {self._EVALPLAN_PHASES}, got {phase!r}",
             )
         try:
-            from hwpx.evalplan_fill import (
+            from hwpx_mcp_server.office.evalplan import (
                 expected_skeleton,
                 fill_evalplan,
                 parse_review_file,
             )
-        except Exception as exc:  # pragma: no cover - dependency compatibility
+        except Exception as exc:  # pragma: no cover - broken package guard
             raise self._context._new_error(
                 "EVALPLAN_FILL_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.evalplan_fill.fill_evalplan",
+                "installed hwpx-mcp-server does not provide the evalplan runtime",
             ) from exc
 
         blank = self._context._resolve_path(path)

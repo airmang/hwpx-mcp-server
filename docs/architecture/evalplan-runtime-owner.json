@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "hwpx-mcp.evalplan-runtime-owner/v1",
+  "canonicalOwner": "hwpx_mcp_server.office.evalplan",
+  "sourceCompatibilityOwner": "python-hwpx 4.x",
+  "source": {
+    "head": "98a6282bcf486859c9c3b9786d9744a1ff3bd362",
+    "pythonFiles": 1,
+    "loc": 2727,
+    "sha256": "35aaf4ab6964a028cd5470da05e80ccb0a7537532b48644c31dd142604a9eb52",
+    "manifestSha256": "3769acd8a4d599f20fe3658f212c83b384096bdf64014c8ca1892e52b6115089"
+  },
+  "canonical": {
+    "pythonFiles": 2,
+    "loc": 2798,
+    "manifestSha256": "f27c9d25e2dfd08545a00c530c034335dac8c3628896d38549d4bc38554824d5"
+  },
+  "packageFiles": ["__init__.py", "runtime.py"],
+  "moduleMap": {
+    "hwpx.evalplan_fill": "hwpx_mcp_server.office.evalplan"
+  },
+  "approvedCoreImports": [
+    "hwpx.body_patch",
+    "hwpx.patch",
+    "hwpx.table_patch"
+  ],
+  "forbiddenCoreCompatibilityImports": [
+    "hwpx.evalplan_fill"
+  ],
+  "siblingApplicationOwners": [
+    "hwpx_mcp_server.office.form_fill"
+  ],
+  "retainedCorePrimitives": [
+    "balanced table and paragraph byte spans",
+    "logical table-cell address/span records",
+    "table/body/paragraph mutation operations",
+    "package section reads and explicit part rewrites",
+    "byte-preserving mutation and open-safety reports"
+  ],
+  "productionConsumers": [
+    "hwpx_mcp_server.office.form_fill.quality",
+    "hwpx_mcp_server.ops_services.form_fields"
+  ],
+  "compatibilityPolicy": {
+    "coreLine": "4.x",
+    "featureWork": "MCP canonical owner only",
+    "mirrors": "correctness-or-security-only with parity test and receipt",
+    "removalGate": "public observation followed by separately approved core major"
+  },
+  "toolContract": {
+    "default": 119,
+    "advanced": 127,
+    "skillRequired": 28,
+    "hash": "429cb6706323e762",
+    "applyEvalplanToolSha256": "5f3a93c2a698d2e715e82b8ada2101c622452c17e84ac3a26aeb78db4034cef9"
+  }
+}

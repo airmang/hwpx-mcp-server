@@ -38,12 +38,6 @@ from pathlib import Path
 from typing import Any
 
 from hwpx.table_patch import (
-    build_grid,
-)
-from hwpx.table_patch import (
-    iter_table_spans as _iter_table_spans,
-)
-from hwpx.table_patch import (
     read_source_bytes as _read_source_bytes,
 )
 from hwpx.table_patch import (
@@ -52,6 +46,8 @@ from hwpx.table_patch import (
 from hwpx.table_patch import (
     table_text as _text_of,
 )
+
+from .classification import _classify, _Table, _tables
 
 # --------------------------------------------------------------------------- #
 # Data model
@@ -122,59 +118,6 @@ class ScoreCard:
             "axes": [a.to_dict() for a in self.axes],
             "lowest_axis": self.lowest_axis().key,
         }
-
-
-# --------------------------------------------------------------------------- #
-# Shared table extraction
-# --------------------------------------------------------------------------- #
-
-
-@dataclass
-class _Table:
-    section: str
-    index: int
-    bytes: bytes
-    rows: int
-    cols: int
-    first_row: list[str]
-    heading: str
-    text: str
-
-
-def _tables(source: str | Path | bytes) -> list[_Table]:
-    data = _read_source_bytes(source)
-    out: list[_Table] = []
-    for sp, section in sorted(_sections(data).items()):
-        spans = _iter_table_spans(section)
-        for ti, (s, e) in enumerate(spans):
-            tb = section[s:e]
-            _grid, rep = build_grid(tb)
-            first: list[str] = []
-            for col in range(rep.col_count):
-                c = _grid.get((0, col))
-                first.append(
-                    " ".join(_text_of(tb[c.start : c.end]).split()) if c else ""
-                )
-            # de-dup horizontally-merged repeats in the preview
-            dedup: list[str] = []
-            for cell in first:
-                if not dedup or dedup[-1] != cell:
-                    dedup.append(cell)
-            w_start = max(0, s - 8000)
-            heading = " ".join(_text_of(section[w_start:s]).split())[-80:]
-            out.append(
-                _Table(
-                    section=sp,
-                    index=ti,
-                    bytes=tb,
-                    rows=rep.row_count,
-                    cols=rep.col_count,
-                    first_row=dedup,
-                    heading=heading,
-                    text=" ".join(_text_of(tb).split()),
-                )
-            )
-    return out
 
 
 _BORDERFILL_RE = re.compile(rb'borderFillIDRef="(\d+)"')
@@ -438,48 +381,6 @@ def score_format_fidelity(produced: str | Path, blank: str | Path) -> AxisScore:
 # --------------------------------------------------------------------------- #
 
 
-def _classify(t: _Table) -> str:
-    """Coarse table type from its first-row / heading signature."""
-    fr = " | ".join(t.first_row)
-    txt = t.text
-    # A numbered section-header table ("5 | | 기준 성취율과 성취도") is a divider, not
-    # a content table -- exclude it so it never counts as achieve_rate/ratio/etc.
-    if t.rows == 1 and t.first_row and t.first_row[0].strip().isdigit():
-        return "other"
-    if "석차등급" in fr and "원점수" in fr:
-        return "seokcha"  # red table -> should be deleted
-    if "제출" in fr and ("모아찍기" in txt or "인쇄물" in txt):
-        return "submit"  # red submit table -> deleted
-    if t.rows == 1 and t.cols == 1 and t.text.startswith("★유의"):
-        return "notice_star"  # red ★유의 table -> deleted
-    # --- 2015-개정 (3학년) signatures -----------------------------------------
-    if fr.startswith("교육과정 성취기준") and "평가기준" in fr:
-        return "achievement"  # 성취기준·평가기준 (상/중/하)
-    if fr.startswith("성취수준") and "일반적 특성" in fr:
-        return "level"  # 영역별 성취수준 (A/B/C)
-    if fr.startswith("교육과정성취기준"):
-        return "rubric"  # 수행평가 세부기준 rubric
-    # --- 2022-개정 (2학년) signatures ------------------------------------------
-    # The 최소 성취수준 (E) table shares the "성취기준별 성취수준" first-row phrase with
-    # the per-area achievement table, so it MUST be matched first (its "최소 능력"
-    # column is the discriminator) -- otherwise it would count as an achievement
-    # block and inflate the C-axis count.
-    if "최소 능력" in fr or "최소 성취수준" in fr:
-        return "minlevel"  # 영역별 최소 성취수준 (공통과목 전용)
-    if "성취기준별 성취수준" in fr and "최소" not in fr:
-        return "achievement"  # per-area 성취기준별 성취수준 (A~E)
-    if "학기 단위 성취수준" in fr:
-        return "level"  # 학기 단위 성취수준 (A~E)
-    if fr.startswith("평가 영역명") and "영역 만점" in fr:
-        return "rubric"  # 수행평가 세부기준 rubric (평가 영역명)
-    # --- shared signatures ----------------------------------------------------
-    if "평가 종류" in fr or ("수행평가" in fr and "합계" in fr):
-        return "ratio"  # 평가의 종류와 반영비율
-    if "성취율" in fr and "성취도" in fr:
-        return "achieve_rate"  # 기준 성취율과 성취도
-    return "other"
-
-
 def _skeleton(source: str | Path) -> dict[str, Any]:
     tabs = _tables(source)
     kinds: dict[str, int] = {}
@@ -626,7 +527,7 @@ def _content_region_fill(md_text: str, norm_prod: str) -> dict[str, float]:
     unavailable."""
     regions: dict[str, float] = {}
     try:
-        from hwpx.evalplan_fill import parse_review_md
+        from ..evalplan import parse_review_md
 
         c = parse_review_md(md_text)
     except Exception:
@@ -836,7 +737,7 @@ def score_content(
     # 반영비율 numbers (e.g. 35/35/30) -- a leftover sample lacks them and fails.
     if ratio_tabs and content is not None:
         try:
-            from hwpx.evalplan_fill import parse_review_md
+            from ..evalplan import parse_review_md
 
             cc = parse_review_md(md_text)
         except Exception:

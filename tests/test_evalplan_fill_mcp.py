@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """apply_evalplan_fill MCP tool — the whole-form 평가계획 recipe surface.
 
-Skips until the installed python-hwpx provides hwpx.evalplan_fill. Uses the
-in-repo public blank form fixture (no owner PII) + a synthetic review markdown.
+Uses the core repository's public blank form fixture (no owner PII) with the
+canonical MCP-owned evaluation-plan runtime and a synthetic review markdown.
 """
 
 from __future__ import annotations
@@ -12,13 +12,9 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 import hwpx
 import hwpx.table_patch as table_patch
-
-pytest.importorskip(
-    "hwpx.evalplan_fill", reason="requires python-hwpx with evalplan_fill recipe"
-)
+import pytest
 
 from hwpx_mcp_server.hwpx_ops import HwpxOperationError, HwpxOps
 from hwpx_mcp_server import server
@@ -150,7 +146,7 @@ def test_apply_evalplan_fill_default_phase_is_all_no_finalize(tmp_path):
     not BLANK.exists(), reason="public blank-form fixture not available"
 )
 def test_apply_evalplan_fill_clean_phase_runs_finalize(tmp_path):
-    """phase='clean' routes through core fill_evalplan(phase='clean'), so the
+    """phase='clean' routes through MCP fill_evalplan(phase='clean'), so the
     deterministic post-fill cleanup runs and its report is surfaced under
     contentReport.finalize (the one-call driver-free clean path)."""
     shutil.copy(BLANK, tmp_path / "blank.hwpx")
