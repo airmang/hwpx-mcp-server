@@ -9,36 +9,50 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from hwpx import (
-    build_comparison_table_plan as build_hwpx_comparison_table_plan,
-)
-from ..office.authoring import (
-    create_document_from_plan as build_document_from_plan,
-    get_document_plan_schema as get_hwpx_document_plan_schema,
-    inspect_document_authoring_quality as inspect_authoring_document_quality,
-    normalize_document_plan as normalize_hwpx_document_plan,
-    validate_document_plan as validate_hwpx_document_plan,
-)
-from ..office.authoring.presets import (
-    create_proposal_document as build_proposal_document,
-    inspect_proposal_quality as inspect_proposal_document_quality,
-)
-from ..office.authoring.style_profile import (
-    describe_template as describe_hwpx_template,
-    list_templates as list_hwpx_templates,
-    register_template as register_hwpx_template,
-)
 from hwpx.tools import report_utils as hwpx_report_utils
 from hwpx.tools.report_parser import (
     parse_government_report_text as parse_hwpx_government_report_text,
 )
 
+from .. import quality as quality_contract
 from ..core.content import (
     copy_document_file,
 )
 from ..core.document import create_blank
 from ..document_state import document_state_payload
-from .. import quality as quality_contract
+from ..office.authoring import (
+    create_document_from_plan as build_document_from_plan,
+)
+from ..office.authoring import (
+    get_document_plan_schema as get_hwpx_document_plan_schema,
+)
+from ..office.authoring import (
+    inspect_document_authoring_quality as inspect_authoring_document_quality,
+)
+from ..office.authoring import (
+    normalize_document_plan as normalize_hwpx_document_plan,
+)
+from ..office.authoring import (
+    validate_document_plan as validate_hwpx_document_plan,
+)
+from ..office.authoring.presets import (
+    create_proposal_document as build_proposal_document,
+)
+from ..office.authoring.presets import (
+    inspect_proposal_quality as inspect_proposal_document_quality,
+)
+from ..office.authoring.style_profile import (
+    describe_template as describe_hwpx_template,
+)
+from ..office.authoring.style_profile import (
+    list_templates as list_hwpx_templates,
+)
+from ..office.authoring.style_profile import (
+    register_template as register_hwpx_template,
+)
+from ..office.document_ops import (
+    build_comparison_table_plan as build_hwpx_comparison_table_plan,
+)
 from ..quality_generation import (
     create_quality_document_fallback,
 )
@@ -54,7 +68,6 @@ from ._shared import (
     _quality_profile_argument,
     _revision_guard,
 )
-
 
 _VERBOSITY_MODES = {"compact", "full"}
 

@@ -9,15 +9,13 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from hwpx.tools.redline import verify_redline as verify_hwpx_redline
-
-from ..core.document import open_doc
 from .. import quality as quality_contract
+from ..core.document import open_doc
+from ..office.document_ops import verify_redline as verify_hwpx_redline
 from ..storage import (
     build_hwpx_verification_report,
 )
 from ..utils.helpers import resolve_path
-
 
 _REDLINE_RECEIPT_FIELDS = (
     "changeCount",

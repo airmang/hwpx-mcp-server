@@ -72,10 +72,7 @@ ALLOWED_AUTHORING_CORE_IMPORTS = (
     "hwpx.tools.toc_author",
     "hwpx.tools.validator",
 )
-TEMPORARY_AUTHORING_CORE_IMPORTS = (
-    "hwpx.tools.mail_merge",
-    "hwpx.visual",
-)
+TEMPORARY_AUTHORING_CORE_IMPORTS: tuple[str, ...] = ()
 FROZEN_CORE_AUTHORING_IMPORTS = (
     "hwpx.authoring",
     "hwpx.builder",
@@ -135,6 +132,20 @@ FROZEN_CORE_EXAM_IMPORTS = (
     "hwpx.exam",
     "hwpx.form_fit",
 )
+CANONICAL_DOCUMENT_OPS_ROOT = "src/hwpx_mcp_server/office/document_ops"
+CANONICAL_DOCUMENT_OPS_FILE_COUNT = 4
+ALLOWED_DOCUMENT_OPS_CORE_IMPORTS = (
+    "hwpx.document",
+    "hwpx.tools.doc_diff",
+    "hwpx.tools.mail_merge",
+    "hwpx.tools.redline",
+)
+FROZEN_CORE_DOCUMENT_OPS_CALLABLES = {
+    "hwpx": frozenset({"build_comparison_table_plan", "mail_merge"}),
+    "hwpx.tools.doc_diff": frozenset({"build_comparison_table_plan"}),
+    "hwpx.tools.mail_merge": frozenset({"mail_merge"}),
+    "hwpx.tools.redline": frozenset({"verify_redline"}),
+}
 
 
 def _imports(path: Path) -> list[str]:
@@ -146,6 +157,15 @@ def _imports(path: Path) -> list[str]:
         elif isinstance(node, ast.ImportFrom) and node.module:
             names.append(node.module)
     return names
+
+
+def _imported_members(path: Path) -> list[tuple[str, str]]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    members: list[tuple[str, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            members.extend((node.module, alias.name) for alias in node.names)
+    return members
 
 
 def _policy_owner_import_violation(
@@ -294,6 +314,24 @@ def _rendering_owner_import_violation(
     return None
 
 
+def _document_ops_owner_import_violation(
+    relative: str,
+    imported: str,
+) -> str | None:
+    if not relative.startswith(f"{CANONICAL_DOCUMENT_OPS_ROOT}/"):
+        return None
+    if imported == "hwpx" or imported.startswith("hwpx."):
+        if not any(
+            imported == allowed or imported.startswith(f"{allowed}.")
+            for allowed in ALLOWED_DOCUMENT_OPS_CORE_IMPORTS
+        ):
+            return (
+                "canonical document-ops owner uses unapproved core seam: "
+                f"{relative} -> {imported}"
+            )
+    return None
+
+
 def evaluate(root: Path) -> dict[str, Any]:
     violations: list[str] = []
     source = root / SOURCE_ROOT
@@ -352,6 +390,15 @@ def evaluate(root: Path) -> dict[str, Any]:
             f"{CANONICAL_EXAM_FILE_COUNT} Python files: "
             f"{CANONICAL_EXAM_ROOT}"
         )
+    document_ops_files = sorted(
+        (root / CANONICAL_DOCUMENT_OPS_ROOT).rglob("*.py")
+    )
+    if len(document_ops_files) != CANONICAL_DOCUMENT_OPS_FILE_COUNT:
+        violations.append(
+            "canonical document-ops owner must contain exactly "
+            f"{CANONICAL_DOCUMENT_OPS_FILE_COUNT} Python files: "
+            f"{CANONICAL_DOCUMENT_OPS_ROOT}"
+        )
 
     for path in files:
         relative = path.relative_to(root).as_posix()
@@ -360,6 +407,13 @@ def evaluate(root: Path) -> dict[str, Any]:
         except (OSError, SyntaxError) as exc:
             violations.append(f"could not inspect {relative}: {exc}")
             continue
+        for imported, member in _imported_members(path):
+            frozen_members = FROZEN_CORE_DOCUMENT_OPS_CALLABLES.get(imported)
+            if frozen_members is not None and member in frozen_members:
+                violations.append(
+                    "MCP production imports frozen core document-ops callable: "
+                    f"{relative} -> {imported}.{member}"
+                )
         for imported in imports:
             if any(
                 imported == prefix or imported.startswith(f"{prefix}.")
@@ -480,6 +534,12 @@ def evaluate(root: Path) -> dict[str, Any]:
             )
             if exam_violation is not None:
                 violations.append(exam_violation)
+            document_ops_violation = _document_ops_owner_import_violation(
+                relative,
+                imported,
+            )
+            if document_ops_violation is not None:
+                violations.append(document_ops_violation)
 
     return {
         "ok": not violations,
@@ -516,6 +576,15 @@ def evaluate(root: Path) -> dict[str, Any]:
         "canonicalExamPythonFiles": len(exam_files),
         "allowedExamCoreImports": list(ALLOWED_EXAM_CORE_IMPORTS),
         "frozenCoreExamImports": list(FROZEN_CORE_EXAM_IMPORTS),
+        "canonicalDocumentOpsRoot": CANONICAL_DOCUMENT_OPS_ROOT,
+        "canonicalDocumentOpsPythonFiles": len(document_ops_files),
+        "allowedDocumentOpsCoreImports": list(
+            ALLOWED_DOCUMENT_OPS_CORE_IMPORTS
+        ),
+        "frozenCoreDocumentOpsCallables": {
+            module: sorted(names)
+            for module, names in FROZEN_CORE_DOCUMENT_OPS_CALLABLES.items()
+        },
         "coreVisualContractConsumers": sorted(CORE_VISUAL_CONTRACT_CONSUMERS),
         "violations": violations,
     }

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "hwpx-mcp.document-operations-owner/v1",
+  "canonicalOwner": "hwpx_mcp_server.office.document_ops",
+  "sourceCompatibilityOwner": "python-hwpx 4.x",
+  "source": {
+    "head": "86e26314540a82c5a772a05012be5fb2f14f9ed4",
+    "pythonFiles": 3,
+    "loc": 1020,
+    "manifestSha256": "630469fdb286eb383262afae1a6e8e28f76d1774b86712b097b62bfd79370649",
+    "qualifiedExportCount": 13,
+    "qualifiedSnapshotSha256": "a1b77d246543217e33df910b6ef2c021f93120c8b75975cde279f5fb695f9a0e"
+  },
+  "canonical": {
+    "status": "canonical",
+    "pythonFiles": 4,
+    "loc": 221,
+    "manifestSha256": "1897981af6c2620248d8fd2a2c5b04614ff8b99e10207011641163d3b7df2263"
+  },
+  "memberOwners": {
+    "core": [
+      "hwpx.tools.doc_diff.diff_paragraphs",
+      "hwpx.tools.doc_diff.doc_diff",
+      "hwpx.tools.doc_diff.inspect_reference_consistency",
+      "hwpx.tools.mail_merge.load_mail_merge_rows",
+      "hwpx.tools.mail_merge.inspect_mail_merge_placeholders",
+      "hwpx.tools.mail_merge.merge_template_rows",
+      "hwpx.tools.redline.author_demo_redline",
+      "hwpx.tools.redline.inspect_redline_structure"
+    ],
+    "mcpCanonical": [
+      "office.document_ops.comparison.build_comparison_table_plan",
+      "office.document_ops.mail_merge.build_mail_merge",
+      "office.document_ops.redline.verify_redline"
+    ],
+    "coreCompatibility": [
+      "hwpx.tools.doc_diff.build_comparison_table_plan",
+      "hwpx.tools.mail_merge.mail_merge",
+      "hwpx.tools.redline.verify_redline"
+    ]
+  },
+  "approvedCoreImports": [
+    "hwpx.document",
+    "hwpx.tools.doc_diff",
+    "hwpx.tools.mail_merge",
+    "hwpx.tools.redline"
+  ],
+  "forbiddenCoreCompatibilityCallables": {
+    "hwpx": [
+      "build_comparison_table_plan",
+      "mail_merge"
+    ],
+    "hwpx.tools.doc_diff": [
+      "build_comparison_table_plan"
+    ],
+    "hwpx.tools.mail_merge": [
+      "mail_merge"
+    ],
+    "hwpx.tools.redline": [
+      "verify_redline"
+    ]
+  },
+  "siblingOwners": [
+    "hwpx_mcp_server.office.compliance",
+    "hwpx_mcp_server.office.form_fill.fit",
+    "hwpx_mcp_server.office.rendering"
+  ],
+  "productionConsumers": [
+    "hwpx_mcp_server.handlers.authoring",
+    "hwpx_mcp_server.handlers.specialized",
+    "hwpx_mcp_server.handlers.tracked_changes",
+    "hwpx_mcp_server.office.authoring.style_profile"
+  ],
+  "compatibilityPolicy": {
+    "coreLine": "4.x",
+    "featureWork": "MCP canonical owner or generic core seam only",
+    "mirrors": "correctness-or-security-only with parity test and receipt",
+    "removalGate": "S-106 observation followed by separately approved S-107 core major"
+  },
+  "toolContract": {
+    "default": 119,
+    "advanced": 127,
+    "skillRequired": 28,
+    "hash": "429cb6706323e762"
+  }
+}

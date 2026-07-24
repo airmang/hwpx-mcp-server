@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
-from hwpx.tools.mail_merge import inspect_mail_merge_placeholders
+from ..document_ops import inspect_mail_merge_placeholders
 from .template_analyzer import TemplateAnalysis, analyze_template
 
 STYLE_PROFILE_SCHEMA_VERSION = "hwpx.style-profile.v1"

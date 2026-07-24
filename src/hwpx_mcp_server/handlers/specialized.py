@@ -7,14 +7,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, cast
-
-from hwpx import (
-    inspect_mail_merge_placeholders as inspect_hwpx_mail_merge_placeholders,
-)
-from hwpx import (
-    mail_merge as build_hwpx_mail_merge,
-)
+from typing import Any
 
 from ..core.content import (
     collect_full_text,
@@ -30,13 +23,19 @@ from ..office.authoring.advanced_generators import (
     build_organization_chart as build_hwpx_organization_chart,
 )
 from ..office.compliance import DEFAULT_POLICY, detect_pii, mask_value
+from ..office.document_ops import (
+    build_mail_merge as build_hwpx_mail_merge,
+)
+from ..office.document_ops import (
+    inspect_mail_merge_placeholders as inspect_hwpx_mail_merge_placeholders,
+)
 from ..office.exam import (
     ExamParseError,
     FormProfileError,
     compose_exam_into_form,
     measure_question_splits,
 )
-from ..office.form_fill.fit import FitMode, FitPolicy
+from ..office.form_fill.fit import FitPolicy as _FitPolicy
 from ..office.form_fill.fit import seal as seal_ops
 from ..office.form_fill.fit.wordbox import (
     OracleUnavailable,
@@ -57,6 +56,9 @@ from ._shared import (
     _with_dry_run_verification,
     _with_save_verification,
 )
+
+# Retain the established handler-module binding used by ownership consumers.
+FitPolicy = _FitPolicy
 
 
 def inspect_mail_merge_placeholders(filename: str) -> dict:
@@ -123,14 +125,6 @@ def mail_merge(
     """
     if build_hwpx_mail_merge is None:
         raise RuntimeError("installed python-hwpx does not provide mail merge tools")
-    fit_policy = None
-    if fit_mode:
-        valid_modes = set(getattr(FitMode, "__args__", ()))
-        if valid_modes and fit_mode not in valid_modes:
-            raise ValueError(
-                f"unknown fit_mode {fit_mode!r}; expected one of {sorted(valid_modes)}"
-            )
-        fit_policy = FitPolicy(mode=cast(FitMode, fit_mode), max_lines=max_lines)
     data_source = _mail_merge_data_source(data_rows, data_filename)
     report = build_hwpx_mail_merge(
         resolve_path(template_filename),
@@ -140,9 +134,8 @@ def mail_merge(
         zip_path=resolve_path(zip_filename) if zip_filename else None,
         strict=strict,
         split_newlines=split_newlines,
-        fit_policy=fit_policy,
+        fit_mode=fit_mode,
         max_lines=max_lines,
-        masking_policy=DEFAULT_POLICY,
     )
     open_safety = _mail_merge_open_safety_summary(report)
     report["openSafety"] = open_safety
