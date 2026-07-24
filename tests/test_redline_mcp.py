@@ -7,9 +7,10 @@ import pytest
 
 import hwpx_mcp_server.server as server
 from hwpx.tools.redline import verify_redline
-from hwpx.visual import oracle as _oracle
+from hwpx.visual import oracle as _core_oracle
 from hwpx_mcp_server.core.document import open_doc
 from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
+from hwpx_mcp_server.office.rendering import oracle as _mcp_oracle
 
 
 @pytest.fixture
@@ -26,10 +27,19 @@ def _force_structural_oracle_degrade(monkeypatch: pytest.MonkeyPatch) -> None:
     may be ``None``). Force both oracle backends unavailable so the structural
     degrade path is taken deterministically — matching the suite convention that
     live-oracle checks are opt-in (HWPX_MAC_ORACLE_SMOKE).
+
+    Both oracle modules must be patched. This test drives two runtimes: the MCP
+    tool (``server.add_tracked_edit`` -> ``office.document_ops.redline`` ->
+    ``office.rendering.oracle``) and the core compatibility callable
+    (``hwpx.tools.redline.verify_redline`` -> ``hwpx.visual.oracle``). Since the
+    visual runtime split these are distinct classes, so patching only the core
+    module leaves the MCP tool on a live backend and the flake returns. Compare
+    ``tests/test_visual_runtime_parity.py``, which patches both for the same reason.
     """
 
-    monkeypatch.setattr(_oracle.WindowsComOracle, "available", lambda self: False)
-    monkeypatch.setattr(_oracle.MacHancomOracle, "available", lambda self: False)
+    for module in (_core_oracle, _mcp_oracle):
+        monkeypatch.setattr(module.WindowsComOracle, "available", lambda self: False)
+        monkeypatch.setattr(module.MacHancomOracle, "available", lambda self: False)
 
 
 def _sha256(path: Path) -> str:

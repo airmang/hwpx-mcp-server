@@ -172,9 +172,12 @@ def test_check_seal_compliance_degrades_without_oracle(tmp_path, monkeypatch):
 
 
 def _mac_seal_oracle_ready() -> bool:
+    # Gate on the canonical MCP owners, because the smoke below drives the MCP
+    # surface. The core compatibility copies are distinct classes since the
+    # visual/form-fill runtime splits, so gating on them can mis-fire.
     try:
-        import hwpx.form_fit.wordbox as wb
-        from hwpx.visual.oracle import MacHancomOracle
+        from hwpx_mcp_server.office.form_fill.fit import wordbox as wb
+        from hwpx_mcp_server.office.rendering.oracle import MacHancomOracle
 
         return MacHancomOracle().available() and wb.fitz_available()
     except Exception:
