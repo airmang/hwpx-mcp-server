@@ -45,7 +45,7 @@ def test_canonical_owner_rejects_frozen_and_unapproved_core_seams() -> None:
     assert (
         check(
             "src/hwpx_mcp_server/office/exam/measure.py",
-            "hwpx.visual.oracle",
+            "hwpx.visual.block_splits",
         )
         is None
     )

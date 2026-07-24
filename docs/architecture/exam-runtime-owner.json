@@ -12,7 +12,7 @@
     "status": "canonical",
     "pythonFiles": 6,
     "loc": 806,
-    "manifestSha256": "3540685b1df45f8749a283bd37eec69196e2cdc274d624c57aa694052dd663e2"
+    "manifestSha256": "2ffc011280ca599bd2012b06c5deb518ea58e4dc41d08aac59cae6769890f58a"
   },
   "packageFiles": [
     "__init__.py",
@@ -29,7 +29,7 @@
     "hwpx.document",
     "hwpx.oxml",
     "hwpx.tools.table_cleanup",
-    "hwpx.visual.oracle"
+    "hwpx.visual.block_splits"
   ],
   "approvedSiblingOwners": [
     "hwpx_mcp_server.office.form_fill.fit.wordbox",
@@ -39,10 +39,10 @@
     "hwpx.exam",
     "hwpx.form_fit"
   ],
-  "temporaryCoreVisualContract": {
-    "module": "hwpx.visual.oracle",
+  "coreVisualContract": {
+    "module": "hwpx.visual.block_splits",
     "members": ["Block", "detect_block_splits"],
-    "removalGate": "S-104 visual split"
+    "status": "renderer-neutral core owner"
   },
   "retainedCorePrimitives": [
     "HwpxDocument object model and package serialization",

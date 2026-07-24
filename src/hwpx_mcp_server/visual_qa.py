@@ -108,14 +108,14 @@ class DeterministicFixtureAdapter:
 
 
 class CoreDeterministicAdapter:
-    """Run python-hwpx's frozen full-page detectors behind the adapter boundary."""
+    """Run the MCP-owned full-page detector orchestrator behind the adapter boundary."""
 
     adapter_id = "python-hwpx-deterministic"
 
     def inspect_page(self, page: Mapping[str, Any]) -> AdapterPageResult:
         number = int(page["page"])
         try:
-            from hwpx.visual.page_qa import inspect_page_png
+            from .office.rendering.page_qa import inspect_page_png
 
             verdict = inspect_page_png(str(page["absolutePath"]), page=number)
             raw_findings = verdict.to_dict().get("findings", [])

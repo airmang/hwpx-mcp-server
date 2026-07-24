@@ -230,9 +230,9 @@ def verify_toc(
     refreshed = None
     if refresh or verify_render:
         try:
-            from hwpx.visual.oracle import resolve_oracle
+            from ..office.rendering import resolve_hancom_oracle
 
-            oracle = resolve_oracle()
+            oracle = resolve_hancom_oracle()
         except Exception:  # pragma: no cover - oracle stack unavailable
             oracle = None
     if refresh:

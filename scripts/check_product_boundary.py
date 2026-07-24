@@ -12,20 +12,38 @@ from typing import Any
 
 SOURCE_ROOT = "src/hwpx_mcp_server"
 FORBIDDEN_IMPORTS = ("hwpx_skill",)
-LEGACY_DIRECT_RENDER_DISCOVERY = frozenset(
-    {
-        "src/hwpx_mcp_server/handlers/layout_style.py",
-    }
-)
 CORE_VISUAL_CONTRACT_CONSUMERS = frozenset(
     {
-        # Contract-only use of Block/detect_block_splits. Runtime discovery
-        # remains routed through office.rendering; S-104 removes this temporary
-        # visual compatibility import when the visual split is canonicalized.
+        # Contract-only use of Block/detect_block_splits through the neutral
+        # core geometry module. Runtime discovery belongs to office.rendering.
         "src/hwpx_mcp_server/office/exam/measure.py",
     }
 )
-CANONICAL_RENDER_BINDING = "src/hwpx_mcp_server/office/rendering.py"
+CANONICAL_RENDER_ROOT = "src/hwpx_mcp_server/office/rendering"
+CANONICAL_RENDER_FILE_COUNT = 6
+CANONICAL_RENDER_RESOURCES = frozenset(
+    {
+        "_hancom_open_rate.ps1",
+        "_refresh_hwpx_mac.applescript",
+        "_render_hwpx.ps1",
+        "_render_hwpx_mac.applescript",
+    }
+)
+ALLOWED_RENDERING_CORE_IMPORTS = (
+    "hwpx.quality",
+    "hwpx.visual.block_splits",
+    "hwpx.visual.detectors",
+    "hwpx.visual.diff",
+    "hwpx.visual.qa_contracts",
+)
+FROZEN_CORE_VISUAL_RUNTIME_IMPORTS = (
+    "hwpx.form_fit",
+    "hwpx.visual.fixture_corpus",
+    "hwpx.visual.hancom_worker",
+    "hwpx.visual.oracle",
+    "hwpx.visual.page_qa",
+    "hwpx.visual.qa_metrics",
+)
 CANONICAL_AGENT_ROOT = "src/hwpx_mcp_server/office/agent"
 CANONICAL_AGENT_FILE_COUNT = 19
 CANONICAL_AUTHORING_ROOT = "src/hwpx_mcp_server/office/authoring"
@@ -111,7 +129,7 @@ ALLOWED_EXAM_CORE_IMPORTS = (
     "hwpx.document",
     "hwpx.oxml",
     "hwpx.tools.table_cleanup",
-    "hwpx.visual.oracle",
+    "hwpx.visual.block_splits",
 )
 FROZEN_CORE_EXAM_IMPORTS = (
     "hwpx.exam",
@@ -245,6 +263,37 @@ def _exam_owner_import_violation(
     return None
 
 
+def _rendering_owner_import_violation(
+    relative: str,
+    imported: str,
+) -> str | None:
+    """Reject application runtime and unapproved core seams in the MCP owner."""
+
+    if not (
+        relative == f"{CANONICAL_RENDER_ROOT}.py"
+        or relative.startswith(f"{CANONICAL_RENDER_ROOT}/")
+    ):
+        return None
+    if any(
+        imported == frozen or imported.startswith(f"{frozen}.")
+        for frozen in FROZEN_CORE_VISUAL_RUNTIME_IMPORTS
+    ):
+        return (
+            "canonical rendering owner imports frozen core compatibility "
+            f"runtime: {relative} -> {imported}"
+        )
+    if imported == "hwpx" or imported.startswith("hwpx."):
+        if not any(
+            imported == allowed or imported.startswith(f"{allowed}.")
+            for allowed in ALLOWED_RENDERING_CORE_IMPORTS
+        ):
+            return (
+                "canonical rendering owner uses unapproved core seam: "
+                f"{relative} -> {imported}"
+            )
+    return None
+
+
 def evaluate(root: Path) -> dict[str, Any]:
     violations: list[str] = []
     source = root / SOURCE_ROOT
@@ -252,9 +301,22 @@ def evaluate(root: Path) -> dict[str, Any]:
 
     if (root / "src" / "hwpx").exists():
         violations.append("MCP repository must not own or vendor src/hwpx")
-    if not (root / CANONICAL_RENDER_BINDING).is_file():
+    render_root = root / CANONICAL_RENDER_ROOT
+    render_files = sorted(render_root.rglob("*.py"))
+    if len(render_files) != CANONICAL_RENDER_FILE_COUNT:
         violations.append(
-            f"missing canonical render binding: {CANONICAL_RENDER_BINDING}"
+            "canonical rendering owner must contain exactly "
+            f"{CANONICAL_RENDER_FILE_COUNT} Python files: {CANONICAL_RENDER_ROOT}"
+        )
+    render_resources = {
+        path.name
+        for path in render_root.iterdir()
+        if path.is_file() and path.suffix in {".ps1", ".applescript"}
+    } if render_root.is_dir() else set()
+    if render_resources != CANONICAL_RENDER_RESOURCES:
+        violations.append(
+            "canonical rendering resources must match the frozen inventory: "
+            f"{CANONICAL_RENDER_ROOT}"
         )
     agent_files = sorted((root / CANONICAL_AGENT_ROOT).rglob("*.py"))
     if len(agent_files) != CANONICAL_AGENT_FILE_COUNT:
@@ -306,15 +368,26 @@ def evaluate(root: Path) -> dict[str, Any]:
                 violations.append(
                     f"MCP imports skill implementation: {relative} -> {imported}"
                 )
-            if (
-                imported == "hwpx.visual.oracle"
-                and relative != CANONICAL_RENDER_BINDING
-                and relative not in LEGACY_DIRECT_RENDER_DISCOVERY
-                and relative not in CORE_VISUAL_CONTRACT_CONSUMERS
+            rendering_violation = _rendering_owner_import_violation(
+                relative,
+                imported,
+            )
+            if rendering_violation is not None:
+                violations.append(rendering_violation)
+            elif any(
+                imported == frozen or imported.startswith(f"{frozen}.")
+                for frozen in FROZEN_CORE_VISUAL_RUNTIME_IMPORTS
             ):
-                violations.append(
-                    f"new direct render discovery bypasses office adapter: {relative}"
-                )
+                if imported == "hwpx.visual.oracle":
+                    violations.append(
+                        "new direct render discovery bypasses office adapter: "
+                        f"{relative}"
+                    )
+                else:
+                    violations.append(
+                        "MCP production imports frozen core visual runtime: "
+                        f"{relative} -> {imported}"
+                    )
             if imported == "hwpx.agent" or imported.startswith("hwpx.agent."):
                 violations.append(
                     f"MCP production imports frozen core agent copy: {relative} -> {imported}"
@@ -411,7 +484,13 @@ def evaluate(root: Path) -> dict[str, Any]:
     return {
         "ok": not violations,
         "pythonFiles": len(files),
-        "canonicalRenderBinding": CANONICAL_RENDER_BINDING,
+        "canonicalRenderingRoot": CANONICAL_RENDER_ROOT,
+        "canonicalRenderingPythonFiles": len(render_files),
+        "canonicalRenderingResources": sorted(render_resources),
+        "allowedRenderingCoreImports": list(ALLOWED_RENDERING_CORE_IMPORTS),
+        "frozenCoreVisualRuntimeImports": list(
+            FROZEN_CORE_VISUAL_RUNTIME_IMPORTS
+        ),
         "canonicalAgentRoot": CANONICAL_AGENT_ROOT,
         "canonicalAgentPythonFiles": len(agent_files),
         "allowedAgentCoreImports": list(ALLOWED_AGENT_CORE_IMPORTS),
@@ -438,7 +517,6 @@ def evaluate(root: Path) -> dict[str, Any]:
         "allowedExamCoreImports": list(ALLOWED_EXAM_CORE_IMPORTS),
         "frozenCoreExamImports": list(FROZEN_CORE_EXAM_IMPORTS),
         "coreVisualContractConsumers": sorted(CORE_VISUAL_CONTRACT_CONSUMERS),
-        "legacyDirectRenderDiscovery": sorted(LEGACY_DIRECT_RENDER_DISCOVERY),
         "violations": violations,
     }
 

@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Hancom render binding for the MCP application layer.
+"""Canonical Hancom rendering owner for the MCP application layer.
 
-``python-hwpx`` owns only the renderer-neutral save contract. This module owns
-runtime discovery of Hancom and adapts the compatibility visual implementation
-to that contract. The adapter is deliberately internal to MCP and adds no tool.
+The package owns runtime discovery, renderer execution, serialized worker
+policy, fixture orchestration, and visual-QA measurement.  ``python-hwpx``
+supplies only renderer-neutral contracts and deterministic geometry helpers.
 """
 
 from __future__ import annotations
@@ -14,7 +14,16 @@ from typing import Any
 
 from hwpx.quality import SavePipeline
 from hwpx.quality.rendering import EditMask, VisualReport
-from hwpx.visual.oracle import NullOracle, resolve_oracle, visual_check
+
+from .oracle import (
+    MacHancomOracle,
+    NullOracle,
+    RenderBackend,
+    RenderOracle,
+    WindowsComOracle,
+    resolve_oracle,
+    visual_check,
+)
 
 
 class HancomRenderBackend:
@@ -56,7 +65,7 @@ def resolve_hancom_backend(*, dpi: int = 150, **_options: Any) -> HancomRenderBa
 
 
 def resolve_hancom_oracle(*, dpi: int = 150, **_options: Any) -> Any:
-    """Return the compatibility Hancom transport at the MCP boundary."""
+    """Return the canonical Hancom transport at the MCP boundary."""
 
     return resolve_oracle(dpi=dpi)
 
@@ -79,8 +88,14 @@ def bind_document_rendering(document: Any) -> Iterator[None]:
 
 __all__ = [
     "HancomRenderBackend",
+    "MacHancomOracle",
     "NullOracle",
+    "RenderBackend",
+    "RenderOracle",
+    "WindowsComOracle",
     "bind_document_rendering",
     "resolve_hancom_backend",
     "resolve_hancom_oracle",
+    "resolve_oracle",
+    "visual_check",
 ]

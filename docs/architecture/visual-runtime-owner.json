@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "hwpx-mcp.visual-runtime-owner/v1",
+  "canonicalOwner": "hwpx_mcp_server.office.rendering",
+  "sourceCompatibilityOwner": "python-hwpx 4.x",
+  "source": {
+    "head": "3720196aa3ad4c4885059573c23bd7a8293302fb",
+    "pythonFiles": 11,
+    "loc": 2667,
+    "manifestSha256": "1d10fab2feba5b892bc2d6ea7a5af621b11394a6f3a65de0cd2861ce5445c758",
+    "publicSurfaceSha256": "66f3c71e9a03f714de4ab4c6259f362549d4eb0b0d8ab94282c99446cc500481"
+  },
+  "canonical": {
+    "status": "canonical",
+    "pythonFiles": 6,
+    "loc": 2001,
+    "manifestSha256": "4b63f85703896fe8d5b17c9896b323c6b324cd66ff97d69e734b7415b9260a16"
+  },
+  "packageFiles": [
+    "__init__.py",
+    "fixture_corpus.py",
+    "oracle.py",
+    "page_qa.py",
+    "qa_metrics.py",
+    "worker.py"
+  ],
+  "resourceFiles": [
+    "_hancom_open_rate.ps1",
+    "_refresh_hwpx_mac.applescript",
+    "_render_hwpx.ps1",
+    "_render_hwpx_mac.applescript"
+  ],
+  "memberOwners": {
+    "coreContract": [
+      "hwpx.quality.rendering",
+      "hwpx.visual.block_splits",
+      "hwpx.visual.detectors",
+      "hwpx.visual.diff",
+      "hwpx.visual.masks",
+      "hwpx.visual.qa_contracts",
+      "hwpx.visual.report"
+    ],
+    "mcpRuntime": [
+      "Hancom discovery and binding",
+      "Windows COM and Mac GUI oracle execution",
+      "serialized worker lifecycle and runtime policy",
+      "fixture corpus loading",
+      "page QA and corpus metrics orchestration"
+    ],
+    "coreCompatibility": [
+      "hwpx.visual.fixture_corpus",
+      "hwpx.visual.hancom_worker",
+      "hwpx.visual.oracle runtime members",
+      "hwpx.visual.page_qa",
+      "hwpx.visual.qa_metrics"
+    ]
+  },
+  "approvedCoreImports": [
+    "hwpx.quality",
+    "hwpx.visual.block_splits",
+    "hwpx.visual.detectors",
+    "hwpx.visual.diff",
+    "hwpx.visual.qa_contracts"
+  ],
+  "approvedSiblingOwners": [],
+  "forbiddenCoreCompatibilityImports": [
+    "hwpx.form_fit",
+    "hwpx.visual.fixture_corpus",
+    "hwpx.visual.hancom_worker",
+    "hwpx.visual.oracle",
+    "hwpx.visual.page_qa",
+    "hwpx.visual.qa_metrics"
+  ],
+  "productionConsumers": [
+    "hwpx_mcp_server.handlers.layout_style",
+    "hwpx_mcp_server.handlers.specialized",
+    "hwpx_mcp_server.office.authoring",
+    "hwpx_mcp_server.visual_qa"
+  ],
+  "compatibilityPolicy": {
+    "coreLine": "4.x",
+    "featureWork": "MCP canonical owner only",
+    "mirrors": "correctness-or-security-only with parity test and receipt",
+    "removalGate": "S-106 observation followed by separately approved S-107 core major"
+  },
+  "toolContract": {
+    "default": 119,
+    "advanced": 127,
+    "skillRequired": 28,
+    "hash": "429cb6706323e762"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "hwpx.visual-runtime-parity/v1",
+  "scenarios": [
+    {
+      "id": "structural-only",
+      "expectedBackend": "NullOracle",
+      "renderChecked": false,
+      "terminalReason": "RENDER_ORACLE_UNAVAILABLE"
+    },
+    {
+      "id": "oracle-unreachable",
+      "expectedBackend": "NullOracle",
+      "renderChecked": false,
+      "terminalReason": "RENDER_ORACLE_UNAVAILABLE"
+    },
+    {
+      "id": "reachable-mac-selection",
+      "expectedBackend": "MacHancomOracle",
+      "renderChecked": null,
+      "terminalReason": "selection-only"
+    },
+    {
+      "id": "bounded-timeout",
+      "expectedBackend": "MacHancomOracle",
+      "renderChecked": false,
+      "terminalReason": "budget-exhausted"
+    },
+    {
+      "id": "deterministic-worker",
+      "expectedBackend": "DeterministicFakeSession",
+      "renderChecked": false,
+      "terminalReason": "FAKE_RENDER_ONLY"
+    },
+    {
+      "id": "fixture-qa",
+      "expectedBackend": "deterministic-fixture",
+      "renderChecked": false,
+      "terminalReason": "exact-projection"
+    }
+  ]
+}

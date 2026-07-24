@@ -1279,9 +1279,9 @@ def inspect_document_authoring_quality(
         render_checked = False
         visual_complete: Any = "unverified"
         if verify_render:
-            from hwpx.visual import oracle as _oracle
+            from ..rendering import MacHancomOracle
 
-            _mac = _oracle.MacHancomOracle()
+            _mac = MacHancomOracle()
             if _mac.available():
                 import tempfile as _tf
 

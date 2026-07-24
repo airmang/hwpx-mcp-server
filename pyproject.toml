@@ -78,6 +78,12 @@ where = ["src"]
 [tool.setuptools.package-data]
 "hwpx_mcp_server.office.house_style" = ["data/*.json"]
 "hwpx_mcp_server.office.authoring.design" = ["profiles/*/*", "profiles/*/fragments/*"]
+"hwpx_mcp_server.office.rendering" = [
+    "_hancom_open_rate.ps1",
+    "_refresh_hwpx_mac.applescript",
+    "_render_hwpx.ps1",
+    "_render_hwpx_mac.applescript",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
