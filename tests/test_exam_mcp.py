@@ -14,14 +14,14 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-import pytest
-
 import hwpx
-import hwpx_mcp_server.server as server
-from hwpx_mcp_server.handlers import specialized as specialized_handler
+import pytest
 from hwpx.document import HwpxDocument
-from hwpx.exam import SplitReport
 from hwpx.oxml.namespaces import HH
+
+from hwpx_mcp_server import server
+from hwpx_mcp_server.handlers import specialized as specialized_handler
+from hwpx_mcp_server.office.exam import SplitReport
 
 # The exam form fixtures are vendored once in python-hwpx (real school forms,
 # governed by tests/fixtures/exam/NOTICE.md). With the editable sibling checkout

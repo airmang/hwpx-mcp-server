@@ -15,12 +15,6 @@ from hwpx import (
 from hwpx import (
     mail_merge as build_hwpx_mail_merge,
 )
-from hwpx.exam import (
-    ExamParseError,
-    FormProfileError,
-    compose_exam_into_form,
-    measure_question_splits,
-)
 
 from ..core.content import (
     collect_full_text,
@@ -36,6 +30,12 @@ from ..office.authoring.advanced_generators import (
     build_organization_chart as build_hwpx_organization_chart,
 )
 from ..office.compliance import DEFAULT_POLICY, detect_pii, mask_value
+from ..office.exam import (
+    ExamParseError,
+    FormProfileError,
+    compose_exam_into_form,
+    measure_question_splits,
+)
 from ..office.form_fill.fit import FitMode, FitPolicy
 from ..office.form_fill.fit import seal as seal_ops
 from ..office.form_fill.fit.wordbox import (
@@ -505,6 +505,7 @@ def compose_exam(
             }
     out_path = resolve_path(output)
     oracle = None if verify else NullOracle()
+    assert exam_md is not None  # narrowed by the XOR guard and file-load branch
     try:
         result = compose_exam_into_form(
             form_path,

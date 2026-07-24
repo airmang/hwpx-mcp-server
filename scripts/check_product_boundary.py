@@ -17,6 +17,14 @@ LEGACY_DIRECT_RENDER_DISCOVERY = frozenset(
         "src/hwpx_mcp_server/handlers/layout_style.py",
     }
 )
+CORE_VISUAL_CONTRACT_CONSUMERS = frozenset(
+    {
+        # Contract-only use of Block/detect_block_splits. Runtime discovery
+        # remains routed through office.rendering; S-104 removes this temporary
+        # visual compatibility import when the visual split is canonicalized.
+        "src/hwpx_mcp_server/office/exam/measure.py",
+    }
+)
 CANONICAL_RENDER_BINDING = "src/hwpx_mcp_server/office/rendering.py"
 CANONICAL_AGENT_ROOT = "src/hwpx_mcp_server/office/agent"
 CANONICAL_AGENT_FILE_COUNT = 19
@@ -97,6 +105,18 @@ ALLOWED_EVALPLAN_CORE_IMPORTS = (
     "hwpx.table_patch",
 )
 FROZEN_CORE_EVALPLAN_IMPORTS = ("hwpx.evalplan_fill",)
+CANONICAL_EXAM_ROOT = "src/hwpx_mcp_server/office/exam"
+CANONICAL_EXAM_FILE_COUNT = 6
+ALLOWED_EXAM_CORE_IMPORTS = (
+    "hwpx.document",
+    "hwpx.oxml",
+    "hwpx.tools.table_cleanup",
+    "hwpx.visual.oracle",
+)
+FROZEN_CORE_EXAM_IMPORTS = (
+    "hwpx.exam",
+    "hwpx.form_fit",
+)
 
 
 def _imports(path: Path) -> list[str]:
@@ -196,6 +216,35 @@ def _evalplan_owner_import_violation(
     return None
 
 
+def _exam_owner_import_violation(
+    relative: str,
+    imported: str,
+) -> str | None:
+    if not (
+        relative == f"{CANONICAL_EXAM_ROOT}.py"
+        or relative.startswith(f"{CANONICAL_EXAM_ROOT}/")
+    ):
+        return None
+    if any(
+        imported == frozen or imported.startswith(f"{frozen}.")
+        for frozen in FROZEN_CORE_EXAM_IMPORTS
+    ):
+        return (
+            "canonical exam owner imports frozen core compatibility "
+            f"copy: {relative} -> {imported}"
+        )
+    if imported == "hwpx" or imported.startswith("hwpx."):
+        if not any(
+            imported == allowed or imported.startswith(f"{allowed}.")
+            for allowed in ALLOWED_EXAM_CORE_IMPORTS
+        ):
+            return (
+                "canonical exam owner uses unapproved core seam: "
+                f"{relative} -> {imported}"
+            )
+    return None
+
+
 def evaluate(root: Path) -> dict[str, Any]:
     violations: list[str] = []
     source = root / SOURCE_ROOT
@@ -234,6 +283,13 @@ def evaluate(root: Path) -> dict[str, Any]:
             f"{CANONICAL_EVALPLAN_FILE_COUNT} Python files: "
             f"{CANONICAL_EVALPLAN_ROOT}"
         )
+    exam_files = sorted((root / CANONICAL_EXAM_ROOT).rglob("*.py"))
+    if len(exam_files) != CANONICAL_EXAM_FILE_COUNT:
+        violations.append(
+            "canonical exam owner must contain exactly "
+            f"{CANONICAL_EXAM_FILE_COUNT} Python files: "
+            f"{CANONICAL_EXAM_ROOT}"
+        )
 
     for path in files:
         relative = path.relative_to(root).as_posix()
@@ -254,6 +310,7 @@ def evaluate(root: Path) -> dict[str, Any]:
                 imported == "hwpx.visual.oracle"
                 and relative != CANONICAL_RENDER_BINDING
                 and relative not in LEGACY_DIRECT_RENDER_DISCOVERY
+                and relative not in CORE_VISUAL_CONTRACT_CONSUMERS
             ):
                 violations.append(
                     f"new direct render discovery bypasses office adapter: {relative}"
@@ -292,6 +349,14 @@ def evaluate(root: Path) -> dict[str, Any]:
             ):
                 violations.append(
                     "MCP production imports frozen core evalplan copy: "
+                    f"{relative} -> {imported}"
+                )
+            if any(
+                imported == frozen or imported.startswith(f"{frozen}.")
+                for frozen in FROZEN_CORE_EXAM_IMPORTS
+            ):
+                violations.append(
+                    "MCP production imports frozen core exam copy: "
                     f"{relative} -> {imported}"
                 )
             if relative.startswith(f"{CANONICAL_AGENT_ROOT}/") and (
@@ -336,6 +401,12 @@ def evaluate(root: Path) -> dict[str, Any]:
             )
             if evalplan_violation is not None:
                 violations.append(evalplan_violation)
+            exam_violation = _exam_owner_import_violation(
+                relative,
+                imported,
+            )
+            if exam_violation is not None:
+                violations.append(exam_violation)
 
     return {
         "ok": not violations,
@@ -362,6 +433,11 @@ def evaluate(root: Path) -> dict[str, Any]:
         "canonicalEvalplanPythonFiles": len(evalplan_files),
         "allowedEvalplanCoreImports": list(ALLOWED_EVALPLAN_CORE_IMPORTS),
         "frozenCoreEvalplanImports": list(FROZEN_CORE_EVALPLAN_IMPORTS),
+        "canonicalExamRoot": CANONICAL_EXAM_ROOT,
+        "canonicalExamPythonFiles": len(exam_files),
+        "allowedExamCoreImports": list(ALLOWED_EXAM_CORE_IMPORTS),
+        "frozenCoreExamImports": list(FROZEN_CORE_EXAM_IMPORTS),
+        "coreVisualContractConsumers": sorted(CORE_VISUAL_CONTRACT_CONSUMERS),
         "legacyDirectRenderDiscovery": sorted(LEGACY_DIRECT_RENDER_DISCOVERY),
         "violations": violations,
     }
