@@ -3,14 +3,23 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
+from ..office.form_fill import (
+    inspect_fill_residue as inspect_form_fill_residue,
+)
+from ..office.form_fill import (
+    scan_form_guidance as scan_canonical_form_guidance,
+)
+from ..office.form_fill import (
+    score_form_fill as score_canonical_form_fill,
+)
 from ..storage import LocalDocumentStorage
 from ..workspace import (
     WorkspaceMissingParentGuard,
     WorkspaceOutputGuard,
 )
-
 from .context import DocumentContext
 from .save_policy import SavePolicy
 from .transactions import TransactionService
@@ -32,7 +41,7 @@ class FormFieldService:
     def list_form_fields(
         self,
         path: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         document, _resolved = self._context._open_document(path)
         fields = document.list_form_fields()
         return {
@@ -46,11 +55,11 @@ class FormFieldService:
         path: str,
         *,
         value: str,
-        field_index: Optional[int] = None,
-        field_id: Optional[str] = None,
-        name: Optional[str] = None,
+        field_index: int | None = None,
+        field_id: str | None = None,
+        name: str | None = None,
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         document, resolved = self._context._open_document(path)
         result = document.fill_form_field(
             value,
@@ -66,16 +75,16 @@ class FormFieldService:
     def apply_table_ops(
         self,
         path: str,
-        ops: Sequence[Dict[str, Any]],
+        ops: Sequence[dict[str, Any]],
         *,
-        output: Optional[str] = None,
+        output: str | None = None,
         render_check: str = "off",
         dry_run: bool = False,
         output_guard: (
             WorkspaceOutputGuard | WorkspaceMissingParentGuard | None
         ) = None,
         publication_sink: Callable[[WorkspaceOutputGuard], None] | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Byte-preserving structural form-fill: apply cell fills + table structure
         ops (delete_column/row/table, insert_row_by_clone, insert_block_by_clone)
         preserving every untouched byte. Cells/tables may be addressed by
@@ -176,7 +185,7 @@ class FormFieldService:
         before_path: str,
         *,
         require: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Render before/after in REAL Hancom and judge overflow/overlap/layout.
         Honest degrade (renderChecked=false) with no oracle unless require=true."""
         try:
@@ -206,8 +215,8 @@ class FormFieldService:
         blank_path: str,
         *,
         run_render: bool = True,
-        expected_pages: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        expected_pages: int | None = None,
+    ) -> dict[str, Any]:
         """Score a filled evaluation-plan form against a gold reference on 5 axes
         (A render cleanliness / B byte fidelity vs blank / C structure vs gold /
         D content completeness / E compliance) -> weighted 0-100 + per-axis gap
@@ -217,17 +226,10 @@ class FormFieldService:
         form family, ``blankPath`` = the empty province form. A requires a real
         Hancom render (renderCheck); with no oracle A is ``unverified`` (never a
         silent pass). Set runRender=false for a fast structural-only pass."""
-        try:
-            from hwpx.formfill_quality import score_form_fill as _score
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._context._new_error(
-                "SCORE_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.formfill_quality.score_form_fill",
-            ) from exc
         produced = self._context._resolve_path(path)
         gold = self._context._resolve_path(gold_path)
         blank = self._context._resolve_path(blank_path)
-        card = _score(
+        card = score_canonical_form_fill(
             produced,
             gold,
             blank,
@@ -239,15 +241,15 @@ class FormFieldService:
     def apply_body_ops(
         self,
         path: str,
-        ops: Sequence[Dict[str, Any]],
+        ops: Sequence[dict[str, Any]],
         *,
-        output: Optional[str] = None,
+        output: str | None = None,
         dry_run: bool = False,
         output_guard: (
             WorkspaceOutputGuard | WorkspaceMissingParentGuard | None
         ) = None,
         publication_sink: Callable[[WorkspaceOutputGuard], None] | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Byte-preserving BODY(표 밖 직속 문단) ops — Stage 2 결정표의 본문 어휘.
 
         ops: replace_text{find,replace,count=1: <hp:t> 텍스트 안에서만, 개수 불일치
@@ -304,26 +306,19 @@ class FormFieldService:
         self,
         path: str,
         *,
-        blank_path: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        blank_path: str | None = None,
+    ) -> dict[str, Any]:
         """채움본 잔존물 zero-체크(비변형) — 제출 전 기계 게이트(Stage 3).
 
         blank를 주면 범례 기반 신호까지: 삭제색 잔존·미수정 샘플(수정색이 blank와
         동일=prose 샘플 미교체) = ERROR. placeholder ◯◯◯/□□□=ERROR, **=각주와
         중의적이라 needs_review, 고아 마커=needs_review. ok=true는 필요조건일 뿐 —
         제출 확언은 렌더 PDF를 사람이 전 페이지 본 뒤에만."""
-        try:
-            from hwpx.fill_residue import inspect_fill_residue as _inspect
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._context._new_error(
-                "FILL_RESIDUE_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.fill_residue",
-            ) from exc
         produced = self._context._resolve_path(path)
         blank = self._context._resolve_path(blank_path) if blank_path else None
-        return _inspect(produced, blank=blank).to_dict()
+        return inspect_form_fill_residue(produced, blank=blank).to_dict()
 
-    def scan_form_guidance(self, path: str, *, max_items: int = 60) -> Dict[str, Any]:
+    def scan_form_guidance(self, path: str, *, max_items: int = 60) -> dict[str, Any]:
         """Recon an unfamiliar form (NON-MUTATING) — universal form-fill Stage 1.
 
         Walks every run INCLUDING table-cell interiors and table captions, parses
@@ -333,18 +328,11 @@ class FormFieldService:
         tokens (◯◯◯/**/□□□), conditional-choice blocks, empty cells with neighbour
         label + charPr format context, and an honest question list. Candidates are
         proposals — destructive ops still require user approval."""
-        try:
-            from hwpx.guidance_scan import scan_form_guidance as _scan
-        except Exception as exc:  # pragma: no cover - dependency compatibility
-            raise self._context._new_error(
-                "GUIDANCE_SCAN_UNAVAILABLE",
-                "installed python-hwpx does not provide hwpx.guidance_scan",
-            ) from exc
         resolved = self._context._resolve_path(path)
-        report = _scan(resolved)
+        report = scan_canonical_form_guidance(resolved)
         limit = max(1, int(max_items))
 
-        def _cand(c) -> Dict[str, Any]:
+        def _cand(c) -> dict[str, Any]:
             cell = None
             if c.cell is not None:
                 cell = {
@@ -360,7 +348,7 @@ class FormFieldService:
                 "cell": cell,
             }
 
-        def _cap(items) -> List[Dict[str, Any]]:
+        def _cap(items) -> list[dict[str, Any]]:
             return [_cand(c) for c in items[:limit]]
 
         return {
@@ -396,15 +384,15 @@ class FormFieldService:
         review_md: str,
         *,
         phase: str = "all",
-        output: Optional[str] = None,
+        output: str | None = None,
         render_check: str = "off",
-        score_gold_path: Optional[str] = None,
-        expected_pages: Optional[int] = None,
+        score_gold_path: str | None = None,
+        expected_pages: int | None = None,
         output_guard: (
             WorkspaceOutputGuard | WorkspaceMissingParentGuard | None
         ) = None,
         publication_sink: Callable[[WorkspaceOutputGuard], None] | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Whole-form 평가계획 fill: {blank province form + review markdown} ->
         byte-preserving gold-quality 채움본 in ONE call. Runs the structure-driven
         recipe (delete red/optional tables + 정기시험 column, fill 운영계획/성취기준/
@@ -431,9 +419,9 @@ class FormFieldService:
             )
         try:
             from hwpx.evalplan_fill import (
-                parse_review_file,
-                fill_evalplan,
                 expected_skeleton,
+                fill_evalplan,
+                parse_review_file,
             )
         except Exception as exc:  # pragma: no cover - dependency compatibility
             raise self._context._new_error(
@@ -466,7 +454,7 @@ class FormFieldService:
             for s in report.get("rubrics", {}).get("skipped", [])
             if "NEEDS_REVIEW" in s
         ]
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "ok": bool(res.get("ok")),
             "outputPath": str(target_path),
             "byteIdentical": bool(res.get("byteIdentical")),
@@ -523,9 +511,7 @@ class FormFieldService:
 
         if score_gold_path:
             try:
-                from hwpx.formfill_quality import score_form_fill as _score
-
-                card = _score(
+                card = score_canonical_form_fill(
                     target_path,
                     self._context._resolve_path(score_gold_path),
                     blank,

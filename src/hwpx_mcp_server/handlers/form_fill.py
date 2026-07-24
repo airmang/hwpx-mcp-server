@@ -7,16 +7,8 @@ from pathlib import Path
 from typing import Annotated
 
 from pydantic import Field
-# Import the template-formfit callables from their submodule rather than the
-# hwpx top level: at the core 4.0.0 boundary the top-level re-exports become
-# deprecated shims that emit a DeprecationWarning on access, and these MCP tools
-# (now DEPRECATED but still functional) must not trigger a runtime warning. The
-# submodule path is stable across core 3.3.1 and 4.0.0.
-from hwpx.template_formfit import (
-    analyze_template_formfit as analyze_hwpx_template_formfit,
-    apply_template_formfit as apply_hwpx_template_formfit,
-)
 
+from .. import quality as quality_contract
 from ..core.content import (
     fill_by_path_in_doc,
     find_cell_by_label_in_doc,
@@ -29,11 +21,13 @@ from ..form_fill import (
     analyze_form_fill_workflow,
     apply_form_fill_workflow,
 )
-from .. import quality as quality_contract
-from ..mutation_models import (
-    BodyOperation,
-    TableOperation,
-    operation_payloads,
+from ..form_output_models import (
+    AnalyzeFormFillOutput,
+    ApplyBodyOpsOutput,
+    ApplyEvalplanFillOutput,
+    ApplyFormFillOutput,
+    ApplyTableOpsOutput,
+    VerifyFormFillOutput,
 )
 from ..mixed_form import (
     MixedFormApplyInput,
@@ -44,16 +38,25 @@ from ..mixed_form import (
     run_specialized_form_operation,
     verify_canonical_mixed_form_plan,
 )
-from ..form_output_models import (
-    AnalyzeFormFillOutput,
-    ApplyBodyOpsOutput,
-    ApplyEvalplanFillOutput,
-    ApplyFormFillOutput,
-    ApplyTableOpsOutput,
-    VerifyFormFillOutput,
+from ..mutation_models import (
+    BodyOperation,
+    TableOperation,
+    operation_payloads,
 )
-from ..utils.helpers import resolve_path
+
+# Import the template-formfit callables from their submodule rather than the
+# hwpx top level: at the core 4.0.0 boundary the top-level re-exports become
+# deprecated shims that emit a DeprecationWarning on access, and these MCP tools
+# (now DEPRECATED but still functional) must not trigger a runtime warning. The
+# submodule path is stable across core 3.3.1 and 4.0.0.
+from ..office.form_fill import (
+    analyze_template_formfit as analyze_hwpx_template_formfit,
+)
+from ..office.form_fill import (
+    apply_template_formfit as apply_hwpx_template_formfit,
+)
 from ..runtime_services import RUNTIME_SERVICES
+from ..utils.helpers import resolve_path
 from ._shared import (
     _idempotency_fingerprint,
     _idempotency_replay,
@@ -66,7 +69,6 @@ from ._shared import (
     _with_dry_run_verification,
     _with_save_verification,
 )
-
 
 _TABLE_LABEL_DIRECTIONS = ("right", "down")
 
@@ -587,19 +589,19 @@ apply_form_fill.__hwpx_input_schema_extra__ = {  # type: ignore[attr-defined]
 
 
 __all__ = [
-    "scan_form_guidance",
-    "apply_table_ops",
+    "analyze_form_fill",
+    "analyze_template_formfit",
     "apply_body_ops",
-    "inspect_fill_residue",
-    "verify_form_fill",
-    "list_form_fields",
+    "apply_evalplan_fill",
+    "apply_form_fill",
+    "apply_table_ops",
+    "apply_template_formfit",
+    "fill_by_path",
     "fill_form_field",
     "find_cell_by_label",
-    "fill_by_path",
-    "analyze_form_fill",
-    "apply_form_fill",
-    "analyze_template_formfit",
-    "apply_template_formfit",
-    "apply_evalplan_fill",
+    "inspect_fill_residue",
+    "list_form_fields",
+    "scan_form_guidance",
     "score_form_fill",
+    "verify_form_fill",
 ]

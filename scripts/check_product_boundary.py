@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 """Check MCP's application-layer ownership and dependency direction."""
+
 from __future__ import annotations
 
 import argparse
@@ -14,7 +15,6 @@ FORBIDDEN_IMPORTS = ("hwpx_skill",)
 LEGACY_DIRECT_RENDER_DISCOVERY = frozenset(
     {
         "src/hwpx_mcp_server/handlers/layout_style.py",
-        "src/hwpx_mcp_server/handlers/specialized.py",
     }
 )
 CANONICAL_RENDER_BINDING = "src/hwpx_mcp_server/office/rendering.py"
@@ -60,12 +60,8 @@ FROZEN_CORE_AUTHORING_IMPORTS = (
     "hwpx.tools.template_analyzer",
 )
 CANONICAL_POLICY_ROOTS = {
-    "src/hwpx_mcp_server/office/compliance": (
-        "hwpx.document",
-    ),
-    "src/hwpx_mcp_server/office/quality": (
-        "hwpx",
-    ),
+    "src/hwpx_mcp_server/office/compliance": ("hwpx.document",),
+    "src/hwpx_mcp_server/office/quality": ("hwpx",),
     "src/hwpx_mcp_server/office/utilities": (),
 }
 FROZEN_CORE_POLICY_IMPORTS = (
@@ -73,6 +69,29 @@ FROZEN_CORE_POLICY_IMPORTS = (
     "hwpx.tools.pii",
     "hwpx.tools.page_guard",
     "hwpx.tools.table_compute",
+)
+CANONICAL_FORM_FILL_ROOT = "src/hwpx_mcp_server/office/form_fill"
+CANONICAL_FORM_FILL_FILE_COUNT = 14
+ALLOWED_FORM_FILL_CORE_IMPORTS = (
+    "hwpx.document",
+    "hwpx.evalplan_fill",
+    "hwpx.oxml.namespaces",
+    "hwpx.quality",
+    "hwpx.table_patch",
+    "hwpx.tools.package_validator",
+    "hwpx.tools.validator",
+)
+TEMPORARY_FORM_FILL_CORE_IMPORTS = (
+    # S-102 moves the eval-plan parser; S-101 may consume it but cannot enlarge it.
+    "hwpx.evalplan_fill",
+)
+FROZEN_CORE_FORM_FILL_IMPORTS = (
+    "hwpx.fill_residue",
+    "hwpx.form_fill",
+    "hwpx.form_fit",
+    "hwpx.formfill_quality",
+    "hwpx.guidance_scan",
+    "hwpx.template_formfit",
 )
 
 
@@ -94,8 +113,7 @@ def _policy_owner_import_violation(
     for root, allowed_imports in CANONICAL_POLICY_ROOTS.items():
         if relative == f"{root}.py" or relative.startswith(f"{root}/"):
             if any(
-                imported == frozen
-                or imported.startswith(f"{frozen}.")
+                imported == frozen or imported.startswith(f"{frozen}.")
                 for frozen in FROZEN_CORE_POLICY_IMPORTS
             ):
                 return (
@@ -105,10 +123,7 @@ def _policy_owner_import_violation(
             if imported == "hwpx" or imported.startswith("hwpx."):
                 if not any(
                     imported == allowed
-                    or (
-                        allowed != "hwpx"
-                        and imported.startswith(f"{allowed}.")
-                    )
+                    or (allowed != "hwpx" and imported.startswith(f"{allowed}."))
                     for allowed in allowed_imports
                 ):
                     return (
@@ -116,6 +131,35 @@ def _policy_owner_import_violation(
                         f"{relative} -> {imported}"
                     )
             return None
+    return None
+
+
+def _form_fill_owner_import_violation(
+    relative: str,
+    imported: str,
+) -> str | None:
+    if not (
+        relative == f"{CANONICAL_FORM_FILL_ROOT}.py"
+        or relative.startswith(f"{CANONICAL_FORM_FILL_ROOT}/")
+    ):
+        return None
+    if any(
+        imported == frozen or imported.startswith(f"{frozen}.")
+        for frozen in FROZEN_CORE_FORM_FILL_IMPORTS
+    ):
+        return (
+            "canonical form-fill owner imports frozen core compatibility "
+            f"copy: {relative} -> {imported}"
+        )
+    if imported == "hwpx" or imported.startswith("hwpx."):
+        if not any(
+            imported == allowed or imported.startswith(f"{allowed}.")
+            for allowed in ALLOWED_FORM_FILL_CORE_IMPORTS
+        ):
+            return (
+                "canonical form-fill owner uses unapproved core seam: "
+                f"{relative} -> {imported}"
+            )
     return None
 
 
@@ -127,7 +171,9 @@ def evaluate(root: Path) -> dict[str, Any]:
     if (root / "src" / "hwpx").exists():
         violations.append("MCP repository must not own or vendor src/hwpx")
     if not (root / CANONICAL_RENDER_BINDING).is_file():
-        violations.append(f"missing canonical render binding: {CANONICAL_RENDER_BINDING}")
+        violations.append(
+            f"missing canonical render binding: {CANONICAL_RENDER_BINDING}"
+        )
     agent_files = sorted((root / CANONICAL_AGENT_ROOT).rglob("*.py"))
     if len(agent_files) != CANONICAL_AGENT_FILE_COUNT:
         violations.append(
@@ -140,6 +186,13 @@ def evaluate(root: Path) -> dict[str, Any]:
             "canonical authoring owner must contain exactly "
             f"{CANONICAL_AUTHORING_FILE_COUNT} Python files: "
             f"{CANONICAL_AUTHORING_ROOT}"
+        )
+    form_fill_files = sorted((root / CANONICAL_FORM_FILL_ROOT).rglob("*.py"))
+    if len(form_fill_files) != CANONICAL_FORM_FILL_FILE_COUNT:
+        violations.append(
+            "canonical form-fill owner must contain exactly "
+            f"{CANONICAL_FORM_FILL_FILE_COUNT} Python files: "
+            f"{CANONICAL_FORM_FILL_ROOT}"
         )
 
     for path in files:
@@ -154,7 +207,9 @@ def evaluate(root: Path) -> dict[str, Any]:
                 imported == prefix or imported.startswith(f"{prefix}.")
                 for prefix in FORBIDDEN_IMPORTS
             ):
-                violations.append(f"MCP imports skill implementation: {relative} -> {imported}")
+                violations.append(
+                    f"MCP imports skill implementation: {relative} -> {imported}"
+                )
             if (
                 imported == "hwpx.visual.oracle"
                 and relative != CANONICAL_RENDER_BINDING
@@ -176,12 +231,19 @@ def evaluate(root: Path) -> dict[str, Any]:
                     f"{relative} -> {imported}"
                 )
             if any(
-                imported == frozen
-                or imported.startswith(f"{frozen}.")
+                imported == frozen or imported.startswith(f"{frozen}.")
                 for frozen in FROZEN_CORE_POLICY_IMPORTS
             ):
                 violations.append(
                     "MCP production imports frozen core policy copy: "
+                    f"{relative} -> {imported}"
+                )
+            if any(
+                imported == frozen or imported.startswith(f"{frozen}.")
+                for frozen in FROZEN_CORE_FORM_FILL_IMPORTS
+            ):
+                violations.append(
+                    "MCP production imports frozen core form-fill copy: "
                     f"{relative} -> {imported}"
                 )
             if relative.startswith(f"{CANONICAL_AGENT_ROOT}/") and (
@@ -198,8 +260,7 @@ def evaluate(root: Path) -> dict[str, Any]:
                 imported == "hwpx" or imported.startswith("hwpx.")
             ):
                 approved = (
-                    ALLOWED_AUTHORING_CORE_IMPORTS
-                    + TEMPORARY_AUTHORING_CORE_IMPORTS
+                    ALLOWED_AUTHORING_CORE_IMPORTS + TEMPORARY_AUTHORING_CORE_IMPORTS
                 )
                 if not any(
                     imported == allowed or imported.startswith(f"{allowed}.")
@@ -215,6 +276,12 @@ def evaluate(root: Path) -> dict[str, Any]:
             )
             if policy_violation is not None:
                 violations.append(policy_violation)
+            form_fill_violation = _form_fill_owner_import_violation(
+                relative,
+                imported,
+            )
+            if form_fill_violation is not None:
+                violations.append(form_fill_violation)
 
     return {
         "ok": not violations,
@@ -229,10 +296,14 @@ def evaluate(root: Path) -> dict[str, Any]:
         "temporaryAuthoringCoreImports": list(TEMPORARY_AUTHORING_CORE_IMPORTS),
         "frozenCoreAuthoringImports": list(FROZEN_CORE_AUTHORING_IMPORTS),
         "canonicalPolicyRoots": {
-            root: list(imports)
-            for root, imports in CANONICAL_POLICY_ROOTS.items()
+            root: list(imports) for root, imports in CANONICAL_POLICY_ROOTS.items()
         },
         "frozenCorePolicyImports": list(FROZEN_CORE_POLICY_IMPORTS),
+        "canonicalFormFillRoot": CANONICAL_FORM_FILL_ROOT,
+        "canonicalFormFillPythonFiles": len(form_fill_files),
+        "allowedFormFillCoreImports": list(ALLOWED_FORM_FILL_CORE_IMPORTS),
+        "temporaryFormFillCoreImports": list(TEMPORARY_FORM_FILL_CORE_IMPORTS),
+        "frozenCoreFormFillImports": list(FROZEN_CORE_FORM_FILL_IMPORTS),
         "legacyDirectRenderDiscovery": sorted(LEGACY_DIRECT_RENDER_DISCOVERY),
         "violations": violations,
     }
@@ -240,7 +311,9 @@ def evaluate(root: Path) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        "--root", type=Path, default=Path(__file__).resolve().parents[1]
+    )
     args = parser.parse_args(argv)
     report = evaluate(args.root.resolve())
     print(json.dumps(report, ensure_ascii=False, indent=2))

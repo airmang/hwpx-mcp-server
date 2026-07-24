@@ -5,14 +5,16 @@
 runtime discovery of Hancom and adapts the compatibility visual implementation
 to that contract. The adapter is deliberately internal to MCP and adds no tool.
 """
+
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from hwpx.quality import SavePipeline
 from hwpx.quality.rendering import EditMask, VisualReport
-from hwpx.visual.oracle import resolve_oracle, visual_check
+from hwpx.visual.oracle import NullOracle, resolve_oracle, visual_check
 
 
 class HancomRenderBackend:
@@ -50,7 +52,13 @@ class HancomRenderBackend:
 def resolve_hancom_backend(*, dpi: int = 150, **_options: Any) -> HancomRenderBackend:
     """Discover Hancom at the application boundary and return a core backend."""
 
-    return HancomRenderBackend(resolve_oracle(dpi=dpi))
+    return HancomRenderBackend(resolve_hancom_oracle(dpi=dpi))
+
+
+def resolve_hancom_oracle(*, dpi: int = 150, **_options: Any) -> Any:
+    """Return the compatibility Hancom transport at the MCP boundary."""
+
+    return resolve_oracle(dpi=dpi)
 
 
 @contextmanager
@@ -71,6 +79,8 @@ def bind_document_rendering(document: Any) -> Iterator[None]:
 
 __all__ = [
     "HancomRenderBackend",
+    "NullOracle",
     "bind_document_rendering",
     "resolve_hancom_backend",
+    "resolve_hancom_oracle",
 ]

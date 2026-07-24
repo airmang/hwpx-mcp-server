@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "hwpx-mcp.form-fill-runtime-owner/v1",
+  "canonicalOwner": "hwpx_mcp_server.office.form_fill",
+  "sourceCompatibilityOwner": "python-hwpx 4.x",
+  "source": {
+    "head": "5054b50665296a0970823765d753de3d3ff612b5",
+    "pythonFiles": 13,
+    "loc": 5745,
+    "manifestSha256": "9fa54af13942549af74600a841117589fac4eb21c12c659c0b345c48746aae6e"
+  },
+  "canonical": {
+    "pythonFiles": 14,
+    "loc": 6327,
+    "manifestSha256": "0dfedb17ab28d228e894d9cddbdac60084b27f0775c4797a0c41ed4c6bb5bdae"
+  },
+  "moduleMap": {
+    "hwpx.fill_residue": "hwpx_mcp_server.office.form_fill.fill_residue",
+    "hwpx.form_fill": "hwpx_mcp_server.office.form_fill.split_run",
+    "hwpx.form_fit": "hwpx_mcp_server.office.form_fill.fit",
+    "hwpx.formfill_quality": "hwpx_mcp_server.office.form_fill.quality",
+    "hwpx.guidance_scan": "hwpx_mcp_server.office.form_fill.guidance",
+    "hwpx.template_formfit": "hwpx_mcp_server.office.form_fill.template_formfit"
+  },
+  "plannedPackageFiles": [
+    "__init__.py",
+    "fill_residue.py",
+    "guidance.py",
+    "quality.py",
+    "split_run.py",
+    "template_formfit.py",
+    "fit/__init__.py",
+    "fit/apply.py",
+    "fit/engine.py",
+    "fit/measure.py",
+    "fit/policy.py",
+    "fit/report.py",
+    "fit/seal.py",
+    "fit/wordbox.py"
+  ],
+  "approvedCoreImports": [
+    "hwpx.document",
+    "hwpx.evalplan_fill",
+    "hwpx.oxml.namespaces",
+    "hwpx.quality",
+    "hwpx.table_patch",
+    "hwpx.tools.package_validator",
+    "hwpx.tools.validator"
+  ],
+  "temporaryCoreImports": {
+    "hwpx.evalplan_fill": "S-102 moves eval-plan parsing; S-101 may consume the frozen parser without feature growth"
+  },
+  "forbiddenCoreCompatibilityImports": [
+    "hwpx.fill_residue",
+    "hwpx.form_fill",
+    "hwpx.form_fit",
+    "hwpx.formfill_quality",
+    "hwpx.guidance_scan",
+    "hwpx.template_formfit"
+  ],
+  "retainedCorePrimitives": [
+    "HwpxDocument and object model",
+    "table/text/field mutation and byte-preserving package operations",
+    "OWPML namespace and validation primitives",
+    "renderer-neutral quality reports and mutation ledger"
+  ],
+  "renderingSeam": "hwpx_mcp_server.office.rendering",
+  "productionConsumersToRoute": [
+    "hwpx_mcp_server.handlers.form_fill",
+    "hwpx_mcp_server.handlers.specialized",
+    "hwpx_mcp_server.ops_services.form_fields"
+  ],
+  "productionRouting": {
+    "hwpx_mcp_server.handlers.form_fill": "template-formfit callables",
+    "hwpx_mcp_server.handlers.specialized": "fit policy, seal, wordbox, and render seam",
+    "hwpx_mcp_server.ops_services.form_fields": "quality, residue, and guidance"
+  },
+  "compatibilityPolicy": {
+    "coreLine": "4.x",
+    "featureWork": "MCP canonical owner only",
+    "mirrors": "correctness-or-security-only with parity test and receipt",
+    "removalGate": "public observation followed by separately approved core major"
+  },
+  "toolContract": {
+    "default": 119,
+    "advanced": 127,
+    "skillRequired": 28,
+    "hash": "429cb6706323e762"
+  }
+}

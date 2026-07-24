@@ -7,7 +7,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from hwpx import (
     inspect_mail_merge_placeholders as inspect_hwpx_mail_merge_placeholders,
@@ -21,13 +21,6 @@ from hwpx.exam import (
     compose_exam_into_form,
     measure_question_splits,
 )
-from hwpx.form_fit import seal as seal_ops
-from hwpx.form_fit.wordbox import (
-    OracleUnavailable,
-    extract_image_boxes,
-    render_glyph_boxes,
-)
-from hwpx.visual.oracle import NullOracle, resolve_oracle
 
 from ..core.content import (
     collect_full_text,
@@ -43,6 +36,15 @@ from ..office.authoring.advanced_generators import (
     build_organization_chart as build_hwpx_organization_chart,
 )
 from ..office.compliance import DEFAULT_POLICY, detect_pii, mask_value
+from ..office.form_fill.fit import FitMode, FitPolicy
+from ..office.form_fill.fit import seal as seal_ops
+from ..office.form_fill.fit.wordbox import (
+    OracleUnavailable,
+    extract_image_boxes,
+    render_glyph_boxes,
+)
+from ..office.rendering import NullOracle
+from ..office.rendering import resolve_hancom_oracle as resolve_oracle
 from ..storage import (
     build_hwpx_open_safety_report,
 )
@@ -123,14 +125,12 @@ def mail_merge(
         raise RuntimeError("installed python-hwpx does not provide mail merge tools")
     fit_policy = None
     if fit_mode:
-        from hwpx.form_fit import FitMode, FitPolicy
-
         valid_modes = set(getattr(FitMode, "__args__", ()))
         if valid_modes and fit_mode not in valid_modes:
             raise ValueError(
                 f"unknown fit_mode {fit_mode!r}; expected one of {sorted(valid_modes)}"
             )
-        fit_policy = FitPolicy(mode=fit_mode, max_lines=max_lines)
+        fit_policy = FitPolicy(mode=cast(FitMode, fit_mode), max_lines=max_lines)
     data_source = _mail_merge_data_source(data_rows, data_filename)
     report = build_hwpx_mail_merge(
         resolve_path(template_filename),
@@ -270,6 +270,15 @@ def _nearest_rect(rects: list, center: tuple[float, float]):
     )
 
 
+def _is_oracle_unavailable(exc: RuntimeError) -> bool:
+    """Recognize both the canonical and frozen core compatibility exception."""
+
+    return isinstance(exc, OracleUnavailable) or (
+        exc.__class__.__name__ == "OracleUnavailable"
+        and exc.__class__.__module__ == "hwpx.form_fit.wordbox"
+    )
+
+
 def _check_seal_compliance_impl(
     path: str,
     sender_text: str,
@@ -289,7 +298,9 @@ def _check_seal_compliance_impl(
     try:
         boxes, _sizes, backend = render_glyph_boxes(path, out_pdf=pdf)
         seal_rects = extract_image_boxes(pdf)
-    except OracleUnavailable as exc:
+    except RuntimeError as exc:
+        if not _is_oracle_unavailable(exc):
+            raise
         return {
             "ok": False,
             "renderChecked": False,
@@ -360,7 +371,9 @@ def place_seal(
     else:
         try:
             boxes, _sizes, backend = render_glyph_boxes(path)
-        except OracleUnavailable as exc:
+        except RuntimeError as exc:
+            if not _is_oracle_unavailable(exc):
+                raise
             return {
                 "ok": False,
                 "filename": filename,
@@ -540,7 +553,7 @@ def verify_question_splits(
     시각 검증을 요구합니다. ``valid_question_numbers`` 로 측정 대상 문항을 한정하면 양식
     chrome(예: "2026." 연도)이 가짜 문항 블록을 열지 않습니다.
     """
-    if measure_question_splits is None or resolve_oracle is None:
+    if measure_question_splits is None:
         return {
             "ok": False,
             "filename": filename,
@@ -617,14 +630,14 @@ def verify_question_splits(
 
 
 __all__ = [
-    "scan_personal_info",
-    "compose_exam",
-    "verify_question_splits",
-    "place_seal",
-    "check_seal_compliance",
-    "mail_merge",
-    "inspect_mail_merge_placeholders",
     "build_image_grid",
     "build_meeting_nameplates",
     "build_organization_chart",
+    "check_seal_compliance",
+    "compose_exam",
+    "inspect_mail_merge_placeholders",
+    "mail_merge",
+    "place_seal",
+    "scan_personal_info",
+    "verify_question_splits",
 ]

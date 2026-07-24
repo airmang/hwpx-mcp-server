@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "hwpx-mcp.form-fill-runtime-parity/v1",
+  "splitRun": {
+    "section": "<hs:sec xmlns:hs=\"http://www.hancom.co.kr/hwpml/2011/section\" xmlns:hp=\"http://www.hancom.co.kr/hwpml/2011/paragraph\"><hp:p><hp:run charPrIDRef=\"3\"><hp:t>이름: {{na</hp:t></hp:run><hp:run charPrIDRef=\"3\"><hp:t>me}}</hp:t></hp:run><hp:run charPrIDRef=\"9\"><hp:t> 님</hp:t></hp:run></hp:p></hs:sec>",
+    "mappings": {
+      "{{name}}": "홍길동"
+    },
+    "invalidSection": "<hs:sec>"
+  },
+  "fitCases": [
+    {
+      "value": "홍길동",
+      "availableWidth": 5000,
+      "fontPt": 10.0,
+      "maxLines": 1,
+      "mode": "keep",
+      "minFontPt": 6.0
+    },
+    {
+      "value": "가나다라마바사",
+      "availableWidth": 6000,
+      "fontPt": 10.0,
+      "maxLines": 1,
+      "mode": "shrink",
+      "minFontPt": 6.0
+    },
+    {
+      "value": "가나다라마바사아자차",
+      "availableWidth": 6000,
+      "fontPt": 10.0,
+      "maxLines": 1,
+      "mode": "fail_on_overflow",
+      "minFontPt": 6.0
+    }
+  ],
+  "instructionSamples": [
+    "빨간 글씨는 모두 삭제합니다",
+    "교과별로 수정하세요",
+    "성취기준 [12합성01-01]을 평가한다",
+    "※ 재시험은 실시하지 않는다.",
+    ""
+  ]
+}
