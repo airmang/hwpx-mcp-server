@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from hwpx.tools import report_utils as hwpx_report_utils
-from hwpx.tools.report_parser import (
+from ..office.authoring.report_parser import (
     parse_government_report_text as parse_hwpx_government_report_text,
 )
 
