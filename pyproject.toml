@@ -55,6 +55,8 @@ oracle = ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
 vision = ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
 test = [
     "pytest>=8.0",
+    # PEP 440 비교. 핀 검사가 5.0.0rc1을 5.0.0으로 오판하지 않게.
+    "packaging>=23.0",
     "pytest-cov>=5.0",
     "jsonschema>=4.22",
     "olefile>=0.47",

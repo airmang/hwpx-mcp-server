@@ -28,6 +28,31 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_the_build_tree_is_clean_before_anything_else() -> None:
+    """더러운 ``build/``를 발견하면 여기서 멈춘다.
+
+    아래 두 검사는 각각 build/를 지우거나 일부러 더럽힌다. 그래서 **이미**
+    오염된 트리에서 돌려도 둘 다 통과한다 — 실제 사고 상태가 감지되지 않는
+    것이다. 세 번 당한 그 상태를 잡는 건 이 검사다.
+
+    빌드 산출물은 재생성 가능하므로 지우라고 말하는 것으로 충분하다.
+    """
+    stale = ROOT / "build" / "lib"
+    if not stale.is_dir():
+        return
+    declared_prefix = "hwpx_automation"
+    ghosts = sorted(
+        child.name
+        for child in stale.iterdir()
+        if child.is_dir() and not child.name.startswith(declared_prefix)
+    )
+    assert not ghosts, (
+        "build/lib에 선언되지 않은 패키지가 남아 있다 — 이 상태로 빌드하면 "
+        f"wheel에 실린다:\n  {', '.join(ghosts)}\n"
+        "  rm -rf build 후 다시 빌드할 것."
+    )
+
+
 @pytest.mark.parametrize("distribution", ["wheel"])
 def test_wheel_top_level_matches_the_declaration(tmp_path: Path, distribution: str) -> None:
     """wheel의 최상위 이름이 pyproject가 선언한 것과 **정확히** 같아야 한다.

@@ -20,8 +20,23 @@ import tomllib
 from pathlib import Path
 
 
-def _version_tuple(text: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in re.findall(r"\d+", text)[:3])
+def _satisfies(installed: str, specifier: str) -> bool:
+    """PEP 440으로 판정한다.
+
+    숫자 세 개만 뽑아 비교하면 ``5.0.0rc1``과 ``5.0.0``이 같은 값이 되어,
+    릴리스 후보가 정식 릴리스를 만족한다고 잘못 통과한다. packaging이 있으면
+    그걸 쓰고, 없으면 그 사실을 말하고 실패한다 — 조용히 헐거운 비교로
+    내려가는 것이 이 스크립트가 막으려는 바로 그 부류의 사고다.
+    """
+    from packaging.specifiers import SpecifierSet
+    from packaging.version import InvalidVersion, Version
+
+    try:
+        return Version(installed) in SpecifierSet(specifier, prereleases=True) and (
+            Version(installed) >= Version(specifier.lstrip(">="))
+        )
+    except InvalidVersion:
+        return False
 
 
 def main() -> int:
@@ -43,8 +58,7 @@ def main() -> int:
         print(f"python-hwpx 바닥을 읽지 못했다: {floor!r}", file=sys.stderr)
         return 2
 
-    required, actual = _version_tuple(match.group(1)), _version_tuple(core_version)
-    if actual < required:
+    if not _satisfies(core_version, f">={match.group(1)}"):
         print(
             f"핀이 낡았다: 체크아웃된 python-hwpx는 {core_version}인데 "
             f"{declared['name']} {declared['version']}은(는) {floor}을(를) 요구한다.\n"
