@@ -7,17 +7,17 @@ import hashlib
 import json
 from pathlib import Path
 
-from hwpx_mcp_server.handlers import specialized
-from hwpx_mcp_server.office import exam
-from hwpx_mcp_server.tool_bindings import TOOL_BINDINGS
-from hwpx_mcp_server.tool_contract import (
+from hwpx_automation.handlers import specialized
+from hwpx_automation.office import exam
+from hwpx_automation.tool_bindings import TOOL_BINDINGS
+from hwpx_automation.tool_contract import (
     contract_hash,
     expected_tool_names,
     skill_required_tool_names,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-OWNER_ROOT = ROOT / "src" / "hwpx_mcp_server" / "office" / "exam"
+OWNER_ROOT = ROOT / "src" / "hwpx_automation" / "office" / "exam"
 OWNER = json.loads(
     (ROOT / "docs" / "architecture" / "exam-runtime-owner.json").read_text(
         encoding="utf-8"
@@ -60,7 +60,7 @@ def test_production_handler_is_bound_to_mcp_owner() -> None:
     assert specialized.FormProfileError is exam.FormProfileError
     assert TOOL_BINDINGS["compose_exam"] is specialized.compose_exam
     assert exam.compose_exam_into_form.__module__ == (
-        "hwpx_mcp_server.office.exam.compose"
+        "hwpx_automation.office.exam.compose"
     )
 
 

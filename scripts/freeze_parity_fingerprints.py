@@ -70,7 +70,7 @@ from parity_fingerprint import fingerprint
 # compared hwpx.visual.oracle's shape against anything), and the rewritten
 # test builds those fixtures from hwpx.form_fit.wordbox (stays) and the MCP
 # owner's own NullOracle instead. The "visual" domain freezes the full
-# hwpx.visual.oracle surface for hwpx_mcp_server.office.rendering.oracle.
+# hwpx.visual.oracle surface for hwpx_automation.office.rendering.oracle.
 DOMAINS: dict[str, tuple[str, ...]] = {
     "agent": (
         "hwpx.agent",
@@ -213,7 +213,7 @@ def remove_historical_worktree(core_repo: Path, scratch: Path) -> None:
 def _import_core_module(dotted_name: str) -> ModuleType:
     module = importlib.import_module(dotted_name)
     origin = getattr(module, "__file__", None) or ""
-    if "hwpx_mcp_server" in origin:
+    if "hwpx_automation" in origin:
         raise RuntimeError(
             f"{dotted_name} resolved to {origin!r}, not a core python-hwpx module; "
             "check sys.path ordering"

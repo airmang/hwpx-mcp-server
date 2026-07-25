@@ -50,35 +50,35 @@ def test_canonical_policy_roots_use_only_declared_public_core_seams() -> None:
         "utilities": [],
     }
     assert CANONICAL_POLICY_ROOTS == {
-        "src/hwpx_mcp_server/office/compliance": ("hwpx.document",),
-        "src/hwpx_mcp_server/office/quality": ("hwpx",),
-        "src/hwpx_mcp_server/office/utilities": (),
+        "src/hwpx_automation/office/compliance": ("hwpx.document",),
+        "src/hwpx_automation/office/quality": ("hwpx",),
+        "src/hwpx_automation/office/utilities": (),
     }
 
     assert (
         _policy_owner_import_violation(
-            "src/hwpx_mcp_server/office/compliance/pii.py",
+            "src/hwpx_automation/office/compliance/pii.py",
             "hwpx.tools.pii",
         )
         is not None
     )
     assert (
         _policy_owner_import_violation(
-            "src/hwpx_mcp_server/office/quality/page_guard.py",
+            "src/hwpx_automation/office/quality/page_guard.py",
             "hwpx.opc.package",
         )
         is not None
     )
     assert (
         _policy_owner_import_violation(
-            "src/hwpx_mcp_server/office/utilities/table_compute.py",
+            "src/hwpx_automation/office/utilities/table_compute.py",
             "hwpx",
         )
         is not None
     )
     assert (
         _policy_owner_import_violation(
-            "src/hwpx_mcp_server/office/compliance/official_lint.py",
+            "src/hwpx_automation/office/compliance/official_lint.py",
             "hwpx.document",
         )
         is None

@@ -8,10 +8,10 @@ from typing import Any
 
 import pytest
 
-import hwpx_mcp_server.server as server
+import hwpx_automation.server as server
 from hwpx.tools.package_validator import validate_editor_open_safety
-from hwpx_mcp_server.core.document import open_doc, save_doc
-from hwpx_mcp_server.upstream import HH_NS, HP_NS, append_xml_child
+from hwpx_automation.core.document import open_doc, save_doc
+from hwpx_automation.upstream import HH_NS, HP_NS, append_xml_child
 
 
 _SPACING_KEYS = ("hangul", "latin", "hanja", "japanese", "other", "symbol", "user")

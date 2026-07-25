@@ -15,8 +15,8 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from hwpx_mcp_server import runtime as _runtime  # noqa: E402,F401
-from hwpx_mcp_server.tool_contract import (  # noqa: E402
+from hwpx_automation import runtime as _runtime  # noqa: E402,F401
+from hwpx_automation.tool_contract import (  # noqa: E402
     BASELINE_TOOL_SPECS,
     TOOL_SPECS,
     ToolClassification,
@@ -136,7 +136,7 @@ def build_payload() -> dict[str, Any]:
     live_compatibility = _by_classification(ToolClassification.COMPATIBILITY)
     removed_names = {spec.name for spec in internal}
     active_names = {spec.name for spec in TOOL_SPECS}
-    server_source = (SRC / "hwpx_mcp_server" / "server.py").read_text(encoding="utf-8")
+    server_source = (SRC / "hwpx_automation" / "server.py").read_text(encoding="utf-8")
     runtime_hits = sorted(name for name in removed_names if name in server_source)
 
     errors: list[str] = []
@@ -219,8 +219,8 @@ def build_payload() -> dict[str, Any]:
             "ghostRegistrations": [],
         },
         "registrationEvidence": {
-            "canonicalToolSpec": "src/hwpx_mcp_server/tool_contract.py",
-            "fastMcpRegistration": "src/hwpx_mcp_server/server.py",
+            "canonicalToolSpec": "src/hwpx_automation/tool_contract.py",
+            "fastMcpRegistration": "src/hwpx_automation/server.py",
             "boundInstalledToolCount": FROZEN_BOUND_INSTALLED_TOOL_COUNT,
             "bindingHash": FROZEN_BINDING_HASH,
             "normalizedInputOutputSchemasComplete": all(

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.core.document import open_doc, save_doc
-from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
+from hwpx_automation.core.document import open_doc, save_doc
+from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
 
 
 PHASE1_TOOLS = {
@@ -57,7 +57,7 @@ ADVANCED_TOOLS = {
 @pytest.fixture()
 def server_module(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("HWPX_MCP_ADVANCED", raising=False)
-    import hwpx_mcp_server.server as server
+    import hwpx_automation.server as server
 
     return importlib.reload(server)
 
@@ -74,7 +74,7 @@ def test_default_toolset_exposes_phase1_and_hides_advanced(server_module) -> Non
 
 def test_advanced_toolset_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HWPX_MCP_ADVANCED", "1")
-    import hwpx_mcp_server.server as server
+    import hwpx_automation.server as server
 
     reloaded = importlib.reload(server)
     names = set(snapshot_runtime_tools(reloaded.mcp))

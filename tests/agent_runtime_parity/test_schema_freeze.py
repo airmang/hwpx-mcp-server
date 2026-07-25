@@ -29,12 +29,12 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.office.agent.model import (
+from hwpx_automation.office.agent.model import (
     AGENT_BATCH_SCHEMA,
     AgentContractError,
     validate_agent_batch,
 )
-from hwpx_mcp_server.office.agent.form_plan import MIXED_FORM_PLAN_SCHEMA, validate_mixed_form_request
+from hwpx_automation.office.agent.form_plan import MIXED_FORM_PLAN_SCHEMA, validate_mixed_form_request
 from hwpx.mutation_report import (
     MUTATION_REPORT_SCHEMA,
     MutationReport,

@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from hwpx import HwpxDocument
-from hwpx_mcp_server.office.agent.document import HwpxAgentDocument
-from hwpx_mcp_server.office.agent.model import AgentContractError
+from hwpx_automation.office.agent.document import HwpxAgentDocument
+from hwpx_automation.office.agent.model import AgentContractError
 from hwpx.oxml.namespaces import HP
 
 REVISION = "sha256:" + "a" * 64

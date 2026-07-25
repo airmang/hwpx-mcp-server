@@ -6,9 +6,9 @@ import importlib
 from pathlib import Path
 from typing import Any
 
-from hwpx_mcp_server import form_fill
-from hwpx_mcp_server.handlers import specialized
-from hwpx_mcp_server.office.compliance import DEFAULT_POLICY, mask_pii
+from hwpx_automation import form_fill
+from hwpx_automation.handlers import specialized
+from hwpx_automation.office.compliance import DEFAULT_POLICY, mask_pii
 
 
 def test_mail_merge_injects_the_canonical_mcp_policy(
@@ -16,7 +16,7 @@ def test_mail_merge_injects_the_canonical_mcp_policy(
     tmp_path: Path,
 ) -> None:
     mail_merge_owner = importlib.import_module(
-        "hwpx_mcp_server.office.document_ops.mail_merge"
+        "hwpx_automation.office.document_ops.mail_merge"
     )
     captured: dict[str, Any] = {}
 

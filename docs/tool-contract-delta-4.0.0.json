@@ -197,8 +197,8 @@
     "ghostRegistrations": []
   },
   "registrationEvidence": {
-    "canonicalToolSpec": "src/hwpx_mcp_server/tool_contract.py",
-    "fastMcpRegistration": "src/hwpx_mcp_server/server.py",
+    "canonicalToolSpec": "src/hwpx_automation/tool_contract.py",
+    "fastMcpRegistration": "src/hwpx_automation/server.py",
     "boundInstalledToolCount": 132,
     "bindingHash": "0deefdad1aa81a68",
     "normalizedInputOutputSchemasComplete": true,

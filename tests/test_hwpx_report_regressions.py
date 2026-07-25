@@ -8,12 +8,12 @@ from xml.etree import ElementTree as ET
 import anyio
 import pytest
 
-from hwpx_mcp_server.compat import patch_python_hwpx
-from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
+from hwpx_automation.compat import patch_python_hwpx
+from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
 
 
 def _reload_server():
-    import hwpx_mcp_server.server as server_module
+    import hwpx_automation.server as server_module
 
     return importlib.reload(server_module)
 

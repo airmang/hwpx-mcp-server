@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.workflow import WorkFamily, WorkflowState, WorkflowStore
-from hwpx_mcp_server.workflow.service import WorkflowService, default_workflow_store_path
+from hwpx_automation.workflow import WorkFamily, WorkflowState, WorkflowStore
+from hwpx_automation.workflow.service import WorkflowService, default_workflow_store_path
 
 
 RECEIPT_KEYS = {
@@ -453,7 +453,7 @@ def test_nested_generation_verification_open_safety_completes(tmp_path):
 
 
 def test_real_server_namespace_read_workflow_reaches_verified_completion(tmp_path, monkeypatch):
-    from hwpx_mcp_server import server
+    from hwpx_automation import server
 
     monkeypatch.setenv("HWPX_WORKFLOW_STORE", str(tmp_path / "server-workflows.sqlite3"))
     receipt = server.start_workflow(

@@ -5,7 +5,7 @@ import threading
 import time
 from pathlib import Path
 
-from hwpx_mcp_server.office.rendering.worker import (
+from hwpx_automation.office.rendering.worker import (
     DeterministicFakeSession,
     SerializedHancomWorker,
     WorkerJob,

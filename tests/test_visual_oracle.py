@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Tests for the Phase-A VisualComplete gate (``hwpx_mcp_server.office.rendering``).
+"""Tests for the Phase-A VisualComplete gate (``hwpx_automation.office.rendering``).
 
 Two tiers, matching the assurance model:
 
@@ -21,16 +21,16 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.office.rendering import EditMask, RenderOracle, VisualReport, visual_check
-from hwpx_mcp_server.office.rendering import (
+from hwpx_automation.office.rendering import EditMask, RenderOracle, VisualReport, visual_check
+from hwpx_automation.office.rendering import (
     MacHancomOracle,
     NullOracle,
     RenderBackend,
     WindowsComOracle,
     resolve_oracle,
 )
-from hwpx_mcp_server.office.rendering import detectors, diff
-from hwpx_mcp_server.office.rendering import oracle as oracle_module
+from hwpx_automation.office.rendering import detectors, diff
+from hwpx_automation.office.rendering import oracle as oracle_module
 
 
 class _UnavailableOracle:

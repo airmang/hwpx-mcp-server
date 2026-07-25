@@ -94,9 +94,9 @@
     ]
   },
   "callSiteRuntimeRemovalEvidence": {
-    "canonicalToolSpec": "src/hwpx_mcp_server/tool_contract.py",
-    "fastMcpRegistration": "src/hwpx_mcp_server/server.py",
-    "removedRuntimePackage": "src/hwpx_mcp_server/practice",
+    "canonicalToolSpec": "src/hwpx_automation/tool_contract.py",
+    "fastMcpRegistration": "src/hwpx_automation/server.py",
+    "removedRuntimePackage": "src/hwpx_automation/practice",
     "runtimePackagePresent": false,
     "remainingRuntimeReferences": [],
     "activeRemovedNames": []

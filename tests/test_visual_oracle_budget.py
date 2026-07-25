@@ -13,8 +13,8 @@ import sys
 
 import pytest
 
-import hwpx_mcp_server.office.rendering.oracle as oracle_module
-from hwpx_mcp_server.office.rendering.oracle import (
+import hwpx_automation.office.rendering.oracle as oracle_module
+from hwpx_automation.office.rendering.oracle import (
     MacHancomOracle,
     NullOracle,
     WindowsComOracle,

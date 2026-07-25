@@ -6,8 +6,8 @@ from hwpx import HwpxDocument
 from hwpx.quality import QualityPolicy, SavePipeline
 from hwpx.quality.rendering import VisualReport
 
-from hwpx_mcp_server import quality as quality_contract
-from hwpx_mcp_server.office import rendering
+from hwpx_automation import quality as quality_contract
+from hwpx_automation.office import rendering
 
 
 class _FakeOracle:

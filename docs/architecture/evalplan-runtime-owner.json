@@ -1,6 +1,6 @@
 {
   "schemaVersion": "hwpx-mcp.evalplan-runtime-owner/v1",
-  "canonicalOwner": "hwpx_mcp_server.office.evalplan",
+  "canonicalOwner": "hwpx_automation.office.evalplan",
   "sourceCompatibilityOwner": "python-hwpx 4.x",
   "source": {
     "head": "98a6282bcf486859c9c3b9786d9744a1ff3bd362",
@@ -12,11 +12,19 @@
   "canonical": {
     "pythonFiles": 2,
     "loc": 2798,
-    "manifestSha256": "f27c9d25e2dfd08545a00c530c034335dac8c3628896d38549d4bc38554824d5"
+    "manifestSha256": "ba65da4b137cc6b9737b3a44f9a84fbdd04787454f47fa7d8ab3a86533f75e3a",
+    "refrozenFrom": {
+      "loc": 2798,
+      "manifestSha256": "f27c9d25e2dfd08545a00c530c034335dac8c3628896d38549d4bc38554824d5",
+      "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
+    }
   },
-  "packageFiles": ["__init__.py", "runtime.py"],
+  "packageFiles": [
+    "__init__.py",
+    "runtime.py"
+  ],
   "moduleMap": {
-    "hwpx.evalplan_fill": "hwpx_mcp_server.office.evalplan"
+    "hwpx.evalplan_fill": "hwpx_automation.office.evalplan"
   },
   "approvedCoreImports": [
     "hwpx.body_patch",
@@ -27,7 +35,7 @@
     "hwpx.evalplan_fill"
   ],
   "siblingApplicationOwners": [
-    "hwpx_mcp_server.office.form_fill"
+    "hwpx_automation.office.form_fill"
   ],
   "retainedCorePrimitives": [
     "balanced table and paragraph byte spans",
@@ -37,8 +45,8 @@
     "byte-preserving mutation and open-safety reports"
   ],
   "productionConsumers": [
-    "hwpx_mcp_server.office.form_fill.quality",
-    "hwpx_mcp_server.ops_services.form_fields"
+    "hwpx_automation.office.form_fill.quality",
+    "hwpx_automation.ops_services.form_fields"
   ],
   "compatibilityPolicy": {
     "coreLine": "4.x",

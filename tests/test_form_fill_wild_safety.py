@@ -11,12 +11,12 @@ from typing import Any
 import hwpx
 import pytest
 
-from hwpx_mcp_server.office.form_fill.fill_residue import (
+from hwpx_automation.office.form_fill.fill_residue import (
     inspect_fill_residue,
 )
-from hwpx_mcp_server.office.form_fill.guidance import scan_form_guidance
-from hwpx_mcp_server.office.form_fill.quality import score_form_fill
-from hwpx_mcp_server.storage import build_hwpx_open_safety_report
+from hwpx_automation.office.form_fill.guidance import scan_form_guidance
+from hwpx_automation.office.form_fill.quality import score_form_fill
+from hwpx_automation.storage import build_hwpx_open_safety_report
 
 
 CORE_ROOT = Path(hwpx.__file__).resolve().parents[2]

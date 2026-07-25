@@ -11,15 +11,15 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server import quality as Q
-from hwpx_mcp_server import server as server_module
-from hwpx_mcp_server.server import apply_edits, create_document, mcp_server_health
+from hwpx_automation import quality as Q
+from hwpx_automation import server as server_module
+from hwpx_automation.server import apply_edits, create_document, mcp_server_health
 
 
 def _oracle_reachable() -> bool:
     """True when a real Hancom render oracle is reachable on this box."""
     try:
-        from hwpx_mcp_server.office.rendering import resolve_hancom_backend
+        from hwpx_automation.office.rendering import resolve_hancom_backend
 
         return resolve_hancom_backend().available()
     except Exception:

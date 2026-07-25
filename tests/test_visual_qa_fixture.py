@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server import server
-from hwpx_mcp_server.document_state import document_revision
-from hwpx_mcp_server.visual_qa import (
+from hwpx_automation import server
+from hwpx_automation.document_state import document_revision
+from hwpx_automation.visual_qa import (
     FixtureVisualReviewReceipt,
     _canonical_hash,
     repair_fixture,
     review_fixture,
 )
-from hwpx_mcp_server.tool_contract import BASELINE_TOOL_SPECS, ToolClassification
+from hwpx_automation.tool_contract import BASELINE_TOOL_SPECS, ToolClassification
 
 
 def _png(path: Path) -> str:

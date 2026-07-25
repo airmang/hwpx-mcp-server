@@ -82,7 +82,7 @@
       "sha256": "23b45dc9b37e7f516f72fda3f9c7833e87a4e759ce90cba2d59added3117fc2f"
     }
   ],
-  "canonicalRuntimeOwner": "hwpx_mcp_server.office.rendering",
+  "canonicalRuntimeOwner": "hwpx_automation.office.rendering",
   "compatibilityPolicy": "correctness-or-security-only with parity test and receipt",
   "removalGate": "S-106 observation followed by separately approved S-107 core major"
 }

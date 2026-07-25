@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-import hwpx_mcp_server.server as server
+import hwpx_automation.server as server
 from hwpx.tools.redline import verify_redline
-from hwpx_mcp_server.core.document import open_doc
-from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
-from hwpx_mcp_server.office.rendering import oracle as _mcp_oracle
+from hwpx_automation.core.document import open_doc
+from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
+from hwpx_automation.office.rendering import oracle as _mcp_oracle
 
 
 @pytest.fixture

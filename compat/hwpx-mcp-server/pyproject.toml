@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# 옛 이름을 살려두는 얇은 배포다. 코드는 없다 — `python-hwpx-automation[mcp]`를
+# 끌어오고, 옛 import 경로에 안내를 붙인 shim 하나만 담는다.
+#
+# 이 배포가 존재하는 이유는 두 가지다. 공개된 MCP 클라이언트 설정 수백 곳이
+# `hwpx-mcp-server`를 이름으로 실행하고, `pip install hwpx-mcp-server`가 이미
+# 손에 익은 사람이 있다. 둘 다 이름 하나 유지하는 비용으로 지킬 수 있다.
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hwpx-mcp-server"
+version = "6.0.0"
+description = "Compatibility shell — installs python-hwpx-automation[mcp] under its former name."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+dependencies = ["python-hwpx-automation[mcp]==6.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/airmang/hwpx-mcp-server"
+
+[tool.setuptools.packages.find]
+where = ["src"]

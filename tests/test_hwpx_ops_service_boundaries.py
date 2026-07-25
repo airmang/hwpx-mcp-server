@@ -4,22 +4,22 @@ import ast
 from collections import defaultdict
 from pathlib import Path
 
-from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.ops_services.content_layout import ContentLayoutService
-from hwpx_mcp_server.ops_services.context import DocumentContext
-from hwpx_mcp_server.ops_services.form_fields import FormFieldService
-from hwpx_mcp_server.ops_services.media import MediaService
-from hwpx_mcp_server.ops_services.memo_style import MemoStyleService
-from hwpx_mcp_server.ops_services.package_validation import PackageValidationService
-from hwpx_mcp_server.ops_services.planning import PlanningService
-from hwpx_mcp_server.ops_services.preview_export import PreviewExportService
-from hwpx_mcp_server.ops_services.read_query import ReadQueryService
-from hwpx_mcp_server.ops_services.save_policy import SavePolicy
-from hwpx_mcp_server.ops_services.tables import TableService
-from hwpx_mcp_server.ops_services.transactions import TransactionService
+from hwpx_automation.hwpx_ops import HwpxOps
+from hwpx_automation.ops_services.content_layout import ContentLayoutService
+from hwpx_automation.ops_services.context import DocumentContext
+from hwpx_automation.ops_services.form_fields import FormFieldService
+from hwpx_automation.ops_services.media import MediaService
+from hwpx_automation.ops_services.memo_style import MemoStyleService
+from hwpx_automation.ops_services.package_validation import PackageValidationService
+from hwpx_automation.ops_services.planning import PlanningService
+from hwpx_automation.ops_services.preview_export import PreviewExportService
+from hwpx_automation.ops_services.read_query import ReadQueryService
+from hwpx_automation.ops_services.save_policy import SavePolicy
+from hwpx_automation.ops_services.tables import TableService
+from hwpx_automation.ops_services.transactions import TransactionService
 
 
-SOURCE_ROOT = Path(__file__).parents[1] / "src" / "hwpx_mcp_server"
+SOURCE_ROOT = Path(__file__).parents[1] / "src" / "hwpx_automation"
 FACADE_PATH = SOURCE_ROOT / "hwpx_ops.py"
 SERVICES_ROOT = SOURCE_ROOT / "ops_services"
 
@@ -313,8 +313,8 @@ def test_services_are_bounded_concrete_classes_with_an_acyclic_import_graph() ->
             else:
                 continue
             assert not any(
-                name == "hwpx_mcp_server.server"
-                or name == "hwpx_mcp_server.hwpx_ops"
+                name == "hwpx_automation.server"
+                or name == "hwpx_automation.hwpx_ops"
                 or name.endswith(".server")
                 or name.endswith(".hwpx_ops")
                 for name in imported

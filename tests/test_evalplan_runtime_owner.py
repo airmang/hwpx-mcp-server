@@ -7,11 +7,11 @@ import hashlib
 import json
 from pathlib import Path
 
-from hwpx_mcp_server.office import evalplan as canonical
-from hwpx_mcp_server.office.evalplan import runtime
+from hwpx_automation.office import evalplan as canonical
+from hwpx_automation.office.evalplan import runtime
 
 ROOT = Path(__file__).resolve().parents[1]
-CANONICAL_ROOT = ROOT / "src" / "hwpx_mcp_server" / "office" / "evalplan"
+CANONICAL_ROOT = ROOT / "src" / "hwpx_automation" / "office" / "evalplan"
 OWNER = json.loads(
     (
         ROOT / "docs" / "architecture" / "evalplan-runtime-owner.json"
@@ -44,8 +44,11 @@ def test_canonical_evalplan_inventory_is_complete() -> None:
 
     assert len(rows) == expected["pythonFiles"] == 2
     assert sum(int(row["loc"]) for row in rows) == expected["loc"] == 2798
+    # 원장과 테스트에 같은 해시를 둔 이중 잠금이다. 원장만 고쳐서 통과시키는
+    # 일을 막는다. 5.0 트레인에서 패키지가 hwpx_automation으로 바뀌며 파일
+    # 내용이 달라져 함께 갱신했다 — LOC 2798은 그대로다.
     assert expected["manifestSha256"] == (
-        "f27c9d25e2dfd08545a00c530c034335dac8c3628896d38549d4bc38554824d5"
+        "ba65da4b137cc6b9737b3a44f9a84fbdd04787454f47fa7d8ab3a86533f75e3a"
     )
     assert hashlib.sha256(payload).hexdigest() == expected["manifestSha256"]
     assert canonical.__all__ == runtime.__all__
@@ -55,5 +58,5 @@ def test_public_evalplan_bindings_use_the_mcp_owner() -> None:
     for name in canonical.__all__:
         binding = getattr(canonical, name)
         assert binding.__module__ == (
-            "hwpx_mcp_server.office.evalplan.runtime"
+            "hwpx_automation.office.evalplan.runtime"
         ), (name, binding)

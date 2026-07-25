@@ -6,7 +6,7 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from hwpx_mcp_server.workflow import (
+from hwpx_automation.workflow import (
     InvalidTransition,
     WorkFamily,
     WorkOrder,
@@ -14,7 +14,7 @@ from hwpx_mcp_server.workflow import (
     WorkflowState,
     WorkflowStore,
 )
-from hwpx_mcp_server.workflow.models import utc_now
+from hwpx_automation.workflow.models import utc_now
 
 
 def order(**changes: object) -> WorkOrder:

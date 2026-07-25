@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from hwpx_mcp_server import hwp_support
+from hwpx_automation import hwp_support
 
 
 def test_hwp_support_module_imports_without_requiring_olefile() -> None:

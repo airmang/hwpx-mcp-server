@@ -5,8 +5,8 @@ from pathlib import Path
 
 from hwpx.document import HwpxDocument
 from hwpx.tools.package_validator import validate_editor_open_safety
-from hwpx_mcp_server import server
-from hwpx_mcp_server.tool_contract import bound_tool_registry
+from hwpx_automation import server
+from hwpx_automation.tool_contract import bound_tool_registry
 
 
 HH_NS = "http://www.hancom.co.kr/hwpml/2011/head"

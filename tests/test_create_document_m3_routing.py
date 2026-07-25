@@ -2,7 +2,7 @@
 """M3 P4 — create_document_from_plan MCP surface: 공문 routing, quality, HWPX-only."""
 from __future__ import annotations
 
-from hwpx_mcp_server import server
+from hwpx_automation import server
 
 
 def _gongmun_plan():

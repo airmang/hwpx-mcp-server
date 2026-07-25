@@ -8,10 +8,10 @@ from xml.sax.saxutils import escape
 
 import pytest
 
-import hwpx_mcp_server.server as server
-import hwpx_mcp_server.form_fill as form_fill_module
-from hwpx_mcp_server.core.document import open_doc, save_doc
-from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
+import hwpx_automation.server as server
+import hwpx_automation.form_fill as form_fill_module
+from hwpx_automation.core.document import open_doc, save_doc
+from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
 from hwpx.tools.package_validator import validate_package
 from hwpx.tools.validator import validate_document
 

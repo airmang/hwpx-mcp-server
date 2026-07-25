@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 
 from hwpx.document import HwpxDocument
-import hwpx_mcp_server.server as server
+import hwpx_automation.server as server
 
 
 def _rich_note_doc_b64() -> str:

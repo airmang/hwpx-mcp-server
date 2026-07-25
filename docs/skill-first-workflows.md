@@ -155,7 +155,7 @@ No new prompt or resource layer was added in this pass.
 
 Reason:
 
-- the active product surface is the FastMCP tool inventory in `src/hwpx_mcp_server/server.py`
+- the active product surface is the FastMCP tool inventory in `src/hwpx_automation/server.py`
 - legacy prompt/resource code exists elsewhere in the repo, but enabling or expanding it here would broaden scope without proving a product need
 
 If future workflow prompting becomes important, keep the contract narrow and register it against the active FastMCP surface instead of reviving legacy behavior by default.

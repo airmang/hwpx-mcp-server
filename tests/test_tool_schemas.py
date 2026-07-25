@@ -1,7 +1,7 @@
 import jsonschema
 import pytest
 
-from hwpx_mcp_server.tool_contract import bound_tool_registry, contract_payload
+from hwpx_automation.tool_contract import bound_tool_registry, contract_payload
 
 
 def test_representative_tools_are_exposed_only_through_the_canonical_registry():

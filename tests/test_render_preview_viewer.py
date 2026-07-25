@@ -24,13 +24,13 @@ from jsonschema import Draft202012Validator
 
 from hwpx.document import HwpxDocument
 
-from hwpx_mcp_server import server
-from hwpx_mcp_server.ops_services.preview_export import (
+from hwpx_automation import server
+from hwpx_automation.ops_services.preview_export import (
     _count_equation_modes,
     _equation_tier,
 )
-from hwpx_mcp_server.tool_contract import bound_tool_registry
-from hwpx_mcp_server.workspace import WorkspacePathError
+from hwpx_automation.tool_contract import bound_tool_registry
+from hwpx_automation.workspace import WorkspacePathError
 
 pytest.importorskip(
     "hwpx.tools.document_viewer",

@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server import server
-from hwpx_mcp_server.blind_eval import (
+from hwpx_automation import server
+from hwpx_automation.blind_eval import (
     FIXTURE_MANIFEST_SCHEMA,
     export_fixture_benchmark,
     run_fixture_benchmark,
 )
-from hwpx_mcp_server.tool_contract import BASELINE_TOOL_SPECS, ToolClassification
+from hwpx_automation.tool_contract import BASELINE_TOOL_SPECS, ToolClassification
 
 
 def _digest(data: bytes) -> str:

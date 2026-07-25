@@ -13,7 +13,7 @@ OXML owner.
 - Hancom discovery and render-backend binding;
 - workspace authorization and model-facing error contracts.
 
-Application services live under `hwpx_mcp_server.office`. Handlers should
+Application services live under `hwpx_automation.office`. Handlers should
 translate tool requests into these services rather than adding more business
 logic to the core library.
 
@@ -32,7 +32,7 @@ Moving released core workflows here is a compatibility project, not a copy
 project. Each move needs one owner, a primitive seam, a 4.x migration path, and
 an explicit later removal gate.
 
-`hwpx_mcp_server.office.agent` is the canonical owner of the released semantic
+`hwpx_automation.office.agent` is the canonical owner of the released semantic
 agent runtime. MCP production modules must not import the frozen core
 `hwpx.agent` compatibility copy. The canonical runtime may use only the
 approved public core seams for documents, OXML, mutation reports, quality,

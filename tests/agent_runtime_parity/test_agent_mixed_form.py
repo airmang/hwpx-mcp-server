@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from hwpx import HwpxDocument, validate_editor_open_safety
-from hwpx_mcp_server.office.agent import (
+from hwpx_automation.office.agent import (
     AGENT_BATCH_SCHEMA,
     MIXED_FORM_COMPILED_PLAN_SCHEMA,
     MIXED_FORM_LOCATOR_KINDS,
@@ -28,8 +28,8 @@ from hwpx_mcp_server.office.agent import (
     validate_mixed_form_plan,
     validate_mixed_form_request,
 )
-from hwpx_mcp_server.office.agent import form_plan as mixed_form_module
-from hwpx_mcp_server.office.agent.catalog import agent_json_schemas
+from hwpx_automation.office.agent import form_plan as mixed_form_module
+from hwpx_automation.office.agent.catalog import agent_json_schemas
 from hwpx.oxml.namespaces import HP
 from hwpx.quality import SavePipeline
 from hwpx.quality.rendering import UnavailableRenderBackend as NullOracle
@@ -571,8 +571,8 @@ def test_evalplan_and_exam_remain_separate_from_mixed_contract() -> None:
     # hwpx.evalplan_fill no longer exists in core (removed in python-hwpx 5.0);
     # the MCP owner is now the only implementation, so the "evalplan is still
     # its own thing, not folded into the mixed-form contract" check points at
-    # hwpx_mcp_server.office.evalplan.runtime instead.
-    from hwpx_mcp_server.office.evalplan.runtime import fill_evalplan
+    # hwpx_automation.office.evalplan.runtime instead.
+    from hwpx_automation.office.evalplan.runtime import fill_evalplan
 
     tree = ast.parse(Path(mixed_form_module.__file__).read_text(encoding="utf-8"))
     imported_modules: set[str] = set()
@@ -584,7 +584,7 @@ def test_evalplan_and_exam_remain_separate_from_mixed_contract() -> None:
     assert not any(name == "hwpx.exam" or name.startswith("hwpx.exam.") for name in imported_modules)
     assert "exam" not in MIXED_FORM_LOCATOR_KINDS
     assert "evalplan" not in MIXED_FORM_LOCATOR_KINDS
-    assert fill_evalplan.__module__ == "hwpx_mcp_server.office.evalplan.runtime"
+    assert fill_evalplan.__module__ == "hwpx_automation.office.evalplan.runtime"
 
 
 @pytest.mark.parametrize("alias_kind", ["exact", "lexical", "symlink", "hardlink"])

@@ -6,13 +6,13 @@ import zipfile
 from datetime import timedelta
 from pathlib import Path
 
-from hwpx_mcp_server import server
-from hwpx_mcp_server.workflow.models import WorkFamily
-from hwpx_mcp_server.workflow.rendering import (
+from hwpx_automation import server
+from hwpx_automation.workflow.models import WorkFamily
+from hwpx_automation.workflow.rendering import (
     RenderArtifactKind, RenderArtifactV2, RenderJobV2, RenderReceiptV2, RenderStatus,
 )
-from hwpx_mcp_server.workflow.service import WorkflowService
-from hwpx_mcp_server.workflow.store import WorkflowStore
+from hwpx_automation.workflow.service import WorkflowService
+from hwpx_automation.workflow.store import WorkflowStore
 
 
 def hwpx_bytes() -> bytes:

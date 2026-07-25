@@ -10,16 +10,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-SOURCE_ROOT = "src/hwpx_mcp_server"
+SOURCE_ROOT = "src/hwpx_automation"
 FORBIDDEN_IMPORTS = ("hwpx_skill",)
 CORE_VISUAL_CONTRACT_CONSUMERS = frozenset(
     {
         # Contract-only use of Block/detect_block_splits through the neutral
         # core geometry module. Runtime discovery belongs to office.rendering.
-        "src/hwpx_mcp_server/office/exam/measure.py",
+        "src/hwpx_automation/office/exam/measure.py",
     }
 )
-CANONICAL_RENDER_ROOT = "src/hwpx_mcp_server/office/rendering"
+CANONICAL_RENDER_ROOT = "src/hwpx_automation/office/rendering"
 # Ten since the 5.0 boundary closed. Core was still holding block_splits,
 # detectors, diff and qa_contracts — and this owner imported three of them
 # from there — so they came here with the rest of the rendering runtime. The
@@ -59,9 +59,9 @@ FROZEN_CORE_VISUAL_RUNTIME_IMPORTS = (
     "hwpx.visual.page_qa",
     "hwpx.visual.qa_metrics",
 )
-CANONICAL_AGENT_ROOT = "src/hwpx_mcp_server/office/agent"
+CANONICAL_AGENT_ROOT = "src/hwpx_automation/office/agent"
 CANONICAL_AGENT_FILE_COUNT = 19
-CANONICAL_AUTHORING_ROOT = "src/hwpx_mcp_server/office/authoring"
+CANONICAL_AUTHORING_ROOT = "src/hwpx_automation/office/authoring"
 # 17 since the 5.0 train: report_parser joined the owner it always belonged to.
 CANONICAL_AUTHORING_FILE_COUNT = 17
 ALLOWED_AGENT_CORE_IMPORTS = (
@@ -99,9 +99,9 @@ FROZEN_CORE_AUTHORING_IMPORTS = (
     "hwpx.tools.template_analyzer",
 )
 CANONICAL_POLICY_ROOTS = {
-    "src/hwpx_mcp_server/office/compliance": ("hwpx.document",),
-    "src/hwpx_mcp_server/office/quality": ("hwpx",),
-    "src/hwpx_mcp_server/office/utilities": (),
+    "src/hwpx_automation/office/compliance": ("hwpx.document",),
+    "src/hwpx_automation/office/quality": ("hwpx",),
+    "src/hwpx_automation/office/utilities": (),
 }
 FROZEN_CORE_POLICY_IMPORTS = (
     "hwpx.tools.official_lint",
@@ -109,7 +109,7 @@ FROZEN_CORE_POLICY_IMPORTS = (
     "hwpx.tools.page_guard",
     "hwpx.tools.table_compute",
 )
-CANONICAL_FORM_FILL_ROOT = "src/hwpx_mcp_server/office/form_fill"
+CANONICAL_FORM_FILL_ROOT = "src/hwpx_automation/office/form_fill"
 CANONICAL_FORM_FILL_FILE_COUNT = 15
 ALLOWED_FORM_FILL_CORE_IMPORTS = (
     "hwpx.document",
@@ -139,7 +139,7 @@ FROZEN_CORE_FORM_FILL_IMPORTS = (
     "hwpx.guidance_scan",
     "hwpx.template_formfit",
 )
-CANONICAL_EVALPLAN_ROOT = "src/hwpx_mcp_server/office/evalplan"
+CANONICAL_EVALPLAN_ROOT = "src/hwpx_automation/office/evalplan"
 CANONICAL_EVALPLAN_FILE_COUNT = 2
 ALLOWED_EVALPLAN_CORE_IMPORTS = (
     "hwpx.body_patch",
@@ -147,7 +147,7 @@ ALLOWED_EVALPLAN_CORE_IMPORTS = (
     "hwpx.table_patch",
 )
 FROZEN_CORE_EVALPLAN_IMPORTS = ("hwpx.evalplan_fill",)
-CANONICAL_EXAM_ROOT = "src/hwpx_mcp_server/office/exam"
+CANONICAL_EXAM_ROOT = "src/hwpx_automation/office/exam"
 CANONICAL_EXAM_FILE_COUNT = 6
 ALLOWED_EXAM_CORE_IMPORTS = (
     "hwpx.document",
@@ -159,7 +159,7 @@ FROZEN_CORE_EXAM_IMPORTS = (
     "hwpx.exam",
     *FROZEN_CORE_FORM_FIT_APPLICATION,
 )
-CANONICAL_DOCUMENT_OPS_ROOT = "src/hwpx_mcp_server/office/document_ops"
+CANONICAL_DOCUMENT_OPS_ROOT = "src/hwpx_automation/office/document_ops"
 CANONICAL_DOCUMENT_OPS_FILE_COUNT = 4
 ALLOWED_DOCUMENT_OPS_CORE_IMPORTS = (
     "hwpx.document",

@@ -2,7 +2,7 @@
 
 The server pins the MCP SDK exactly (`mcp==1.28.1` in `pyproject.toml`) and the
 runtime admits exactly the audited set (`AUDITED_MCP_PATCHES` in
-`src/hwpx_mcp_server/fastmcp_adapter.py`). These two are the same set by
+`src/hwpx_automation/fastmcp_adapter.py`). These two are the same set by
 invariant — `tests/test_fastmcp_adapter.py::
 test_resolver_pin_and_audited_set_admit_the_same_versions` fails if they drift.
 Anything pip can install must also start; a version that has not been re-audited

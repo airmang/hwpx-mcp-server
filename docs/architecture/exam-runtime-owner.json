@@ -1,6 +1,6 @@
 {
   "schemaVersion": "hwpx-mcp.exam-runtime-owner/v1",
-  "canonicalOwner": "hwpx_mcp_server.office.exam",
+  "canonicalOwner": "hwpx_automation.office.exam",
   "sourceCompatibilityOwner": "python-hwpx 4.x",
   "source": {
     "head": "d0aa3f124ab410686f48f99e299f45958afd1002",
@@ -24,7 +24,7 @@
     "profile.py"
   ],
   "moduleMap": {
-    "hwpx.exam": "hwpx_mcp_server.office.exam"
+    "hwpx.exam": "hwpx_automation.office.exam"
   },
   "approvedCoreImports": [
     "hwpx.document",
@@ -33,8 +33,8 @@
     "hwpx.visual.block_splits"
   ],
   "approvedSiblingOwners": [
-    "hwpx_mcp_server.office.form_fill.fit.wordbox",
-    "hwpx_mcp_server.office.rendering"
+    "hwpx_automation.office.form_fill.fit.wordbox",
+    "hwpx_automation.office.rendering"
   ],
   "forbiddenCoreCompatibilityImports": [
     "hwpx.exam",
@@ -57,7 +57,7 @@
     "tables, equations, mutation, preservation and open-safety"
   ],
   "productionConsumers": [
-    "hwpx_mcp_server.handlers.specialized"
+    "hwpx_automation.handlers.specialized"
   ],
   "compatibilityPolicy": {
     "coreLine": "4.x",

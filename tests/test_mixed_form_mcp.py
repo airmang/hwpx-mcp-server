@@ -20,24 +20,24 @@ from mcp.shared.exceptions import McpError
 from mcp.shared.memory import create_connected_server_and_client_session
 from pydantic import TypeAdapter, ValidationError
 
-import hwpx_mcp_server.mixed_form as mixed_form_adapter
-import hwpx_mcp_server.server as server
-import hwpx_mcp_server.workspace as workspace_module
+import hwpx_automation.mixed_form as mixed_form_adapter
+import hwpx_automation.server as server
+import hwpx_automation.workspace as workspace_module
 from hwpx import HwpxDocument, validate_editor_open_safety
-from hwpx_mcp_server.office.agent import (
+from hwpx_automation.office.agent import (
     AgentContractError,
     HwpxAgentDocument,
     mixed_form_json_schemas,
 )
 from hwpx.oxml.namespaces import HP
-from hwpx_mcp_server.tool_contract import bound_tool_registry
-from hwpx_mcp_server.mixed_form import (
+from hwpx_automation.tool_contract import bound_tool_registry
+from hwpx_automation.mixed_form import (
     FORM_VERIFICATION_RECEIPT_SCHEMA,
     FormVerificationReceipt,
     MixedFormCompiledPlanInput,
     MixedFormPlanInput,
 )
-from hwpx_mcp_server.form_output_models import ApplyTableOpsOutput
+from hwpx_automation.form_output_models import ApplyTableOpsOutput
 
 
 def _append(parent: Any, tag: str, attrs: dict[str, str] | None = None) -> Any:

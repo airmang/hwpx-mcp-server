@@ -22,10 +22,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hwpx_mcp_server.office.rendering.block_splits import Block, BlockSplit, detect_block_splits
+from hwpx_automation.office.rendering.block_splits import Block, BlockSplit, detect_block_splits
 
 ROOT = Path(__file__).resolve().parents[1]
-RENDERING = ROOT / "src" / "hwpx_mcp_server" / "office" / "rendering"
+RENDERING = ROOT / "src" / "hwpx_automation" / "office" / "rendering"
 
 #: 렌더러를 구동하지 않는 순수 기하·이미지 계약.
 NEUTRAL = ("block_splits.py", "detectors.py", "diff.py", "qa_contracts.py")
@@ -93,16 +93,16 @@ def test_importing_the_contract_does_not_start_the_runtime() -> None:
     script = """
 import json
 import sys
-import hwpx_mcp_server.office.rendering.block_splits
-import hwpx_mcp_server.office.rendering.detectors
-import hwpx_mcp_server.office.rendering.diff
-import hwpx_mcp_server.office.rendering.qa_contracts
+import hwpx_automation.office.rendering.block_splits
+import hwpx_automation.office.rendering.detectors
+import hwpx_automation.office.rendering.diff
+import hwpx_automation.office.rendering.qa_contracts
 application = [
-    "hwpx_mcp_server.office.rendering.oracle",
-    "hwpx_mcp_server.office.rendering.worker",
-    "hwpx_mcp_server.office.rendering.page_qa",
-    "hwpx_mcp_server.office.rendering.qa_metrics",
-    "hwpx_mcp_server.office.rendering.fixture_corpus",
+    "hwpx_automation.office.rendering.oracle",
+    "hwpx_automation.office.rendering.worker",
+    "hwpx_automation.office.rendering.page_qa",
+    "hwpx_automation.office.rendering.qa_metrics",
+    "hwpx_automation.office.rendering.fixture_corpus",
 ]
 print(json.dumps([name for name in application if name in sys.modules]))
 """

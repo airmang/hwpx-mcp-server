@@ -41,7 +41,7 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
 
 def test_canonical_owner_rejects_frozen_and_unapproved_core_seams() -> None:
     check = BOUNDARY["_evalplan_owner_import_violation"]
-    canonical = "src/hwpx_mcp_server/office/evalplan/runtime.py"
+    canonical = "src/hwpx_automation/office/evalplan/runtime.py"
 
     assert check(canonical, "hwpx.evalplan_fill") is not None
     assert check(canonical, "hwpx.formfill_quality") is not None
@@ -53,6 +53,6 @@ def test_real_tree_declares_the_evalplan_boundary() -> None:
     report = BOUNDARY["evaluate"](ROOT)
     assert report["ok"], report["violations"]
     assert report["canonicalEvalplanRoot"] == (
-        "src/hwpx_mcp_server/office/evalplan"
+        "src/hwpx_automation/office/evalplan"
     )
     assert report["canonicalEvalplanPythonFiles"] == 2

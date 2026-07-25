@@ -5,7 +5,7 @@ These 15 pytest modules are the executable 4.x compatibility corpus copied from
 Only the import owner prefix changes:
 
 ```text
-hwpx.agent -> hwpx_mcp_server.office.agent
+hwpx.agent -> hwpx_automation.office.agent
 ```
 
 The original core modules remain in place and pass 236 tests against the frozen

@@ -236,7 +236,7 @@ def test_manifest_entry_count_mismatch_fails_the_doc(tmp_path: Path) -> None:
 def _fake_boxes(pages: dict[int, list[str]]):
     """Word boxes where each string in a page's list is its own LINE
     (test_toc_fidelity precedent)."""
-    from hwpx_mcp_server.office.form_fill.fit.wordbox import WordBox
+    from hwpx_automation.office.form_fill.fit.wordbox import WordBox
 
     boxes = []
     for page, lines in pages.items():
@@ -309,7 +309,7 @@ class _UnavailableOracle:
 def _patch_boxes(monkeypatch, oracle: FakeOracle, page_of: dict[str, int] | None = None):
     """Serve synthetic word boxes through the extractor the script injects.
 
-    Patching hwpx_mcp_server.office.form_fill.fit.wordbox directly would test a module the runtime no
+    Patching hwpx_automation.office.form_fill.fit.wordbox directly would test a module the runtime no
     longer reaches: core takes the extractor as an argument now, so the double
     has to be installed where the script resolves it.
     """

@@ -17,8 +17,8 @@ pytest.importorskip(
     "hwpx.guidance_scan", reason="requires python-hwpx with guidance_scan"
 )
 
-from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.tool_contract import bound_tool_registry
+from hwpx_automation.hwpx_ops import HwpxOps
+from hwpx_automation.tool_contract import bound_tool_registry
 
 _CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
 CORE_REPO = (

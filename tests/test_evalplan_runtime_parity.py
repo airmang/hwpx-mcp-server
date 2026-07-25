@@ -37,7 +37,7 @@ import pytest
 import parity_fingerprint
 from parity_fingerprint import fingerprint
 
-from hwpx_mcp_server.office.evalplan import runtime as canonical
+from hwpx_automation.office.evalplan import runtime as canonical
 
 SYNTHETIC_MD = """# 2026학년도 2학기 3학년 「합성 과목」 교수학습운영 및 평가계획
 

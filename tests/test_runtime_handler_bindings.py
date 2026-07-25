@@ -11,30 +11,30 @@ from types import MappingProxyType
 
 import pytest
 
-from hwpx_mcp_server import server
-from hwpx_mcp_server.handlers import workflow as workflow_handler
-from hwpx_mcp_server.runtime_services import RUNTIME_SERVICES
-from hwpx_mcp_server.tool_bindings import TOOL_BINDINGS
-from hwpx_mcp_server.tool_contract import (
+from hwpx_automation import server
+from hwpx_automation.handlers import workflow as workflow_handler
+from hwpx_automation.runtime_services import RUNTIME_SERVICES
+from hwpx_automation.tool_bindings import TOOL_BINDINGS
+from hwpx_automation.tool_contract import (
     TOOL_SPECS,
     expected_tool_order,
     validate_registered_tools,
 )
 
 
-PACKAGE_ROOT = Path(__file__).parents[1] / "src" / "hwpx_mcp_server"
+PACKAGE_ROOT = Path(__file__).parents[1] / "src" / "hwpx_automation"
 HANDLER_ROOT = PACKAGE_ROOT / "handlers"
 HANDLER_OWNERS = {
-    "hwpx_mcp_server.handlers.agent_document": 5,
-    "hwpx_mcp_server.handlers.read_export": 21,
-    "hwpx_mcp_server.handlers.authoring": 15,
-    "hwpx_mcp_server.handlers.content_edit": 20,
-    "hwpx_mcp_server.handlers.layout_style": 17,
-    "hwpx_mcp_server.handlers.form_fill": 15,
-    "hwpx_mcp_server.handlers.tracked_changes": 1,
-    "hwpx_mcp_server.handlers.specialized": 10,
-    "hwpx_mcp_server.handlers.quality_render": 16,
-    "hwpx_mcp_server.handlers.workflow": 7,
+    "hwpx_automation.handlers.agent_document": 5,
+    "hwpx_automation.handlers.read_export": 21,
+    "hwpx_automation.handlers.authoring": 15,
+    "hwpx_automation.handlers.content_edit": 20,
+    "hwpx_automation.handlers.layout_style": 17,
+    "hwpx_automation.handlers.form_fill": 15,
+    "hwpx_automation.handlers.tracked_changes": 1,
+    "hwpx_automation.handlers.specialized": 10,
+    "hwpx_automation.handlers.quality_render": 16,
+    "hwpx_automation.handlers.workflow": 7,
 }
 # S-081 extracted the shared render contracts into a leaf module; the package
 # import graph is now a clean DAG and must stay one.
@@ -42,8 +42,8 @@ ALLOWED_IMPORT_CYCLES: set[frozenset[str]] = set()
 _REMOVED_IMPORT_CYCLES = {
     frozenset(
         {
-            "hwpx_mcp_server.workflow.render_queue",
-            "hwpx_mcp_server.workflow.rendering",
+            "hwpx_automation.workflow.render_queue",
+            "hwpx_automation.workflow.rendering",
         }
     )
 }
@@ -86,9 +86,9 @@ def test_server_runtime_workflow_and_registry_share_canonical_bindings(
 
 def test_handlers_are_plain_owners_without_runtime_or_facade_back_edges() -> None:
     forbidden_modules = {
-        "hwpx_mcp_server.server",
-        "hwpx_mcp_server.runtime",
-        "hwpx_mcp_server.hwpx_ops",
+        "hwpx_automation.server",
+        "hwpx_automation.runtime",
+        "hwpx_automation.hwpx_ops",
     }
     for path in HANDLER_ROOT.glob("*.py"):
         source = path.read_text(encoding="utf-8")
@@ -101,9 +101,9 @@ def test_handlers_are_plain_owners_without_runtime_or_facade_back_edges() -> Non
             elif isinstance(node, ast.ImportFrom):
                 module = node.module or ""
                 if node.level == 2:
-                    imported = {f"hwpx_mcp_server.{module}"}
+                    imported = {f"hwpx_automation.{module}"}
                 elif node.level == 1:
-                    imported = {f"hwpx_mcp_server.handlers.{module}"}
+                    imported = {f"hwpx_automation.handlers.{module}"}
                 else:
                     imported = {module}
             else:
@@ -144,7 +144,7 @@ def _package_import_graph() -> dict[str, set[str]]:
             suffix = ".".join(relative.parent.parts)
         else:
             suffix = ".".join(relative.with_suffix("").parts)
-        module = "hwpx_mcp_server" + (f".{suffix}" if suffix else "")
+        module = "hwpx_automation" + (f".{suffix}" if suffix else "")
         modules[module] = path
 
     graph = {module: set() for module in modules}
@@ -215,7 +215,7 @@ def test_package_import_graph_is_a_clean_dag() -> None:
 
 
 def test_live_order_mismatch_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
-    import hwpx_mcp_server.tool_contract as tool_contract
+    import hwpx_automation.tool_contract as tool_contract
 
     snapshots = dict(tool_contract.snapshot_runtime_tools(server.mcp))
     first_name = next(iter(snapshots))
@@ -233,15 +233,15 @@ def test_live_order_mismatch_fails_closed(monkeypatch: pytest.MonkeyPatch) -> No
 def test_unbound_tool_contract_does_not_lazy_import_server() -> None:
     code = """
 import sys
-from hwpx_mcp_server.tool_contract import bound_tool_registry
+from hwpx_automation.tool_contract import bound_tool_registry
 try:
     bound_tool_registry()
 except RuntimeError as exc:
-    assert 'initialize hwpx_mcp_server.runtime first' in str(exc)
+    assert 'initialize hwpx_automation.runtime first' in str(exc)
 else:
     raise AssertionError('unbound registry unexpectedly succeeded')
-assert 'hwpx_mcp_server.server' not in sys.modules
-assert 'hwpx_mcp_server.runtime' not in sys.modules
+assert 'hwpx_automation.server' not in sys.modules
+assert 'hwpx_automation.runtime' not in sys.modules
 """
     env = dict(os.environ)
     source_root = str(PACKAGE_ROOT.parent)

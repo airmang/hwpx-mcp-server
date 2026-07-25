@@ -7,7 +7,7 @@ from importlib import resources
 
 import pytest
 
-from hwpx_mcp_server.office import house_style
+from hwpx_automation.office import house_style
 
 
 def test_packaged_bank_loads_as_typed_deterministic_data() -> None:

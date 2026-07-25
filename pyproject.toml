@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hwpx-mcp-server"
+name = "python-hwpx-automation"
 version = "6.0.0"
 description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
 readme = "README.md"
@@ -30,11 +30,15 @@ dependencies = [
     "anyio>=4.0",
     # Annotated CallToolResult validation landed in 1.28; the audited private
     # FastMCP seam is intentionally pinned to this minor line and compatibility-tested.
-    "mcp==1.28.1",
     "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
+# MCP는 이 제품의 어댑터 하나지 본체가 아니다. office/·workflow/·
+# ops_services/·core/ 122개 파일 중 mcp를 import하는 것은 0개다. 파이썬으로
+# 문서 자동화만 하는 사용자가 MCP SDK를 강제로 깔 이유가 없다.
+mcp = ["mcp==1.28.1"]
+
 # Legacy .hwp (HWP5/OLE2) reading. Lazy-imported; clear error if missing.
 hwp = ["olefile>=0.47"]
 # HTTP/streamable transport. The default stdio transport needs no extra.
@@ -69,10 +73,10 @@ Homepage = "https://github.com/airmang/hwpx-mcp-server"
 Issues = "https://github.com/airmang/hwpx-mcp-server/issues"
 
 [project.scripts]
-"hwpx-mcp-server" = "hwpx_mcp_server.server:main"
+"hwpx-mcp-server" = "hwpx_automation.server:main"
 # Inherited from python-hwpx 5.0, which no longer declares it. Same command, same
 # subcommands; the agent runtime it drives has been canonical here since S-097.
-"hwpx" = "hwpx_mcp_server.office.agent.cli:main"
+"hwpx" = "hwpx_automation.office.agent.cli:main"
 
 # Co-located development: resolve python-hwpx from the sibling checkout.
 # This affects local `uv` resolution only; published metadata keeps the >=5.0.0 floor.
@@ -84,11 +88,16 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+# 명시적으로 적는다. 이게 없으면 선언이 "src 안의 전부"가 되고, setuptools가
+# 재사용하는 stale build/lib 트리에 남은 옛 패키지까지 wheel에 실린다 —
+# 이름을 hwpx_automation으로 바꾼 뒤에도 옛 hwpx_mcp_server 197개 항목이
+# 그렇게 따라 나왔다.
+include = ["hwpx_automation*"]
 
 [tool.setuptools.package-data]
-"hwpx_mcp_server.office.house_style" = ["data/*.json"]
-"hwpx_mcp_server.office.authoring.design" = ["profiles/*/*", "profiles/*/fragments/*"]
-"hwpx_mcp_server.office.rendering" = [
+"hwpx_automation.office.house_style" = ["data/*.json"]
+"hwpx_automation.office.authoring.design" = ["profiles/*/*", "profiles/*/fragments/*"]
+"hwpx_automation.office.rendering" = [
     "_hancom_open_rate.ps1",
     "_refresh_hwpx_mac.applescript",
     "_render_hwpx.ps1",
@@ -105,18 +114,18 @@ addopts = "-q"
 [tool.mypy]
 python_version = "3.10"
 files = [
-    "src/hwpx_mcp_server/handlers",
-    "src/hwpx_mcp_server/ops_services",
-    "src/hwpx_mcp_server/runtime.py",
-    "src/hwpx_mcp_server/runtime_services.py",
-    "src/hwpx_mcp_server/fastmcp_adapter.py",
-    "src/hwpx_mcp_server/tool_bindings.py",
-    "src/hwpx_mcp_server/server.py",
-    "src/hwpx_mcp_server/hwpx_ops.py",
-    "src/hwpx_mcp_server/form_fill.py",
-    "src/hwpx_mcp_server/office",
-    "src/hwpx_mcp_server/tool_contract.py",
-    "src/hwpx_mcp_server/workflow/service.py",
+    "src/hwpx_automation/handlers",
+    "src/hwpx_automation/ops_services",
+    "src/hwpx_automation/runtime.py",
+    "src/hwpx_automation/runtime_services.py",
+    "src/hwpx_automation/fastmcp_adapter.py",
+    "src/hwpx_automation/tool_bindings.py",
+    "src/hwpx_automation/server.py",
+    "src/hwpx_automation/hwpx_ops.py",
+    "src/hwpx_automation/form_fill.py",
+    "src/hwpx_automation/office",
+    "src/hwpx_automation/tool_contract.py",
+    "src/hwpx_automation/workflow/service.py",
 ]
 follow_imports = "skip"
 ignore_missing_imports = true
@@ -125,7 +134,7 @@ warn_unused_ignores = true
 show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = "hwpx_mcp_server.office.agent.*"
+module = "hwpx_automation.office.agent.*"
 # The canonical transplant retains upstream cross-check comments used by
 # Pyright and by the frozen core mirror.  Mypy does not consume several of
 # those codes, so keep the comments without turning them into false failures.
@@ -139,18 +148,18 @@ typeCheckingMode = "basic"
 # decomposition and typing work — the whole set measures zero errors in basic
 # mode. New modules must enter BOTH gates or carry an itemized exclusion here.
 include = [
-    "src/hwpx_mcp_server/handlers",
-    "src/hwpx_mcp_server/ops_services",
-    "src/hwpx_mcp_server/runtime.py",
-    "src/hwpx_mcp_server/runtime_services.py",
-    "src/hwpx_mcp_server/fastmcp_adapter.py",
-    "src/hwpx_mcp_server/tool_bindings.py",
-    "src/hwpx_mcp_server/server.py",
-    "src/hwpx_mcp_server/hwpx_ops.py",
-    "src/hwpx_mcp_server/form_fill.py",
-    "src/hwpx_mcp_server/office",
-    "src/hwpx_mcp_server/tool_contract.py",
-    "src/hwpx_mcp_server/workflow/service.py",
+    "src/hwpx_automation/handlers",
+    "src/hwpx_automation/ops_services",
+    "src/hwpx_automation/runtime.py",
+    "src/hwpx_automation/runtime_services.py",
+    "src/hwpx_automation/fastmcp_adapter.py",
+    "src/hwpx_automation/tool_bindings.py",
+    "src/hwpx_automation/server.py",
+    "src/hwpx_automation/hwpx_ops.py",
+    "src/hwpx_automation/form_fill.py",
+    "src/hwpx_automation/office",
+    "src/hwpx_automation/tool_contract.py",
+    "src/hwpx_automation/workflow/service.py",
 ]
 reportMissingTypeStubs = false
 
@@ -166,13 +175,13 @@ reportMissingTypeStubs = false
 #   to LocalDocumentStorage at the consumers, so all five now pass pyright basic
 #   inside the gate with no exclusion.
 exclude = [
-    "src/hwpx_mcp_server/handlers/agent_document.py",   # schema-frozen
-    "src/hwpx_mcp_server/handlers/authoring.py",        # schema-frozen
-    "src/hwpx_mcp_server/handlers/content_edit.py",     # schema-frozen
-    "src/hwpx_mcp_server/handlers/form_fill.py",        # schema-frozen
-    "src/hwpx_mcp_server/handlers/layout_style.py",     # schema-frozen
-    "src/hwpx_mcp_server/handlers/quality_render.py",   # schema-frozen
-    "src/hwpx_mcp_server/handlers/read_export.py",      # schema-frozen
-    "src/hwpx_mcp_server/handlers/specialized.py",      # schema-frozen
-    "src/hwpx_mcp_server/handlers/workflow.py",         # schema-frozen
+    "src/hwpx_automation/handlers/agent_document.py",   # schema-frozen
+    "src/hwpx_automation/handlers/authoring.py",        # schema-frozen
+    "src/hwpx_automation/handlers/content_edit.py",     # schema-frozen
+    "src/hwpx_automation/handlers/form_fill.py",        # schema-frozen
+    "src/hwpx_automation/handlers/layout_style.py",     # schema-frozen
+    "src/hwpx_automation/handlers/quality_render.py",   # schema-frozen
+    "src/hwpx_automation/handlers/read_export.py",      # schema-frozen
+    "src/hwpx_automation/handlers/specialized.py",      # schema-frozen
+    "src/hwpx_automation/handlers/workflow.py",         # schema-frozen
 ]

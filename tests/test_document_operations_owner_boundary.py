@@ -8,9 +8,9 @@ import json
 import runpy
 from pathlib import Path
 
-from hwpx_mcp_server.handlers import authoring, specialized, tracked_changes
-from hwpx_mcp_server.office.authoring import style_profile
-from hwpx_mcp_server.tool_contract import (
+from hwpx_automation.handlers import authoring, specialized, tracked_changes
+from hwpx_automation.office.authoring import style_profile
+from hwpx_automation.tool_contract import (
     contract_hash,
     expected_tool_names,
     skill_required_tool_names,
@@ -96,7 +96,7 @@ def test_production_bindings_use_only_the_canonical_owner() -> None:
     )
     assert all(
         binding.__module__.startswith(
-            "hwpx_mcp_server.office.document_ops"
+            "hwpx_automation.office.document_ops"
         )
         for binding in bindings
     )
@@ -105,7 +105,7 @@ def test_production_bindings_use_only_the_canonical_owner() -> None:
 def test_boundary_rejects_frozen_callable_and_unapproved_seams() -> None:
     check = BOUNDARY["_document_ops_owner_import_violation"]
     canonical = (
-        "src/hwpx_mcp_server/office/document_ops/comparison.py"
+        "src/hwpx_automation/office/document_ops/comparison.py"
     )
 
     assert check(canonical, "hwpx.tools.doc_diff") is None

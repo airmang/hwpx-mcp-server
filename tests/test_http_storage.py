@@ -12,7 +12,7 @@ import pytest
 
 from hwpx.document import HwpxDocument
 
-from hwpx_mcp_server.storage import HttpDocumentStorage, RemoteDocumentClient
+from hwpx_automation.storage import HttpDocumentStorage, RemoteDocumentClient
 
 _HP_NS = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 

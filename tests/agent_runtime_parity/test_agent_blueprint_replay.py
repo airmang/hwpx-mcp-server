@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 
 from hwpx import HwpxDocument, validate_editor_open_safety
-from hwpx_mcp_server.office.agent import HwpxAgentDocument
-from hwpx_mcp_server.office.agent.model import AgentContractError
-from hwpx_mcp_server.office.agent.blueprint import dump_document_blueprint, replay_document_blueprint
+from hwpx_automation.office.agent import HwpxAgentDocument
+from hwpx_automation.office.agent.model import AgentContractError
+from hwpx_automation.office.agent.blueprint import dump_document_blueprint, replay_document_blueprint
 from hwpx.quality import SavePipeline
 from hwpx.quality.rendering import UnavailableRenderBackend as NullOracle
 from hwpx.oxml.namespaces import HP

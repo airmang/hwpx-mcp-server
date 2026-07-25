@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.workflow.render_queue import (
+from hwpx_automation.workflow.render_queue import (
     DurableRenderQueue,
     RenderQueueError,
     sign_submission,
 )
-from hwpx_mcp_server.workflow.render_security import RenderSecurityPolicy
-from hwpx_mcp_server.workflow.rendering import (
+from hwpx_automation.workflow.render_security import RenderSecurityPolicy
+from hwpx_automation.workflow.rendering import (
     RenderArtifactKind,
     RenderArtifactV2,
     RenderJobV2,

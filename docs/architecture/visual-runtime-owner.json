@@ -1,6 +1,6 @@
 {
   "schemaVersion": "hwpx-mcp.visual-runtime-owner/v1",
-  "canonicalOwner": "hwpx_mcp_server.office.rendering",
+  "canonicalOwner": "hwpx_automation.office.rendering",
   "sourceCompatibilityOwner": "python-hwpx 4.x",
   "source": {
     "head": "3720196aa3ad4c4885059573c23bd7a8293302fb",
@@ -13,8 +13,13 @@
     "status": "canonical",
     "pythonFiles": 10,
     "loc": 2704,
-    "manifestSha256": "8ceb4f808a6a024262629b73a1e1d262722ea347a5784e382a1ce10118e1b53a",
-    "frozenAtNote": "S-104 동결값 loc=2001 sha=4b63f85703896fe8…에서 재계산. 코드가 바뀐 게 아니라 소유자가 core에 있던 4개 모듈을 받았기 때문이다. 동결은 드리프트를 막으려는 것이지 이동을 막으려는 것이 아니므로, 이유와 함께 다시 얼린다."
+    "manifestSha256": "9587ff0e479f7d221e5202a51ee3635293794a16272e1e89a68b9a3dfd1e7676",
+    "frozenAtNote": "S-104 동결값 loc=2001 sha=4b63f85703896fe8…에서 재계산. 코드가 바뀐 게 아니라 소유자가 core에 있던 4개 모듈을 받았기 때문이다. 동결은 드리프트를 막으려는 것이지 이동을 막으려는 것이 아니므로, 이유와 함께 다시 얼린다.",
+    "refrozenFrom": {
+      "loc": 2704,
+      "manifestSha256": "8ceb4f808a6a024262629b73a1e1d262722ea347a5784e382a1ce10118e1b53a",
+      "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
+    }
   },
   "packageFiles": [
     "__init__.py",
@@ -78,10 +83,10 @@
     "hwpx.visual.qa_metrics"
   ],
   "productionConsumers": [
-    "hwpx_mcp_server.handlers.layout_style",
-    "hwpx_mcp_server.handlers.specialized",
-    "hwpx_mcp_server.office.authoring",
-    "hwpx_mcp_server.visual_qa"
+    "hwpx_automation.handlers.layout_style",
+    "hwpx_automation.handlers.specialized",
+    "hwpx_automation.office.authoring",
+    "hwpx_automation.visual_qa"
   ],
   "compatibilityPolicy": {
     "coreLine": "4.x",

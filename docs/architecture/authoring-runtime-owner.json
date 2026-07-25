@@ -1,6 +1,6 @@
 {
   "schemaVersion": "hwpx-mcp.authoring-runtime-owner/v1",
-  "canonicalOwner": "hwpx_mcp_server.office.authoring",
+  "canonicalOwner": "hwpx_automation.office.authoring",
   "sourceCompatibilityOwner": "python-hwpx 4.x",
   "source": {
     "head": "aff36e145006b6e1acaffbb554d5ff10fa3797ec",
@@ -17,13 +17,13 @@
     "profileManifestSha256": "ed58b46112baae3436bd263058673ddf8bfcd6477811389e088a0d4222bcc6ec"
   },
   "productionConsumers": [
-    "hwpx_mcp_server.core.content",
-    "hwpx_mcp_server.handlers._shared",
-    "hwpx_mcp_server.handlers.authoring",
-    "hwpx_mcp_server.handlers.layout_style",
-    "hwpx_mcp_server.handlers.quality_render",
-    "hwpx_mcp_server.handlers.specialized",
-    "hwpx_mcp_server.quality_generation"
+    "hwpx_automation.core.content",
+    "hwpx_automation.handlers._shared",
+    "hwpx_automation.handlers.authoring",
+    "hwpx_automation.handlers.layout_style",
+    "hwpx_automation.handlers.quality_render",
+    "hwpx_automation.handlers.specialized",
+    "hwpx_automation.quality_generation"
   ],
   "approvedCoreImports": [
     "hwpx.document",

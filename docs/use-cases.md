@@ -226,7 +226,7 @@ ZIP open이 실패하면 `recover=true`를 사용하고, `crcOk`,
 
 ```bash
 # 설치
-pip install hwpx-mcp-server
+pip install python-hwpx-automation[mcp]
 
 # 실행
 hwpx-mcp-server
@@ -289,7 +289,7 @@ Current workflow boundary:
 Layer ownership:
 
 - `python-hwpx` stays the upstream engine for HWPX/package behavior.
-- `hwpx-mcp-server` exposes the stable MCP product surface through `src/hwpx_mcp_server/server.py`.
+- `hwpx-mcp-server` exposes the stable MCP product surface through `src/hwpx_automation/server.py`.
 - Skills and workflow examples orchestrate those tools; they do not replace core editing logic.
 
 ## Agent-first proposal document generation

@@ -195,14 +195,14 @@ def test_visual_pass_and_fail_with_fake_oracle(
     def _clean(*_a, **_k) -> VisualReport:
         return VisualReport(ok=True, render_checked=True)
 
-    monkeypatch.setattr("hwpx_mcp_server.office.rendering.oracle.visual_check", _clean)
+    monkeypatch.setattr("hwpx_automation.office.rendering.oracle.visual_check", _clean)
     verdict = runner_module._eval_visual(corpus, case, _FakeOracle())
     assert verdict.status == "pass"
 
     def _defect(*_a, **_k) -> VisualReport:
         return VisualReport(ok=False, render_checked=True, overflow_detected=True)
 
-    monkeypatch.setattr("hwpx_mcp_server.office.rendering.oracle.visual_check", _defect)
+    monkeypatch.setattr("hwpx_automation.office.rendering.oracle.visual_check", _defect)
     verdict = runner_module._eval_visual(corpus, case, _FakeOracle())
     assert verdict.status == "fail"
     assert verdict.metrics["overflow_count"] == 1
@@ -235,7 +235,7 @@ def test_visual_edit_pair_uses_diff_path(corpus, tmp_path, monkeypatch) -> None:
         seen["edit_mask"] = edit_mask
         return VisualReport(ok=True, render_checked=True)
 
-    monkeypatch.setattr("hwpx_mcp_server.office.rendering.oracle.visual_check", _record)
+    monkeypatch.setattr("hwpx_automation.office.rendering.oracle.visual_check", _record)
     verdict = runner_module._eval_visual(pair_corpus, case, _FakeOracle())
     assert verdict.status == "pass"
     assert verdict.metrics["diffed"] is True
@@ -255,14 +255,14 @@ def test_visual_expect_defect_passes_when_caught(tmp_path, monkeypatch) -> None:
             ok=False, render_checked=True, unexpected_diff_outside_mask=True
         )
 
-    monkeypatch.setattr("hwpx_mcp_server.office.rendering.oracle.visual_check", _defect)
+    monkeypatch.setattr("hwpx_automation.office.rendering.oracle.visual_check", _defect)
     # The planted defect is caught -> the positive control passes.
     assert runner_module._eval_visual(pair_corpus, case, _FakeOracle()).status == "pass"
 
     def _clean(*_a, **_k) -> VisualReport:
         return VisualReport(ok=True, render_checked=True)
 
-    monkeypatch.setattr("hwpx_mcp_server.office.rendering.oracle.visual_check", _clean)
+    monkeypatch.setattr("hwpx_automation.office.rendering.oracle.visual_check", _clean)
     # No defect where one was expected -> the control FAILS (the gate went blind).
     assert runner_module._eval_visual(pair_corpus, case, _FakeOracle()).status == "fail"
 

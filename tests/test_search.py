@@ -3,9 +3,9 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from hwpx_mcp_server.core.search import _clear_xml_paragraph_layout_cache, _replace_in_xml_runs
-from hwpx_mcp_server.core.document import open_doc, save_doc
-from hwpx_mcp_server.server import (
+from hwpx_automation.core.search import _clear_xml_paragraph_layout_cache, _replace_in_xml_runs
+from hwpx_automation.core.document import open_doc, save_doc
+from hwpx_automation.server import (
     add_memo_by_anchor,
     batch_replace,
     create_document,

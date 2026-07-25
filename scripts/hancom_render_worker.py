@@ -23,7 +23,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from hwpx_mcp_server.office.rendering.worker import (
+from hwpx_automation.office.rendering.worker import (
     DeterministicFakeSession, PowerShellHancomSession, SerializedHancomWorker, WorkerJob,
 )
 
@@ -31,7 +31,7 @@ from hwpx_mcp_server.office.rendering.worker import (
 def run_queue_once(queue, worker: SerializedHancomWorker, worker_id: str) -> bool:
     """Claim and finish at most one job; return false when the queue is empty."""
 
-    from hwpx_mcp_server.workflow.rendering import (
+    from hwpx_automation.workflow.rendering import (
         RenderArtifactKind, RenderArtifactV2, RenderReceiptV2, RenderStatus,
     )
 
@@ -91,8 +91,8 @@ def main() -> int:
         secret = os.environ.get("HWPX_RENDER_QUEUE_SECRET")
         if not secret:
             parser.error("HWPX_RENDER_QUEUE_SECRET is required with --daemon")
-        from hwpx_mcp_server.workflow.render_queue import DurableRenderQueue
-        from hwpx_mcp_server.workflow.render_security import RenderSecurityPolicy
+        from hwpx_automation.workflow.render_queue import DurableRenderQueue
+        from hwpx_automation.workflow.render_security import RenderSecurityPolicy
         policy = RenderSecurityPolicy(sandbox_root=args.queue_root.resolve() / "sandboxes")
         queue = DurableRenderQueue(args.queue_root, secret=secret.encode(), policy=policy)
         worker = SerializedHancomWorker(
@@ -106,7 +106,7 @@ def main() -> int:
                     available = False
                     degraded_reason = "FAKE_RENDERER"
                 else:
-                    from hwpx_mcp_server.office.rendering.oracle import WindowsComOracle
+                    from hwpx_automation.office.rendering.oracle import WindowsComOracle
                     available = WindowsComOracle().available()
                     degraded_reason = None if available else "HANCOM_COM_UNAVAILABLE"
                 queue.heartbeat(

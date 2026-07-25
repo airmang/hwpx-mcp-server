@@ -5,7 +5,7 @@ from __future__ import annotations
 from starlette.applications import Starlette
 import pytest
 
-from hwpx_mcp_server.server import mcp, mcp_server_health
+from hwpx_automation.server import mcp, mcp_server_health
 
 
 def test_streamable_http_app_is_constructible() -> None:

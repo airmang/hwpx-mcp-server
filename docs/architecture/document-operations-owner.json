@@ -1,6 +1,6 @@
 {
   "schemaVersion": "hwpx-mcp.document-operations-owner/v1",
-  "canonicalOwner": "hwpx_mcp_server.office.document_ops",
+  "canonicalOwner": "hwpx_automation.office.document_ops",
   "sourceCompatibilityOwner": "python-hwpx 4.x",
   "source": {
     "head": "86e26314540a82c5a772a05012be5fb2f14f9ed4",
@@ -14,7 +14,12 @@
     "status": "canonical",
     "pythonFiles": 4,
     "loc": 183,
-    "manifestSha256": "16fdc78fc1e13462809125a21bfbb54477d90ca84bd608361842926a0c99b62f"
+    "manifestSha256": "504480de77ec0053f713725629ff675b46b4c35257ceb7644ee002e6d9743548",
+    "refrozenFrom": {
+      "loc": 183,
+      "manifestSha256": "16fdc78fc1e13462809125a21bfbb54477d90ca84bd608361842926a0c99b62f",
+      "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
+    }
   },
   "memberOwners": {
     "core": [
@@ -58,15 +63,15 @@
     ]
   },
   "siblingOwners": [
-    "hwpx_mcp_server.office.compliance",
-    "hwpx_mcp_server.office.form_fill.fit",
-    "hwpx_mcp_server.office.rendering"
+    "hwpx_automation.office.compliance",
+    "hwpx_automation.office.form_fill.fit",
+    "hwpx_automation.office.rendering"
   ],
   "productionConsumers": [
-    "hwpx_mcp_server.handlers.authoring",
-    "hwpx_mcp_server.handlers.specialized",
-    "hwpx_mcp_server.handlers.tracked_changes",
-    "hwpx_mcp_server.office.authoring.style_profile"
+    "hwpx_automation.handlers.authoring",
+    "hwpx_automation.handlers.specialized",
+    "hwpx_automation.handlers.tracked_changes",
+    "hwpx_automation.office.authoring.style_profile"
   ],
   "compatibilityPolicy": {
     "coreLine": "4.x",

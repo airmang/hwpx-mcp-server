@@ -2,7 +2,7 @@ import importlib
 
 import pytest
 
-from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
+from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
 
 
 @pytest.fixture(autouse=True)
@@ -12,7 +12,7 @@ def enable_advanced(monkeypatch):
 
 
 def test_package_parts(tmp_path):
-    import hwpx_mcp_server.server as server
+    import hwpx_automation.server as server
     server = importlib.reload(server)
 
     target = tmp_path / "test.hwpx"
@@ -25,7 +25,7 @@ def test_package_parts(tmp_path):
 
 
 def test_package_get_xml_truncation(tmp_path):
-    import hwpx_mcp_server.server as server
+    import hwpx_automation.server as server
     server = importlib.reload(server)
 
     target = tmp_path / "test.hwpx"
@@ -40,7 +40,7 @@ def test_package_get_xml_truncation(tmp_path):
 def test_advanced_tools_hidden_by_default(monkeypatch):
     """HWPX_MCP_ADVANCED 미설정 시 고급 도구가 등록되지 않는지 확인"""
     monkeypatch.delenv("HWPX_MCP_ADVANCED", raising=False)
-    import hwpx_mcp_server.server as server
+    import hwpx_automation.server as server
 
     reloaded = importlib.reload(server)
     tool_names = set(snapshot_runtime_tools(reloaded.mcp))
@@ -52,7 +52,7 @@ def test_advanced_tools_hidden_by_default(monkeypatch):
 
 
 def test_object_find_by_attr_matches_any_value_when_attr_value_omitted(tmp_path):
-    import hwpx_mcp_server.server as server
+    import hwpx_automation.server as server
     server = importlib.reload(server)
 
     target = tmp_path / "test.hwpx"

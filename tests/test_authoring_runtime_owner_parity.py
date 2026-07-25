@@ -37,13 +37,13 @@ import hwpx.tools.template_analyzer as core_template
 from hwpx.tools.package_validator import validate_editor_open_safety
 from parity_fingerprint import fingerprint
 
-import hwpx_mcp_server.office.authoring as mcp_authoring
-import hwpx_mcp_server.office.authoring.advanced_generators as mcp_generators
-import hwpx_mcp_server.office.authoring.builder as mcp_builder
-import hwpx_mcp_server.office.authoring.design as mcp_design
-import hwpx_mcp_server.office.authoring.presets as mcp_presets
-import hwpx_mcp_server.office.authoring.style_profile as mcp_style
-import hwpx_mcp_server.office.authoring.template_analyzer as mcp_template
+import hwpx_automation.office.authoring as mcp_authoring
+import hwpx_automation.office.authoring.advanced_generators as mcp_generators
+import hwpx_automation.office.authoring.builder as mcp_builder
+import hwpx_automation.office.authoring.design as mcp_design
+import hwpx_automation.office.authoring.presets as mcp_presets
+import hwpx_automation.office.authoring.style_profile as mcp_style
+import hwpx_automation.office.authoring.template_analyzer as mcp_template
 
 _FIXTURES = Path(__file__).parent / "parity_fingerprints"
 FROZEN = json.loads((_FIXTURES / "authoring.json").read_text(encoding="utf-8"))["modules"]

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.document_state import document_revision
-from hwpx_mcp_server.workflow import (
+from hwpx_automation.document_state import document_revision
+from hwpx_automation.workflow import (
     ActionRequest,
     AllowlistedDispatcher,
     PolicyViolation,
@@ -296,7 +296,7 @@ def test_elapsed_time_budget_is_derived_from_durable_creation_time(tmp_path, mon
     store, record, source = make_record(tmp_path, budget={"max_elapsed_seconds": 1})
     action = ActionRequest(tool_name="scan_form_guidance", arguments={"path": str(source)})
     monkeypatch.setattr(
-        "hwpx_mcp_server.workflow.policy.utc_now",
+        "hwpx_automation.workflow.policy.utc_now",
         lambda: record.created_at + timedelta(seconds=2),
     )
 

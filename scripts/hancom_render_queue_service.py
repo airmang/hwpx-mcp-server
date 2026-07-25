@@ -7,9 +7,9 @@ import argparse
 import os
 from pathlib import Path
 
-from hwpx_mcp_server.workflow.render_queue import DurableRenderQueue
-from hwpx_mcp_server.workflow.render_security import RenderSecurityPolicy
-from hwpx_mcp_server.workflow.render_transport import serve_private_queue
+from hwpx_automation.workflow.render_queue import DurableRenderQueue
+from hwpx_automation.workflow.render_security import RenderSecurityPolicy
+from hwpx_automation.workflow.render_transport import serve_private_queue
 
 
 def main() -> int:

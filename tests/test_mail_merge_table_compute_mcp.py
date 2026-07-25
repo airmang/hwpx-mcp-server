@@ -5,8 +5,8 @@ from zipfile import ZipFile
 
 from hwpx.document import HwpxDocument
 from hwpx.tools.package_validator import validate_editor_open_safety
-from hwpx_mcp_server import server
-from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
+from hwpx_automation import server
+from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
 
 
 def _template(path: Path) -> None:

@@ -69,7 +69,7 @@ def _clear_path_sandbox_for_inprocess_tests(
 ) -> None:
     """Give each test explicit repository and temporary workspace roots.
 
-    The MCP server CLI (`python -m hwpx_mcp_server.server`) enables sandboxing in
+    The MCP server CLI (`python -m hwpx_automation.server`) enables sandboxing in
     `main()` via `os.environ.setdefault("HWPX_MCP_SANDBOX_ROOT", cwd)`.
 
     But unit tests often operate on pytest tmp directories and may call helpers
@@ -86,10 +86,10 @@ def _clear_path_sandbox_for_inprocess_tests(
         "HWPX_MCP_WORKSPACE_ROOTS",
         json.dumps([str(_REPO_ROOT), str(tmp_path), str(_LOCAL_PYTHON_HWPX_REPO)]),
     )
-    from hwpx_mcp_server import server as server_module
-    from hwpx_mcp_server.hwpx_ops import HwpxOps
-    from hwpx_mcp_server.storage import LocalDocumentStorage
-    from hwpx_mcp_server.workspace import WorkspaceResolver
+    from hwpx_automation import server as server_module
+    from hwpx_automation.hwpx_ops import HwpxOps
+    from hwpx_automation.storage import LocalDocumentStorage
+    from hwpx_automation.workspace import WorkspaceResolver
 
     server_module._replace_ops(
         HwpxOps(
@@ -153,7 +153,7 @@ def _default_server_cmd() -> str:
     cmd = os.getenv("SERVER_CMD") or os.getenv("MCP_SERVER_CMD")
     if cmd:
         return cmd
-    return f"{sys.executable} -m hwpx_mcp_server.server"
+    return f"{sys.executable} -m hwpx_automation.server"
 
 
 def _split_server_cmd(command: str) -> list[str]:

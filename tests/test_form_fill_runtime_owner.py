@@ -6,14 +6,14 @@ import hashlib
 import json
 from pathlib import Path
 
-from hwpx_mcp_server.handlers import form_fill, specialized
-from hwpx_mcp_server.office import form_fill as canonical
-from hwpx_mcp_server.ops_services import form_fields
+from hwpx_automation.handlers import form_fill, specialized
+from hwpx_automation.office import form_fill as canonical
+from hwpx_automation.ops_services import form_fields
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_ROOT = (
-    ROOT / "src" / "hwpx_mcp_server" / "office" / "form_fill"
+    ROOT / "src" / "hwpx_automation" / "office" / "form_fill"
 )
 OWNER = json.loads(
     (
@@ -69,7 +69,7 @@ def test_all_form_fill_application_bindings_use_the_mcp_owner() -> None:
 
     for binding in bindings:
         assert binding.__module__.startswith(
-            "hwpx_mcp_server.office.form_fill"
+            "hwpx_automation.office.form_fill"
         ), binding
 
 
@@ -84,7 +84,7 @@ def test_neutral_fit_contract_resolves_to_core_not_to_a_second_copy() -> None:
     must come *from core*, so re-introducing a local copy fails here.
     """
 
-    from hwpx_mcp_server.office.form_fill import fit
+    from hwpx_automation.office.form_fill import fit
 
     for binding in (
         specialized.FitPolicy,
@@ -99,5 +99,5 @@ def test_neutral_fit_contract_resolves_to_core_not_to_a_second_copy() -> None:
 
 def test_render_oracle_is_resolved_only_through_the_mcp_seam() -> None:
     assert specialized.resolve_oracle.__module__ == (
-        "hwpx_mcp_server.office.rendering"
+        "hwpx_automation.office.rendering"
     )

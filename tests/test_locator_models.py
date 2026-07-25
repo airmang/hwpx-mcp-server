@@ -1,12 +1,12 @@
 from pydantic import TypeAdapter
 
-from hwpx_mcp_server.core.locator import (
+from hwpx_automation.core.locator import (
     DocumentLocator,
     locator_identifier,
     locator_path,
     normalize_locator_payload,
 )
-from hwpx_mcp_server.core.plan import PlanEditInput
+from hwpx_automation.core.plan import PlanEditInput
 
 
 LOCATOR_ADAPTER = TypeAdapter(DocumentLocator)

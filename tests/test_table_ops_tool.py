@@ -24,8 +24,8 @@ pytest.importorskip(
 )
 
 from hwpx.table_patch import _direct_cells, _iter_table_spans, build_grid
-from hwpx_mcp_server.hwpx_ops import HwpxOperationError, HwpxOps
-from hwpx_mcp_server import server
+from hwpx_automation.hwpx_ops import HwpxOperationError, HwpxOps
+from hwpx_automation import server
 
 _CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
 CORE_REPO = (

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.tool_contract import RELEASED_CONTRACT_HASH
+from hwpx_automation.tool_contract import RELEASED_CONTRACT_HASH
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,13 +33,13 @@ from importlib.metadata import version
 from mcp.shared.exceptions import McpError
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from hwpx_mcp_server import __version__, server
-from hwpx_mcp_server.fastmcp_adapter import (
+from hwpx_automation import __version__, server
+from hwpx_automation.fastmcp_adapter import (
     AUDITED_MCP_PATCHES,
     runtime_server_version,
     snapshot_runtime_tools,
 )
-from hwpx_mcp_server.tool_contract import (
+from hwpx_automation.tool_contract import (
     contract_hash,
     expected_tool_order,
     validate_registered_tools,

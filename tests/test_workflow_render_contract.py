@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from hwpx_mcp_server.workflow import (
+from hwpx_automation.workflow import (
     NullRenderBackend,
     RenderBackend,
     RenderJob,

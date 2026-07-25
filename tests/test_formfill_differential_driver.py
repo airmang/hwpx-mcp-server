@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.office.form_fill.fit import wordbox as wb
+from hwpx_automation.office.form_fill.fit import wordbox as wb
 from tests.test_form_fit_wordbox import _layout_pdf, _overlap_pdf
 
 # Load scripts/corpus_formfill_differential.py as a module (scripts/ is not a

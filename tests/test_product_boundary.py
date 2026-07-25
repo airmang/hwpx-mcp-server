@@ -14,10 +14,10 @@ SPEC.loader.exec_module(boundary)
 
 
 def _minimal_tree(root: Path) -> Path:
-    office = root / "src" / "hwpx_mcp_server" / "office"
+    office = root / "src" / "hwpx_automation" / "office"
     office.mkdir(parents=True)
     (office / "rendering.py").write_text("VALUE = 1\n", encoding="utf-8")
-    return root / "src" / "hwpx_mcp_server"
+    return root / "src" / "hwpx_automation"
 
 
 def test_real_tree_satisfies_mcp_boundary() -> None:

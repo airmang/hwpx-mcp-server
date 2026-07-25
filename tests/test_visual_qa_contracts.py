@@ -4,7 +4,7 @@ import hashlib
 
 import pytest
 
-from hwpx_mcp_server.office.rendering.qa_contracts import (
+from hwpx_automation.office.rendering.qa_contracts import (
     TAXONOMY_VERSION,
     DefectCategory,
     Evidence,

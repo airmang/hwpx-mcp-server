@@ -7,9 +7,9 @@ import json
 
 from parity_fingerprint import fingerprint
 
-import hwpx_mcp_server.office.agent as mcp_agent
-import hwpx_mcp_server.office.exam.compose as mcp_exam_compose
-import hwpx_mcp_server.office.form_fill.guidance as mcp_guidance
+import hwpx_automation.office.agent as mcp_agent
+import hwpx_automation.office.exam.compose as mcp_exam_compose
+import hwpx_automation.office.form_fill.guidance as mcp_guidance
 
 
 def test_fingerprint_is_deterministic_across_repeated_calls() -> None:

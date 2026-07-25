@@ -11,15 +11,15 @@ import anyio
 import pytest
 from jsonschema import Draft202012Validator
 
-from hwpx_mcp_server import __version__
-from hwpx_mcp_server import server
-import hwpx_mcp_server.tool_contract as tool_contract_module
-from hwpx_mcp_server.handlers import quality_render as quality_render_handlers
-from hwpx_mcp_server.fastmcp_adapter import (
+from hwpx_automation import __version__
+from hwpx_automation import server
+import hwpx_automation.tool_contract as tool_contract_module
+from hwpx_automation.handlers import quality_render as quality_render_handlers
+from hwpx_automation.fastmcp_adapter import (
     runtime_server_version,
     snapshot_runtime_tools,
 )
-from hwpx_mcp_server.tool_contract import (
+from hwpx_automation.tool_contract import (
     BASELINE_TOOL_SPECS,
     DOMAIN_SPECS,
     MIN_MCP_VERSION,
@@ -336,9 +336,9 @@ def test_missing_required_canonical_symbol_is_startup_fatal_and_never_ghost_regi
     None
 ):
     code = """
-import hwpx_mcp_server.office.authoring as authoring
+import hwpx_automation.office.authoring as authoring
 delattr(authoring, 'create_document_from_plan')
-import hwpx_mcp_server.server  # noqa: F401
+import hwpx_automation.server  # noqa: F401
 """
     result = subprocess.run(
         [sys.executable, "-c", code],
@@ -368,7 +368,7 @@ import hwpx
 assert not hasattr(hwpx, 'create_document_from_plan'), (
     'core still exposes an authoring name this package owns'
 )
-import hwpx_mcp_server.server  # noqa: F401
+import hwpx_automation.server  # noqa: F401
 """
     result = subprocess.run(
         [sys.executable, "-c", code],
@@ -405,8 +405,8 @@ def test_health_detects_live_schema_skew(monkeypatch) -> None:
 def test_advanced_registry_exactly_matches_contract_in_fresh_process() -> None:
     code = """
 import json
-from hwpx_mcp_server import server
-from hwpx_mcp_server.tool_contract import expected_tool_names, validate_registered_tools
+from hwpx_automation import server
+from hwpx_automation.tool_contract import expected_tool_names, validate_registered_tools
 print(json.dumps({
     'actual': sorted(server._fastmcp_tool_names()),
     'expected': sorted(expected_tool_names(advanced=True)),

@@ -10,9 +10,9 @@ import hwpx
 from hwpx.tools.package_validator import validate_editor_open_safety
 from hwpx.tools.package_validator import validate_package
 
-import hwpx_mcp_server.server as server
-from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.tool_contract import bound_tool_registry
+import hwpx_automation.server as server
+from hwpx_automation.hwpx_ops import HwpxOps
+from hwpx_automation.tool_contract import bound_tool_registry
 
 
 def _sample_hwpx() -> Path:

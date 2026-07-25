@@ -4,20 +4,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hwpx_mcp_server import quality_generation
-from hwpx_mcp_server.handlers import (
+from hwpx_automation import quality_generation
+from hwpx_automation.handlers import (
     _shared,
     authoring,
     layout_style,
     quality_render,
     specialized,
 )
-import hwpx_mcp_server.office.authoring as canonical
+import hwpx_automation.office.authoring as canonical
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_ROOT = (
-    ROOT / "src" / "hwpx_mcp_server" / "office" / "authoring"
+    ROOT / "src" / "hwpx_automation" / "office" / "authoring"
 )
 
 
@@ -59,5 +59,5 @@ def test_all_authoring_production_bindings_use_the_mcp_owner() -> None:
     for binding in bindings:
         assert binding is not None
         assert binding.__module__.startswith(
-            "hwpx_mcp_server.office.authoring"
+            "hwpx_automation.office.authoring"
         ), binding

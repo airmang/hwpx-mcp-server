@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import hwpx_mcp_server.server as server
+import hwpx_automation.server as server
 
 
 def test_markdown_to_document_plan_builds_valid_plan() -> None:

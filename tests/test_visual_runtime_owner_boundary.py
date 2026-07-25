@@ -7,8 +7,8 @@ import json
 import runpy
 from pathlib import Path
 
-from hwpx_mcp_server.office import rendering
-from hwpx_mcp_server.tool_contract import (
+from hwpx_automation.office import rendering
+from hwpx_automation.tool_contract import (
     contract_hash,
     expected_tool_names,
     skill_required_tool_names,
@@ -51,7 +51,7 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
 
 def test_rendering_owner_gate_rejects_runtime_and_private_core_seams() -> None:
     check = BOUNDARY["_rendering_owner_import_violation"]
-    canonical = "src/hwpx_mcp_server/office/rendering/oracle.py"
+    canonical = "src/hwpx_automation/office/rendering/oracle.py"
 
     assert check(canonical, "hwpx.visual.oracle") is not None
     assert check(canonical, "hwpx.visual.hancom_worker") is not None
@@ -64,7 +64,7 @@ def test_rendering_owner_gate_rejects_runtime_and_private_core_seams() -> None:
 
 def test_exam_uses_neutral_block_split_contract() -> None:
     source = (
-        ROOT / "src" / "hwpx_mcp_server" / "office" / "exam" / "measure.py"
+        ROOT / "src" / "hwpx_automation" / "office" / "exam" / "measure.py"
     ).read_text(encoding="utf-8")
     # The block-split contract lives with the rendering owner now, not in core.
     # The point of the assertion is unchanged: exam consumes the shared
@@ -85,13 +85,13 @@ def test_canonical_package_inventory_and_runtime_identities_are_exact() -> None:
         if path.suffix in {".ps1", ".applescript"}
     ) == OWNER["resourceFiles"]
     assert rendering.NullOracle.__module__ == (
-        "hwpx_mcp_server.office.rendering.oracle"
+        "hwpx_automation.office.rendering.oracle"
     )
     assert rendering.resolve_oracle.__module__ == (
-        "hwpx_mcp_server.office.rendering.oracle"
+        "hwpx_automation.office.rendering.oracle"
     )
     assert rendering.HancomRenderBackend.__module__ == (
-        "hwpx_mcp_server.office.rendering"
+        "hwpx_automation.office.rendering"
     )
 
 

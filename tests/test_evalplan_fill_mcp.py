@@ -16,10 +16,10 @@ import hwpx
 import hwpx.table_patch as table_patch
 import pytest
 
-from hwpx_mcp_server.hwpx_ops import HwpxOperationError, HwpxOps
-from hwpx_mcp_server import server
-from hwpx_mcp_server.mixed_form import FORM_VERIFICATION_RECEIPT_SCHEMA
-from hwpx_mcp_server.tool_contract import bound_tool_registry
+from hwpx_automation.hwpx_ops import HwpxOperationError, HwpxOps
+from hwpx_automation import server
+from hwpx_automation.mixed_form import FORM_VERIFICATION_RECEIPT_SCHEMA
+from hwpx_automation.tool_contract import bound_tool_registry
 
 _CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
 CORE_REPO = (

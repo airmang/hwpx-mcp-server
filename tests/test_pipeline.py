@@ -1,6 +1,6 @@
 import pytest
 
-from hwpx_mcp_server.core.plan import PlanManager, PipelineError
+from hwpx_automation.core.plan import PlanManager, PipelineError
 
 
 def make_manager(paragraphs):

@@ -58,14 +58,14 @@ from hwpx.document import HwpxDocument
 from hwpx.tools.package_validator import validate_editor_open_safety
 from parity_fingerprint import fingerprint
 
-from hwpx_mcp_server.office import exam as mcp_exam
-from hwpx_mcp_server.office.exam import compose as mcp_compose
-from hwpx_mcp_server.office.exam import ir as mcp_ir
-from hwpx_mcp_server.office.exam import measure as mcp_measure
-from hwpx_mcp_server.office.exam import parser as mcp_parser
-from hwpx_mcp_server.office.exam import profile as mcp_profile
-from hwpx_mcp_server.office.form_fill.fit.wordbox import WordBox
-from hwpx_mcp_server.office.rendering.oracle import NullOracle
+from hwpx_automation.office import exam as mcp_exam
+from hwpx_automation.office.exam import compose as mcp_compose
+from hwpx_automation.office.exam import ir as mcp_ir
+from hwpx_automation.office.exam import measure as mcp_measure
+from hwpx_automation.office.exam import parser as mcp_parser
+from hwpx_automation.office.exam import profile as mcp_profile
+from hwpx_automation.office.form_fill.fit.wordbox import WordBox
+from hwpx_automation.office.rendering.oracle import NullOracle
 
 # The exam corpus lives in the core repository and is read from there rather
 # than copied. hwpx.exam.ir is going away, so its __file__ can no longer locate

@@ -9,9 +9,9 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10
     import tomli as tomllib
 
-import hwpx_mcp_server
-from hwpx_mcp_server import server
-from hwpx_mcp_server.tool_contract import (
+import hwpx_automation
+from hwpx_automation import server
+from hwpx_automation.tool_contract import (
     BASELINE_TOOL_SPECS,
     DOMAIN_SPECS,
     MIN_MCP_VERSION,
@@ -41,12 +41,12 @@ INTERNAL_FIXTURE_QA_TOOLS = {
     "visual_repair_fixture",
 }
 RETIRED_LEGACY_MODULES = {
-    "hwpx_mcp_server.tools": "tools.py",
-    "hwpx_mcp_server.legacy_server": "legacy_server.py",
-    "hwpx_mcp_server.prompts": "prompts.py",
-    "hwpx_mcp_server.logging_conf": "logging_conf.py",
-    "hwpx_mcp_server.schema.builder": "schema/builder.py",
-    "hwpx_mcp_server.schema.sanitizer": "schema/sanitizer.py",
+    "hwpx_automation.tools": "tools.py",
+    "hwpx_automation.legacy_server": "legacy_server.py",
+    "hwpx_automation.prompts": "prompts.py",
+    "hwpx_automation.logging_conf": "logging_conf.py",
+    "hwpx_automation.schema.builder": "schema/builder.py",
+    "hwpx_automation.schema.sanitizer": "schema/sanitizer.py",
 }
 
 
@@ -62,7 +62,11 @@ def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
     # deferring to it would have installed nothing.
     assert optional_dependencies["oracle"] == ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
     assert optional_dependencies["vision"] == ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
-    assert "mcp==1.28.1" in dependencies
+    # 필수가 아니라 extra. 이 패키지는 MCP 어댑터를 포함하지만 그것이 본체는
+    # 아니다 — office/·workflow/·ops_services/·core/ 어느 파일도 mcp를
+    # import하지 않는다.
+    assert "mcp==1.28.1" not in dependencies
+    assert "mcp==1.28.1" in optional_dependencies["mcp"]
     assert "pydantic>=2.11,<3" in dependencies
 
 
@@ -76,14 +80,14 @@ def _load_hygiene_module():
 
 
 def test_practice_package_is_absent_from_the_import_surface() -> None:
-    package_root = Path(hwpx_mcp_server.__file__).resolve().parent
+    package_root = Path(hwpx_automation.__file__).resolve().parent
 
     assert not (package_root / "practice").exists()
-    assert importlib.util.find_spec("hwpx_mcp_server.practice") is None
+    assert importlib.util.find_spec("hwpx_automation.practice") is None
 
 
 def test_pre_fastmcp_shadow_modules_are_absent_from_the_import_surface() -> None:
-    package_root = Path(hwpx_mcp_server.__file__).resolve().parent
+    package_root = Path(hwpx_automation.__file__).resolve().parent
 
     for module_name, relative_path in RETIRED_LEGACY_MODULES.items():
         assert not (package_root / relative_path).exists()
@@ -137,7 +141,7 @@ def test_public_hygiene_rejects_practice_source_and_wheel_members(
     hygiene = _load_hygiene_module()
 
     assert hygiene._forbidden_path(
-        "src/hwpx_mcp_server/practice/runtime.py", "mcp"
+        "src/hwpx_automation/practice/runtime.py", "mcp"
     )
     assert hygiene._forbidden_path("tests/test_practice_runtime.py", "mcp")
 
@@ -145,16 +149,16 @@ def test_public_hygiene_rejects_practice_source_and_wheel_members(
     dist.mkdir()
     wheel = dist / "boundary-test.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
-        archive.writestr("hwpx_mcp_server/practice/runtime.py", b"pass\n")
+        archive.writestr("hwpx_automation/practice/runtime.py", b"pass\n")
         archive.writestr(
-            "hwpx_mcp_server/server.py",
+            "hwpx_automation/server.py",
             b"PRACTICE_ROOT = 'HWPX_PRACTICE_ROOT'\n",
         )
 
     monkeypatch.setattr(hygiene, "ROOT", tmp_path)
     failures = hygiene._wheel_failures()
 
-    assert any("hwpx_mcp_server/practice/runtime.py" in item for item in failures)
+    assert any("hwpx_automation/practice/runtime.py" in item for item in failures)
     assert any("HWPX_PRACTICE_ROOT" in item for item in failures)
 
 

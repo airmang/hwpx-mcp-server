@@ -108,11 +108,11 @@
       "owner": "core-contract"
     },
     "src/hwpx/visual/fixture_corpus.py": {
-      "owner": "hwpx_mcp_server.office.rendering",
+      "owner": "hwpx_automation.office.rendering",
       "compatibility": "core 4.x source/API frozen"
     },
     "src/hwpx/visual/hancom_worker.py": {
-      "owner": "hwpx_mcp_server.office.rendering",
+      "owner": "hwpx_automation.office.rendering",
       "compatibility": "core 4.x source/API frozen"
     },
     "src/hwpx/visual/masks.py": {
@@ -139,14 +139,14 @@
       "compatibility": "core 4.x source/API frozen"
     },
     "src/hwpx/visual/page_qa.py": {
-      "owner": "hwpx_mcp_server.office.rendering",
+      "owner": "hwpx_automation.office.rendering",
       "compatibility": "core 4.x source/API frozen"
     },
     "src/hwpx/visual/qa_contracts.py": {
       "owner": "core-contract"
     },
     "src/hwpx/visual/qa_metrics.py": {
-      "owner": "hwpx_mcp_server.office.rendering",
+      "owner": "hwpx_automation.office.rendering",
       "compatibility": "core 4.x source/API frozen"
     },
     "src/hwpx/visual/report.py": {

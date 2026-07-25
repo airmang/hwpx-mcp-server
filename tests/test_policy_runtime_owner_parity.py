@@ -34,14 +34,14 @@ from parity_fingerprint import fingerprint
 
 core_page_guard = importlib.import_module("hwpx.tools.page_guard")
 official_lint = importlib.import_module(
-    "hwpx_mcp_server.office.compliance.official_lint"
+    "hwpx_automation.office.compliance.official_lint"
 )
-pii = importlib.import_module("hwpx_mcp_server.office.compliance.pii")
+pii = importlib.import_module("hwpx_automation.office.compliance.pii")
 page_guard = importlib.import_module(
-    "hwpx_mcp_server.office.quality.page_guard"
+    "hwpx_automation.office.quality.page_guard"
 )
 table_compute = importlib.import_module(
-    "hwpx_mcp_server.office.utilities.table_compute"
+    "hwpx_automation.office.utilities.table_compute"
 )
 
 _FIXTURES = Path(__file__).parent / "parity_fingerprints"

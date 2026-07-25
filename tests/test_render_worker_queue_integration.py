@@ -12,13 +12,13 @@ from pathlib import Path
 import pytest
 
 import hwpx
-from hwpx_mcp_server.office.rendering.worker import (
+from hwpx_automation.office.rendering.worker import (
     DeterministicFakeSession,
     SerializedHancomWorker,
 )
-from hwpx_mcp_server.workflow.render_queue import DurableRenderQueue, sign_submission
-from hwpx_mcp_server.workflow.render_security import RenderSecurityPolicy
-from hwpx_mcp_server.workflow.rendering import RenderJobV2, RenderStatus
+from hwpx_automation.workflow.render_queue import DurableRenderQueue, sign_submission
+from hwpx_automation.workflow.render_security import RenderSecurityPolicy
+from hwpx_automation.workflow.rendering import RenderJobV2, RenderStatus
 
 
 def _resolve_worker_script() -> Path:

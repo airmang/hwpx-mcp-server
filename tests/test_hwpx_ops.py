@@ -5,9 +5,9 @@ from typing import Any
 import pytest
 
 from hwpx.document import HwpxDocument
-from hwpx_mcp_server.hwpx_ops import HH_NS, HP_NS, HwpxOps
-import hwpx_mcp_server.hwpx_ops as ops_module
-import hwpx_mcp_server.ops_services.read_query as read_query_module
+from hwpx_automation.hwpx_ops import HH_NS, HP_NS, HwpxOps
+import hwpx_automation.hwpx_ops as ops_module
+import hwpx_automation.ops_services.read_query as read_query_module
 
 PNG_1X1_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/axwAqkAAAAASUVORK5CYII="
 PNG_1X1_ALT_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAFgwJ/l8EydgAAAABJRU5ErkJggg=="

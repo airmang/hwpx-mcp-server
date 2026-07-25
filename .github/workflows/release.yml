@@ -30,6 +30,7 @@ jobs:
       - name: Install test dependencies
         working-directory: hwpx-mcp-server
         run: |
+          python scripts/check_pinned_core_satisfies_floor.py ../python-hwpx
           python -m pip install -e "../python-hwpx[visual,preview]"
           python -m pip install -e ".[test,typecheck]"
       - name: Check public repository hygiene

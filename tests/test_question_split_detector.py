@@ -1,5 +1,5 @@
-from hwpx_mcp_server.office.form_fill.fit.wordbox import WordBox
-from hwpx_mcp_server.office.rendering.block_splits import Block, detect_block_splits
+from hwpx_automation.office.form_fill.fit.wordbox import WordBox
+from hwpx_automation.office.rendering.block_splits import Block, detect_block_splits
 
 LEFT = (0.0, 300.0)
 RIGHT = (320.0, 620.0)

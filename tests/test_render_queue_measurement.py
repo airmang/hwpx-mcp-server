@@ -8,12 +8,12 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from hwpx_mcp_server.workflow.render_metrics import (
+from hwpx_automation.workflow.render_metrics import (
     FROZEN_BASELINE_CORPUS, RenderMetricObservation, account_terminal_receipts,
 )
-from hwpx_mcp_server.workflow.render_queue import DurableRenderQueue, sign_submission
-from hwpx_mcp_server.workflow.render_security import RenderSecurityPolicy
-from hwpx_mcp_server.workflow.rendering import RenderJobV2, RenderStatus
+from hwpx_automation.workflow.render_queue import DurableRenderQueue, sign_submission
+from hwpx_automation.workflow.render_security import RenderSecurityPolicy
+from hwpx_automation.workflow.rendering import RenderJobV2, RenderStatus
 
 
 NOW = datetime(2026, 7, 12, tzinfo=timezone.utc)

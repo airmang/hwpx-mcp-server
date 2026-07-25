@@ -3,10 +3,10 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-import hwpx_mcp_server.server as server
+import hwpx_automation.server as server
 from hwpx.tools.package_validator import validate_package
 from hwpx.tools.validator import validate_document
-from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
+from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
 
 
 def _sha256(path: Path) -> str:

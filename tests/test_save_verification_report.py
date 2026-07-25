@@ -6,18 +6,18 @@ from typing import Any
 
 import pytest
 
-import hwpx_mcp_server.server as server_module
-import hwpx_mcp_server.storage as storage_module
-from hwpx_mcp_server.core.document import create_blank, open_doc
-from hwpx_mcp_server.hwpx_ops import HwpxOps
-from hwpx_mcp_server.storage import (
+import hwpx_automation.server as server_module
+import hwpx_automation.storage as storage_module
+from hwpx_automation.core.document import create_blank, open_doc
+from hwpx_automation.hwpx_ops import HwpxOps
+from hwpx_automation.storage import (
     LocalDocumentStorage,
     build_hwpx_open_safety_report,
     build_hwpx_presave_snapshot,
     build_hwpx_verification_report,
     require_hwpx_editor_open_safe,
 )
-from hwpx_mcp_server.upstream import new_document
+from hwpx_automation.upstream import new_document
 
 
 def _write_minimal_hwpx(path: Path, section_xml: str) -> None:
@@ -289,7 +289,7 @@ def test_open_safety_report_rejects_document_validation_failure(
         warnings = ()
 
     monkeypatch.setattr(
-        "hwpx_mcp_server.storage.validate_document_path",
+        "hwpx_automation.storage.validate_document_path",
         lambda _path: FailedDocumentReport(),
     )
 
@@ -315,7 +315,7 @@ def test_local_open_allows_document_validation_only_failure(
         warnings = ()
 
     monkeypatch.setattr(
-        "hwpx_mcp_server.storage.validate_document_path",
+        "hwpx_automation.storage.validate_document_path",
         lambda _path: FailedDocumentReport(),
     )
 
@@ -366,7 +366,7 @@ def test_local_storage_does_not_replace_target_when_open_safety_fails(
     doc.add_paragraph("this save should not replace target")
 
     monkeypatch.setattr(
-        "hwpx_mcp_server.storage.build_hwpx_open_safety_report",
+        "hwpx_automation.storage.build_hwpx_open_safety_report",
         lambda path: {
             "ok": False,
             "summary": "forced failure",
@@ -519,7 +519,7 @@ def test_generated_document_save_preserves_existing_target_when_open_safety_fail
             }
         }
 
-    from hwpx_mcp_server.handlers import authoring as authoring_handler
+    from hwpx_automation.handlers import authoring as authoring_handler
 
     monkeypatch.setattr(
         authoring_handler,

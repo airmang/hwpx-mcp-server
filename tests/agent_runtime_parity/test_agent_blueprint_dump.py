@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 
 from hwpx import HwpxDocument
-from hwpx_mcp_server.office.agent import HwpxAgentDocument
-from hwpx_mcp_server.office.agent.blueprint import (
+from hwpx_automation.office.agent import HwpxAgentDocument
+from hwpx_automation.office.agent.blueprint import (
     build_blueprint_bundle,
     dump_document_blueprint,
     read_blueprint_bundle,
@@ -19,7 +19,7 @@ from hwpx_mcp_server.office.agent.blueprint import (
     validate_blueprint_manifest,
     with_blueprint_hash,
 )
-from hwpx_mcp_server.office.agent.model import AgentContractError
+from hwpx_automation.office.agent.model import AgentContractError
 from hwpx.oxml.namespaces import HP
 
 

@@ -26,7 +26,7 @@ Windows·macOS·Linux·CI 어디서나 같은 흐름으로 동작합니다.
 ## 시작하기
 
 ```bash
-uvx hwpx-mcp-server          # 또는: pip install hwpx-mcp-server && hwpx-mcp-server
+uvx hwpx-mcp-server          # 또는: pip install python-hwpx-automation[mcp] && hwpx-mcp-server
 ```
 
 MCP 클라이언트 설정 파일에 아래 블록 하나면 `hwpx` 서버를 잡습니다 — Claude Desktop은

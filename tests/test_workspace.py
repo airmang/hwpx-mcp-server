@@ -7,8 +7,8 @@ from pathlib import Path, PureWindowsPath
 
 import pytest
 
-import hwpx_mcp_server.workspace as workspace_module
-from hwpx_mcp_server.workspace import (
+import hwpx_automation.workspace as workspace_module
+from hwpx_automation.workspace import (
     LEGACY_SANDBOX_ROOT_ENV,
     WORKSPACE_ROOTS_ENV,
     WorkspaceConfigurationError,
@@ -980,7 +980,7 @@ def test_explicit_roots_still_accepted_when_cwd_would_be_degenerate(
 def test_unconfigured_degenerate_cwd_storage_defers_until_use(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from hwpx_mcp_server.storage import LocalDocumentStorage
+    from hwpx_automation.storage import LocalDocumentStorage
 
     monkeypatch.delenv(WORKSPACE_ROOTS_ENV, raising=False)
     monkeypatch.delenv(LEGACY_SANDBOX_ROOT_ENV, raising=False)
@@ -1001,7 +1001,7 @@ def test_unconfigured_degenerate_cwd_storage_defers_until_use(
 def test_explicit_invalid_env_root_fails_fast_not_deferred(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from hwpx_mcp_server.storage import LocalDocumentStorage
+    from hwpx_automation.storage import LocalDocumentStorage
 
     monkeypatch.delenv(LEGACY_SANDBOX_ROOT_ENV, raising=False)
     monkeypatch.setenv(WORKSPACE_ROOTS_ENV, str(tmp_path / "does-not-exist"))

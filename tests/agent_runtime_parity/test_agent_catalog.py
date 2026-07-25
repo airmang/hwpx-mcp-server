@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from hwpx_mcp_server.office.agent.catalog import agent_catalog, agent_json_schemas, catalog_hash, human_help, node_help
-from hwpx_mcp_server.office.agent.model import AgentContractError, NODE_KINDS, NODE_PROPERTY_CATALOG_V1
+from hwpx_automation.office.agent.catalog import agent_catalog, agent_json_schemas, catalog_hash, human_help, node_help
+from hwpx_automation.office.agent.model import AgentContractError, NODE_KINDS, NODE_PROPERTY_CATALOG_V1
 
 
 def test_catalog_help_and_schemas_share_one_kind_catalog() -> None:

@@ -6,8 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
-from hwpx_mcp_server.office.rendering.fixture_corpus import load_fixture_manifest
-from hwpx_mcp_server.office.rendering.qa_metrics import measure_fixture_corpus
+from hwpx_automation.office.rendering.fixture_corpus import load_fixture_manifest
+from hwpx_automation.office.rendering.qa_metrics import measure_fixture_corpus
 
 
 def main() -> int:

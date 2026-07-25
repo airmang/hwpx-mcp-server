@@ -29,9 +29,9 @@ from pathlib import Path
 import pytest
 from parity_fingerprint import fingerprint
 
-import hwpx_mcp_server.office.agent as mcp_agent
-import hwpx_mcp_server.office.agent.blueprint as mcp_blueprint
-import hwpx_mcp_server.office.agent.cli as mcp_cli
+import hwpx_automation.office.agent as mcp_agent
+import hwpx_automation.office.agent.blueprint as mcp_blueprint
+import hwpx_automation.office.agent.cli as mcp_cli
 
 _FIXTURES = Path(__file__).parent / "parity_fingerprints"
 FROZEN = json.loads((_FIXTURES / "agent.json").read_text(encoding="utf-8"))["modules"]

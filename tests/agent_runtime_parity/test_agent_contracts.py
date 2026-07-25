@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from hwpx_mcp_server.office.agent.model import (
+from hwpx_automation.office.agent.model import (
     AGENT_BATCH_SCHEMA,
     AGENT_NODE_SCHEMA,
     AgentBatchResult,

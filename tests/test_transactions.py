@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-import hwpx_mcp_server.ops_services.save_policy as save_policy_module
-import hwpx_mcp_server.server as server_module
+import hwpx_automation.ops_services.save_policy as save_policy_module
+import hwpx_automation.server as server_module
 
-from hwpx_mcp_server.core.transactions import semantic_diff
-from hwpx_mcp_server.server import (
+from hwpx_automation.core.transactions import semantic_diff
+from hwpx_automation.server import (
     add_paragraph,
     apply_edits,
     create_document,
@@ -16,8 +16,8 @@ from hwpx_mcp_server.server import (
     get_table_text,
     undo_last_edit,
 )
-from hwpx_mcp_server.storage import build_hwpx_open_safety_report
-from hwpx_mcp_server.workspace import WorkspacePathError
+from hwpx_automation.storage import build_hwpx_open_safety_report
+from hwpx_automation.workspace import WorkspacePathError
 
 
 def _replace_zip_part(path: Path, part_name: str, payload: bytes) -> None:

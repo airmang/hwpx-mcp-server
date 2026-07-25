@@ -11,11 +11,11 @@ from zipfile import ZipFile
 import pytest
 
 from hwpx import HwpxDocument, validate_editor_open_safety
-from hwpx_mcp_server.office.agent import AGENT_BATCH_SCHEMA, HwpxAgentDocument, apply_document_commands
-from hwpx_mcp_server.office.agent.catalog import catalog_hash
-from hwpx_mcp_server.office.agent.model import AgentContractError, agent_contract_manifest
-from hwpx_mcp_server.office.agent.path import parse_path
-from hwpx_mcp_server.office.agent.story import parse_header_story_path
+from hwpx_automation.office.agent import AGENT_BATCH_SCHEMA, HwpxAgentDocument, apply_document_commands
+from hwpx_automation.office.agent.catalog import catalog_hash
+from hwpx_automation.office.agent.model import AgentContractError, agent_contract_manifest
+from hwpx_automation.office.agent.path import parse_path
+from hwpx_automation.office.agent.story import parse_header_story_path
 from hwpx.oxml import HwpxOxmlDocument
 
 

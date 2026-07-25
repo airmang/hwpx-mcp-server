@@ -18,8 +18,8 @@ from jsonschema import Draft202012Validator
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from hwpx_mcp_server import server
-from hwpx_mcp_server.tool_contract import bound_tool_registry
+from hwpx_automation import server
+from hwpx_automation.tool_contract import bound_tool_registry
 
 # 1x1 transparent PNG.
 _PNG_1X1 = base64.b64decode(

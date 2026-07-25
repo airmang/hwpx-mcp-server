@@ -6,14 +6,14 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from hwpx_mcp_server.workflow.render_metrics import (
+from hwpx_automation.workflow.render_metrics import (
     FROZEN_BASELINE_CORPUS,
     MeasureFirstGate,
     QueueMetricSample,
     RenderMetricObservation,
     account_terminal_receipts,
 )
-from hwpx_mcp_server.workflow.render_security import (
+from hwpx_automation.workflow.render_security import (
     HWPX_MEDIA_TYPE,
     RenderInputInspection,
     RenderSecurityPolicy,
@@ -21,7 +21,7 @@ from hwpx_mcp_server.workflow.render_security import (
     redact_render_log,
     validate_render_input,
 )
-from hwpx_mcp_server.workflow.rendering import (
+from hwpx_automation.workflow.rendering import (
     RENDER_SCHEMA_VERSION,
     RENDER_SCHEMA_VERSION_V2,
     RenderArtifactKind,

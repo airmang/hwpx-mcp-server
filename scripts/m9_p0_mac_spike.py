@@ -18,8 +18,8 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from hwpx_mcp_server.office.form_fill.fit.wordbox import extract_cell_clips, extract_glyph_boxes
-from hwpx_mcp_server.office.rendering.oracle import MacHancomOracle
+from hwpx_automation.office.form_fill.fit.wordbox import extract_cell_clips, extract_glyph_boxes
+from hwpx_automation.office.rendering.oracle import MacHancomOracle
 
 
 def _sha256(path: Path) -> str:

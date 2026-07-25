@@ -26,8 +26,8 @@ from typing import Any
 
 from hwpx import form_fit as frozen_fit
 
-from hwpx_mcp_server.office.form_fill import split_run as canonical_split
-from hwpx_mcp_server.office.form_fill.fit import (
+from hwpx_automation.office.form_fill import split_run as canonical_split
+from hwpx_automation.office.form_fill.fit import (
     FitEngine,
     FitPolicy,
     SlotMetrics,
@@ -35,7 +35,7 @@ from hwpx_mcp_server.office.form_fill.fit import (
     estimate_text_width,
     measure,
 )
-from hwpx_mcp_server.office.form_fill.guidance import (
+from hwpx_automation.office.form_fill.guidance import (
     is_form_instruction,
 )
 

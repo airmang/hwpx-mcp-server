@@ -2,7 +2,7 @@
 """Form-fill differential corpus driver (M9-full P3, specs/010 FR-004).
 
 Drives the shipped form-fill differential DECISION (new-overflow / layout-stable
-/ new-overlap, ``hwpx_mcp_server.office.form_fill.fit.wordbox``) over the frozen corpus manifest's
+/ new-overlap, ``hwpx_automation.office.form_fill.fit.wordbox``) over the frozen corpus manifest's
 form-fit records, **entirely offline** against pre-rendered Hancom PDFs:
 
 * the blank forms were rendered once on the Mac oracle (P0 spike-3; the receipt
@@ -84,7 +84,7 @@ _SRC = Path(__file__).resolve().parent.parent / "src"
 if _SRC.is_dir() and str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from hwpx_mcp_server.office.form_fill.fit import wordbox as wb  # noqa: E402
+from hwpx_automation.office.form_fill.fit import wordbox as wb  # noqa: E402
 
 # How many overflow/overlap incidents to embed per pair (counts stay exact; the
 # examples are capped so a pathological pair cannot balloon the report).
@@ -107,7 +107,7 @@ class PrerenderedOracle:
     already produced for that exact source, so a corpus run replays faithful
     captures without touching Hancom.
 
-    Degrade contract (matches :class:`hwpx_mcp_server.office.rendering.oracle.MacHancomOracle`): an
+    Degrade contract (matches :class:`hwpx_automation.office.rendering.oracle.MacHancomOracle`): an
     unmapped source — or a mapped PDF that is missing/empty on disk — returns
     ``None`` from :meth:`render_pdf`, which the ``verify_*`` render legs turn
     into ``OracleUnavailable`` -> an honest ``unverified`` verdict. It never

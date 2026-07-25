@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-from hwpx_mcp_server.office.form_fill.fit import wordbox as wb
+from hwpx_automation.office.form_fill.fit import wordbox as wb
 
 
 def _box(x0, y0, x1, y1, text="x", page=0):
@@ -1065,7 +1065,7 @@ def test_extract_image_boxes_returns_image_rects(tmp_path):
 
 def _mac_form_oracle_ready() -> bool:
     try:
-        from hwpx_mcp_server.office.rendering.oracle import MacHancomOracle
+        from hwpx_automation.office.rendering.oracle import MacHancomOracle
 
         return MacHancomOracle().available() and wb.fitz_available()
     except Exception:
@@ -1089,7 +1089,7 @@ def test_mac_form_fill_overflow0_layout_stable_smoke(tmp_path):
 
     from hwpx.document import HwpxDocument
     from hwpx.form_fit.policy import FitPolicy
-    from hwpx_mcp_server.office.rendering.oracle import MacHancomOracle
+    from hwpx_automation.office.rendering.oracle import MacHancomOracle
 
     blank = "tests/fixtures/m2_corpus/public_official_table.hwpx"
     doc = HwpxDocument.open(blank)
@@ -1130,7 +1130,7 @@ def test_mac_glyph_overprint_caught_smoke():
     stable). Complements ``…_overflow0_layout_stable_smoke`` (the clean negative).
     """
 
-    from hwpx_mcp_server.office.rendering.oracle import MacHancomOracle
+    from hwpx_automation.office.rendering.oracle import MacHancomOracle
 
     base = "tests/fixtures/glyph_overlap"
     oracle = MacHancomOracle(timeout=120)

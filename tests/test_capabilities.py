@@ -6,18 +6,18 @@
 """
 from __future__ import annotations
 
-from hwpx_mcp_server.capabilities import DOMAINS, build_capability_report, coverage_against
-from hwpx_mcp_server.tool_contract import contract_hash, expected_tool_names, skill_required_tool_names
+from hwpx_automation.capabilities import DOMAINS, build_capability_report, coverage_against
+from hwpx_automation.tool_contract import contract_hash, expected_tool_names, skill_required_tool_names
 
 
 def _live_tools() -> set[str]:
-    import hwpx_mcp_server.server as s
+    import hwpx_automation.server as s
 
     return set(s._fastmcp_tool_names())
 
 
 def _active_advanced() -> bool:
-    import hwpx_mcp_server.server as s
+    import hwpx_automation.server as s
 
     return s._ACTIVE_ADVANCED
 
@@ -53,7 +53,7 @@ def test_report_shape_and_domain_filter():
 
 
 def test_mcp_tool_registered_and_callable():
-    import hwpx_mcp_server.server as s
+    import hwpx_automation.server as s
 
     assert "describe_capabilities" in set(s._fastmcp_tool_names())
     out = s.describe_capabilities()

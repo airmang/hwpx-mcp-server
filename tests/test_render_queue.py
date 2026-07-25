@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.workflow.render_queue import (
+from hwpx_automation.workflow.render_queue import (
     DurableRenderQueue,
     RenderQueueError,
     sign_submission,
 )
-from hwpx_mcp_server.workflow.render_security import RenderSecurityPolicy, RenderSecurityViolation
-from hwpx_mcp_server.workflow.rendering import RenderJobV2, RenderReceiptV2, RenderStatus
+from hwpx_automation.workflow.render_security import RenderSecurityPolicy, RenderSecurityViolation
+from hwpx_automation.workflow.rendering import RenderJobV2, RenderReceiptV2, RenderStatus
 
 
 NOW = datetime(2026, 7, 12, tzinfo=timezone.utc)
@@ -173,7 +173,7 @@ def test_health_is_honest_until_fresh_worker_heartbeat(tmp_path):
 
 
 def _success(j: RenderJobV2, completed_at: datetime) -> RenderReceiptV2:
-    from hwpx_mcp_server.workflow.rendering import RenderArtifactKind, RenderArtifactV2
+    from hwpx_automation.workflow.rendering import RenderArtifactKind, RenderArtifactV2
 
     return RenderReceiptV2(
         job_id=j.job_id, workflow_id=j.workflow_id, input_content_hash=j.source_content_hash,

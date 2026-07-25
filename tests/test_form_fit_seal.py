@@ -7,8 +7,8 @@ centered seal (pass) from a mis-placed one (fail) — acceptance #3.
 """
 from __future__ import annotations
 
-from hwpx_mcp_server.office.form_fill.fit import seal
-from hwpx_mcp_server.office.form_fill.fit.wordbox import Rect, WordBox
+from hwpx_automation.office.form_fill.fit import seal
+from hwpx_automation.office.form_fill.fit.wordbox import Rect, WordBox
 
 
 def _line(text, *, x0=100.0, y=400.0, w=12.0, h=14.0, page=0):

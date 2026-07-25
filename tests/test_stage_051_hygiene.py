@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-import hwpx_mcp_server.server as server
+import hwpx_automation.server as server
 
 
 def _plan(title: str = "Stage 051 Compact Response") -> dict:

@@ -9,8 +9,8 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict
 
-import hwpx_mcp_server.fastmcp_adapter as adapter
-from hwpx_mcp_server.fastmcp_adapter import (
+import hwpx_automation.fastmcp_adapter as adapter
+from hwpx_automation.fastmcp_adapter import (
     AUDITED_MCP_PATCHES,
     FastMcpAdapterError,
     SUPPORTED_MCP_RANGE,
@@ -157,7 +157,16 @@ def test_resolver_pin_and_audited_set_admit_the_same_versions() -> None:
     pyproject = tomllib.loads(
         (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text("utf-8")
     )
-    mcp_specs = [d for d in pyproject["project"]["dependencies"] if d.startswith("mcp")]
+    # mcp 핀은 [mcp] extra로 옮겼다 — 응용 계층은 MCP SDK 없이 동작하므로
+    # 필수 의존이 아니다. 핀 자체는 그대로 감사 대상이라 여기서 계속 본다.
+    mcp_specs = [
+        d
+        for d in pyproject["project"]["optional-dependencies"]["mcp"]
+        if d.startswith("mcp")
+    ]
+    assert not [
+        d for d in pyproject["project"]["dependencies"] if d.startswith("mcp")
+    ], "mcp가 필수 의존으로 돌아왔다 — extra여야 한다"
     assert mcp_specs == [f"mcp{SUPPORTED_MCP_RANGE}"]
     # Exact-pin shape, and the pinned version is the audited set.
     assert SUPPORTED_MCP_RANGE.startswith("==")

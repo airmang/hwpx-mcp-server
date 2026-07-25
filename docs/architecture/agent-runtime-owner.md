@@ -1,6 +1,6 @@
 # Canonical agent runtime owner
 
-`hwpx_mcp_server.office.agent` is the canonical application-layer owner of the
+`hwpx_automation.office.agent` is the canonical application-layer owner of the
 released semantic agent runtime as of S-097. It was transplanted from
 `python-hwpx` commit `fd879637f97a796c7a038e2c0c4a647a9b501064`:
 
@@ -17,9 +17,9 @@ contracts and do not change with the Python owner namespace.
 
 MCP production traffic enters this owner through:
 
-- `hwpx_mcp_server.agent_document`;
-- `hwpx_mcp_server.mixed_form`;
-- `hwpx_mcp_server.runtime`.
+- `hwpx_automation.agent_document`;
+- `hwpx_automation.mixed_form`;
+- `hwpx_automation.runtime`.
 
 The product-boundary gate rejects any production import from the frozen core
 `hwpx.agent` copy and limits the canonical runtime to the approved public core

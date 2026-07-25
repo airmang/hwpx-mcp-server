@@ -12,9 +12,9 @@ import zipfile
 
 import pytest
 
-import hwpx_mcp_server.server as server
-from hwpx_mcp_server.handlers import specialized as specialized_handler
-from hwpx_mcp_server.office.form_fill.fit.wordbox import OracleUnavailable, Rect, WordBox
+import hwpx_automation.server as server
+from hwpx_automation.handlers import specialized as specialized_handler
+from hwpx_automation.office.form_fill.fit.wordbox import OracleUnavailable, Rect, WordBox
 
 HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 SENDER = "행정안전부장관 홍길동"
@@ -36,7 +36,7 @@ def _sender_boxes(*, y: float = 700.0):
 
 
 def _anchor_center():
-    from hwpx_mcp_server.office.form_fill.fit import seal
+    from hwpx_automation.office.form_fill.fit import seal
 
     return seal.find_seal_anchor(_sender_boxes(), SENDER).center
 
@@ -176,8 +176,8 @@ def _mac_seal_oracle_ready() -> bool:
     # surface. The core compatibility copies are distinct classes since the
     # visual/form-fill runtime splits, so gating on them can mis-fire.
     try:
-        from hwpx_mcp_server.office.form_fill.fit import wordbox as wb
-        from hwpx_mcp_server.office.rendering.oracle import MacHancomOracle
+        from hwpx_automation.office.form_fill.fit import wordbox as wb
+        from hwpx_automation.office.rendering.oracle import MacHancomOracle
 
         return MacHancomOracle().available() and wb.fitz_available()
     except Exception:

@@ -5,12 +5,12 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-import hwpx_mcp_server.ops_services.transactions as transactions_module
-import hwpx_mcp_server.server as server_module
-import hwpx_mcp_server.workspace as workspace_module
+import hwpx_automation.ops_services.transactions as transactions_module
+import hwpx_automation.server as server_module
+import hwpx_automation.workspace as workspace_module
 import hwpx.patch as hwpx_patch_module
-from hwpx_mcp_server.core.document import open_doc, save_doc
-from hwpx_mcp_server.server import (
+from hwpx_automation.core.document import open_doc, save_doc
+from hwpx_automation.server import (
     add_heading,
     add_memo,
     add_page_break,
@@ -38,8 +38,8 @@ from hwpx_mcp_server.server import (
     replace_in_paragraph,
     set_table_cell_text,
 )
-from hwpx_mcp_server.utils.helpers import resolve_path
-from hwpx_mcp_server.workspace import WorkspacePathError
+from hwpx_automation.utils.helpers import resolve_path
+from hwpx_automation.workspace import WorkspacePathError
 
 _FORM_ROWS = [["성명:", ""], ["소속", ""], ["합계", "100"]]
 HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
@@ -1535,7 +1535,7 @@ def test_fill_by_path_saves_after_successful_mutation(
     _create_form_document(target)
 
     save_calls: list[str] = []
-    from hwpx_mcp_server.handlers import _shared as handler_shared
+    from hwpx_automation.handlers import _shared as handler_shared
 
     original_save = handler_shared.save_doc
 

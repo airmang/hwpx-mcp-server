@@ -8,9 +8,9 @@ from __future__ import annotations
 from pathlib import Path
 
 
-from hwpx_mcp_server.office.authoring import _outline_style_refs
+from hwpx_automation.office.authoring import _outline_style_refs
 from hwpx.document import HwpxDocument
-import hwpx_mcp_server.server as server
+import hwpx_automation.server as server
 
 
 def _authored(tmp_path: Path, *, headings: int = 2) -> Path:

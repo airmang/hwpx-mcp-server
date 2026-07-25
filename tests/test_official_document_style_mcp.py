@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from hwpx.document import HwpxDocument
-from hwpx_mcp_server import server
-from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
+from hwpx_automation import server
+from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
 
 
 def test_official_document_style_tool_is_exposed() -> None:

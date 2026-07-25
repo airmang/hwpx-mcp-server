@@ -616,9 +616,9 @@ def _word_box_extractor():
     """
 
     try:
-        from hwpx_mcp_server.office.form_fill.fit.wordbox import extract_word_boxes
+        from hwpx_automation.office.form_fill.fit.wordbox import extract_word_boxes
     except ImportError:
-        from hwpx_mcp_server.office.form_fill.fit.wordbox import extract_word_boxes
+        from hwpx_automation.office.form_fill.fit.wordbox import extract_word_boxes
     return extract_word_boxes
 
 
@@ -677,7 +677,7 @@ def main(argv: list[str] | None = None) -> int:
     oracle: Any | None = None
     if args.renumber_sample > 0:
         # The ONLY path that touches a live backend (S-060 discipline).
-        from hwpx_mcp_server.office.rendering.oracle import resolve_oracle
+        from hwpx_automation.office.rendering.oracle import resolve_oracle
 
         oracle = resolve_oracle()
 

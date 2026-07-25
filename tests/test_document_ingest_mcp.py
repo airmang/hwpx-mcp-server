@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server import ingest_adapters
-import hwpx_mcp_server.server as server
+from hwpx_automation import ingest_adapters
+import hwpx_automation.server as server
 
 
 def _sample_hwpx(tmp_path: Path) -> Path:

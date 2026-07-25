@@ -4,9 +4,9 @@ from dataclasses import dataclass
 
 import pytest
 
-from hwpx_mcp_server.office.agent.model import AgentContractError
-from hwpx_mcp_server.office.agent.path import MAX_PATH_CHARS, canonicalize_path, parse_path
-from hwpx_mcp_server.office.agent.query import evaluate_selector, normalize_search_text, parse_selector
+from hwpx_automation.office.agent.model import AgentContractError
+from hwpx_automation.office.agent.path import MAX_PATH_CHARS, canonicalize_path, parse_path
+from hwpx_automation.office.agent.query import evaluate_selector, normalize_search_text, parse_selector
 
 
 @dataclass(frozen=True)

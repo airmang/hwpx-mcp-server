@@ -1,6 +1,6 @@
 {
   "schemaVersion": "hwpx-mcp.form-fill-runtime-owner/v1",
-  "canonicalOwner": "hwpx_mcp_server.office.form_fill",
+  "canonicalOwner": "hwpx_automation.office.form_fill",
   "sourceCompatibilityOwner": "python-hwpx 4.x",
   "source": {
     "head": "5054b50665296a0970823765d753de3d3ff612b5",
@@ -11,16 +11,21 @@
   "canonical": {
     "pythonFiles": 15,
     "loc": 5060,
-    "manifestSha256": "f5f8bb74f12375c044b1e93f74c01b7f2ccd76fbab18e6b31ccff96d3c40f995",
-    "refrozenNote": "8d5fd9a114d4a190…에서 재계산. quality.py의 docstring이 가리키던 오라클 경로가 core에서 렌더 소유자로 바뀌었다(5.0 경계 마감). 동작 변화 없음."
+    "manifestSha256": "9da1c81298ca242f05b81f17cfac3dbe3fc5235a1a74b14f0d00be726dda70f5",
+    "refrozenNote": "8d5fd9a114d4a190…에서 재계산. quality.py의 docstring이 가리키던 오라클 경로가 core에서 렌더 소유자로 바뀌었다(5.0 경계 마감). 동작 변화 없음.",
+    "refrozenFrom": {
+      "loc": 5060,
+      "manifestSha256": "f5f8bb74f12375c044b1e93f74c01b7f2ccd76fbab18e6b31ccff96d3c40f995",
+      "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
+    }
   },
   "moduleMap": {
-    "hwpx.fill_residue": "hwpx_mcp_server.office.form_fill.fill_residue",
-    "hwpx.form_fill": "hwpx_mcp_server.office.form_fill.split_run",
-    "hwpx.form_fit": "hwpx_mcp_server.office.form_fill.fit",
-    "hwpx.formfill_quality": "hwpx_mcp_server.office.form_fill.quality",
-    "hwpx.guidance_scan": "hwpx_mcp_server.office.form_fill.guidance",
-    "hwpx.template_formfit": "hwpx_mcp_server.office.form_fill.template_formfit"
+    "hwpx.fill_residue": "hwpx_automation.office.form_fill.fill_residue",
+    "hwpx.form_fill": "hwpx_automation.office.form_fill.split_run",
+    "hwpx.form_fit": "hwpx_automation.office.form_fill.fit",
+    "hwpx.formfill_quality": "hwpx_automation.office.form_fill.quality",
+    "hwpx.guidance_scan": "hwpx_automation.office.form_fill.guidance",
+    "hwpx.template_formfit": "hwpx_automation.office.form_fill.template_formfit"
   },
   "plannedPackageFiles": [
     "__init__.py",
@@ -68,16 +73,16 @@
     "OWPML namespace and validation primitives",
     "renderer-neutral quality reports and mutation ledger"
   ],
-  "renderingSeam": "hwpx_mcp_server.office.rendering",
+  "renderingSeam": "hwpx_automation.office.rendering",
   "productionConsumersToRoute": [
-    "hwpx_mcp_server.handlers.form_fill",
-    "hwpx_mcp_server.handlers.specialized",
-    "hwpx_mcp_server.ops_services.form_fields"
+    "hwpx_automation.handlers.form_fill",
+    "hwpx_automation.handlers.specialized",
+    "hwpx_automation.ops_services.form_fields"
   ],
   "productionRouting": {
-    "hwpx_mcp_server.handlers.form_fill": "template-formfit callables",
-    "hwpx_mcp_server.handlers.specialized": "fit policy, seal, wordbox, and render seam",
-    "hwpx_mcp_server.ops_services.form_fields": "quality, residue, and guidance"
+    "hwpx_automation.handlers.form_fill": "template-formfit callables",
+    "hwpx_automation.handlers.specialized": "fit policy, seal, wordbox, and render seam",
+    "hwpx_automation.ops_services.form_fields": "quality, residue, and guidance"
   },
   "compatibilityPolicy": {
     "coreLine": "4.x",

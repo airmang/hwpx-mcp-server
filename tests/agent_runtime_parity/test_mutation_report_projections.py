@@ -14,7 +14,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from hwpx_mcp_server.office.agent.model import AgentBatchResult
+from hwpx_automation.office.agent.model import AgentBatchResult
 from hwpx.body_patch import BodyOpsResult
 from hwpx.mutation_report import (
     MUTATION_REPORT_SCHEMA,

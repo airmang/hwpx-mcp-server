@@ -45,11 +45,11 @@ from pathlib import Path
 from parity_fingerprint import fingerprint
 from PIL import Image, ImageDraw
 
-from hwpx_mcp_server.office.rendering import fixture_corpus as mcp_fixture
-from hwpx_mcp_server.office.rendering import oracle as mcp_oracle
-from hwpx_mcp_server.office.rendering import page_qa as mcp_page_qa
-from hwpx_mcp_server.office.rendering import qa_metrics as mcp_metrics
-from hwpx_mcp_server.office.rendering import worker as mcp_worker
+from hwpx_automation.office.rendering import fixture_corpus as mcp_fixture
+from hwpx_automation.office.rendering import oracle as mcp_oracle
+from hwpx_automation.office.rendering import page_qa as mcp_page_qa
+from hwpx_automation.office.rendering import qa_metrics as mcp_metrics
+from hwpx_automation.office.rendering import worker as mcp_worker
 
 ROOT = Path(__file__).resolve().parents[1]
 SCENARIOS = json.loads(
@@ -125,7 +125,7 @@ def test_frozen_scenario_corpus_covers_all_required_paths() -> None:
 
 def test_frozen_visual_modules_shape_matches_frozen_core() -> None:
     # hwpx.visual.oracle.__all__ re-exports WordBox (from hwpx.form_fit.wordbox,
-    # for convenience) but hwpx_mcp_server.office.rendering.oracle does not —
+    # for convenience) but hwpx_automation.office.rendering.oracle does not —
     # a pre-existing asymmetry, not something this freeze changed. The
     # pre-freeze version of this file never asserted full __all__ parity for
     # oracle either (unlike the agent/authoring/exam parity files), only

@@ -7,18 +7,18 @@ import hashlib
 import json
 from pathlib import Path
 
-from hwpx_mcp_server.handlers import specialized
-from hwpx_mcp_server.office import rendering
-from hwpx_mcp_server.office.rendering import page_qa, worker
-from hwpx_mcp_server.tool_contract import (
+from hwpx_automation.handlers import specialized
+from hwpx_automation.office import rendering
+from hwpx_automation.office.rendering import page_qa, worker
+from hwpx_automation.tool_contract import (
     contract_hash,
     expected_tool_names,
     skill_required_tool_names,
 )
-from hwpx_mcp_server.visual_qa import CoreDeterministicAdapter
+from hwpx_automation.visual_qa import CoreDeterministicAdapter
 
 ROOT = Path(__file__).resolve().parents[1]
-OWNER_ROOT = ROOT / "src" / "hwpx_mcp_server" / "office" / "rendering"
+OWNER_ROOT = ROOT / "src" / "hwpx_automation" / "office" / "rendering"
 OWNER = json.loads(
     (ROOT / "docs" / "architecture" / "visual-runtime-owner.json").read_text(
         encoding="utf-8"
@@ -70,10 +70,10 @@ def test_production_runtime_symbols_resolve_to_mcp_owner() -> None:
 
     for binding in bindings:
         assert binding.__module__.startswith(
-            "hwpx_mcp_server.office.rendering"
+            "hwpx_automation.office.rendering"
         ), binding
     assert specialized.resolve_oracle is rendering.resolve_hancom_oracle
-    assert CoreDeterministicAdapter.__module__ == "hwpx_mcp_server.visual_qa"
+    assert CoreDeterministicAdapter.__module__ == "hwpx_automation.visual_qa"
 
 
 def test_tool_contract_is_exactly_unchanged() -> None:

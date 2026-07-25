@@ -1,15 +1,15 @@
 {
   "schemaVersion": "hwpx-mcp.compliance-quality-utilities-owner/v1",
   "canonicalOwners": {
-    "hwpx.tools.official_lint": "hwpx_mcp_server.office.compliance.official_lint",
-    "hwpx.tools.pii": "hwpx_mcp_server.office.compliance.pii",
-    "hwpx.tools.page_guard": "hwpx_mcp_server.office.quality.page_guard",
-    "hwpx.tools.table_compute": "hwpx_mcp_server.office.utilities.table_compute"
+    "hwpx.tools.official_lint": "hwpx_automation.office.compliance.official_lint",
+    "hwpx.tools.pii": "hwpx_automation.office.compliance.pii",
+    "hwpx.tools.page_guard": "hwpx_automation.office.quality.page_guard",
+    "hwpx.tools.table_compute": "hwpx_automation.office.utilities.table_compute"
   },
   "packageRoots": {
-    "compliance": "src/hwpx_mcp_server/office/compliance",
-    "quality": "src/hwpx_mcp_server/office/quality",
-    "utilities": "src/hwpx_mcp_server/office/utilities"
+    "compliance": "src/hwpx_automation/office/compliance",
+    "quality": "src/hwpx_automation/office/quality",
+    "utilities": "src/hwpx_automation/office/utilities"
   },
   "sourceCompatibilityOwner": "python-hwpx 4.x",
   "source": {
@@ -21,21 +21,34 @@
   "canonical": {
     "pythonFiles": 7,
     "loc": 1684,
-    "manifestSha256": "74112864e78e032e39bf0859f24a77b9aa519756f6c5700c85dd08c26ebf67c6",
+    "manifestSha256": "a395e5eef5c1c96d860e3787881644ea0ddf322adc969910322feb09fd35c5ec",
     "packageFileCounts": {
       "compliance": 3,
       "quality": 2,
       "utilities": 2
+    },
+    "refrozenFrom": {
+      "loc": 1684,
+      "manifestSha256": "74112864e78e032e39bf0859f24a77b9aa519756f6c5700c85dd08c26ebf67c6",
+      "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
     }
   },
   "approvedCoreImports": {
-    "compliance": ["hwpx.document"],
-    "quality": ["hwpx"],
+    "compliance": [
+      "hwpx.document"
+    ],
+    "quality": [
+      "hwpx"
+    ],
     "utilities": []
   },
   "approvedCoreSymbols": {
-    "hwpx.document": ["HwpxDocument"],
-    "hwpx": ["HwpxPackage"]
+    "hwpx.document": [
+      "HwpxDocument"
+    ],
+    "hwpx": [
+      "HwpxPackage"
+    ]
   },
   "forbiddenCoreCompatibilityImports": [
     "hwpx.tools.official_lint",
@@ -44,17 +57,17 @@
     "hwpx.tools.table_compute"
   ],
   "productionConsumersToRoute": [
-    "hwpx_mcp_server.handlers.quality_render",
-    "hwpx_mcp_server.handlers.specialized",
-    "hwpx_mcp_server.handlers.read_export",
-    "hwpx_mcp_server.handlers.content_edit",
-    "hwpx_mcp_server.form_fill",
-    "hwpx_mcp_server.office.authoring",
-    "hwpx_mcp_server.office.authoring.template_analyzer"
+    "hwpx_automation.handlers.quality_render",
+    "hwpx_automation.handlers.specialized",
+    "hwpx_automation.handlers.read_export",
+    "hwpx_automation.handlers.content_edit",
+    "hwpx_automation.form_fill",
+    "hwpx_automation.office.authoring",
+    "hwpx_automation.office.authoring.template_analyzer"
   ],
   "policyInjection": {
-    "formFill": "hwpx_mcp_server.office.compliance.DEFAULT_POLICY",
-    "mailMerge": "pass masking_policy=hwpx_mcp_server.office.compliance.DEFAULT_POLICY to the core merge primitive"
+    "formFill": "hwpx_automation.office.compliance.DEFAULT_POLICY",
+    "mailMerge": "pass masking_policy=hwpx_automation.office.compliance.DEFAULT_POLICY to the core merge primitive"
   },
   "coreRetainedPrimitives": [
     "HwpxDocument",

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """직인 floating placement (M2 P3 slice 2 / FR-003).
 
-Slice 1 (:mod:`hwpx_mcp_server.office.form_fill.fit.seal`) decided the rule *geometrically* (where the
+Slice 1 (:mod:`hwpx_automation.office.form_fill.fit.seal`) decided the rule *geometrically* (where the
 seal center belongs + pass/fail). Slice 2 actually **places** the seal image at
 that point as a **floating** object — ``add_picture`` is inline-only, so the seal
 needs a PAPER-relative ``<hp:pos>`` whose offset lands the seal *center* on the
@@ -21,8 +21,8 @@ import os
 import pytest
 
 from hwpx.document import HwpxDocument
-from hwpx_mcp_server.office.form_fill.fit import seal
-import hwpx_mcp_server.office.form_fill.fit.wordbox as wb
+from hwpx_automation.office.form_fill.fit import seal
+import hwpx_automation.office.form_fill.fit.wordbox as wb
 
 HC = "{http://www.hancom.co.kr/hwpml/2011/core}"
 HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
@@ -304,7 +304,7 @@ def test_place_seal_output_passes_open_safety(tmp_path):
 
 def _mac_seal_oracle_ready() -> bool:
     try:
-        from hwpx_mcp_server.office.rendering.oracle import MacHancomOracle
+        from hwpx_automation.office.rendering.oracle import MacHancomOracle
 
         return MacHancomOracle().available() and wb.fitz_available()
     except Exception:
@@ -330,7 +330,7 @@ def test_mac_seal_placement_lands_on_anchor_smoke(tmp_path):
     acceptance #3). Proves the full library path: ``isEmbeded`` (image renders) +
     ``IN_FRONT_OF_TEXT`` (no reflow) + PAPER offsets (lands on the anchor).
     """
-    from hwpx_mcp_server.office.rendering.oracle import MacHancomOracle
+    from hwpx_automation.office.rendering.oracle import MacHancomOracle
 
     oracle = MacHancomOracle(timeout=120)
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from hwpx_mcp_server.workflow.render_security import redact_render_log
+from hwpx_automation.workflow.render_security import redact_render_log
 
 
 def test_all_document_secret_path_and_nested_values_are_absent_from_render_log():

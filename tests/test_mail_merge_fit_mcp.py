@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import hwpx_mcp_server.server as server
+import hwpx_automation.server as server
 from hwpx.document import HwpxDocument
 
 OVERFLOW = "아주아주아주아주아주긴이름입니다정말로깁니다"

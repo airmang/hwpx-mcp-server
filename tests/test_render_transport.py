@@ -14,13 +14,13 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
-from hwpx_mcp_server.workflow.render_queue import DurableRenderQueue
-from hwpx_mcp_server.workflow.render_security import RenderSecurityPolicy
-from hwpx_mcp_server.workflow.render_transport import (
+from hwpx_automation.workflow.render_queue import DurableRenderQueue
+from hwpx_automation.workflow.render_security import RenderSecurityPolicy
+from hwpx_automation.workflow.render_transport import (
     RemoteRenderClientV2,
     serve_private_queue,
 )
-from hwpx_mcp_server.workflow.rendering import (
+from hwpx_automation.workflow.rendering import (
     RenderArtifactKind,
     RenderArtifactV2,
     RenderJobV2,
@@ -318,8 +318,8 @@ def test_private_network_policy_rejects_wildcard_bind_unless_test_override(tmp_p
 def test_server_render_client_wires_mtls_identity_from_environment(
     monkeypatch, tmp_path
 ):
-    from hwpx_mcp_server import server as mcp_server
-    from hwpx_mcp_server.handlers import _shared as handler_shared
+    from hwpx_automation import server as mcp_server
+    from hwpx_automation.handlers import _shared as handler_shared
 
     captured = {}
 
@@ -405,8 +405,8 @@ def test_authenticated_remote_submit_poll_cancel_health_and_artifact_fetch(
     queue.complete(lease, receipt, now=NOW + timedelta(seconds=1))
     assert client.get(job.job_id).binds(job)
     assert client.fetch_artifact(job.job_id, pdf_hash) == pdf
-    from hwpx_mcp_server import server as mcp_server
-    from hwpx_mcp_server.handlers import quality_render as quality_render_handler
+    from hwpx_automation import server as mcp_server
+    from hwpx_automation.handlers import quality_render as quality_render_handler
 
     original = quality_render_handler._render_client
     quality_render_handler._render_client = lambda: client

@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from hwpx import HwpxDocument, validate_editor_open_safety
-from hwpx_mcp_server.office.agent import (
+from hwpx_automation.office.agent import (
     AGENT_BATCH_SCHEMA,
     MIXED_FORM_COMPILED_PLAN_SCHEMA,
     MIXED_FORM_PLAN_SCHEMA,
@@ -406,12 +406,12 @@ def test_label_cell_normalizes_merged_logical_coordinate(tmp_path: Path) -> None
 
 
 def test_evalplan_remains_available_and_exam_is_not_imported() -> None:
-    import hwpx_mcp_server.office.agent.form_plan as form_plan
+    import hwpx_automation.office.agent.form_plan as form_plan
 
     # hwpx.evalplan_fill no longer exists in core (removed in python-hwpx
     # 5.0); the MCP owner is now the only implementation, so "evalplan is
-    # still available" points at hwpx_mcp_server.office.evalplan.runtime.
-    import hwpx_mcp_server.office.evalplan.runtime as evalplan_runtime
+    # still available" points at hwpx_automation.office.evalplan.runtime.
+    import hwpx_automation.office.evalplan.runtime as evalplan_runtime
 
     tree = ast.parse(Path(form_plan.__file__).read_text(encoding="utf-8"))
     imported = {

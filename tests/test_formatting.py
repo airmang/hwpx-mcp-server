@@ -4,8 +4,8 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from hwpx_mcp_server.core.document import open_doc, save_doc
-from hwpx_mcp_server.server import (
+from hwpx_automation.core.document import open_doc, save_doc
+from hwpx_automation.server import (
     add_paragraph,
     add_table,
     copy_document,

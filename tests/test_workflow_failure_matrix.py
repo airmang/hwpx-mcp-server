@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.document_state import document_revision
-from hwpx_mcp_server.tool_contract import expected_tool_names
-from hwpx_mcp_server.workflow import (
+from hwpx_automation.document_state import document_revision
+from hwpx_automation.tool_contract import expected_tool_names
+from hwpx_automation.workflow import (
     ActionRequest,
     PolicyViolation,
     WorkFamily,
@@ -21,7 +21,7 @@ from hwpx_mcp_server.workflow import (
     WorkflowState,
     WorkflowStore,
 )
-from hwpx_mcp_server.workflow.service import WorkflowService
+from hwpx_automation.workflow.service import WorkflowService
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,8 +43,8 @@ def _crash_after(code: str, *, env: dict[str, str], expected: int = CRASH_CODE) 
 def _query_state_in_fresh_service(db: Path, workflow_id: str) -> str:
     code = """
 import json, os
-from hwpx_mcp_server.workflow import WorkflowStore
-from hwpx_mcp_server.workflow.service import WorkflowService
+from hwpx_automation.workflow import WorkflowStore
+from hwpx_automation.workflow.service import WorkflowService
 service = WorkflowService({}, store=WorkflowStore(os.environ['DB']))
 print(json.dumps({'state': service.get(os.environ['WF'])['state']}))
 """
@@ -65,16 +65,16 @@ def test_process_exit_after_every_committed_service_state_resumes_from_same_sqli
     source.write_bytes(b"read workflow fixture")
     start_code = """
 import os
-from hwpx_mcp_server.workflow import WorkflowStore
-from hwpx_mcp_server.workflow.service import WorkflowService
+from hwpx_automation.workflow import WorkflowStore
+from hwpx_automation.workflow.service import WorkflowService
 service = WorkflowService({'get_document_info': lambda **kwargs: {'ok': True}}, store=WorkflowStore(os.environ['DB']))
 service.start(family='read_extract', idempotency_key='process-boundary-read', source_path=os.environ['SOURCE'], parameters={'operation': 'info'})
 os._exit(73)
 """
     continue_code = """
 import os
-from hwpx_mcp_server.workflow import WorkflowStore
-from hwpx_mcp_server.workflow.service import WorkflowService
+from hwpx_automation.workflow import WorkflowStore
+from hwpx_automation.workflow.service import WorkflowService
 service = WorkflowService({'get_document_info': lambda **kwargs: {'ok': True}}, store=WorkflowStore(os.environ['DB']))
 service.continue_workflow(os.environ['WF'])
 os._exit(73)
@@ -127,8 +127,8 @@ def test_mutation_then_process_exit_is_in_doubt_and_never_runs_twice(tmp_path):
     mutate_then_exit = """
 import os
 from pathlib import Path
-from hwpx_mcp_server.workflow import WorkflowStore
-from hwpx_mcp_server.workflow.service import WorkflowService
+from hwpx_automation.workflow import WorkflowStore
+from hwpx_automation.workflow.service import WorkflowService
 def scan(**kwargs): return {'ok': True}
 def mutate(**kwargs):
     counter = Path(os.environ['COUNTER'])
@@ -183,7 +183,7 @@ def test_process_exit_inside_sqlite_transition_rolls_back_update_and_event(tmp_p
     )
     crash_inside_transaction = """
 import os
-from hwpx_mcp_server.workflow import WorkflowState, WorkflowStore
+from hwpx_automation.workflow import WorkflowState, WorkflowStore
 class CrashStore(WorkflowStore):
     def _append_event(self, *args, **kwargs):
         if kwargs.get('event_type') == 'workflow.transitioned':
@@ -296,7 +296,7 @@ def test_policy_bypass_negative_matrix_reports_exact_fail_closed_codes(tmp_path,
     )
     elapsed_action = ActionRequest("scan_form_guidance", {"filename": str(elapsed_source)})
     monkeypatch.setattr(
-        "hwpx_mcp_server.workflow.policy.utc_now",
+        "hwpx_automation.workflow.policy.utc_now",
         lambda: elapsed_record.created_at + timedelta(seconds=2),
     )
     capture(
@@ -379,7 +379,7 @@ def test_policy_bypass_negative_matrix_reports_exact_fail_closed_codes(tmp_path,
 
 
 def test_default_toolspec_regression_remains_exactly_119():
-    from hwpx_mcp_server import server
+    from hwpx_automation import server
 
     expected = expected_tool_names(advanced=False)
     assert len(expected) == 119

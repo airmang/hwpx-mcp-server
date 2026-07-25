@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 _MCP_INTERNAL_RUNTIME_MARKERS = (
-    b"hwpx_mcp_server.practice",
+    b"hwpx_automation.practice",
     b"hwpx.practice",
     b"private_practice",
     b"HWPX_PRACTICE_ROOT",
@@ -58,7 +58,7 @@ def _forbidden_path(path: str, kind: str) -> bool:
     if kind == "mcp":
         return (
             path.startswith("docs/superpowers/")
-            or path.startswith("src/hwpx_mcp_server/practice/")
+            or path.startswith("src/hwpx_automation/practice/")
             or path.startswith("tests/test_practice_")
             or bool(re.fullmatch(r"tests/(?:.*report.*|.*evidence.*)\.md", path))
         )
@@ -95,7 +95,7 @@ def _wheel_failures() -> list[str]:
         "examples/out/",
         ".harness/",
         ".omx/",
-        "hwpx_mcp_server/practice/",
+        "hwpx_automation/practice/",
     )
     for wheel in sorted((ROOT / "dist").glob("*.whl")):
         with zipfile.ZipFile(wheel) as archive:

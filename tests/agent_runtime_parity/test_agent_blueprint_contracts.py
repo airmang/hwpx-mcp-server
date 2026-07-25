@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.office.agent.blueprint import (
+from hwpx_automation.office.agent.blueprint import (
     BLUEPRINT_REPLAY_SCHEMA,
     BLUEPRINT_SCHEMA,
     blueprint_catalog,
@@ -18,7 +18,7 @@ from hwpx_mcp_server.office.agent.blueprint import (
     validate_replay_request,
     with_blueprint_hash,
 )
-from hwpx_mcp_server.office.agent.model import AGENT_CATALOG_SCHEMA, AgentContractError
+from hwpx_automation.office.agent.model import AGENT_CATALOG_SCHEMA, AgentContractError
 
 
 def _digest(seed: str) -> str:

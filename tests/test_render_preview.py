@@ -8,8 +8,8 @@ from pathlib import Path
 from hwpx.document import HwpxDocument
 from jsonschema import Draft202012Validator
 
-from hwpx_mcp_server import server
-from hwpx_mcp_server.tool_contract import bound_tool_registry
+from hwpx_automation import server
+from hwpx_automation.tool_contract import bound_tool_registry
 
 
 def test_render_preview_tool_is_bound_to_the_canonical_registry() -> None:

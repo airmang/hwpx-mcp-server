@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from hwpx_mcp_server.office.rendering.fixture_corpus import load_fixture_manifest
-from hwpx_mcp_server.office.rendering.qa_contracts import DefectCategory, VerdictStatus
-from hwpx_mcp_server.office.rendering.page_qa import inspect_fixture_case, inspect_page_set
+from hwpx_automation.office.rendering.fixture_corpus import load_fixture_manifest
+from hwpx_automation.office.rendering.qa_contracts import DefectCategory, VerdictStatus
+from hwpx_automation.office.rendering.page_qa import inspect_fixture_case, inspect_page_set
 
 
 CORPUS = Path(__file__).parent / "fixtures" / "visual_qa_v1"

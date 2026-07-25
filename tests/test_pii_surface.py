@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from hwpx_mcp_server.core.document import open_doc, save_doc
-from hwpx_mcp_server.server import (
+from hwpx_automation.core.document import open_doc, save_doc
+from hwpx_automation.server import (
     create_document,
     get_document_text,
     scan_personal_info,

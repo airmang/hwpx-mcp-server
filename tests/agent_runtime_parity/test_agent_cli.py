@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 
 from hwpx import HwpxDocument
-from hwpx_mcp_server.office.agent import AGENT_BATCH_SCHEMA, HwpxAgentDocument
-from hwpx_mcp_server.office.agent.blueprint import read_blueprint_bundle
-from hwpx_mcp_server.office.agent.cli import (
+from hwpx_automation.office.agent import AGENT_BATCH_SCHEMA, HwpxAgentDocument
+from hwpx_automation.office.agent.blueprint import read_blueprint_bundle
+from hwpx_automation.office.agent.cli import (
     EXIT_CONFLICT,
     EXIT_OK,
     EXIT_TARGET,

@@ -801,7 +801,7 @@ def redline_parsed_from_jsonl(jsonl_path: str) -> dict[str, bool]:
 def real_open_checker(powershell: str | None = None, timeout: float = 300.0) -> OpenChecker:
     """Return the real Hancom open checker (degrades to all-unverified off-box)."""
 
-    from hwpx_mcp_server.office.rendering.oracle import WindowsComOracle
+    from hwpx_automation.office.rendering.oracle import WindowsComOracle
 
     oracle = WindowsComOracle(powershell=powershell, timeout=timeout)
     return oracle.open_check_many

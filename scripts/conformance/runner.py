@@ -160,7 +160,7 @@ def _eval_visual(
             "visual_complete", "unverified", "no Hancom oracle reachable"
         )
 
-    from hwpx_mcp_server.office.rendering.oracle import visual_check
+    from hwpx_automation.office.rendering.oracle import visual_check
 
     after = corpus.path_for(case)
     before = corpus.root / case.before if case.before else None
@@ -273,7 +273,7 @@ def run_conformance(
     """
 
     if tier == "oracle" and oracle is None:
-        from hwpx_mcp_server.office.rendering.oracle import resolve_oracle
+        from hwpx_automation.office.rendering.oracle import resolve_oracle
 
         oracle = resolve_oracle()
 

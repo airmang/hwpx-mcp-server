@@ -35,7 +35,7 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
 
 def test_canonical_owner_rejects_frozen_and_unapproved_core_seams() -> None:
     check = BOUNDARY["_exam_owner_import_violation"]
-    canonical = "src/hwpx_mcp_server/office/exam/compose.py"
+    canonical = "src/hwpx_automation/office/exam/compose.py"
 
     assert check(canonical, "hwpx.exam") is not None
     assert check(canonical, "hwpx.form_fit.wordbox") is not None
@@ -44,7 +44,7 @@ def test_canonical_owner_rejects_frozen_and_unapproved_core_seams() -> None:
     assert check(canonical, "hwpx.tools.table_cleanup") is None
     assert (
         check(
-            "src/hwpx_mcp_server/office/exam/measure.py",
+            "src/hwpx_automation/office/exam/measure.py",
             "hwpx.visual.block_splits",
         )
         is None
@@ -54,5 +54,5 @@ def test_canonical_owner_rejects_frozen_and_unapproved_core_seams() -> None:
 def test_real_tree_is_canonical_and_boundary_clean() -> None:
     report = BOUNDARY["evaluate"](ROOT)
     assert report["ok"], report["violations"]
-    assert report["canonicalExamRoot"] == ("src/hwpx_mcp_server/office/exam")
+    assert report["canonicalExamRoot"] == ("src/hwpx_automation/office/exam")
     assert report["canonicalExamPythonFiles"] == 6

@@ -1,4 +1,4 @@
-from hwpx_mcp_server import server
+from hwpx_automation import server
 
 
 def _spec() -> dict:

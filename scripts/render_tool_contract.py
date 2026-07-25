@@ -15,8 +15,8 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from hwpx_mcp_server import runtime as _runtime  # noqa: E402,F401
-from hwpx_mcp_server.tool_contract import (  # noqa: E402
+from hwpx_automation import runtime as _runtime  # noqa: E402,F401
+from hwpx_automation.tool_contract import (  # noqa: E402
     BASELINE_TOOL_SPECS,
     DOMAIN_SPECS,
     TOOL_SPECS,

@@ -3,8 +3,8 @@ import subprocess
 import pytest
 from hwpx.document import HwpxDocument
 
-from hwpx_mcp_server.hwp_converter import convert_hwp_to_hwpx
-from hwpx_mcp_server.hwpx_ops import HwpxOps
+from hwpx_automation.hwp_converter import convert_hwp_to_hwpx
+from hwpx_automation.hwpx_ops import HwpxOps
 
 
 def _table_count(document: HwpxDocument) -> int:
@@ -101,7 +101,7 @@ def test_convert_hwp_to_hwpx_preserves_existing_output_when_open_safety_fails(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     monkeypatch.setattr(
-        "hwpx_mcp_server.storage.build_hwpx_open_safety_report",
+        "hwpx_automation.storage.build_hwpx_open_safety_report",
         lambda path: {
             "ok": False,
             "summary": "forced conversion safety failure",

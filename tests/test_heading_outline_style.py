@@ -6,8 +6,8 @@
 outline 읽기 경로는 스타일 기반 + 구버전 '#' 텍스트 기반을 모두 인식한다.
 """
 
-import hwpx_mcp_server.server as server
-from hwpx_mcp_server.core.document import open_doc
+import hwpx_automation.server as server
+from hwpx_automation.core.document import open_doc
 
 
 def test_add_heading_stores_clean_text(tmp_path):
@@ -27,7 +27,7 @@ def test_add_heading_applies_outline_style(tmp_path):
     server.add_heading(target, "제목 둘", level=2)
 
     doc = open_doc(target)
-    from hwpx_mcp_server.core.formatting import outline_style_levels
+    from hwpx_automation.core.formatting import outline_style_levels
 
     levels = outline_style_levels(doc)
     styled = [
@@ -87,7 +87,7 @@ def test_paragraph_after_heading_does_not_inherit_outline(tmp_path):
     server.add_paragraph(target, "헤딩 뒤 일반 문단")
 
     doc = open_doc(target)
-    from hwpx_mcp_server.core.formatting import outline_style_levels
+    from hwpx_automation.core.formatting import outline_style_levels
 
     levels = outline_style_levels(doc)
     body = [p for p in doc.paragraphs if (p.text or "").strip() == "헤딩 뒤 일반 문단"]

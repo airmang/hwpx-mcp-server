@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from hwpx_mcp_server.errors import build_error_payload
-from hwpx_mcp_server.hwpx_ops import HwpxOperationError
+from hwpx_automation.errors import build_error_payload
+from hwpx_automation.hwpx_ops import HwpxOperationError
 
 
 @pytest.mark.parametrize(

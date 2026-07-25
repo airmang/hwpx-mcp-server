@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-import hwpx_mcp_server.server as server
+import hwpx_automation.server as server
 
 
 def _sample_hwpx_base64(tmp_path: Path) -> str:

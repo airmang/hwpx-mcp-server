@@ -6,7 +6,7 @@ from urllib.request import Request
 
 import pytest
 
-from hwpx_mcp_server.network_policy import (
+from hwpx_automation.network_policy import (
     NetworkPolicy,
     NetworkPolicyError,
     PolicyRedirectHandler,

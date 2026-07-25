@@ -6,18 +6,18 @@ import hashlib
 import json
 from pathlib import Path
 
-from hwpx_mcp_server import form_fill
-from hwpx_mcp_server.handlers import (
+from hwpx_automation import form_fill
+from hwpx_automation.handlers import (
     content_edit,
     quality_render,
     read_export,
     specialized,
 )
-from hwpx_mcp_server.office import authoring, compliance, quality, utilities
-from hwpx_mcp_server.office.authoring import template_analyzer
+from hwpx_automation.office import authoring, compliance, quality, utilities
+from hwpx_automation.office.authoring import template_analyzer
 
 ROOT = Path(__file__).resolve().parents[1]
-OFFICE = ROOT / "src" / "hwpx_mcp_server" / "office"
+OFFICE = ROOT / "src" / "hwpx_automation" / "office"
 
 
 def _manifest() -> list[dict[str, str | int]]:
@@ -73,14 +73,14 @@ def test_all_policy_production_bindings_use_the_mcp_owner() -> None:
         template_analyzer.collect_metrics,
     )
     expected_prefixes = (
-        "hwpx_mcp_server.office.compliance",
-        "hwpx_mcp_server.office.compliance",
-        "hwpx_mcp_server.office.compliance",
-        "hwpx_mcp_server.office.compliance",
-        "hwpx_mcp_server.office.compliance",
-        "hwpx_mcp_server.office.compliance",
-        "hwpx_mcp_server.office.utilities",
-        "hwpx_mcp_server.office.quality",
+        "hwpx_automation.office.compliance",
+        "hwpx_automation.office.compliance",
+        "hwpx_automation.office.compliance",
+        "hwpx_automation.office.compliance",
+        "hwpx_automation.office.compliance",
+        "hwpx_automation.office.compliance",
+        "hwpx_automation.office.utilities",
+        "hwpx_automation.office.quality",
     )
     for binding, expected in zip(bindings, expected_prefixes):
         assert binding.__module__.startswith(expected), binding

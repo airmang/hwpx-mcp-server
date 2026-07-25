@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-import hwpx_mcp_server.quality_generation as quality_generation_module
-from hwpx_mcp_server import server
-from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
+import hwpx_automation.quality_generation as quality_generation_module
+from hwpx_automation import server
+from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
 
 
 def test_quality_generation_tools_are_removed_from_the_mcp_surface() -> None:
     # The analyze_quality_generation/apply_quality_generation MCP tools were
     # removed at the 5.0.0 major boundary (S-091). The generation engine lives on
-    # in hwpx_mcp_server.quality_generation (exercised directly below); the
+    # in hwpx_automation.quality_generation (exercised directly below); the
     # replacement product path is create_document_from_plan + inspect_document_quality.
     names = set(snapshot_runtime_tools(server.mcp))
 

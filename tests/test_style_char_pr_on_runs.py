@@ -14,10 +14,10 @@ char_pr_id_ref를 넘겨 정상이었다(대칭 회복).
 
 import pytest
 
-import hwpx_mcp_server.server as server
-from hwpx_mcp_server.core.content import _default_body_char_pr, _iter_tables
-from hwpx_mcp_server.core.document import open_doc
-from hwpx_mcp_server.core.formatting import list_styles_in_doc
+import hwpx_automation.server as server
+from hwpx_automation.core.content import _default_body_char_pr, _iter_tables
+from hwpx_automation.core.document import open_doc
+from hwpx_automation.core.formatting import list_styles_in_doc
 
 
 def _style_char_pr(doc, name: str) -> str | None:

@@ -43,7 +43,7 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
 
 def test_canonical_owner_rejects_frozen_and_unapproved_core_seams() -> None:
     check = BOUNDARY["_form_fill_owner_import_violation"]
-    canonical = "src/hwpx_mcp_server/office/form_fill/quality.py"
+    canonical = "src/hwpx_automation/office/form_fill/quality.py"
     assert check(canonical, "hwpx.formfill_quality") is not None
     assert check(canonical, "hwpx.visual.oracle") is not None
     assert check(canonical, "hwpx.table_patch") is None
@@ -53,5 +53,5 @@ def test_canonical_owner_rejects_frozen_and_unapproved_core_seams() -> None:
 def test_real_tree_declares_the_form_fill_boundary() -> None:
     report = BOUNDARY["evaluate"](ROOT)
     assert report["ok"], report["violations"]
-    assert report["canonicalFormFillRoot"] == ("src/hwpx_mcp_server/office/form_fill")
+    assert report["canonicalFormFillRoot"] == ("src/hwpx_automation/office/form_fill")
     assert report["canonicalFormFillPythonFiles"] == 15

@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import mcp.types as mcp_types
 import pytest
 
-from hwpx_mcp_server import server
-from hwpx_mcp_server.workspace import WorkspacePathError
+from hwpx_automation import server
+from hwpx_automation.workspace import WorkspacePathError
 
 
 def _request(arguments: dict | None = None) -> SimpleNamespace:

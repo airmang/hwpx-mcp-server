@@ -26,7 +26,7 @@ from hwpx import HwpxDocument
 from hwpx.tools.redline import author_demo_redline
 from hwpx.tools.redline import verify_redline as compatibility_verify_redline
 
-from hwpx_mcp_server.office.document_ops import (
+from hwpx_automation.office.document_ops import (
     build_comparison_table_plan,
     build_mail_merge,
     verify_redline,
@@ -163,7 +163,7 @@ def test_canonical_owner_injects_a_backend_instead_of_degrading(monkeypatch) -> 
     to be behavioural instead.
     """
 
-    from hwpx_mcp_server.office.document_ops import redline as owner
+    from hwpx_automation.office.document_ops import redline as owner
 
     supplied: list[object] = []
 

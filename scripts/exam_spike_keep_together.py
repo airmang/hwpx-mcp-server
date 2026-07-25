@@ -52,13 +52,13 @@ if str(_REPO_SRC) not in sys.path:
     sys.path.insert(0, str(_REPO_SRC))
 
 from hwpx.document import HwpxDocument  # noqa: E402
-from hwpx_mcp_server.office.rendering.oracle import (  # noqa: E402
+from hwpx_automation.office.rendering.oracle import (  # noqa: E402
     Block,
     MacHancomOracle,
     resolve_oracle,
 )
 import re as _re  # noqa: E402
-from hwpx_mcp_server.office.exam.measure import (  # noqa: E402
+from hwpx_automation.office.exam.measure import (  # noqa: E402
     group_question_blocks,
     measure_question_splits,
 )
