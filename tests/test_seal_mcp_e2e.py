@@ -14,7 +14,7 @@ import pytest
 
 import hwpx_mcp_server.server as server
 from hwpx_mcp_server.handlers import specialized as specialized_handler
-from hwpx.form_fit.wordbox import OracleUnavailable, Rect, WordBox
+from hwpx_mcp_server.office.form_fill.fit.wordbox import OracleUnavailable, Rect, WordBox
 
 HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
 SENDER = "행정안전부장관 홍길동"
@@ -36,7 +36,7 @@ def _sender_boxes(*, y: float = 700.0):
 
 
 def _anchor_center():
-    from hwpx.form_fit import seal
+    from hwpx_mcp_server.office.form_fill.fit import seal
 
     return seal.find_seal_anchor(_sender_boxes(), SENDER).center
 

@@ -19,9 +19,9 @@ from hwpx_mcp_server.server import apply_edits, create_document, mcp_server_heal
 def _oracle_reachable() -> bool:
     """True when a real Hancom render oracle is reachable on this box."""
     try:
-        from hwpx.visual.oracle import resolve_oracle
+        from hwpx_mcp_server.office.rendering import resolve_hancom_backend
 
-        return resolve_oracle().available()
+        return resolve_hancom_backend().available()
     except Exception:
         return False
 
@@ -125,7 +125,7 @@ def _failing_report():
         SemanticReport,
         VisualCompleteReport,
     )
-    from hwpx.visual.report import VisualReport
+    from hwpx.quality.rendering import VisualReport
 
     return VisualCompleteReport(
         ok=False,

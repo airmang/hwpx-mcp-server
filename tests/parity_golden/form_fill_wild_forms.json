@@ -1,0 +1,4556 @@
+{
+  "forms": {
+    "blank_form_3hak.hwpx": {
+      "guidance": {
+        "color_inventory": {
+          "#0000FF": {
+            "family": "blue",
+            "runs": 189,
+            "samples": [
+              "**",
+              "Ⅰ.함께 노래하는 음악(교가)",
+              "[12음01-01]다양한 주법과 표현 기법을 심화시켜 노래나 악기로 개…",
+              "강의식 수업",
+              "실기 수업"
+            ]
+          },
+          "#FF0000": {
+            "family": "red",
+            "runs": 37,
+            "samples": [
+              "◯◯◯, ◯◯◯",
+              "유의)",
+              "검정색 글씨는",
+              "모두 그대로 두고 /",
+              "파란색 글씨는"
+            ]
+          }
+        },
+        "conditional_choices": [
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶40 본문",
+            "signals": [
+              "conditional_choice"
+            ],
+            "text_preview": "※※※유의) 과목별로 아래 2개 중에서 해당하는 것만 남기고 나머지는 삭제!!!"
+          }
+        ],
+        "delete_candidates": [
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶1 본문",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "담당교사: ◯◯◯, ◯◯◯"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶2 본문",
+            "signals": [
+              "legend:삭제색",
+              "keyword:유의)"
+            ],
+            "text_preview": "유의) 검정색 글씨는 모두 그대로 두고 / 파란색 글씨는 과목별로 수정 / 빨간색 글씨는 모두 삭제합니다"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶7 본문",
+            "signals": [
+              "legend:삭제색",
+              "keyword:유의)"
+            ],
+            "text_preview": "유의) 1. 모든 내용은 교과별 교육과정의 평가 목적, 기본방향, 방침에 맞추어 작성해주세요"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶25 본문",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "마. 교과별로 수정 및 추가 사항 기록"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶40 본문",
+            "signals": [
+              "legend:삭제색",
+              "keyword:※"
+            ],
+            "text_preview": "※※※유의) 과목별로 아래 2개 중에서 해당하는 것만 남기고 나머지는 삭제!!!"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶41 본문",
+            "signals": [
+              "legend:삭제색",
+              "keyword:문의주세요"
+            ],
+            "text_preview": "추정분할점수는 따로 문의주세요."
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶44 본문",
+            "signals": [
+              "legend:삭제색",
+              "keyword:삭제!!"
+            ],
+            "text_preview": "빨간 글씨 삭제!! (일반 선택 과목: 독서, 화법과 작문, 미적분, 영어 독해와 작문, 윤리와 사상, 사회·문화)"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶48 본문",
+            "signals": [
+              "legend:삭제색",
+              "keyword:삭제!!"
+            ],
+            "text_preview": "빨간 글씨 삭제!! (체육예술교과, 진로 선택 과목: 위 5단계에 해당하지 않는 모든 과목)"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶52 본문",
+            "signals": [
+              "legend:삭제색",
+              "keyword:삭제!!"
+            ],
+            "text_preview": "빨간 글씨 삭제!! (환경)"
+          },
+          {
+            "cell": null,
+            "confidence": "medium",
+            "location": "§0¶59 본문",
+            "signals": [
+              "keyword:※"
+            ],
+            "text_preview": "※ 가급적 동점자가 발생하지 않도록 유의하고, 동점자가 생길 경우 학업성적관리규정 제17조 ⑤항에"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 4,
+              "table_index": 19
+            },
+            "confidence": "high",
+            "location": "§0¶67 표19 r4c1",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "교과별로 수정 및 추가, 삭제 가능"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 4,
+              "table_index": 19
+            },
+            "confidence": "high",
+            "location": "§0¶67 표19 r4c1",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "AI를 활용하는 수행평가의 경우, [학생 유의사항]을 제시해야 함. AI 활용하지 않는 수행평가이면 (현재 셀)을 삭제할 수 있음."
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 4,
+              "table_index": 20
+            },
+            "confidence": "high",
+            "location": "§0¶70 표20 r4c1",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "교과별로 수정 및 추가, 삭제 가능"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 4,
+              "table_index": 20
+            },
+            "confidence": "high",
+            "location": "§0¶70 표20 r4c1",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "AI를 활용하는 수행평가의 경우, [학생 유의사항]을 제시해야 함. AI 활용하지 않는 수행평가이면 (현재 셀)을 삭제할 수 있음."
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 4,
+              "table_index": 21
+            },
+            "confidence": "high",
+            "location": "§0¶73 표21 r4c1",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "교과별로 수정 및 추가, 삭제 가능"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 4,
+              "table_index": 21
+            },
+            "confidence": "high",
+            "location": "§0¶73 표21 r4c1",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "AI를 활용하는 수행평가의 경우, [학생 유의사항]을 제시해야 함. AI 활용하지 않는 수행평가이면 (현재 셀)을 삭제할 수 있음."
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶75 본문",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "– 교과별 특성이 드러나게 작성"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶90 본문",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "바. 교과별로 수정 및 추가 사항 기록"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶102 본문",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "(6) 교과별로 수정, 삭제 및 추가사항 기록"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 27
+            },
+            "confidence": "high",
+            "location": "§0¶115 표27 r0c0",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "(**) : 과목별 평가 내용을 고려하여 작성"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶117 본문",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "(8) 교과별로 수정, 삭제 및 추가사항 기록"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶124 본문",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "(3) 교과별로 수정 및 추가 사항 기록"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶132 본문",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "(5) 교과별로 수정 및 추가 사항 기록"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶142 본문",
+            "signals": [
+              "legend:삭제색",
+              "keyword:※"
+            ],
+            "text_preview": "※ 이하는 작성 완료하신 후에 모두 삭제 바랍니다 ----------------------------------"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 29
+            },
+            "confidence": "high",
+            "location": "§0¶143 표29 r0c1",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "-과목별 인쇄물 제출: 2쪽 모아찍기, 단면 인쇄"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 1,
+              "table_index": 29
+            },
+            "confidence": "high",
+            "location": "§0¶143 표29 r1c1",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "파란 색 글씨는 과목별로 수정 / 빨간색 글씨는 모두 삭제"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 30
+            },
+            "confidence": "high",
+            "location": "§0¶144 표30 r0c0",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "★유의1) 2학기 교수학습평가계획은 반드시 새 양식에 작성해야 하며, 양식을 수정할 수 없습니다."
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 30
+            },
+            "confidence": "high",
+            "location": "§0¶144 표30 r0c0",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "★유의2) [2학기 교수학습평가계획]은 반드시 아래 내용에 준하여 작성하시기 바랍니다."
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 30
+            },
+            "confidence": "high",
+            "location": "§0¶144 표30 r0c0",
+            "signals": [
+              "legend:삭제색"
+            ],
+            "text_preview": "- [출력_필독](3학년) 2026-2학기 교수학습평가계획 작성 시 유의사항"
+          }
+        ],
+        "empty_cell_candidates": [
+          {
+            "cell": {
+              "col": 2,
+              "row": 5,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r5c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 3"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 5,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r5c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 5,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r5c4",
+            "signals": [
+              "empty_cell",
+              "format:9pt·bold"
+            ],
+            "text_preview": "상단: ★ 디지털기반수업강의식 수업프로젝트학습수행…"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 5,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r5c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "상단: (프로젝트 평가)프레젠테이션 제작 및 발표…"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 6,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r6c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 4"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 6,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r6c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 6,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r6c4",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 6,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r6c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 7,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r7c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 1"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 7,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r7c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 7,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r7c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 7,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r7c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 8,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r8c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 2"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 8,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r8c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 8,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r8c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt·bold"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 8,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r8c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 9,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r9c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 3"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 9,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r9c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 9,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r9c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: ★1차 정기시험"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 10,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r10c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 4"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 10,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r10c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 10,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r10c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "상단: ★1차 정기시험"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 10,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r10c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 11,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r11c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 5"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 11,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r11c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 11,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r11c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 11,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r11c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 12,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r12c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 1"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 12,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r12c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 12,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r12c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 12,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r12c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 13,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r13c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 2"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 13,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r13c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 13,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r13c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 13,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r13c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 14,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r14c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 3"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 14,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r14c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 14,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r14c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 14,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r14c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 15,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r15c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 4"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 15,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r15c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 15,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r15c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 15,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r15c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 16,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r16c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 1"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 16,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r16c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 16,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r16c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 16,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r16c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 17,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r17c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 2"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 17,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r17c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 17,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r17c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 17,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r17c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 18,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r18c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 3"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 18,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r18c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 18,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r18c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt·bold"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 18,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r18c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 19,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r19c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 4"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 19,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r19c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 19,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r19c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 19,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r19c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 20,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r20c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 5"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 20,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r20c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 20,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r20c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: ★학교주도활동"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 21,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r21c2",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 1"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 21,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r21c3",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 21,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r21c4",
+            "signals": [
+              "empty_cell",
+              "format:8pt"
+            ],
+            "text_preview": "상단: ★학교주도활동"
+          },
+          {
+            "cell": {
+              "col": 5,
+              "row": 21,
+              "table_index": 2
+            },
+            "confidence": "medium",
+            "location": "§0¶4 표2 r21c5",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 4
+            },
+            "confidence": "medium",
+            "location": "§0¶9 표4 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 1"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 5
+            },
+            "confidence": "medium",
+            "location": "§0¶14 표5 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 2"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 6
+            },
+            "confidence": "medium",
+            "location": "§0¶19 표6 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 3"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 7
+            },
+            "confidence": "medium",
+            "location": "§0¶27 표7 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 4"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 12
+            },
+            "confidence": "medium",
+            "location": "§0¶39 표12 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 5"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 16
+            },
+            "confidence": "medium",
+            "location": "§0¶56 표16 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 6"
+          },
+          {
+            "cell": {
+              "col": 6,
+              "row": 2,
+              "table_index": 17
+            },
+            "confidence": "medium",
+            "location": "§0¶58 표17 r2c6",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 유전자 발현에 대한 탐구와 나의 생각 글쓰기"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 5,
+              "table_index": 17
+            },
+            "confidence": "medium",
+            "location": "§0¶58 표17 r5c4",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 20%"
+          },
+          {
+            "cell": {
+              "col": 6,
+              "row": 6,
+              "table_index": 17
+            },
+            "confidence": "medium",
+            "location": "§0¶58 표17 r6c6",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 10월 1주"
+          },
+          {
+            "cell": {
+              "col": 6,
+              "row": 7,
+              "table_index": 17
+            },
+            "confidence": "medium",
+            "location": "§0¶58 표17 r7c6",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "좌측: [10통과1-03-06]"
+          },
+          {
+            "cell": {
+              "col": 6,
+              "row": 8,
+              "table_index": 17
+            },
+            "confidence": "medium",
+            "location": "§0¶58 표17 r8c6",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 생명 시스템의 유지에 필요한 세포 내 정보…"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 18
+            },
+            "confidence": "medium",
+            "location": "§0¶64 표18 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 7"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 6,
+              "table_index": 19
+            },
+            "confidence": "medium",
+            "location": "§0¶67 표19 r6c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "좌측: 문제파악근거 제시의 적합성 논리적 전개"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 6,
+              "table_index": 19
+            },
+            "confidence": "medium",
+            "location": "§0¶67 표19 r6c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 채점 기준"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 7,
+              "table_index": 19
+            },
+            "confidence": "medium",
+            "location": "§0¶67 표19 r7c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 8,
+              "table_index": 19
+            },
+            "confidence": "medium",
+            "location": "§0¶67 표19 r8c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 9,
+              "table_index": 19
+            },
+            "confidence": "medium",
+            "location": "§0¶67 표19 r9c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 10,
+              "table_index": 19
+            },
+            "confidence": "medium",
+            "location": "§0¶67 표19 r10c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 11,
+              "table_index": 19
+            },
+            "confidence": "medium",
+            "location": "§0¶67 표19 r11c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 12,
+              "table_index": 19
+            },
+            "confidence": "medium",
+            "location": "§0¶67 표19 r12c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 교육과정성취기준"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 1,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r1c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "좌측: 상"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 2,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r2c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "좌측: 중"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 3,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r3c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "좌측: 하"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 6,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r6c0",
+            "signals": [
+              "empty_cell",
+              "format:10pt·bold"
+            ],
+            "text_preview": "상단: 영역(만점)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 6,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r6c1",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 평가항목"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 6,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r6c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 평가요소"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 6,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r6c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 채점 기준"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 6,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r6c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 배점"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 7,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r7c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 7,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r7c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 8,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r8c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 8,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r8c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 9,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r9c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 9,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r9c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 10,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r10c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 10,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r10c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 11,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r11c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 11,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r11c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 12,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r12c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 12,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r12c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 13,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r13c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 14,
+              "table_index": 20
+            },
+            "confidence": "medium",
+            "location": "§0¶70 표20 r14c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:9pt"
+            ],
+            "text_preview": "좌측: 교육과정성취기준"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 1,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r1c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "좌측: 상"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 2,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r2c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "좌측: 중"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 3,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r3c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "좌측: 하"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 6,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r6c0",
+            "signals": [
+              "empty_cell",
+              "format:10pt·bold"
+            ],
+            "text_preview": "상단: 영역(만점)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 6,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r6c1",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 평가항목"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 6,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r6c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 평가요소"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 6,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r6c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 채점 기준"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 6,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r6c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 배점"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 7,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r7c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 7,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r7c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 8,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r8c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 8,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r8c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 9,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r9c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 9,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r9c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 10,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r10c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 10,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r10c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 11,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r11c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 11,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r11c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 3,
+              "row": 12,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r12c3",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 12,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r12c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 13,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r13c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 4,
+              "row": 14,
+              "table_index": 21
+            },
+            "confidence": "medium",
+            "location": "§0¶73 표21 r14c4",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 22
+            },
+            "confidence": "medium",
+            "location": "§0¶75 표22 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 8"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 24
+            },
+            "confidence": "medium",
+            "location": "§0¶84 표24 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 9"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 25
+            },
+            "confidence": "medium",
+            "location": "§0¶92 표25 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 10"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 28
+            },
+            "confidence": "medium",
+            "location": "§0¶119 표28 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:15pt·bold"
+            ],
+            "text_preview": "좌측: 11"
+          }
+        ],
+        "legend": [
+          {
+            "action": "keep",
+            "color_word": "검정",
+            "exact_hex": null,
+            "family": "black",
+            "source_text": "유의) 검정색 글씨는 모두 그대로 두고"
+          },
+          {
+            "action": "modify",
+            "color_word": "파란",
+            "exact_hex": null,
+            "family": "blue",
+            "source_text": "파란색 글씨는 과목별로 수정"
+          },
+          {
+            "action": "delete",
+            "color_word": "빨간",
+            "exact_hex": "#FF0000",
+            "family": "red",
+            "source_text": "빨간색 글씨는 모두 삭제합니다"
+          }
+        ],
+        "limitations": [
+          "색 신호는 run charPr textColor 기준 — 배경색/테두리색 신호는 미커버.",
+          "여기 나온 것은 후보다. 삭제/수정 확정은 사용자 승인 후에만 한다."
+        ],
+        "modify_candidates_by_table": {
+          "§0 본문": {
+            "format_context": "10pt",
+            "paragraphs": 9,
+            "sample": "가. 정기시험 외에 면접, 토론, 논술, 관찰, 활동 보고서, 포트폴리오 등을 통한 다양한 평가가 이루어질…"
+          },
+          "표0": {
+            "format_context": "15pt·bold",
+            "paragraphs": 1,
+            "sample": "2026학년도 1학기 3학년 **과목 교수학습운영 및 평가계획"
+          },
+          "표10": {
+            "format_context": "9pt",
+            "paragraphs": 3,
+            "sample": "발성, 호흡, 태도를 바르게 유지하며 노래 부를 수 있으며, 주법과 태도를 바르게 유지하여 악기를 연주할 …"
+          },
+          "표11": {
+            "format_context": "11.5pt",
+            "paragraphs": 4,
+            "sample": "(2) 비평"
+          },
+          "표17": {
+            "format_context": "9pt",
+            "paragraphs": 57,
+            "sample": "50%"
+          },
+          "표19": {
+            "format_context": "9pt",
+            "paragraphs": 28,
+            "sample": "[10한사01-02]고대 사회의 종교와 사상을 시기별로 살펴보고, 정치·사회적 기능을 파악한다."
+          },
+          "표2": {
+            "format_context": "9pt",
+            "paragraphs": 29,
+            "sample": "Ⅰ.함께 노래하는 음악(교가)"
+          },
+          "표23": {
+            "format_context": "10pt",
+            "paragraphs": 9,
+            "sample": "인성적 측면"
+          },
+          "표27": {
+            "format_context": "10pt",
+            "paragraphs": 4,
+            "sample": "실제 평가 시 다양한 자료를 수집하기 위하여 AI 등 다양한 디지털 도구를 활용할 수 있으나, AI를 활용…"
+          },
+          "표29": {
+            "format_context": "10pt·bold",
+            "paragraphs": 1,
+            "sample": "파란 색 글씨는 과목별로 수정 / 빨간색 글씨는 모두 삭제"
+          },
+          "표8": {
+            "format_context": "9pt",
+            "paragraphs": 22,
+            "sample": "[12음연01-01]"
+          },
+          "표9": {
+            "format_context": "9pt",
+            "paragraphs": 15,
+            "sample": "[12음연02-01]"
+          }
+        },
+        "placeholder_candidates": [
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 0
+            },
+            "confidence": "medium",
+            "location": "§0¶0 표0 r0c0",
+            "signals": [
+              "placeholder:double_star"
+            ],
+            "text_preview": "2026학년도 1학기 3학년 **과목 교수학습운영 및 평가계획"
+          },
+          {
+            "cell": null,
+            "confidence": "high",
+            "location": "§0¶1 본문",
+            "signals": [
+              "placeholder:circle_blank"
+            ],
+            "text_preview": "담당교사: ◯◯◯, ◯◯◯"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 27
+            },
+            "confidence": "medium",
+            "location": "§0¶115 표27 r0c0",
+            "signals": [
+              "placeholder:double_star"
+            ],
+            "text_preview": "실제 평가 시 다양한 자료를 수집하기 위하여 AI 등 다양한 디지털 도구를 활용할 수 있으나, AI를 활용하여 (**)하는 행위는 금지되어 적…"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 27
+            },
+            "confidence": "medium",
+            "location": "§0¶115 표27 r0c0",
+            "signals": [
+              "placeholder:double_star"
+            ],
+            "text_preview": "(**) : 과목별 평가 내용을 고려하여 작성"
+          }
+        ],
+        "questions": [
+          "§0¶40 본문 조건부 블록 — 어느 쪽을 남길지 결정 필요: “※※※유의) 과목별로 아래 2개 중에서 해당하는 것만 남기고 나머지는 삭제!!!”",
+          "§0¶1 본문 빈칸(◯◯◯) — 들어갈 실제 값은? “담당교사: ◯◯◯, ◯◯◯”"
+        ],
+        "source": "/Users/wilycastle/Code/projects/hwpx/python-hwpx-s049/tests/fixtures/m105_evalplan/blank_form_3hak.hwpx",
+        "stats": {
+          "colored_runs": 226,
+          "paragraphs": 696,
+          "tables": 31
+        }
+      },
+      "residue": {
+        "errors": [
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶1 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "◯◯◯, ◯◯◯"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶2 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "유의)"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶2 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "검정색 글씨는"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶2 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "모두 그대로 두고 /"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶2 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "파란색 글씨는"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶2 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "과목별로 수정 /"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶2 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "빨간색 글씨는"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶2 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "모두 삭제합니다"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶7 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "1. 모든 내용은 교과별 교육과정의 평가 목적, 기본방향, 방침에 맞추어 작성해주세요"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶25 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "교과별로 수정 및 추가 사항 기록"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶40 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "※※※"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶40 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "유의) 과목별로 아래 2개 중에서 해당하는 것만 남기고 나머지는 삭제!!!"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶41 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "추정분할점수는 따로 문의주세요."
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶44 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "빨간 글씨 삭제!! (일반 선택 과목: 독서, 화법과 작문, 미적분, 영어 독해와 작문, 윤리와 사상, 사회·문화)"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶48 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "빨간 글씨 삭제!! (체육예술교과, 진로 선택 과목: 위 5단계에 해당하지 않는 모든 과목)"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶52 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "빨간 글씨 삭제!! (환경)"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶67 표19 r4c1",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "교과별로 수정 및 추가, 삭제 가능"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶67 표19 r4c1",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "AI를 활용하는 수행평가의 경우, [학생 유의사항]을 제시해야 함. AI 활용하지 않는 수행평가이면 (현재 셀)을 삭제할 수 있음."
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶75 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "– 교과별 특성이 드러나게 작성"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶90 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "바. 교과별로 수정 및 추가 사항 기록"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶102 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "(6) 교과별로 수정, 삭제 및 추가사항 기록"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶115 표27 r0c0",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": ": 과목별 평가 내용을 고려하여 작성"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶117 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "(8) 교과별로 수정, 삭제 및 추가사항 기록"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶124 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "(3) 교과별로 수정 및 추가 사항 기록"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶132 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "(5) 교과별로 수정 및 추가 사항 기록"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶142 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "※ 이하는 작성 완료하신 후에 모두 삭제 바랍니다 ----------------------------------"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶143 표29 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "2쪽 모아찍기, 단면 인쇄"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶143 표29 r1c1",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "빨간색 글씨"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶144 표30 r0c0",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "반드시 새 양식에 작성"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶144 표30 r0c0",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "반드시 아래"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶144 표30 r0c0",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "내용에 준하여 작성"
+          },
+          {
+            "kind": "delete_color_residue",
+            "location": "§0¶144 표30 r0c0",
+            "severity": "error",
+            "signal": "blank 범례가 '삭제'로 선언한 색의 텍스트가 잔존",
+            "textPreview": "[출력_필독](3학년) 2026-2학기 교수학습평가계획 작성 시 유의사항"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r1c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "Ⅰ.함께 노래하는 음악(교가)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r1c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음01-01]다양한 주법과 표현 기법을 심화시켜 노래나 악기로 개성 있게 연주한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r1c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "강의식 수업"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r1c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "실기 수업"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r1c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "★문화예술"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r1c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "교육(2시간)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r1c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(관찰) 연주하는 과정을 관찰하고 피드백함"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r1c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(동료평가) 짝을 구성하여 연주한 부분의 리듬과 음정이 정확하고 연주 자세가 올바른지 평가함"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r2c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "Ⅰ.함께 노래하는 음악"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r2c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음01-02]음악 요소와 음악적 특징의 변화를 살려 노래나 악기로 발표하고 비평한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r2c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(퀴즈) 오페라, 뮤지컬, 판소리 이해를 통한 퀴즈 평가"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r2c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(실습평가)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r2c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "짝을 구성하여 연주한 부분의 리듬과 음정이 정확하고 연주 자세가 올바른지 평가함"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r3c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "Ⅳ. 우리가 만드는 음악"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r3c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음02-02] 다양한 시대 · 사회 · 문화권의 음악을 듣고 음악적 특징과 구성의 변화를 해석한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r3c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음02-03] 다양한 시대 · 사회 · 문화권의 음악을 듣고 맥락, 기능, 기여의 관점에서 비평한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r3c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음03-01]다양한 맥락과 연계되는 음악적 의도나 아이디어를 여러 매체나 방법에 적용하여 창작하고 성찰한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r3c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음03-04] 생활 속에서 여러 영역과 융합한 음악을 만들며, 저작권의 중요성 및 음악의 역할과 기여에 대하여 인식한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r3c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "문제해결학습"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r3c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(퀴즈) 작곡 표현과 연계하여 평가"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r3c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(자기평가)수행평가 전, 각각의 구성요소를 이해하는지 형성평가하고 피드백함"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r4c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "프로젝트학습"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r4c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "수행평가"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r4c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(프로젝트 평가)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r4c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "프레젠테이션 제작 및 발표 평가"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r4c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(수행평가-논술형 평가)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶4 표2 r4c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "인공지능 작곡가의 작품에 대한 창작여부에 따른 논술형 평가"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶20 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "가. 정기시험 외에 면접, 토론, 논술, 관찰, 활동 보고서, 포트폴리오 등을 통한 다양한 평가가 이루어질 수 있도록 한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶21 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "나. 사고력 신장이나 가치·태도의 변화를 평가하기 위하여 양적 자료와 더불어 질적 자료의 수집과 활용을 평가하도록 한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶22 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "다. 발표, 토론, 역할 놀이, 시뮬레이션 등 개인 집단 활동에 대한 관찰이나 면접과 같은 평가 방법을"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶23 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "활용하여 문제 및 갈등 해결 능력, 공감 능력, 친사회적 행동 실천 능력 등을 평가한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶24 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "라. 자료를 분석·해석하고, 복합적이고 단계적으로 사고하는 것을 측정할 수 있는 평가 방법을 고안한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r1c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음연01-01]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r1c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바른 발성, 호흡, 주법, 태도로 연주한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r1c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[평가준거 성취기준 ①]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r1c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바른 발성, 호흡,"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r1c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "태도로 노래 부른다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r1c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "발성, 호흡, 태도를 바르게 유지하며 노래 부를 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r2c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "발성, 호흡, 태도 중 일부를 바르게 유지하며 노래 부를 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r3c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "발성, 호흡, 태도 중 일부를 바르게 하며 노래 부를 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r4c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[평가준거 성취기준 ②]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r4c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바른 주법, 태도로"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r4c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "악기를 연주한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r4c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "주법과 태도를 바르게 유지하며 악기를 연주할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r5c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "주법이나 태도를 바르게 유지하며 악기를 연주할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r6c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바른 주법이나 태도로 악기를 연주할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r7c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음연01-02]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r7c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "악곡의 요소와 개념을 이해하여 창의적으로 표현한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r7c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "악곡의 구성 요소와 개념을 창의적으로 표현할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r8c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "악곡의 구성 요소와 개념을 정확하게 표현할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r9c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "다소 정확하지는 않지만 악곡의 구성 요소와 개념을 표현할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r10c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음연01-03]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r10c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "다양한 연주 형태의 특성을 이해하고 표현한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r10c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "다양한 연주 형태의 특성에 맞게 창의적으로 표현할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r11c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "다양한 연주 형태의 특성에 맞게 표현할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶30 표8 r12c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "다양한 연주 형태의 특성에 대체적으로 맞게 표현할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r1c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음연02-01]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r1c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "발표 예절에 대해 이해하고 발표 예절을 지켜 연주한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r1c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바른 발표 태도와 음악 장르, 공연 장소 등에 적합한 발표 예절을 지켜 연주할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r2c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바른 발표 태도와 음악 장르 또는 공연 장소에 적합한 발표 예절을 지켜 연주할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r3c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "음악 장르 또는 공연 장소에 적합한 발표 예절을 지켜 연주할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r4c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음연02-02]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r4c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바람직한 태도로 다른 사람의 연주를 관람한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r4c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바람직한 태도로 음악 장르에 적합하게 다른 사람의 연주를 관람할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r5c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "음악 장르에 적합한 태도로 다른 사람의 연주를 관람할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r6c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "다른 사람의 연주를 관람할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r7c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[12음연02-03]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r7c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "자신 및 다른 사람의 연주를 듣고 연주자의 표현 능력 및 태도에 대해 분석하고 비평한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r7c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "자신 및 다른 사람의 연주를 듣고 연주자의 표현 능력 및 태도에 대해 분석하고 비평할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r8c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "자신 및 다른 사람의 연주를 듣고 연주자의 표현 능력 및 태도에 대해 비평할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶33 표9 r9c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "자신 및 다른 사람의 연주를 듣고 비평할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶36 표10 r1c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "발성, 호흡, 태도를 바르게 유지하며 노래 부를 수 있으며, 주법과 태도를 바르게 유지하여 악기를 연주할 수 있다. 또한 악곡의 구성 요소와 개"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶36 표10 r2c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "발성, 호흡, 태도 중 일부를 바르게 유지하며 노래 부를 수 있으며, 주법이나 태도를 바르게 유지하여 악기를 연주할 수 있다. 또한 악곡의 구성"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶36 표10 r3c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "발성, 호흡, 태도 중 일부를 바르게 하며 노래 부를 수 있으며, 바른 주법이나 태도로 악기를 연주할 수 있다. 또한 악곡의 구성 요소와 개념 "
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶37 표11 r1c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바른 발표 태도와 음악 장르, 공연 장소 등에 적합한 발표 예절에 대해 설명하고 그것을 지켜 연주할 수 있으며 바람직한 태도로 음악 장르에 적합"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶37 표11 r2c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "바른 발표 태도와 음악 장르 또는 공연 장소에 적합한 발표 예절을 지켜 연주할 수 있으며 음악 장르에 적합한 태도로 다른 사람의 연주를 관람할 "
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶37 표11 r3c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "음악 장르 또는 공연 장소 등에 적합한 발표 예절을 지켜 연주할 수 있으며 다른 사람의 연주를 관람할 수 있다. 또한 자신 및 다른 사람의 연주"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r1c6",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "100%"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r2c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "디지털 정보 처리가 우리 삶에 미친 영향 탐구"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r2c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "삼투현상 실험을 통한 세포막의 역할 탐구"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r2c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "유전자 발현에 대한 탐구와 나의 생각 글쓰기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r4c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(45%)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r4c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(5%)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r4c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(20%)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r4c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(10%)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r6c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "10월 3주"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r6c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "8월 4주"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r6c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "9월 2주"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r6c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "10월 1주"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-01-01]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-01-02]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-01-03]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-01-04]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-02-01]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-02-02]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-02-03]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-02-04]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-03-05]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r7c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10통과1-03-06]"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "자연을 시간과 공간에서 기술하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "길이와 시간 측정의 현대적 방법과 다양한 규모의 측정 사례 이해하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "기본량의 의미를 알고, 자연 현상을 기술하는데 단위가 가지는 의미 이해하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "빛의 스펙트럼을 분석하여 우주 초기에 형성된 원소와 천체의 구성 물질을 추론하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "우주 초기의 원소들로부터 태양계의 재료이면서 생명체를 구성하는 원소들이 형성되는 과정 이해하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "스마트폰의 센서를 활용하여 물리량 측정하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "센서를 통해 나타나는 디지털 정보 확인하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "디지털 정보 기술의 유용성 논증하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c3",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "스마트 기기를 활용하여 자연의 변화를 측정하여 정보를 디지털로 변환하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "가설 및 변인을 설정하여 과학적 탐구 실험 설계하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "세포막을 통한 물질의 이동 방식을 적용한 실험 원리 설명하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "실험 결과를 예상하고 관찰을 통해 데이터를 수집하여 결과 분석 및 결론 도출하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c4",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "세포막을 통한 물질의 이동 특징 제시하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "생명 시스템의 유지에 필요한 세포 내 정보의 흐름 조사하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "유전자로부터 단백질이 만들어지는 과정을 탐구하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "전사와 번역에 대한 나의 생각 표현하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶58 표17 r8c5",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "세포에는 생명 시스템 유지에 필요한 정보가 있음을 표현하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶66 본문",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "전근대사 신문 작성하기"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사01-02]고대 사회의 종교와 사상을 시기별로 살펴보고, 정치·사회적 기능을 파악한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사01-03]고려 시대 통치 체제의 성립과 변화를 국제 질서의 변동과 연결 지어 파악한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사01-04]다원적인 사회 구조와 다양한 사상적 기반 위에 고려 사회가 운영되었음을 이해한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사01-05]조선 시대 세계관의 변화를 국내 정치 운영과 국제 질서의 변동 속에서 탐구한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사01-06]조선 시대 신분의 구성과 특성을 살펴보고, 양난 이후 상품 화폐 경제가 발달하면서 신분제에 변동이 나타났음을 이해한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사02-01]흥선 대원군이 추진한 정책의 내용과 성격을 이해하고, 서구 열강의 침략적 접근에 대한 조선의 대응을 파악한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사02-02]강화도 조약의 성격을 살펴보고, 개화 정책의 내용과 이를 둘러싼 여러 세력의 대응을 다른 나라의 사례와 비교하여 파악한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사02-03]열강의 침략이 가속화되는 가운데 여러 세력이 추진한 근대 국민 국가 수립 노력을 탐색한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사02-04]일본의 국권 침탈 과정과 이에 맞선 국권 수호 운동의 내용을 파악한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사02-05]개항 이후 열강의 경제 침략과 이로 인한 경제적 변화를 살펴보고, 이를 저지하기 위한 노력을 파악한다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r0c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "[10한사02-06]개항 이후 근대 문물 수용으로 나타난 사회‧문화적 변화를 살펴본다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r1c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "우리 역사의 형성‧발전에서 근대 사회에 이르기까지 각 시대의 핵심 인물을 파악하고,"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r1c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "국내 정치 운영과 국제 질서의 변동 속에서 인물에 대한"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r1c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "객관적인 역사적 근거를 바탕으로 자신의 생각을 논리적으로 전개하였다. 인물이 추진한 정책의 내용과 성격을 파악하고, 역사적 사실을 이해하며 인물"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r2c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "우리 역사의 형성‧발전에서 근대 사회에 이르기까지 각 시대의 핵심 인물을 파악하고, 객관적인 역사적 근거를 바탕으로 하여 역사적 평가를 내릴 수"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r3c2",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "우리 역사의 형성‧발전에서 근대 사회에 이르기까지 각 시대의 인물을 파악하고 역사적 사실을 이해할 수 있다."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r6c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "전근대사신문"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r6c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(20점)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r6c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "문제파악"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r6c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "근거 제시의 적합성"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶67 표19 r6c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "논리적 전개"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶81 표23 r1c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "인성적 측면"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶81 표23 r1c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(정체성, 상호존중, 참여)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶81 표23 r1c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "우리 역사와 세계 역사에 대한 이해를 바탕으로 우리의 관점에서 오늘날 요구되는 역사의식을 함양하고 타인을 존중함. 역사적 주체로서 현대 한국 사"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶81 표23 r2c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "창의적 측면"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶81 표23 r2c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(통찰력)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶81 표23 r2c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "한국 근현대사에 대한 심도 깊은 이해를 통해 현대 한국 사회가 지닌 역사적 문제에 대해 통찰하는 능력을 함양함."
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶81 표23 r3c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "의사소통적 측면"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶81 표23 r3c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(역사정보 활용 및 의사소통)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶81 표23 r3c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "다양한 매체를 통해 얻은 역사정보를 모둠원과 분석, 토론, 종합, 평가하고, 발표하는 상대방을 배려하여 경청하고, 의사소통함. 모둠원들과 실현 "
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶115 표27 r0c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "(**)"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶115 표27 r0c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "ex) AI가 생성한 글, 이미지 등을 자신의 창작물로 제출하는 행위, AI 문제풀이 앱"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶115 표27 r0c0",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "등을 활용하여 수행평가 문항을 입력하고 생성된 답안을 그대로 제출하는 행위 등"
+          },
+          {
+            "kind": "unmodified_sample",
+            "location": "§0¶143 표29 r1c1",
+            "severity": "error",
+            "signal": "blank 범례가 '수정'으로 선언한 텍스트가 그대로 잔존(샘플 미교체)",
+            "textPreview": "파란 색 글씨"
+          },
+          {
+            "kind": "placeholder",
+            "location": "§0¶1 본문",
+            "severity": "error",
+            "signal": "placeholder:circle_blank",
+            "textPreview": "담당교사: ◯◯◯, ◯◯◯"
+          }
+        ],
+        "needsReview": [
+          {
+            "kind": "placeholder_ambiguous",
+            "location": "§0¶0 표0 r0c0",
+            "severity": "needs_review",
+            "signal": "placeholder?:double_star — 각주 표식일 수 있음",
+            "textPreview": "2026학년도 1학기 3학년 **과목 교수학습운영 및 평가계획"
+          },
+          {
+            "kind": "marker_only",
+            "location": "§0¶10 본문",
+            "severity": "needs_review",
+            "signal": "목록 마커만 있는 문단 — 의도된 빈 자리인지 사람 판단",
+            "textPreview": "가."
+          },
+          {
+            "kind": "marker_only",
+            "location": "§0¶11 본문",
+            "severity": "needs_review",
+            "signal": "목록 마커만 있는 문단 — 의도된 빈 자리인지 사람 판단",
+            "textPreview": "나."
+          },
+          {
+            "kind": "marker_only",
+            "location": "§0¶12 본문",
+            "severity": "needs_review",
+            "signal": "목록 마커만 있는 문단 — 의도된 빈 자리인지 사람 판단",
+            "textPreview": "다."
+          },
+          {
+            "kind": "marker_only",
+            "location": "§0¶15 본문",
+            "severity": "needs_review",
+            "signal": "목록 마커만 있는 문단 — 의도된 빈 자리인지 사람 판단",
+            "textPreview": "가."
+          },
+          {
+            "kind": "marker_only",
+            "location": "§0¶16 본문",
+            "severity": "needs_review",
+            "signal": "목록 마커만 있는 문단 — 의도된 빈 자리인지 사람 판단",
+            "textPreview": "나."
+          },
+          {
+            "kind": "marker_only",
+            "location": "§0¶17 본문",
+            "severity": "needs_review",
+            "signal": "목록 마커만 있는 문단 — 의도된 빈 자리인지 사람 판단",
+            "textPreview": "다."
+          },
+          {
+            "kind": "marker_only",
+            "location": "§0¶53 표15 r1c0",
+            "severity": "needs_review",
+            "signal": "목록 마커만 있는 문단 — 의도된 빈 자리인지 사람 판단",
+            "textPreview": "-"
+          },
+          {
+            "kind": "marker_only",
+            "location": "§0¶69 본문",
+            "severity": "needs_review",
+            "signal": "목록 마커만 있는 문단 — 의도된 빈 자리인지 사람 판단",
+            "textPreview": "나."
+          },
+          {
+            "kind": "marker_only",
+            "location": "§0¶72 본문",
+            "severity": "needs_review",
+            "signal": "목록 마커만 있는 문단 — 의도된 빈 자리인지 사람 판단",
+            "textPreview": "다."
+          },
+          {
+            "kind": "placeholder_ambiguous",
+            "location": "§0¶115 표27 r0c0",
+            "severity": "needs_review",
+            "signal": "placeholder?:double_star — 각주 표식일 수 있음",
+            "textPreview": "실제 평가 시 다양한 자료를 수집하기 위하여 AI 등 다양한 디지털 도구를 활용할 수 있으나, AI를 활용하여 (**)하는 행위는 금지되어 적발"
+          },
+          {
+            "kind": "placeholder_ambiguous",
+            "location": "§0¶115 표27 r0c0",
+            "severity": "needs_review",
+            "signal": "placeholder?:double_star — 각주 표식일 수 있음",
+            "textPreview": "(**) : 과목별 평가 내용을 고려하여 작성"
+          }
+        ],
+        "ok": false,
+        "stats": {
+          "blankDeleteTexts": 32,
+          "blankModifyTexts": 151,
+          "errors": 184,
+          "needsReview": 12,
+          "paragraphs": 696
+        }
+      },
+      "score": {
+        "axes": [
+          {
+            "detail": {},
+            "findings": [
+              "render skipped (run_render=False) -- A unverified"
+            ],
+            "key": "A",
+            "name": "render_cleanliness",
+            "score": 0.0,
+            "status": "unverified",
+            "weight": 30
+          },
+          {
+            "detail": {
+              "carried": 31,
+              "carry_rate": 1.0,
+              "fmt_preservation": 1.0,
+              "n_produced": 31,
+              "regenerated_tables": []
+            },
+            "findings": [
+              "carried verbatim: 31/31 tables (100%); edited-format-preservation: 100% over 0 edited tables"
+            ],
+            "key": "B",
+            "name": "format_fidelity",
+            "score": 25.0,
+            "status": "measured",
+            "weight": 25
+          },
+          {
+            "detail": {
+              "count_ref": {
+                "achieve_rate": 2,
+                "achievement": 2,
+                "level": 2,
+                "notice_star": 1,
+                "other": 18,
+                "ratio": 1,
+                "rubric": 3,
+                "seokcha": 1,
+                "submit": 1
+              },
+              "gold_kinds": {
+                "achieve_rate": 2,
+                "achievement": 2,
+                "level": 2,
+                "notice_star": 1,
+                "other": 18,
+                "ratio": 1,
+                "rubric": 3,
+                "seokcha": 1,
+                "submit": 1
+              },
+              "passed": 8,
+              "produced_kinds": {
+                "achieve_rate": 2,
+                "achievement": 2,
+                "level": 2,
+                "notice_star": 1,
+                "other": 18,
+                "ratio": 1,
+                "rubric": 3,
+                "seokcha": 1,
+                "submit": 1
+              },
+              "total": 8
+            },
+            "findings": [
+              "structure checks 8/8 (policy vs gold, counts vs gold (same-semester assumption))"
+            ],
+            "key": "C",
+            "name": "structure_conformance",
+            "score": 20.0,
+            "status": "measured",
+            "weight": 20
+          },
+          {
+            "detail": {
+              "content_match": null,
+              "leftover_sample_frac": null,
+              "missing_sections": [],
+              "passed": 2,
+              "region_fill": {},
+              "total": 2
+            },
+            "findings": [
+              "content checks 2/2",
+              "note: no review content given -- content-fidelity unchecked (D is structural only)",
+              "note: empty-required-cell detection is coarse (text-presence only)"
+            ],
+            "key": "D",
+            "name": "content_completeness",
+            "score": 15.0,
+            "status": "measured",
+            "weight": 15
+          },
+          {
+            "detail": {
+              "passed": 2,
+              "total": 3
+            },
+            "findings": [
+              "lint 2/3 computable rules pass; manual-only 유의사항 rules (수행 30%↑, 기본점수 20~40%, 급간 동일, 물결표 문맥) require human review -> needs_review",
+              "LINT 정기시험 열 부재: 반영비율 table still has 정기시험 column"
+            ],
+            "key": "E",
+            "name": "compliance",
+            "score": 6.67,
+            "status": "needs_review",
+            "weight": 10
+          }
+        ],
+        "lowest_axis": "E",
+        "render_checked": false,
+        "total": 66.67
+      }
+    },
+    "irb_form_blank.hwpx": {
+      "guidance": {
+        "color_inventory": {},
+        "conditional_choices": [],
+        "delete_candidates": [],
+        "empty_cell_candidates": [],
+        "legend": [],
+        "limitations": [
+          "색 신호는 run charPr textColor 기준 — 배경색/테두리색 신호는 미커버.",
+          "여기 나온 것은 후보다. 삭제/수정 확정은 사용자 승인 후에만 한다."
+        ],
+        "modify_candidates_by_table": {},
+        "placeholder_candidates": [],
+        "questions": [
+          "색 범례 문장을 찾지 못함 — 색의 의미(유지/수정/삭제)를 알려달라."
+        ],
+        "source": "/Users/wilycastle/Code/projects/hwpx/python-hwpx-s049/tests/fixtures/reader_robustness/irb_form_blank.hwpx",
+        "stats": {
+          "colored_runs": 0,
+          "paragraphs": 3,
+          "tables": 0
+        }
+      },
+      "residue": {
+        "errors": [],
+        "needsReview": [],
+        "ok": true,
+        "stats": {
+          "blankDeleteTexts": 0,
+          "blankModifyTexts": 0,
+          "errors": 0,
+          "needsReview": 0,
+          "paragraphs": 3
+        }
+      },
+      "score": {
+        "axes": [
+          {
+            "detail": {},
+            "findings": [
+              "render skipped (run_render=False) -- A unverified"
+            ],
+            "key": "A",
+            "name": "render_cleanliness",
+            "score": 0.0,
+            "status": "unverified",
+            "weight": 30
+          },
+          {
+            "detail": {
+              "carried": 2,
+              "carry_rate": 1.0,
+              "fmt_preservation": 1.0,
+              "n_produced": 2,
+              "regenerated_tables": []
+            },
+            "findings": [
+              "carried verbatim: 2/2 tables (100%); edited-format-preservation: 100% over 0 edited tables"
+            ],
+            "key": "B",
+            "name": "format_fidelity",
+            "score": 25.0,
+            "status": "measured",
+            "weight": 25
+          },
+          {
+            "detail": {
+              "count_ref": {
+                "other": 2
+              },
+              "gold_kinds": {
+                "other": 2
+              },
+              "passed": 8,
+              "produced_kinds": {
+                "other": 2
+              },
+              "total": 8
+            },
+            "findings": [
+              "structure checks 8/8 (policy vs gold, counts vs gold (same-semester assumption))"
+            ],
+            "key": "C",
+            "name": "structure_conformance",
+            "score": 20.0,
+            "status": "measured",
+            "weight": 20
+          },
+          {
+            "detail": {
+              "content_match": null,
+              "leftover_sample_frac": null,
+              "missing_sections": [
+                "평가의 목적",
+                "평가의 기본 방향",
+                "평가 방침",
+                "성취기준 및 성취수준",
+                "평가의 종류와 반영비율",
+                "기준 성취율과 성취도",
+                "수행평가 세부기준",
+                "정의적 능력 평가",
+                "수행평가 미응시자",
+                "평가 유의사항",
+                "평가 결과 분석"
+              ],
+              "passed": 0,
+              "region_fill": {},
+              "total": 1
+            },
+            "findings": [
+              "content checks 0/1",
+              "INCOMPLETE sections [1]~[11] present: missing sections: ['평가의 목적', '평가의 기본 방향', '평가 방침', '성취기준 및 성취수준', '평가의 종류와 반영비율', '기준 성취율과 성취도', '수행평가 세부기준', '정의적 능력 평가', '수행평가 미응시자', '평가 유의사항', '평가 결과 분석']",
+              "note: no review content given -- content-fidelity unchecked (D is structural only)",
+              "note: empty-required-cell detection is coarse (text-presence only)"
+            ],
+            "key": "D",
+            "name": "content_completeness",
+            "score": 7.5,
+            "status": "measured",
+            "weight": 15
+          },
+          {
+            "detail": {
+              "passed": 1,
+              "total": 1
+            },
+            "findings": [
+              "lint 1/1 computable rules pass; manual-only 유의사항 rules (수행 30%↑, 기본점수 20~40%, 급간 동일, 물결표 문맥) require human review -> needs_review"
+            ],
+            "key": "E",
+            "name": "compliance",
+            "score": 10.0,
+            "status": "needs_review",
+            "weight": 10
+          }
+        ],
+        "lowest_axis": "D",
+        "render_checked": false,
+        "total": 62.5
+      }
+    },
+    "public_official_table.hwpx": {
+      "guidance": {
+        "color_inventory": {
+          "#289B6E": {
+            "family": "green",
+            "runs": 1,
+            "samples": [
+              "공공부문 인공지능 대전환"
+            ]
+          },
+          "#3A3C84": {
+            "family": "other",
+            "runs": 3,
+            "samples": [
+              "국민 주도 참여‧소통 거버넌스 구현",
+              "포용과 균형의 기본사회 구현",
+              "성과로 신뢰받는 일 잘하는 정부 구현"
+            ]
+          },
+          "#FF0000": {
+            "family": "red",
+            "runs": 3,
+            "samples": [
+              "(온라인)",
+              "16:00",
+              "(지 면)"
+            ]
+          }
+        },
+        "conditional_choices": [],
+        "delete_candidates": [],
+        "empty_cell_candidates": [
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 0
+            },
+            "confidence": "medium",
+            "location": "§0¶0 표0 r0c0",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 0,
+              "table_index": 0
+            },
+            "confidence": "medium",
+            "location": "§0¶0 표0 r0c2",
+            "signals": [
+              "empty_cell",
+              "format:12pt·bold"
+            ],
+            "text_preview": "좌측: 보도자료"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 3
+            },
+            "confidence": "medium",
+            "location": "§0¶3 표3 r0c0",
+            "signals": [
+              "empty_cell",
+              "format:1pt·bold"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 0,
+              "table_index": 3
+            },
+            "confidence": "medium",
+            "location": "§0¶3 표3 r0c2",
+            "signals": [
+              "empty_cell",
+              "format:1pt·bold"
+            ],
+            "text_preview": "좌측: 〈 정부혁신으로 달라지는 모습 〉"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 1,
+              "table_index": 3
+            },
+            "confidence": "medium",
+            "location": "§0¶3 표3 r1c0",
+            "signals": [
+              "empty_cell",
+              "format:1pt·bold"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 1,
+              "table_index": 3
+            },
+            "confidence": "medium",
+            "location": "§0¶3 표3 r1c2",
+            "signals": [
+              "empty_cell",
+              "format:1pt·bold"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 1,
+              "table_index": 4
+            },
+            "confidence": "medium",
+            "location": "§0¶28 표4 r1c0",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "상단: 담당 부서"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 3,
+              "table_index": 4
+            },
+            "confidence": "medium",
+            "location": "§0¶28 표4 r3c0",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 5
+            },
+            "confidence": "medium",
+            "location": "§0¶29 표5 r0c0",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 5
+            },
+            "confidence": "medium",
+            "location": "§0¶29 표5 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 0,
+              "table_index": 5
+            },
+            "confidence": "medium",
+            "location": "§0¶29 표5 r0c2",
+            "signals": [
+              "empty_cell",
+              "format:10pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 0,
+              "table_index": 8
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표8 r0c0",
+            "signals": [
+              "empty_cell",
+              "format:18pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 0,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r0c1",
+            "signals": [
+              "empty_cell",
+              "format:13pt"
+            ],
+            "text_preview": "좌측: 1참여소통"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 2,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r2c0",
+            "signals": [
+              "empty_cell",
+              "format:1pt·bold"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 2,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r2c1",
+            "signals": [
+              "empty_cell",
+              "format:1pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 2,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r2c2",
+            "signals": [
+              "empty_cell",
+              "format:1pt"
+            ],
+            "text_preview": "상단: 󰊱 대국민 소통 일상화로 국민의 의견을 정…"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 3,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r3c1",
+            "signals": [
+              "empty_cell",
+              "format:13pt"
+            ],
+            "text_preview": "좌측: 2기본사회"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 5,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r5c0",
+            "signals": [
+              "empty_cell",
+              "format:1pt·bold"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 5,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r5c1",
+            "signals": [
+              "empty_cell",
+              "format:1pt"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 2,
+              "row": 5,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r5c2",
+            "signals": [
+              "empty_cell",
+              "format:1pt"
+            ],
+            "text_preview": "상단: 󰊴 사각지대 없는 포용적 공공서비스 체계 …"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 6,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r6c1",
+            "signals": [
+              "empty_cell",
+              "format:13pt"
+            ],
+            "text_preview": "좌측: 3공직혁신"
+          },
+          {
+            "cell": {
+              "col": 0,
+              "row": 8,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r8c0",
+            "signals": [
+              "empty_cell",
+              "format:1pt·bold"
+            ],
+            "text_preview": "(라벨 없음)"
+          },
+          {
+            "cell": {
+              "col": 1,
+              "row": 9,
+              "table_index": 10
+            },
+            "confidence": "medium",
+            "location": "§0¶34 표10 r9c1",
+            "signals": [
+              "empty_cell",
+              "format:13pt"
+            ],
+            "text_preview": "좌측: 4공공 AX"
+          }
+        ],
+        "legend": [],
+        "limitations": [
+          "색 신호는 run charPr textColor 기준 — 배경색/테두리색 신호는 미커버.",
+          "여기 나온 것은 후보다. 삭제/수정 확정은 사용자 승인 후에만 한다."
+        ],
+        "modify_candidates_by_table": {},
+        "placeholder_candidates": [],
+        "questions": [
+          "`#FF0000`(red) run 3개의 의미가 범례에 없음 — 유지/수정/삭제 중 무엇인가? 예: (온라인)",
+          "`#3A3C84`(other) run 3개의 의미가 범례에 없음 — 유지/수정/삭제 중 무엇인가? 예: 국민 주도 참여‧소통 거버넌스 구현",
+          "색 범례 문장을 찾지 못함 — 색의 의미(유지/수정/삭제)를 알려달라."
+        ],
+        "source": "/Users/wilycastle/Code/projects/hwpx/python-hwpx-s049/tests/fixtures/m2_corpus/public_official_table.hwpx",
+        "stats": {
+          "colored_runs": 7,
+          "paragraphs": 113,
+          "tables": 11
+        }
+      },
+      "residue": {
+        "errors": [],
+        "needsReview": [],
+        "ok": true,
+        "stats": {
+          "blankDeleteTexts": 0,
+          "blankModifyTexts": 0,
+          "errors": 0,
+          "needsReview": 0,
+          "paragraphs": 113
+        }
+      },
+      "score": {
+        "axes": [
+          {
+            "detail": {},
+            "findings": [
+              "render skipped (run_render=False) -- A unverified"
+            ],
+            "key": "A",
+            "name": "render_cleanliness",
+            "score": 0.0,
+            "status": "unverified",
+            "weight": 30
+          },
+          {
+            "detail": {
+              "carried": 11,
+              "carry_rate": 1.0,
+              "fmt_preservation": 1.0,
+              "n_produced": 11,
+              "regenerated_tables": []
+            },
+            "findings": [
+              "carried verbatim: 11/11 tables (100%); edited-format-preservation: 100% over 0 edited tables"
+            ],
+            "key": "B",
+            "name": "format_fidelity",
+            "score": 25.0,
+            "status": "measured",
+            "weight": 25
+          },
+          {
+            "detail": {
+              "count_ref": {
+                "other": 11
+              },
+              "gold_kinds": {
+                "other": 11
+              },
+              "passed": 8,
+              "produced_kinds": {
+                "other": 11
+              },
+              "total": 8
+            },
+            "findings": [
+              "structure checks 8/8 (policy vs gold, counts vs gold (same-semester assumption))"
+            ],
+            "key": "C",
+            "name": "structure_conformance",
+            "score": 20.0,
+            "status": "measured",
+            "weight": 20
+          },
+          {
+            "detail": {
+              "content_match": null,
+              "leftover_sample_frac": null,
+              "missing_sections": [
+                "평가의 목적",
+                "평가의 기본 방향",
+                "평가 방침",
+                "성취기준 및 성취수준",
+                "평가의 종류와 반영비율",
+                "기준 성취율과 성취도",
+                "수행평가 세부기준",
+                "정의적 능력 평가",
+                "수행평가 미응시자",
+                "평가 유의사항",
+                "평가 결과 분석"
+              ],
+              "passed": 0,
+              "region_fill": {},
+              "total": 1
+            },
+            "findings": [
+              "content checks 0/1",
+              "INCOMPLETE sections [1]~[11] present: missing sections: ['평가의 목적', '평가의 기본 방향', '평가 방침', '성취기준 및 성취수준', '평가의 종류와 반영비율', '기준 성취율과 성취도', '수행평가 세부기준', '정의적 능력 평가', '수행평가 미응시자', '평가 유의사항', '평가 결과 분석']",
+              "note: no review content given -- content-fidelity unchecked (D is structural only)",
+              "note: empty-required-cell detection is coarse (text-presence only)"
+            ],
+            "key": "D",
+            "name": "content_completeness",
+            "score": 7.5,
+            "status": "measured",
+            "weight": 15
+          },
+          {
+            "detail": {
+              "passed": 1,
+              "total": 1
+            },
+            "findings": [
+              "lint 1/1 computable rules pass; manual-only 유의사항 rules (수행 30%↑, 기본점수 20~40%, 급간 동일, 물결표 문맥) require human review -> needs_review"
+            ],
+            "key": "E",
+            "name": "compliance",
+            "score": 10.0,
+            "status": "needs_review",
+            "weight": 10
+          }
+        ],
+        "lowest_axis": "D",
+        "render_checked": false,
+        "total": 62.5
+      }
+    }
+  },
+  "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
+  "note": "Outputs of the core 4.x guidance/residue/score callables on the checked-in wild forms, recorded before those modules are removed. The gate compares the canonical MCP owner against this record instead of against a live copy.",
+  "schemaVersion": "hwpx.wild-form-parity-golden/v1"
+}

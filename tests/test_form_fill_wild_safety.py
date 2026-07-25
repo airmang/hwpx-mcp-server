@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
 import hwpx
 import pytest
-from hwpx.fill_residue import inspect_fill_residue as frozen_residue
-from hwpx.formfill_quality import score_form_fill as frozen_score
-from hwpx.guidance_scan import scan_form_guidance as frozen_guidance
 
 from hwpx_mcp_server.office.form_fill.fill_residue import (
     inspect_fill_residue,
@@ -22,6 +20,17 @@ from hwpx_mcp_server.storage import build_hwpx_open_safety_report
 
 
 CORE_ROOT = Path(hwpx.__file__).resolve().parents[2]
+
+# The core 4.x guidance/residue/score callables produced these outputs on the
+# checked-in wild forms, recorded while those modules still existed. Comparing
+# against the record rather than a live copy is what keeps this gate meaningful
+# once core stops shipping the application half — a parity test whose other side
+# has been deleted proves nothing.
+PARITY_GOLDEN = json.loads(
+    (Path(__file__).parent / "parity_golden" / "form_fill_wild_forms.json").read_text(
+        encoding="utf-8"
+    )
+)["forms"]
 WILD_FORMS = (
     (
         CORE_ROOT
@@ -82,25 +91,19 @@ def test_wild_form_read_only_behavior_is_exact_and_non_mutating(
 ) -> None:
     before = (_sha256(source), source.stat().st_mtime_ns)
 
+    frozen = PARITY_GOLDEN[source.name]
+
     canonical_guidance = _plain(scan_form_guidance(source))
-    compatibility_guidance = _plain(frozen_guidance(source))
     canonical_residue = inspect_fill_residue(source, source).to_dict()
-    compatibility_residue = frozen_residue(source, source).to_dict()
     canonical_score = score_form_fill(
         source,
         source,
         source,
         run_render=False,
     ).to_dict()
-    compatibility_score = frozen_score(
-        source,
-        source,
-        source,
-        run_render=False,
-    ).to_dict()
 
-    assert canonical_guidance == compatibility_guidance
-    assert canonical_residue == compatibility_residue
-    assert canonical_score == compatibility_score
+    assert canonical_guidance == frozen["guidance"]
+    assert canonical_residue == frozen["residue"]
+    assert canonical_score == frozen["score"]
     assert (_sha256(source), source.stat().st_mtime_ns) == before
     assert build_hwpx_open_safety_report(source)["ok"] is expected_open_safety
