@@ -34,7 +34,10 @@ jobs:
         working-directory: hwpx-mcp-server
       - run: python -m pip install -e "../python-hwpx[visual,preview]"
         working-directory: hwpx-mcp-server
-      - run: python -m pip install -e ".[test,typecheck]"
+      # [mcp]를 뺄 수 없다: 아래 단계가 hwpx_automation.server를 import하고
+      # 그건 mcp SDK를 필요로 한다. 6.0.0에서 mcp가 필수 의존에서 extra로
+      # 빠지면서 여기 명시가 의무가 됐다.
+      - run: python -m pip install -e ".[mcp,test,typecheck]"
         working-directory: hwpx-mcp-server
       - run: python scripts/check_public_hygiene.py
         working-directory: hwpx-mcp-server
@@ -110,7 +113,7 @@ jobs:
         run: |
           python -m venv .clean-package
           CORE_WHEEL=$(find ../candidate-wheelhouse -name 'python_hwpx-*.whl' -print -quit)
-          SERVER_WHEEL=$(find ../candidate-wheelhouse -name 'hwpx_automation-*.whl' -print -quit)
+          SERVER_WHEEL=$(find ../candidate-wheelhouse -name 'python_hwpx_automation-*.whl' -print -quit)
           .clean-package/bin/python -m pip install "${CORE_WHEEL}"
           .clean-package/bin/python -m pip install "${SERVER_WHEEL}${EXTRAS}"
           .clean-package/bin/python -m pip check

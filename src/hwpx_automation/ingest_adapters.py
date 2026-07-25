@@ -57,7 +57,8 @@ def _load_markitdown_class() -> type:
         from markitdown import MarkItDown
     except ImportError as exc:
         raise MissingMarkItDownDependency(
-            "install hwpx-mcp-server[ingest] to enable non-HWPX document ingest"
+            "install python-hwpx-automation[ingest] (or hwpx-mcp-server[ingest]) "
+            "to enable non-HWPX document ingest"
         ) from exc
     return MarkItDown
 

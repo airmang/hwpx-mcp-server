@@ -46,7 +46,17 @@ def _project_kind() -> str:
     if (ROOT / "packaging" / "hosts.json").is_file():
         return "plugin"
     metadata = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    return "mcp" if 'name = "hwpx-mcp-server"' in metadata else "core"
+    # 이름 하나로 판별하면 배포명이 바뀌는 순간 이 저장소가 core로 분류되고
+    # MCP 전용 금지 규칙이 통째로 건너뛰어진다. 실제로 6.0.0 재명명 뒤 게이트가
+    # "[OK] public hygiene: core"를 내며 아무것도 검사하지 않았다.
+    #
+    # 이름 목록이 아니라 **구조**로 판별한다. 이 저장소만 응용 소유자 트리를
+    # 갖는다.
+    if (ROOT / "src" / "hwpx_automation").is_dir():
+        return "mcp"
+    if 'name = "hwpx-mcp-server"' in metadata:
+        return "mcp"
+    return "core"
 
 
 def _forbidden_path(path: str, kind: str) -> bool:

@@ -16,7 +16,8 @@ except ImportError:  # pragma: no cover - exercised only without the extra
 
 _OLEFILE_INSTALL_HINT = (
     "Reading legacy .hwp (HWP5/OLE2) files requires the 'olefile' package. "
-    "Install it with: pip install 'hwpx-mcp-server[hwp]' (or pip install olefile)."
+    "Install it with: pip install 'python-hwpx-automation[hwp]' "
+    "(or 'hwpx-mcp-server[hwp]', or pip install olefile)."
 )
 
 

@@ -32,7 +32,7 @@ jobs:
         run: |
           python scripts/check_pinned_core_satisfies_floor.py ../python-hwpx
           python -m pip install -e "../python-hwpx[visual,preview]"
-          python -m pip install -e ".[test,typecheck]"
+          python -m pip install -e ".[mcp,test,typecheck]"
       - name: Check public repository hygiene
         working-directory: hwpx-mcp-server
         run: python scripts/check_public_hygiene.py
@@ -149,8 +149,23 @@ jobs:
           python -m pip install --upgrade build twine
           rm -rf dist build
           python -m build
+          # 호환 배포도 함께 만든다. 이게 없으면 `pip install hwpx-mcp-server`와
+          # `uvx hwpx-mcp-server`가 6.0.0에서 끊긴다 — README와 수백 곳의 MCP
+          # 클라이언트 설정이 그 이름을 부르는데도.
+          rm -rf compat/hwpx-mcp-server/build
+          python -m build --outdir dist compat/hwpx-mcp-server
           twine check dist/*
           python scripts/check_public_hygiene.py
+          # 두 배포가 다 나왔는지 확인한다. 없는 것을 조용히 넘기면 절반만
+          # 발행되고, 그 절반이 옛 이름 쪽이다.
+          python - <<'CHECK'
+          import pathlib, sys
+          names = {p.name.split("-")[0] for p in pathlib.Path("dist").glob("*.whl")}
+          missing = {"python_hwpx_automation", "hwpx_mcp_server"} - names
+          if missing:
+              sys.exit(f"dist에 빠진 배포: {sorted(missing)} (있는 것: {sorted(names)})")
+          print(f"두 배포 확인: {sorted(names)}")
+          CHECK
 
       - name: Generate release SBOM
         run: |

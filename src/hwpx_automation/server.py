@@ -250,7 +250,8 @@ def main(argv: list[str] | None = None) -> None:
     except ImportError as exc:  # pragma: no cover - exercised only without the extra
         raise RuntimeError(
             "HTTP transport requires the 'uvicorn' package. Install it with: "
-            "pip install 'hwpx-mcp-server[http]' (or pip install uvicorn). "
+            "pip install 'python-hwpx-automation[http]' "
+            "(or 'hwpx-mcp-server[http]', or pip install uvicorn). "
             "The default stdio transport needs no extra."
         ) from exc
 
