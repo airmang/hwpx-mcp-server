@@ -1,16 +1,28 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Exact parity between core 4.x compatibility and MCP canonical owners."""
+"""Exact parity between core 4.x compatibility and MCP canonical owners.
+
+``hwpx.tools.redline`` (``author_demo_redline``, ``verify_redline``) is not
+being removed — the module-ownership ledger keeps it as core's tracked-change
+structural contract — so it stays imported live, unchanged below.
+
+``hwpx.tools.doc_diff.build_comparison_table_plan`` and
+``hwpx.tools.mail_merge.mail_merge`` *are* both gone as of python-hwpx 5.0
+(the modules themselves survive — ``doc_diff``'s other diff/reference parts
+and ``mail_merge``'s now-public ``merge_template_rows`` are still core — only
+these two specific wrapper functions were removed). Their expected outputs
+are read from ``tests/parity_fingerprints/document_ops.golden.json``,
+captured from a scratch git worktree at the commit before removal (see
+``scripts/freeze_parity_fingerprints.py --historical``) rather than a live
+import.
+"""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 from hwpx import HwpxDocument
-from hwpx.tools.doc_diff import (
-    build_comparison_table_plan as compatibility_comparison_plan,
-)
-from hwpx.tools.mail_merge import mail_merge as compatibility_mail_merge
 from hwpx.tools.redline import author_demo_redline
 from hwpx.tools.redline import verify_redline as compatibility_verify_redline
 
@@ -19,6 +31,11 @@ from hwpx_mcp_server.office.document_ops import (
     build_mail_merge,
     verify_redline,
 )
+
+_FIXTURES = Path(__file__).parent / "parity_fingerprints"
+DOCUMENT_OPS_GOLDEN = json.loads(
+    (_FIXTURES / "document_ops.golden.json").read_text(encoding="utf-8")
+)["calls"]
 
 
 class _UnavailableOracle:
@@ -89,7 +106,7 @@ def _mail_merge_projection(report: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def test_comparison_plan_is_exact() -> None:
+def test_comparison_plan_matches_frozen_core() -> None:
     old = ["제1조 목적", "제2조 예산"]
     new = ["제1조 목적", "제2조 예산 변경", "제3조 시행"]
 
@@ -98,43 +115,27 @@ def test_comparison_plan_is_exact() -> None:
         new,
         title="신구대조표",
         include_equal=False,
-    ) == compatibility_comparison_plan(
-        old,
-        new,
-        title="신구대조표",
-        include_equal=False,
-    )
+    ) == DOCUMENT_OPS_GOLDEN["comparisonPlan"]
 
 
-def test_mail_merge_policy_and_receipts_are_exact(tmp_path: Path) -> None:
+def test_mail_merge_policy_and_receipts_match_frozen_core(tmp_path: Path) -> None:
     template = tmp_path / "template.hwpx"
     _template(template)
     rows = [{"name": "홍길동", "phone": "010-1234-5678"}]
 
-    compatibility = compatibility_mail_merge(
-        template,
-        rows,
-        output_dir=tmp_path / "compatibility",
-    )
     canonical = build_mail_merge(
         template,
         rows,
         output_dir=tmp_path / "canonical",
     )
 
-    assert _mail_merge_projection(canonical) == _mail_merge_projection(
-        compatibility
-    )
-    compatibility_doc = HwpxDocument.open(
-        compatibility["rows"][0]["filename"]
-    )
+    assert _mail_merge_projection(canonical) == DOCUMENT_OPS_GOLDEN["mailMerge"]["projection"]
     canonical_doc = HwpxDocument.open(canonical["rows"][0]["filename"])
     try:
-        assert canonical_doc.export_text() == compatibility_doc.export_text()
+        assert canonical_doc.export_text() == DOCUMENT_OPS_GOLDEN["mailMerge"]["exportText"]
         assert "010-****-****" in canonical_doc.export_text()
     finally:
         canonical_doc.close()
-        compatibility_doc.close()
 
 
 def test_unavailable_oracle_redline_receipt_is_exact(tmp_path: Path) -> None:

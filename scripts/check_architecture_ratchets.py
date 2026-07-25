@@ -108,6 +108,9 @@ C901_PATHS = (
     "src/hwpx_mcp_server/workflow/service.py",
 )
 
+# report_parser arrived from python-hwpx unchanged in the 5.0 train — the S-099
+# authoring migration had left it behind. Its complexity is relocated, not new:
+# core's own ratchet lost the same function on the other side.
 EXPECTED_C901 = (
     ("src/hwpx_mcp_server/fastmcp_adapter.py", "_normalize_implicit_none_parameters", 13),
     ("src/hwpx_mcp_server/fastmcp_adapter.py", "_register", 19),
@@ -148,95 +151,32 @@ EXPECTED_C901 = (
     ("src/hwpx_mcp_server/office/authoring/builder/core.py", "_section_feature_flags", 14),
     ("src/hwpx_mcp_server/office/authoring/builder/core.py", "lower", 18),
     ("src/hwpx_mcp_server/office/authoring/presets/proposal.py", "create_proposal_document", 11),
+    ("src/hwpx_mcp_server/office/authoring/report_parser.py", "parse_government_report_text", 13),
     ("src/hwpx_mcp_server/office/authoring/template_analyzer.py", "main", 11),
-    (
-        "src/hwpx_mcp_server/office/compliance/official_lint.py",
-        "_paragraphs_from_document_plan",
-        14,
-    ),
+    ("src/hwpx_mcp_server/office/compliance/official_lint.py", "_paragraphs_from_document_plan", 14),
     ("src/hwpx_mcp_server/office/compliance/pii.py", "detect_pii", 13),
     ("src/hwpx_mcp_server/office/compliance/pii.py", "mask_value", 14),
-    (
-        "src/hwpx_mcp_server/office/evalplan/runtime.py",
-        "_build_3hak_ladder",
-        20,
-    ),
-    (
-        "src/hwpx_mcp_server/office/evalplan/runtime.py",
-        "_fill_2022_ladder_detailed",
-        14,
-    ),
-    (
-        "src/hwpx_mcp_server/office/evalplan/runtime.py",
-        "_fill_rubric_2022_ladder",
-        14,
-    ),
-    (
-        "src/hwpx_mcp_server/office/evalplan/runtime.py",
-        "_fill_rubric_ae_levels",
-        15,
-    ),
+    ("src/hwpx_mcp_server/office/evalplan/runtime.py", "_build_3hak_ladder", 20),
+    ("src/hwpx_mcp_server/office/evalplan/runtime.py", "_fill_2022_ladder_detailed", 14),
+    ("src/hwpx_mcp_server/office/evalplan/runtime.py", "_fill_rubric_2022_ladder", 14),
+    ("src/hwpx_mcp_server/office/evalplan/runtime.py", "_fill_rubric_ae_levels", 15),
     ("src/hwpx_mcp_server/office/evalplan/runtime.py", "_parse_subarea", 11),
-    (
-        "src/hwpx_mcp_server/office/evalplan/runtime.py",
-        "_prune_header_empty_bullets",
-        11,
-    ),
-    (
-        "src/hwpx_mcp_server/office/evalplan/runtime.py",
-        "_ratio_row_source",
-        14,
-    ),
-    (
-        "src/hwpx_mcp_server/office/evalplan/runtime.py",
-        "fill_achievement",
-        13,
-    ),
+    ("src/hwpx_mcp_server/office/evalplan/runtime.py", "_prune_header_empty_bullets", 11),
+    ("src/hwpx_mcp_server/office/evalplan/runtime.py", "_ratio_row_source", 14),
+    ("src/hwpx_mcp_server/office/evalplan/runtime.py", "fill_achievement", 13),
     ("src/hwpx_mcp_server/office/evalplan/runtime.py", "fill_ratio", 15),
     ("src/hwpx_mcp_server/office/evalplan/runtime.py", "fill_sections", 11),
-    (
-        "src/hwpx_mcp_server/office/evalplan/runtime.py",
-        "finalize_evalplan",
-        19,
-    ),
-    (
-        "src/hwpx_mcp_server/office/evalplan/runtime.py",
-        "plan_structural_ops",
-        12,
-    ),
-    (
-        "src/hwpx_mcp_server/office/form_fill/classification.py",
-        "_classify",
-        14,
-    ),
-    (
-        "src/hwpx_mcp_server/office/form_fill/fit/seal.py",
-        "find_seal_anchor",
-        11,
-    ),
-    (
-        "src/hwpx_mcp_server/office/form_fill/fit/wordbox.py",
-        "extract_glyph_boxes",
-        17,
-    ),
-    (
-        "src/hwpx_mcp_server/office/form_fill/fit/wordbox.py",
-        "verify_form_fill",
-        11,
-    ),
+    ("src/hwpx_mcp_server/office/evalplan/runtime.py", "finalize_evalplan", 19),
+    ("src/hwpx_mcp_server/office/evalplan/runtime.py", "plan_structural_ops", 12),
+    ("src/hwpx_mcp_server/office/form_fill/classification.py", "_classify", 14),
+    ("src/hwpx_mcp_server/office/form_fill/fit/seal.py", "find_seal_anchor", 11),
+    ("src/hwpx_mcp_server/office/form_fill/fit/wordbox.py", "extract_glyph_boxes", 17),
+    ("src/hwpx_mcp_server/office/form_fill/fit/wordbox.py", "verify_form_fill", 11),
     ("src/hwpx_mcp_server/office/form_fill/guidance.py", "to_markdown", 14),
-    (
-        "src/hwpx_mcp_server/office/form_fill/quality.py",
-        "detect_overflow_crossings",
-        11,
-    ),
+    ("src/hwpx_mcp_server/office/form_fill/quality.py", "detect_overflow_crossings", 11),
     ("src/hwpx_mcp_server/office/form_fill/quality.py", "score_content", 18),
     ("src/hwpx_mcp_server/office/form_fill/quality.py", "score_render", 12),
-    (
-        "src/hwpx_mcp_server/office/form_fill/template_formfit.py",
-        "_analyze_targets",
-        11,
-    ),
+    ("src/hwpx_mcp_server/office/form_fill/template_formfit.py", "_analyze_targets", 11),
     ("src/hwpx_mcp_server/office/quality/page_guard.py", "collect_metrics", 13),
     ("src/hwpx_mcp_server/office/quality/page_guard.py", "compare_metrics", 16),
     ("src/hwpx_mcp_server/ops_services/form_fields.py", "apply_evalplan_fill", 12),
@@ -255,6 +195,7 @@ EXPECTED_C901 = (
     ("src/hwpx_mcp_server/runtime.py", "_strict_call_tool_handler", 11),
     ("src/hwpx_mcp_server/workflow/service.py", "continue_workflow", 22),
 )
+
 
 
 def _package_modules() -> dict[str, Path]:

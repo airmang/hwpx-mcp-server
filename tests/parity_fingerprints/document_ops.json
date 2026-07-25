@@ -1,0 +1,58 @@
+{
+  "frozenFrom": "python-hwpx d980d310c947e2ae1418a3ca0a63c643e7fe195b (historical, pre-70d56ed)",
+  "modules": {
+    "hwpx.tools.doc_diff": {
+      "DOC_DIFF_REPORT_VERSION": {
+        "kind": "constant",
+        "value": "doc-diff-v1"
+      },
+      "REFERENCE_CONSISTENCY_REPORT_VERSION": {
+        "kind": "constant",
+        "value": "reference-consistency-v1"
+      },
+      "build_comparison_table_plan": {
+        "kind": "function",
+        "signature": "(old_source: 'Any', new_source: 'Any', *, title: 'str' = '신구대조표', include_equal: 'bool' = True) -> 'dict[str, Any]'"
+      },
+      "diff_paragraphs": {
+        "kind": "function",
+        "signature": "(old_paragraphs: 'Sequence[str]', new_paragraphs: 'Sequence[str]') -> 'list[dict[str, Any]]'"
+      },
+      "doc_diff": {
+        "kind": "function",
+        "signature": "(old_source: 'Any', new_source: 'Any') -> 'dict[str, Any]'"
+      },
+      "inspect_reference_consistency": {
+        "kind": "function",
+        "signature": "(source: 'Any') -> 'dict[str, Any]'"
+      }
+    },
+    "hwpx.tools.mail_merge": {
+      "MAIL_MERGE_REPORT_VERSION": {
+        "kind": "constant",
+        "value": "mail-merge-v1"
+      },
+      "ValueSanitizer": {
+        "kind": "function",
+        "signature": "(*args, **kwargs)"
+      },
+      "inspect_mail_merge_placeholders": {
+        "kind": "function",
+        "signature": "(source: 'str | Path | HwpxDocument') -> 'dict[str, Any]'"
+      },
+      "load_mail_merge_rows": {
+        "kind": "function",
+        "signature": "(data: 'str | Path | Sequence[Mapping[str, Any]] | Mapping[str, Any]') -> 'list[dict[str, Any]]'"
+      },
+      "mail_merge": {
+        "kind": "function",
+        "signature": "(template: 'str | Path', data: 'str | Path | Sequence[Mapping[str, Any]] | Mapping[str, Any]', *, output_dir: 'str | Path | None' = None, filename_pattern: 'str' = '{index:03d}.hwpx', zip_path: 'str | Path | None' = None, strict: 'bool' = False, split_newlines: 'bool' = True, fit_policy: \"'Any | None'\" = None, max_lines: 'int' = 1, masking_policy: \"'PIIPolicy | None'\" = PIIPolicy(mask_char='*', machine_enabled=True, contextual_enabled=True, prefix_len=1, suffix_len=0)) -> 'dict[str, Any]'"
+      },
+      "merge_template_rows": {
+        "kind": "function",
+        "signature": "(template: 'str | Path', data: 'str | Path | Sequence[Mapping[str, Any]] | Mapping[str, Any]', *, output_dir: 'str | Path | None' = None, filename_pattern: 'str' = '{index:03d}.hwpx', zip_path: 'str | Path | None' = None, strict: 'bool' = False, split_newlines: 'bool' = True, fit_policy: \"'Any | None'\" = None, max_lines: 'int' = 1, value_sanitizer: \"'ValueSanitizer | None'\" = None) -> 'dict[str, Any]'"
+      }
+    }
+  },
+  "schemaVersion": "hwpx.parity-fingerprint/v1"
+}

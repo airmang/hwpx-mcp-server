@@ -24,6 +24,14 @@ Core is resolved the same way ``tests/conftest.py`` resolves it for the test
 suite: an explicit ``PYTHON_HWPX_REPO`` pin, else the sibling worktree
 matching this repo's name (``hwpx-mcp-server-X`` -> ``python-hwpx-X``), else
 whatever ``hwpx`` is importable as. Never a bare unpinned ``../python-hwpx``.
+
+python-hwpx 5.0 (commit ``70d56ed``) physically removed a second wave of
+modules — agent, authoring, exam (already handled above), eval-plan,
+form-fill, official lint, PII, table compute — so they no longer exist in the
+worktree at all and cannot be imported live. For those, pass
+``--historical --domain <name>``: this checks out ``70d56ed^`` (its parent,
+the last commit that still had them) into a scratch ``git worktree``, imports
+from there, and removes the worktree afterward. See ``HISTORICAL_DOMAINS``.
 """
 
 from __future__ import annotations
@@ -34,8 +42,10 @@ import importlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from types import ModuleType
 
@@ -43,10 +53,13 @@ ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 OUTPUT_DIR = TESTS / "parity_fingerprints"
 SCHEMA_VERSION = "hwpx.parity-fingerprint/v1"
+REMOVAL_COMMIT = "70d56ed"
+HISTORICAL_COMMIT = f"{REMOVAL_COMMIT}^"
 
 if str(TESTS) not in sys.path:
     sys.path.insert(0, str(TESTS))
 
+import parity_fingerprint
 from parity_fingerprint import fingerprint
 
 # Domain name -> dotted core module names that domain's parity test imports
@@ -94,6 +107,33 @@ DOMAINS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# Domain name -> dotted module names that no longer exist in the live
+# worktree at all (removed in 70d56ed, python-hwpx 5.0) and must be frozen
+# from HISTORICAL_COMMIT via a scratch git worktree instead (--historical).
+#
+# "form_fill_module" (hwpx.form_fill) is deliberately a separate domain/file
+# from the existing "form_fill" (hwpx.guidance_scan, frozen earlier from the
+# live worktree, already committed) — mixing a live-frozen and a
+# historical-frozen module under one frozenFrom commit would be misleading,
+# and the existing form_fill.json must not be touched.
+#
+# hwpx.tools.page_guard is NOT here: it is not being removed (module-ownership
+# ledger: "page-guard CLI retained"), so test_policy_runtime_owner_parity.py
+# keeps comparing it live.
+HISTORICAL_DOMAINS: dict[str, tuple[str, ...]] = {
+    "document_ops": (
+        "hwpx.tools.doc_diff",
+        "hwpx.tools.mail_merge",
+    ),
+    "evalplan": ("hwpx.evalplan_fill",),
+    "form_fill_module": ("hwpx.form_fill",),
+    "policy": (
+        "hwpx.tools.official_lint",
+        "hwpx.tools.pii",
+        "hwpx.tools.table_compute",
+    ),
+}
+
 
 def _matching_core_repo() -> Path:
     return ROOT.parent / ROOT.name.replace("hwpx-mcp-server", "python-hwpx", 1)
@@ -131,6 +171,43 @@ def core_git_sha(core_repo: Path) -> str:
         check=True,
     )
     return result.stdout.strip()
+
+
+def create_historical_worktree(core_repo: Path, commit: str) -> tuple[Path, str]:
+    """Check out ``commit`` into a scratch git worktree and return its root + sha.
+
+    A worktree (rather than ``git show`` per file) is used because a package
+    ``__init__.py`` transitively imports sibling modules — e.g. importing
+    ``hwpx.tools.official_lint`` alone still executes ``hwpx/tools/__init__.py``,
+    which imports several other tool modules. Reconstructing only the
+    requested files risks an inconsistent partial tree; checking out the full
+    historical source doesn't.
+    """
+
+    resolved_sha = subprocess.run(
+        ["git", "-C", str(core_repo), "rev-parse", commit],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    scratch = Path(tempfile.mkdtemp(prefix="hwpx-core-history-"))
+    subprocess.run(
+        ["git", "-C", str(core_repo), "worktree", "add", "--detach", str(scratch), resolved_sha],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return scratch, resolved_sha
+
+
+def remove_historical_worktree(core_repo: Path, scratch: Path) -> None:
+    subprocess.run(
+        ["git", "-C", str(core_repo), "worktree", "remove", "--force", str(scratch)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    shutil.rmtree(scratch, ignore_errors=True)
 
 
 def _import_core_module(dotted_name: str) -> ModuleType:
@@ -568,8 +645,399 @@ GOLDEN_BUILDERS: dict[str, object] = {
 }
 
 
-def render_golden(domain: str, *, frozen_from: str) -> str | None:
-    builder = GOLDEN_BUILDERS.get(domain)
+# --- Historical golden builders (freeze from HISTORICAL_COMMIT) --------
+
+
+def _mail_merge_projection(report: dict[str, object]) -> dict[str, object]:
+    """Mirror test_document_operations_parity.py's own ``_mail_merge_projection``.
+
+    Deliberately excludes ``outputDir``/``template``/row``filename`` — the
+    original test already designed this projection to never compare an
+    absolute path, which is exactly what a frozen-at-one-machine golden
+    needs. Nothing new to normalise here.
+    """
+
+    row = report["rows"][0]  # type: ignore[index]
+    return {
+        "report_version": report["report_version"],
+        "placeholderKeys": report["placeholderKeys"],
+        "fitAware": report["fitAware"],
+        "rowCount": report["rowCount"],
+        "createdCount": report["createdCount"],
+        "rowsWithIssues": report["rowsWithIssues"],
+        "ok": report["ok"],
+        "openSafety": report["openSafety"],
+        "row": {
+            key: row[key]
+            for key in (
+                "rowIndex",
+                "created",
+                "replacedCount",
+                "missingKeys",
+                "unresolvedPlaceholders",
+                "openSafety",
+                "fitFields",
+                "maskedFields",
+                "reasons",
+                "ok",
+            )
+        },
+    }
+
+
+def _build_document_ops_golden() -> dict[str, object]:
+    doc_diff = _import_core_module("hwpx.tools.doc_diff")
+    mail_merge_module = _import_core_module("hwpx.tools.mail_merge")
+    document_module = _import_core_module("hwpx.document")
+
+    old = ["제1조 목적", "제2조 예산"]
+    new = ["제1조 목적", "제2조 예산 변경", "제3조 시행"]
+    comparison_plan = doc_diff.build_comparison_table_plan(
+        old, new, title="신구대조표", include_equal=False
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        template = tmp_path / "template.hwpx"
+        document = document_module.HwpxDocument.new()
+        try:
+            document.add_paragraph("name={{name}} / phone={{phone}}")
+            document.save_to_path(template)
+        finally:
+            document.close()
+
+        rows = [{"name": "홍길동", "phone": "010-1234-5678"}]
+        report = mail_merge_module.mail_merge(
+            template, rows, output_dir=tmp_path / "compatibility"
+        )
+        projection = _mail_merge_projection(report)
+
+        created = document_module.HwpxDocument.open(report["rows"][0]["filename"])
+        try:
+            export_text = created.export_text()
+        finally:
+            created.close()
+
+    return {
+        "comparisonPlan": comparison_plan,
+        "mailMerge": {
+            "projection": projection,
+            "exportText": export_text,
+        },
+    }
+
+
+_EVALPLAN_SYNTHETIC_MD = """# 2026학년도 2학기 3학년 「합성 과목」 교수학습운영 및 평가계획
+
+> **담당교사: 홍길동**
+
+## Ⅰ. 교수학습 운영 계획
+
+| 월 | 주 | 단원 | 성취기준 | 수업방법 | 주안점 |
+|---|---|---|---|---|---|
+| 8 | 3 | 단원1 | [12합성01-01] | 강의 | 주안점1 |
+
+## Ⅱ. 평가 세부 계획
+
+### 1. 평가의 목적
+가. 목적 하나.
+
+### 2. 평가의 기본 방향
+가. 방향 하나.
+
+### 3. 평가 방침
+가. 방침 하나.
+
+### 4. 성취기준 및 성취수준
+**가. 교육과정 성취기준·평가기준(상/중/하)**
+
+| 성취기준 | 상 | 중 | 하 |
+|---|---|---|---|
+| [12합성01-01] 표준 하나 | 상1 | 중1 | 하1 |
+
+**나. 영역별 성취수준(A/B/C)**
+
+| 영역 | A | B | C |
+|---|---|---|---|
+| 영역 가 | A1 | B1 | C1 |
+
+### 5. 기준 성취율과 성취도
+| 성취율(원점수) | 성취도 |
+|---|---|
+| 80% 이상 | A |
+| 60% 이상 ~ 80% 미만 | B |
+| 60% 미만 | C |
+
+### 6. 평가의 종류와 반영비율
+| 구분 | ① 영역 가 | ② 영역 나 | 합계 |
+|---|---|---|---|
+| 영역 만점 | 60점(60%) | 40점(40%) | 100% |
+
+### 7. 수행평가 세부기준
+**① 영역 가 (60점)** · [12합성01-01]
+
+| 평가항목 | 채점 기준(배점) |
+|---|---|
+| 항목1 | 완비 **40** / 부분 **20** |
+| 기본점수 **18** · 장기 미인정 결석 **17** | |
+
+### 8. 정의적 능력 평가
+- 요소 하나.
+
+### 9. 수행평가 미응시자
+가. 처리 하나.
+
+### 10. 평가 유의사항
+- 유의 하나.
+
+### 11. 평가 결과 분석 및 활용
+- 활용 하나.
+"""
+_EVALPLAN_DETAILED_S7 = """### 7. 수행평가 세부기준
+
+#### ① 영역 가
+
+- **평가 영역명**: 영역 가 ｜ **영역 만점**: 60점
+- **수행과제**: 합성 과제
+- **성취기준 / 성취수준(A~E)**: [12합성01-01]
+- **평가 방법**: ☑ 산출물
+
+**［세부 영역 가. 세부 하나 (60점)］ 평가요소 ｜ 수행수준(채점 기준) ｜ 배점**
+
+| 평가요소 | 수행수준(채점 기준) | 배점 |
+|---|---|---|
+| 항목1 | 완비하여 산출함 | 40 |
+| | 부분만 완성함 | 20 |
+| **가. 소계** | | **60** |
+
+**［영역 공통］**
+
+| 구분 | 배점 |
+|---|---|
+| 기본점수 | 18 |
+| 장기 미인정 결석자 | 17 |
+
+"""
+_EVALPLAN_DETAILED_MD = (
+    _EVALPLAN_SYNTHETIC_MD[: _EVALPLAN_SYNTHETIC_MD.index("### 7. 수행평가 세부기준")]
+    + _EVALPLAN_DETAILED_S7
+    + _EVALPLAN_SYNTHETIC_MD[_EVALPLAN_SYNTHETIC_MD.index("### 8. 정의적 능력 평가") :]
+)
+# A relative, deterministic non-existent path: parse_review_file embeds the
+# path it was given verbatim (not resolved to absolute), so this string
+# reproduces byte-identically whether captured here or replayed at test time
+# — unlike pytest's tmp_path, which is a fresh absolute path every run.
+_EVALPLAN_MISSING_PATH = "__parity_fixture_missing__/missing-review.md"
+
+
+def _build_evalplan_golden() -> dict[str, object]:
+    import hashlib
+
+    frozen = _import_core_module("hwpx.evalplan_fill")
+
+    fixtures_dir = (
+        Path(frozen.__file__).resolve().parents[2] / "tests" / "fixtures" / "m105_evalplan"
+    )
+    blank_3hak = fixtures_dir / "blank_form_3hak.hwpx"
+    if not blank_3hak.is_file():
+        raise RuntimeError(f"evalplan fixture missing at historical checkout: {blank_3hak}")
+
+    def _parse_projection(markdown: str) -> dict[str, object]:
+        content = frozen.parse_review_md(markdown)
+        return {
+            "toDict": content.to_dict(),
+            "asDict": dataclasses.asdict(content),
+            "expectedSkeleton": frozen.expected_skeleton(content),
+        }
+
+    parses = {
+        "synthetic": _parse_projection(_EVALPLAN_SYNTHETIC_MD),
+        "detailed": _parse_projection(_EVALPLAN_DETAILED_MD),
+    }
+
+    empty_partial = {}
+    for key, markdown in (
+        ("empty", ""),
+        ("titleOnly", "# 제목만"),
+        ("s7Only", "### 7. 수행평가 세부기준\n"),
+    ):
+        content = frozen.parse_review_md(markdown)
+        empty_partial[key] = dataclasses.asdict(content)
+
+    fill_cases = {}
+    for phase, md_key, markdown in (
+        ("structural", "synthetic", _EVALPLAN_SYNTHETIC_MD),
+        ("all", "synthetic", _EVALPLAN_SYNTHETIC_MD),
+        ("clean", "synthetic", _EVALPLAN_SYNTHETIC_MD),
+        ("clean", "detailed", _EVALPLAN_DETAILED_MD),
+    ):
+        content = frozen.parse_review_md(markdown)
+        structural = frozen.plan_structural_ops(blank_3hak, content)
+        result = frozen.fill_evalplan(blank_3hak, content, phase=phase)
+        data = result.pop("_data")
+        fill_cases[f"{phase}:{md_key}"] = {
+            "structuralOps": structural,
+            "fillResult": result,
+            "dataSha256": hashlib.sha256(data).hexdigest(),
+            "dataLength": len(data),
+        }
+
+    try:
+        frozen.parse_review_file(_EVALPLAN_MISSING_PATH)
+        missing_error = None
+    except FileNotFoundError as exc:
+        missing_error = {"type": type(exc).__name__, "message": str(exc)}
+
+    # RubricItem/RubricSubArea are reachable module attributes but not in
+    # __all__ (Rubric.items holds RubricItem, RubricSubArea composes it) —
+    # the pre-freeze test checked their dataclass shape explicitly by name,
+    # so this golden does too, via the same describe_class the fingerprint
+    # module uses for every other dataclass.
+    extra_dataclasses = {
+        name: parity_fingerprint._describe_class(getattr(frozen, name))
+        for name in ("RubricItem", "RubricSubArea")
+    }
+
+    return {
+        "parses": parses,
+        "emptyPartial": empty_partial,
+        "fillCases": fill_cases,
+        "missingInputError": missing_error,
+        "extraDataclasses": extra_dataclasses,
+    }
+
+
+def _build_form_fill_module_golden() -> dict[str, object]:
+    import base64
+
+    frozen_split = _import_core_module("hwpx.form_fill")
+    scenarios = json.loads(
+        (TESTS / "form_fill_runtime_parity" / "scenarios.json").read_text(encoding="utf-8")
+    )
+    scenario = scenarios["splitRun"]
+    section = scenario["section"].encode()
+
+    found = frozen_split.find_split_placeholders(section)
+    section_bytes, report = frozen_split.fill_section_bytes(section, scenario["mappings"])
+
+    refusal_messages = []
+    for _ in range(2):  # the live test calls find_split_placeholders twice (canonical + frozen)
+        try:
+            frozen_split.find_split_placeholders(scenario["invalidSection"].encode())
+        except ValueError as exc:
+            refusal_messages.append(str(exc))
+
+    return {
+        "foundPlaceholders": _plain_for_json(found),
+        "filledSectionBase64": base64.b64encode(section_bytes).decode("ascii"),
+        "fillReport": _plain_for_json(report),
+        "invalidSectionRefusalMessage": refusal_messages[0] if refusal_messages else None,
+    }
+
+
+def _plain_for_json(value: object) -> object:
+    """dataclasses.asdict-style flattening, matching the parity tests' own
+    ``_plain`` helper so the golden shape matches what the live test builds."""
+
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {
+            field.name: _plain_for_json(getattr(value, field.name))
+            for field in dataclasses.fields(value)
+        }
+    if isinstance(value, dict):
+        return {key: _plain_for_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain_for_json(item) for item in value]
+    return value
+
+
+def _build_policy_golden() -> dict[str, object]:
+    official_lint = _import_core_module("hwpx.tools.official_lint")
+    pii = _import_core_module("hwpx.tools.pii")
+    table_compute = _import_core_module("hwpx.tools.table_compute")
+
+    paragraphs = [
+        "1. 추진 목적",
+        "  가. 세부 내용",
+        "일시: 2026. 7. 24.",
+        "금액: 금1,000원",
+        "붙임  1. 자료 1부.  끝.",
+    ]
+    lint_result = official_lint.inspect_official_document_style(
+        paragraphs, document_type="gongmun"
+    )
+
+    text = "성명: 홍길동 / 010-1234-5678 / hong@example.com"
+    pii_results = {
+        "detectPii": pii.detect_pii(text),
+        "maskPii": pii.mask_pii(text),
+        "maskValue": {
+            kind: pii.mask_value(value, kind)
+            for kind, value in (
+                ("phone", "010-1234-5678"),
+                ("email", "hong@example.com"),
+                ("name", "홍길동"),
+            )
+        },
+        "minimizeFields": pii.minimize_fields(
+            {"name": "홍길동", "empty": "", "score": 0},
+            ["score", "empty", "name"],
+            drop_empty=True,
+        ),
+        "deidentify": pii.deidentify("홍길동", salt="s100"),
+    }
+    try:
+        pii.PIIPolicy(mask_char="**")
+        pii_policy_error = None
+    except Exception as exc:  # noqa: BLE001 - parity projects the public error
+        pii_policy_error = {"type": type(exc).__name__, "message": str(exc)}
+
+    table = {
+        "type": "table",
+        "columns": [
+            {"key": "team", "label": "팀"},
+            {"key": "amount", "label": "금액"},
+        ],
+        "rows": [
+            {"team": "A", "amount": "1,000원"},
+            {"team": "A", "amount": "2,000원"},
+            {"team": "B", "amount": ""},
+        ],
+    }
+    table_kwargs = {
+        "value_columns": ["amount"],
+        "operations": ["subtotal", "sum", "average"],
+        "group_by": "team",
+        "label_column": "team",
+    }
+    table_result = table_compute.table_compute(table, **table_kwargs)
+    try:
+        table_compute.table_compute([{"amount": 1}], operations=["median"])
+        table_compute_error = None
+    except Exception as exc:  # noqa: BLE001 - parity projects the public error
+        table_compute_error = {"type": type(exc).__name__, "message": str(exc)}
+
+    return {
+        "officialLintResult": lint_result,
+        "pii": pii_results,
+        "piiPolicyError": pii_policy_error,
+        "tableComputeResult": table_result,
+        "tableComputeError": table_compute_error,
+    }
+
+
+HISTORICAL_GOLDEN_BUILDERS: dict[str, object] = {
+    "document_ops": _build_document_ops_golden,
+    "evalplan": _build_evalplan_golden,
+    "form_fill_module": _build_form_fill_module_golden,
+    "policy": _build_policy_golden,
+}
+
+
+def render_golden(
+    domain: str, *, frozen_from: str, builders: dict[str, object] = GOLDEN_BUILDERS
+) -> str | None:
+    builder = builders.get(domain)
     if builder is None:
         return None
     payload = {
@@ -594,21 +1062,7 @@ def _sync(path: Path, content: str, *, check: bool) -> bool:
     return True
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="verify the checked-in JSON matches a fresh freeze instead of writing",
-    )
-    parser.add_argument(
-        "--domain",
-        action="append",
-        choices=sorted(DOMAINS),
-        help="freeze only this domain (repeatable); default: all domains",
-    )
-    args = parser.parse_args()
-
+def _run_live(args: argparse.Namespace) -> int:
     core_repo = resolve_core_repo()
     core_src = core_repo / "src"
     if not core_src.is_dir():
@@ -623,15 +1077,84 @@ def main() -> int:
     domains = args.domain or sorted(DOMAINS)
     ok = True
     for domain in domains:
+        if domain not in DOMAINS:
+            print(f"error: {domain!r} is not a live domain; pass --historical", file=sys.stderr)
+            return 1
         content = render_domain(domain, DOMAINS[domain], frozen_from=frozen_from)
         if not _sync(OUTPUT_DIR / f"{domain}.json", content, check=args.check):
             ok = False
-        golden = render_golden(domain, frozen_from=frozen_from)
+        golden = render_golden(domain, frozen_from=frozen_from, builders=GOLDEN_BUILDERS)
         if golden is not None and not _sync(
             OUTPUT_DIR / f"{domain}.golden.json", golden, check=args.check
         ):
             ok = False
     return 0 if ok else 1
+
+
+def _run_historical(args: argparse.Namespace) -> int:
+    core_repo = resolve_core_repo()
+    domains = args.domain or sorted(HISTORICAL_DOMAINS)
+    for domain in domains:
+        if domain not in HISTORICAL_DOMAINS:
+            print(f"error: {domain!r} is not a historical domain", file=sys.stderr)
+            return 1
+
+    scratch, resolved_sha = create_historical_worktree(core_repo, HISTORICAL_COMMIT)
+    try:
+        scratch_src = scratch / "src"
+        if not scratch_src.is_dir():
+            print(f"error: {scratch_src} missing in historical checkout", file=sys.stderr)
+            return 1
+        sys.path.insert(0, str(scratch_src))
+
+        frozen_from = f"python-hwpx {resolved_sha} (historical, pre-{REMOVAL_COMMIT})"
+        print(f"freezing from: {frozen_from}")
+        print(f"  scratch worktree: {scratch}")
+
+        ok = True
+        for domain in domains:
+            content = render_domain(domain, HISTORICAL_DOMAINS[domain], frozen_from=frozen_from)
+            if not _sync(OUTPUT_DIR / f"{domain}.json", content, check=args.check):
+                ok = False
+            golden = render_golden(
+                domain, frozen_from=frozen_from, builders=HISTORICAL_GOLDEN_BUILDERS
+            )
+            if golden is not None and not _sync(
+                OUTPUT_DIR / f"{domain}.golden.json", golden, check=args.check
+            ):
+                ok = False
+        return 0 if ok else 1
+    finally:
+        sys.path.remove(str(scratch_src)) if str(scratch_src) in sys.path else None
+        remove_historical_worktree(core_repo, scratch)
+        print(f"removed scratch worktree: {scratch}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="verify the checked-in JSON matches a fresh freeze instead of writing",
+    )
+    parser.add_argument(
+        "--historical",
+        action="store_true",
+        help=(
+            "freeze HISTORICAL_DOMAINS (modules removed in "
+            f"{REMOVAL_COMMIT}, python-hwpx 5.0) from a scratch worktree at "
+            f"{HISTORICAL_COMMIT} instead of the live DOMAINS"
+        ),
+    )
+    parser.add_argument(
+        "--domain",
+        action="append",
+        choices=sorted(set(DOMAINS) | set(HISTORICAL_DOMAINS)),
+        help="freeze only this domain (repeatable); default: all domains for the selected mode",
+    )
+    args = parser.parse_args()
+
+    return _run_historical(args) if args.historical else _run_live(args)
 
 
 if __name__ == "__main__":

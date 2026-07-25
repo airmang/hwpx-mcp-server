@@ -407,7 +407,11 @@ def test_label_cell_normalizes_merged_logical_coordinate(tmp_path: Path) -> None
 
 def test_evalplan_remains_available_and_exam_is_not_imported() -> None:
     import hwpx_mcp_server.office.agent.form_plan as form_plan
-    import hwpx.evalplan_fill as evalplan_fill
+
+    # hwpx.evalplan_fill no longer exists in core (removed in python-hwpx
+    # 5.0); the MCP owner is now the only implementation, so "evalplan is
+    # still available" points at hwpx_mcp_server.office.evalplan.runtime.
+    import hwpx_mcp_server.office.evalplan.runtime as evalplan_runtime
 
     tree = ast.parse(Path(form_plan.__file__).read_text(encoding="utf-8"))
     imported = {
@@ -422,5 +426,5 @@ def test_evalplan_remains_available_and_exam_is_not_imported() -> None:
         if isinstance(node, ast.ImportFrom)
     )
     assert not any(name == "hwpx.exam" or name.startswith("hwpx.exam.") for name in imported)
-    assert callable(evalplan_fill.parse_review_md)
-    assert callable(evalplan_fill.fill_evalplan)
+    assert callable(evalplan_runtime.parse_review_md)
+    assert callable(evalplan_runtime.fill_evalplan)

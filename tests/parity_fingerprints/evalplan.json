@@ -1,0 +1,184 @@
+{
+  "frozenFrom": "python-hwpx d980d310c947e2ae1418a3ca0a63c643e7fe195b (historical, pre-70d56ed)",
+  "modules": {
+    "hwpx.evalplan_fill": {
+      "EvalPlanContent": {
+        "bases": [],
+        "fields": {
+          "absentee": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "achieve_rate": {
+            "hasDefault": true,
+            "type": "list[list[str]]"
+          },
+          "achievement_std": {
+            "hasDefault": true,
+            "type": "list[list[str]]"
+          },
+          "affective": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "analysis": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "cautions": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "directions": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "levels": {
+            "hasDefault": true,
+            "type": "list[list[str]]"
+          },
+          "policies": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "purposes": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "ratio_header": {
+            "hasDefault": true,
+            "type": "list[str]"
+          },
+          "ratio_rows": {
+            "hasDefault": true,
+            "type": "list[list[str]]"
+          },
+          "rubrics": {
+            "hasDefault": true,
+            "type": "list[Rubric]"
+          },
+          "schedule": {
+            "hasDefault": true,
+            "type": "list[list[str]]"
+          },
+          "teacher": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "title": {
+            "hasDefault": true,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "Rubric": {
+        "bases": [],
+        "fields": {
+          "base_score": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "criteria": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "long_score": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "method": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "points": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "rows": {
+            "hasDefault": true,
+            "type": "list[list[str]]"
+          },
+          "standards": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "student_notes": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "subareas": {
+            "hasDefault": true,
+            "type": "list[RubricSubArea]"
+          },
+          "task": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "title": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "detailed": "property(self) -> 'bool'",
+          "items": "property(self) -> 'list[RubricItem]'",
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "expected_skeleton": {
+        "kind": "function",
+        "signature": "(content: 'EvalPlanContent', blank: 'str | Path | None' = None) -> 'dict[str, int]'"
+      },
+      "fill_achievement": {
+        "kind": "function",
+        "signature": "(data: 'bytes', content: 'EvalPlanContent') -> 'tuple[bytes, dict[str, Any]]'"
+      },
+      "fill_evalplan": {
+        "kind": "function",
+        "signature": "(blank: 'str | Path', content: 'EvalPlanContent', *, output: 'str | None' = None, phase: 'str' = 'structural') -> 'dict[str, Any]'"
+      },
+      "fill_levels": {
+        "kind": "function",
+        "signature": "(data: 'bytes', content: 'EvalPlanContent') -> 'tuple[bytes, dict[str, Any]]'"
+      },
+      "fill_ratio": {
+        "kind": "function",
+        "signature": "(data: 'bytes', content: 'EvalPlanContent') -> 'tuple[bytes, dict[str, Any]]'"
+      },
+      "fill_rubrics": {
+        "kind": "function",
+        "signature": "(data: 'bytes', content: 'EvalPlanContent') -> 'tuple[bytes, dict[str, Any]]'"
+      },
+      "fill_schedule": {
+        "kind": "function",
+        "signature": "(data: 'bytes', content: 'EvalPlanContent') -> 'tuple[bytes, dict[str, Any]]'"
+      },
+      "fill_sections": {
+        "kind": "function",
+        "signature": "(data: 'bytes', content: 'EvalPlanContent') -> 'tuple[bytes, dict[str, Any]]'"
+      },
+      "finalize_evalplan": {
+        "kind": "function",
+        "signature": "(data: 'bytes', content: 'EvalPlanContent') -> 'tuple[bytes, dict[str, Any]]'"
+      },
+      "parse_review_file": {
+        "kind": "function",
+        "signature": "(path: 'str | Path') -> 'EvalPlanContent'"
+      },
+      "parse_review_md": {
+        "kind": "function",
+        "signature": "(md_text: 'str') -> 'EvalPlanContent'"
+      },
+      "plan_structural_ops": {
+        "kind": "function",
+        "signature": "(blank: 'str | Path', content: 'EvalPlanContent | None' = None) -> 'dict[str, Any]'"
+      }
+    }
+  },
+  "schemaVersion": "hwpx.parity-fingerprint/v1"
+}

@@ -156,15 +156,15 @@ def test_artifact_materializing_render_tools_are_marked_mutating() -> None:
 
 def test_release_contract_versions_counts_and_hash_are_exact() -> None:
     assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
-        "4.2.0",
-        "5.1.0",
-        "0.8.0",
+        "5.0.0",
+        "6.0.0",
+        "1.0.0",
     )
     assert len(expected_tool_names(advanced=False)) == 119
     assert len(expected_tool_names(advanced=True)) == 127
     assert len(skill_required_tool_names()) == 28
-    assert RELEASED_CONTRACT_HASH == "429cb6706323e762"
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "429cb6706323e762"
+    assert RELEASED_CONTRACT_HASH == "9bfc7ec7b0c3c62b"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "9bfc7ec7b0c3c62b"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 
@@ -353,9 +353,21 @@ import hwpx_mcp_server.server  # noqa: F401
 
 
 def test_missing_frozen_core_authoring_symbol_does_not_break_mcp_startup() -> None:
+    """Startup must survive core not carrying the authoring names — and now it does.
+
+    The 4.x version simulated the absence with delattr. From python-hwpx 5.0 the
+    absence is simply the truth: create_document_from_plan lives in this package,
+    not in core. Asserting the name is gone as well as that startup works keeps
+    the guarantee meaningful — a delattr on a name that no longer exists would
+    raise, and a test that only imports the server would no longer be testing
+    anything about missing core symbols.
+    """
+
     code = """
 import hwpx
-delattr(hwpx, 'create_document_from_plan')
+assert not hasattr(hwpx, 'create_document_from_plan'), (
+    'core still exposes an authoring name this package owns'
+)
 import hwpx_mcp_server.server  # noqa: F401
 """
     result = subprocess.run(

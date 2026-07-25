@@ -1,27 +1,29 @@
 # SPDX-License-Identifier: Apache-2.0
 """Behavior parity between the MCP owner and the frozen core 4.x copy.
 
-``hwpx.form_fill`` and ``hwpx.form_fit`` are not being deleted from core (see
-the S-049 library-extraction plan) — MCP imports the fit family on purpose as
-a neutral contract, and core's split-run helpers stay as an independent
-compatibility copy. Both are compared against live below.
+``hwpx.form_fit`` is not being deleted from core — MCP imports the fit family
+on purpose as a neutral contract (core's own table/field APIs call it too).
+It is compared against live below, unchanged.
 
-``hwpx.guidance_scan`` *is* scheduled for deletion, so
-``test_instruction_lexicon_parity`` no longer imports it. Its expected
-outputs were captured once from core's ``is_form_instruction`` (commit
-recorded in ``tests/parity_fingerprints/form_fill.json``) into
-``instructionSamplesExpected`` in the scenarios fixture below, the same way
-``splitRun``/``fitCases`` already pin expected shapes as fixture data rather
-than live core calls.
+``hwpx.guidance_scan`` and ``hwpx.form_fill`` *are* both gone from core as of
+python-hwpx 5.0. ``test_instruction_lexicon_parity`` already didn't need a
+live import (captured earlier into ``instructionSamplesExpected`` in the
+scenarios fixture below). ``test_split_run_scan_fill_and_refusal_parity``
+did need one — it compared core's split-run helpers against the MCP owner's.
+Its expected outputs are now read from
+``tests/parity_fingerprints/form_fill_module.golden.json``, captured from a
+scratch git worktree at the commit before removal (see
+``scripts/freeze_parity_fingerprints.py --historical``) rather than a live
+``hwpx.form_fill`` import.
 """
 from __future__ import annotations
 
+import base64
 import dataclasses
 import json
 from pathlib import Path
 from typing import Any
 
-from hwpx import form_fill as frozen_split
 from hwpx import form_fit as frozen_fit
 
 from hwpx_mcp_server.office.form_fill import split_run as canonical_split
@@ -44,6 +46,10 @@ SCENARIOS = json.loads(
         / "scenarios.json"
     ).read_text(encoding="utf-8")
 )
+_FIXTURES = Path(__file__).parent / "parity_fingerprints"
+FORM_FILL_MODULE_GOLDEN = json.loads(
+    (_FIXTURES / "form_fill_module.golden.json").read_text(encoding="utf-8")
+)["calls"]
 
 
 def _plain(value: Any) -> Any:
@@ -63,28 +69,23 @@ def test_split_run_scan_fill_and_refusal_parity() -> None:
     scenario = SCENARIOS["splitRun"]
     section = scenario["section"].encode()
     canonical_found = canonical_split.find_split_placeholders(section)
-    frozen_found = frozen_split.find_split_placeholders(section)
-    assert _plain(canonical_found) == _plain(frozen_found)
+    assert _plain(canonical_found) == FORM_FILL_MODULE_GOLDEN["foundPlaceholders"]
 
     canonical_bytes, canonical_report = canonical_split.fill_section_bytes(
         section, scenario["mappings"]
     )
-    frozen_bytes, frozen_report = frozen_split.fill_section_bytes(
-        section, scenario["mappings"]
+    assert base64.b64encode(canonical_bytes).decode("ascii") == (
+        FORM_FILL_MODULE_GOLDEN["filledSectionBase64"]
     )
-    assert canonical_bytes == frozen_bytes
-    assert _plain(canonical_report) == _plain(frozen_report)
+    assert _plain(canonical_report) == FORM_FILL_MODULE_GOLDEN["fillReport"]
 
-    for implementation in (
-        canonical_split.find_split_placeholders,
-        frozen_split.find_split_placeholders,
-    ):
-        try:
-            implementation(scenario["invalidSection"].encode())
-        except ValueError as exc:
-            assert "invalid section XML" in str(exc)
-        else:  # pragma: no cover - explicit refusal gate
-            raise AssertionError("invalid XML must be refused")
+    try:
+        canonical_split.find_split_placeholders(scenario["invalidSection"].encode())
+    except ValueError as exc:
+        assert "invalid section XML" in str(exc)
+        assert str(exc) == FORM_FILL_MODULE_GOLDEN["invalidSectionRefusalMessage"]
+    else:  # pragma: no cover - explicit refusal gate
+        raise AssertionError("invalid XML must be refused")
 
 
 def test_fit_measurement_and_policy_parity() -> None:

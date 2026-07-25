@@ -27,14 +27,17 @@ from .fastmcp_adapter import (
 )
 
 
-MIN_PYTHON_HWPX = "4.2.0"
-MIN_MCP_VERSION = "5.1.0"
-MIN_SKILL_VERSION = "0.8.0"
+MIN_PYTHON_HWPX = "5.0.0"
+# The 5.0 train: core drops the workflow surfaces and the `hwpx` console name,
+# this package picks the name up, and the plugin pins both. The three move
+# together — a mixed set is what "no valid install has two declarers" rules out.
+MIN_MCP_VERSION = "6.0.0"
+MIN_SKILL_VERSION = "1.0.0"
 # Frozen release receipt for non-runtime services. Runtime construction still
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "429cb6706323e762"
+RELEASED_CONTRACT_HASH = "9bfc7ec7b0c3c62b"
 
 
 class ToolClassification(str, Enum):

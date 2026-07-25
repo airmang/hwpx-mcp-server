@@ -1,15 +1,41 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Behavior parity between the MCP owner and the frozen core 4.x copy."""
+"""Behavior parity between the MCP owner and the frozen core 4.x copy.
+
+``hwpx.evalplan_fill`` is gone from core as of python-hwpx 5.0. Structural
+claims (exports, signatures, dataclass fields) compare the live MCP module's
+``tests.parity_fingerprint.fingerprint()`` against
+``tests/parity_fingerprints/evalplan.json``. ``RubricItem``/``RubricSubArea``
+are reachable module attributes but not in ``__all__`` (``Rubric.items``
+holds a list of ``RubricItem``; ``RubricSubArea`` composes it) — the
+pre-freeze version of this file checked their dataclass shape explicitly by
+name, so this one does too, via the same ``parity_fingerprint._describe_class``
+the fingerprint module itself uses. Behavioural claims (parsing, skeleton
+projection, structural-ops planning, and the fill/finalize byte output) compare
+against ``tests/parity_fingerprints/evalplan.golden.json``. Both were captured
+from a scratch git worktree at the commit before removal (see
+``scripts/freeze_parity_fingerprints.py --historical``) rather than a live
+``hwpx.evalplan_fill`` import.
+
+The filled document's raw bytes (``result["_data"]``) can't live in JSON —
+the golden records their SHA-256 and length instead, the same tradeoff
+``test_exam_runtime_parity.py`` made for its composed output.
+
+Every assertion the pre-freeze version of this file made is still made here;
+none needed dropping.
+"""
 
 from __future__ import annotations
 
 import dataclasses
-import inspect
-from collections.abc import Callable
+import hashlib
+import json
 from pathlib import Path
 
+import hwpx
 import pytest
-from hwpx import evalplan_fill as frozen
+
+import parity_fingerprint
+from parity_fingerprint import fingerprint
 
 from hwpx_mcp_server.office.evalplan import runtime as canonical
 
@@ -112,58 +138,62 @@ DETAILED_MD = (
     + SYNTHETIC_MD[SYNTHETIC_MD.index("### 8. 정의적 능력 평가") :]
 )
 
-CORE_FIXTURES = (
-    Path(frozen.__file__).resolve().parents[2]
-    / "tests"
-    / "fixtures"
-    / "m105_evalplan"
-)
-BLANK_3HAK = CORE_FIXTURES / "blank_form_3hak.hwpx"
+# hwpx itself (the top-level package) is not removed, only many of its
+# submodules — so the core repo root is still reachable this way even though
+# `from hwpx import evalplan_fill` no longer is. Same technique
+# test_form_fill_wild_safety.py uses for its own core-fixture reads.
+CORE_ROOT = Path(hwpx.__file__).resolve().parents[2]
+BLANK_3HAK = CORE_ROOT / "tests" / "fixtures" / "m105_evalplan" / "blank_form_3hak.hwpx"
+
+# A relative, deterministic non-existent path: parse_review_file embeds the
+# path it was given verbatim (not resolved to absolute), so this reproduces
+# byte-identically against the golden captured at freeze time — unlike
+# pytest's tmp_path, which is a fresh absolute path every run.
+MISSING_PATH = "__parity_fixture_missing__/missing-review.md"
+
+_FIXTURES = Path(__file__).parent / "parity_fingerprints"
+FROZEN = json.loads((_FIXTURES / "evalplan.json").read_text(encoding="utf-8"))["modules"]
+GOLDEN = json.loads((_FIXTURES / "evalplan.golden.json").read_text(encoding="utf-8"))["calls"]
 
 
-def _dataclass_shape(value: type[object]) -> list[tuple[str, str, object]]:
-    return [
-        (field.name, str(field.type), field.default)
-        for field in dataclasses.fields(value)
-    ]
+def _jsonify(value: object) -> object:
+    """Round-trip through JSON so tuples (``dataclasses.asdict`` keeps
+    ``RubricItem.levels: list[tuple[str, str]]`` as ``tuple``) compare equal
+    to GOLDEN, which already went through JSON and came back as ``list`` —
+    the same normalisation ``test_exam_runtime_parity.py`` needed."""
+
+    return json.loads(json.dumps(value, ensure_ascii=False))
 
 
-def test_public_api_and_dataclass_shape_parity() -> None:
-    assert canonical.__all__ == frozen.__all__
+def test_public_api_and_dataclass_shape_matches_frozen_core() -> None:
+    assert fingerprint(canonical) == FROZEN["hwpx.evalplan_fill"]
 
-    for name in frozen.__all__:
-        canonical_binding = getattr(canonical, name)
-        frozen_binding = getattr(frozen, name)
-        if callable(frozen_binding):
-            assert inspect.signature(canonical_binding) == inspect.signature(
-                frozen_binding
-            )
-
-    for name in ("RubricItem", "RubricSubArea", "Rubric", "EvalPlanContent"):
-        assert _dataclass_shape(getattr(canonical, name)) == _dataclass_shape(
-            getattr(frozen, name)
-        )
+    for name in ("RubricItem", "RubricSubArea"):
+        described = parity_fingerprint._describe_class(getattr(canonical, name))
+        assert described == GOLDEN["extraDataclasses"][name]
 
 
-@pytest.mark.parametrize("markdown", [SYNTHETIC_MD, DETAILED_MD])
-def test_synthetic_parse_and_skeleton_parity(markdown: str) -> None:
+@pytest.mark.parametrize("label,markdown", [("synthetic", SYNTHETIC_MD), ("detailed", DETAILED_MD)])
+def test_synthetic_parse_and_skeleton_matches_frozen_core(label: str, markdown: str) -> None:
     canonical_content = canonical.parse_review_md(markdown)
-    frozen_content = frozen.parse_review_md(markdown)
+    expected = GOLDEN["parses"][label]
 
-    assert canonical_content.to_dict() == frozen_content.to_dict()
-    assert dataclasses.asdict(canonical_content) == dataclasses.asdict(frozen_content)
-    assert canonical.expected_skeleton(canonical_content) == frozen.expected_skeleton(
-        frozen_content
-    )
+    assert canonical_content.to_dict() == expected["toDict"]
+    assert _jsonify(dataclasses.asdict(canonical_content)) == expected["asDict"]
+    assert canonical.expected_skeleton(canonical_content) == expected["expectedSkeleton"]
 
 
-def test_empty_and_partial_input_parity() -> None:
-    for markdown in ("", "# 제목만", "### 7. 수행평가 세부기준\n"):
-        canonical_content = canonical.parse_review_md(markdown)
-        frozen_content = frozen.parse_review_md(markdown)
-        assert dataclasses.asdict(canonical_content) == dataclasses.asdict(
-            frozen_content
-        )
+@pytest.mark.parametrize(
+    "label,markdown",
+    [
+        ("empty", ""),
+        ("titleOnly", "# 제목만"),
+        ("s7Only", "### 7. 수행평가 세부기준\n"),
+    ],
+)
+def test_empty_and_partial_input_matches_frozen_core(label: str, markdown: str) -> None:
+    canonical_content = canonical.parse_review_md(markdown)
+    assert _jsonify(dataclasses.asdict(canonical_content)) == GOLDEN["emptyPartial"][label]
 
 
 @pytest.mark.skipif(
@@ -171,51 +201,44 @@ def test_empty_and_partial_input_parity() -> None:
     reason="public evaluation-plan blank fixture is unavailable",
 )
 @pytest.mark.parametrize(
-    ("phase", "markdown"),
+    ("phase", "md_label", "markdown"),
     [
-        ("structural", SYNTHETIC_MD),
-        ("all", SYNTHETIC_MD),
-        ("clean", SYNTHETIC_MD),
-        ("clean", DETAILED_MD),
+        ("structural", "synthetic", SYNTHETIC_MD),
+        ("all", "synthetic", SYNTHETIC_MD),
+        ("clean", "synthetic", SYNTHETIC_MD),
+        ("clean", "detailed", DETAILED_MD),
     ],
 )
-def test_plan_fill_and_cleanup_byte_parity(phase: str, markdown: str) -> None:
+def test_plan_fill_and_cleanup_byte_matches_frozen_core(
+    phase: str, md_label: str, markdown: str
+) -> None:
+    expected = GOLDEN["fillCases"][f"{phase}:{md_label}"]
     canonical_content = canonical.parse_review_md(markdown)
-    frozen_content = frozen.parse_review_md(markdown)
 
-    assert canonical.plan_structural_ops(
-        BLANK_3HAK, canonical_content
-    ) == frozen.plan_structural_ops(BLANK_3HAK, frozen_content)
+    assert _jsonify(canonical.plan_structural_ops(BLANK_3HAK, canonical_content)) == (
+        expected["structuralOps"]
+    )
 
     canonical_result = canonical.fill_evalplan(
         BLANK_3HAK,
         canonical_content,
         phase=phase,
     )
-    frozen_result = frozen.fill_evalplan(
-        BLANK_3HAK,
-        frozen_content,
-        phase=phase,
-    )
-
-    assert canonical_result == frozen_result
-    assert canonical_result["_data"] == frozen_result["_data"]
+    data = canonical_result.pop("_data")
+    assert _jsonify(canonical_result) == expected["fillResult"]
+    assert hashlib.sha256(data).hexdigest() == expected["dataSha256"]
+    assert len(data) == expected["dataLength"]
 
 
-def _failure(
-    callable_: Callable[..., object],
-    *args: object,
-) -> tuple[type[FileNotFoundError], str]:
+def test_missing_input_refusal_matches_frozen_core() -> None:
     try:
-        callable_(*args)
+        canonical.parse_review_file(MISSING_PATH)
     except FileNotFoundError as exc:
-        return type(exc), str(exc)
-    raise AssertionError("call unexpectedly succeeded")
+        payload = (type(exc).__name__, str(exc))
+    else:
+        raise AssertionError("call unexpectedly succeeded")
 
-
-def test_missing_input_refusal_parity(tmp_path: Path) -> None:
-    missing = tmp_path / "missing-review.md"
-    assert _failure(canonical.parse_review_file, missing) == _failure(
-        frozen.parse_review_file,
-        missing,
+    assert payload == (
+        GOLDEN["missingInputError"]["type"],
+        GOLDEN["missingInputError"]["message"],
     )

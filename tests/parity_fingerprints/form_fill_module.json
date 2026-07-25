@@ -1,0 +1,140 @@
+{
+  "frozenFrom": "python-hwpx d980d310c947e2ae1418a3ca0a63c643e7fe195b (historical, pre-70d56ed)",
+  "modules": {
+    "hwpx.form_fill": {
+      "FillReport": {
+        "bases": [],
+        "fields": {
+          "missing_keys": {
+            "hasDefault": false,
+            "type": "tuple[str, ...]"
+          },
+          "placeholders_found": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "replacements": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "warnings": {
+            "hasDefault": false,
+            "type": "tuple[HeterogeneousWarning, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "HeterogeneousWarning": {
+        "bases": [],
+        "fields": {
+          "charprid_refs": {
+            "hasDefault": false,
+            "type": "tuple[str, ...]"
+          },
+          "key": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "message": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "paragraph_index": {
+            "hasDefault": false,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "MISSING_CHAR_PR_ID_REF": {
+        "kind": "constant",
+        "value": "<missing>"
+      },
+      "PLACEHOLDER_RE": {
+        "kind": "function",
+        "signature": "<signature unavailable>"
+      },
+      "Placeholder": {
+        "bases": [],
+        "fields": {
+          "charprid_refs": {
+            "hasDefault": false,
+            "type": "tuple[str, ...]"
+          },
+          "end": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "fragments": {
+            "hasDefault": false,
+            "type": "tuple[TextFragment, ...]"
+          },
+          "key": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "paragraph_index": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "split": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "start": {
+            "hasDefault": false,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "TextFragment": {
+        "bases": [],
+        "fields": {
+          "char_pr_id_ref": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "local_end": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "local_start": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "paragraph_index": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "run_index": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "text_index": {
+            "hasDefault": false,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "fill_section_bytes": {
+        "kind": "function",
+        "signature": "(section_bytes: 'bytes', values: 'Mapping[str, str]') -> 'tuple[bytes, FillReport]'"
+      },
+      "find_split_placeholders": {
+        "kind": "function",
+        "signature": "(section_bytes: 'bytes') -> 'list[Placeholder]'"
+      },
+      "heterogeneous_warnings": {
+        "kind": "function",
+        "signature": "(placeholders: 'Sequence[Placeholder]') -> 'list[HeterogeneousWarning]'"
+      }
+    }
+  },
+  "schemaVersion": "hwpx.parity-fingerprint/v1"
+}

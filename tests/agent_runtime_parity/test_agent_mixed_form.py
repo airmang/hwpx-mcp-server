@@ -568,7 +568,11 @@ def test_compiled_plan_hash_rejects_tampering(tmp_path: Path) -> None:
 
 
 def test_evalplan_and_exam_remain_separate_from_mixed_contract() -> None:
-    from hwpx.evalplan_fill import fill_evalplan
+    # hwpx.evalplan_fill no longer exists in core (removed in python-hwpx 5.0);
+    # the MCP owner is now the only implementation, so the "evalplan is still
+    # its own thing, not folded into the mixed-form contract" check points at
+    # hwpx_mcp_server.office.evalplan.runtime instead.
+    from hwpx_mcp_server.office.evalplan.runtime import fill_evalplan
 
     tree = ast.parse(Path(mixed_form_module.__file__).read_text(encoding="utf-8"))
     imported_modules: set[str] = set()
@@ -580,7 +584,7 @@ def test_evalplan_and_exam_remain_separate_from_mixed_contract() -> None:
     assert not any(name == "hwpx.exam" or name.startswith("hwpx.exam.") for name in imported_modules)
     assert "exam" not in MIXED_FORM_LOCATOR_KINDS
     assert "evalplan" not in MIXED_FORM_LOCATOR_KINDS
-    assert fill_evalplan.__module__ == "hwpx.evalplan_fill"
+    assert fill_evalplan.__module__ == "hwpx_mcp_server.office.evalplan.runtime"
 
 
 @pytest.mark.parametrize("alias_kind", ["exact", "lexical", "symlink", "hardlink"])

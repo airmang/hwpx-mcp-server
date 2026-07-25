@@ -1,0 +1,44 @@
+{
+  "calls": {
+    "fillReport": {
+      "missing_keys": [],
+      "placeholders_found": 1,
+      "replacements": 1,
+      "warnings": []
+    },
+    "filledSectionBase64": "PGhzOnNlYyB4bWxuczpocz0iaHR0cDovL3d3dy5oYW5jb20uY28ua3IvaHdwbWwvMjAxMS9zZWN0aW9uIiB4bWxuczpocD0iaHR0cDovL3d3dy5oYW5jb20uY28ua3IvaHdwbWwvMjAxMS9wYXJhZ3JhcGgiPjxocDpwPjxocDpydW4gY2hhclBySURSZWY9IjMiPjxocDp0PuydtOumhDog7ZmN6ri464+ZPC9ocDp0PjwvaHA6cnVuPjxocDpydW4gY2hhclBySURSZWY9IjMiPjxocDp0PjwvaHA6dD48L2hwOnJ1bj48aHA6cnVuIGNoYXJQcklEUmVmPSI5Ij48aHA6dD4g64uYPC9ocDp0PjwvaHA6cnVuPjwvaHA6cD48L2hzOnNlYz4=",
+    "foundPlaceholders": [
+      {
+        "charprid_refs": [
+          "3"
+        ],
+        "end": 12,
+        "fragments": [
+          {
+            "char_pr_id_ref": "3",
+            "local_end": 8,
+            "local_start": 4,
+            "paragraph_index": 0,
+            "run_index": 0,
+            "text_index": 0
+          },
+          {
+            "char_pr_id_ref": "3",
+            "local_end": 4,
+            "local_start": 0,
+            "paragraph_index": 0,
+            "run_index": 1,
+            "text_index": 1
+          }
+        ],
+        "key": "{{name}}",
+        "paragraph_index": 0,
+        "split": true,
+        "start": 4
+      }
+    ],
+    "invalidSectionRefusalMessage": "invalid section XML"
+  },
+  "frozenFrom": "python-hwpx d980d310c947e2ae1418a3ca0a63c643e7fe195b (historical, pre-70d56ed)",
+  "schemaVersion": "hwpx.parity-golden/v1"
+}

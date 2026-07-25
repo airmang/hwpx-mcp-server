@@ -25,7 +25,8 @@ def test_canonical_authoring_inventory_and_profile_assets_are_complete() -> None
     files = sorted(CANONICAL_ROOT.rglob("*.py"))
     profiles = CANONICAL_ROOT / "design" / "profiles"
 
-    assert len(files) == 16
+    # 17 since the 5.0 train: report_parser joined the owner it always belonged to.
+    assert len(files) == 17
     assert len(canonical.__all__) == 14
     assert sorted(path.name for path in profiles.iterdir()) == [
         "application_form",

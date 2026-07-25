@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "hwpx.tool-contract-delta/v1",
+  "version": "6.0.0",
+  "note": "Floors only. The 5.0 train moves python-hwpx to 5.0.0, this package to 6.0.0, and the plugin to 1.0.0, and contract_hash() covers the floors — so the hash moves even though no tool did. Names, order, schemas, classifications and the default/advanced/skill-required split are all unchanged, which is what makes this a floors-only delta rather than a surface change.",
+  "previousHash": "429cb6706323e762",
+  "hash": "9bfc7ec7b0c3c62b",
+  "toolCounts": {
+    "default": 119,
+    "advanced": 127,
+    "skillRequired": 28
+  },
+  "unchangedFromPrevious": [
+    "names",
+    "order",
+    "schemas",
+    "classifications",
+    "errorContracts"
+  ],
+  "floors": {
+    "python-hwpx": "5.0.0",
+    "hwpx-mcp-server": "6.0.0",
+    "hwpx-skill": "1.0.0"
+  }
+}

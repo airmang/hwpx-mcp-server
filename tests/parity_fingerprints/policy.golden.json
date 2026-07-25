@@ -1,0 +1,208 @@
+{
+  "calls": {
+    "officialLintResult": {
+      "document_type": "gongmun",
+      "pass": false,
+      "repair_hints": [
+        {
+          "paragraph_index": 4,
+          "rule": "end-marker",
+          "suggestion": "Place attachment lines first, then a standalone final \"끝.\" paragraph."
+        },
+        {
+          "paragraph_index": 4,
+          "rule": "attachment-notation",
+          "suggestion": "Use notation such as \"붙임 1. 세부계획서 1부.\"."
+        }
+      ],
+      "report_version": "official-document-style-v1",
+      "score": 0.8,
+      "structure_pass": true,
+      "summary": {
+        "error_count": 0,
+        "paragraph_count": 5,
+        "rules_checked": [
+          "item-marker-hierarchy",
+          "end-marker",
+          "attachment-notation",
+          "date-notation",
+          "amount-notation",
+          "colon-question-spacing"
+        ],
+        "violation_count": 2
+      },
+      "violations": [
+        {
+          "message": "when attachments are listed, \"끝.\" should be a standalone final paragraph",
+          "paragraph_index": 4,
+          "rule": "end-marker",
+          "severity": "warning",
+          "source": {
+            "document": "hwpx-skill/references/official-document-rules.md",
+            "rule": "end-marker"
+          },
+          "suggestion": "Place attachment lines first, then a standalone final \"끝.\" paragraph.",
+          "text": "붙임  1. 자료 1부.  끝."
+        },
+        {
+          "message": "attachment notation should include item text, copy count, and a period",
+          "paragraph_index": 4,
+          "rule": "attachment-notation",
+          "severity": "warning",
+          "source": {
+            "document": "hwpx-skill/references/official-document-rules.md",
+            "rule": "attachment-notation"
+          },
+          "suggestion": "Use notation such as \"붙임 1. 세부계획서 1부.\".",
+          "text": "붙임  1. 자료 1부.  끝."
+        }
+      ]
+    },
+    "pii": {
+      "deidentify": "di_5869ac67ffa3",
+      "detectPii": [
+        {
+          "confidence": "low",
+          "end": 7,
+          "start": 4,
+          "type": "name",
+          "value": "홍길동"
+        },
+        {
+          "confidence": "high",
+          "end": 23,
+          "start": 10,
+          "type": "phone",
+          "value": "010-1234-5678"
+        },
+        {
+          "confidence": "high",
+          "end": 42,
+          "start": 26,
+          "type": "email",
+          "value": "hong@example.com"
+        }
+      ],
+      "maskPii": "성명: 홍** / 010-****-**** / h****@example.com",
+      "maskValue": {
+        "email": "h****@example.com",
+        "name": "홍**",
+        "phone": "010-****-****"
+      },
+      "minimizeFields": {
+        "name": "홍길동",
+        "score": 0
+      }
+    },
+    "piiPolicyError": {
+      "message": "mask_char must be exactly one character",
+      "type": "ValueError"
+    },
+    "tableComputeError": {
+      "message": "unsupported table operation: 'median'",
+      "type": "ValueError"
+    },
+    "tableComputeResult": {
+      "append": "rows",
+      "computedTable": {
+        "columns": [
+          {
+            "key": "team",
+            "label": "팀"
+          },
+          {
+            "key": "amount",
+            "label": "금액"
+          }
+        ],
+        "rows": [
+          {
+            "amount": "1,000원",
+            "team": "A"
+          },
+          {
+            "amount": "2,000원",
+            "team": "A"
+          },
+          {
+            "amount": "3,000",
+            "team": "A 소계"
+          },
+          {
+            "amount": "",
+            "team": "B"
+          },
+          {
+            "amount": "",
+            "team": "B 소계"
+          },
+          {
+            "amount": "3,000",
+            "team": "합계"
+          },
+          {
+            "amount": "1,500",
+            "team": "평균"
+          }
+        ],
+        "type": "table"
+      },
+      "evidence": [
+        {
+          "axis": "rows",
+          "column": "amount",
+          "group": "A",
+          "groupBy": "team",
+          "operation": "subtotal",
+          "result": "3,000",
+          "sourceRowCount": 2,
+          "sourceRowStart": 0,
+          "sourceValueCount": 2
+        },
+        {
+          "axis": "rows",
+          "column": "amount",
+          "group": "B",
+          "groupBy": "team",
+          "operation": "subtotal",
+          "result": "",
+          "sourceRowCount": 1,
+          "sourceRowStart": 2,
+          "sourceValueCount": 0
+        },
+        {
+          "axis": "rows",
+          "column": "amount",
+          "operation": "sum",
+          "result": "3,000",
+          "sourceRowCount": 3,
+          "sourceRowStart": 0,
+          "sourceValueCount": 2
+        },
+        {
+          "axis": "rows",
+          "column": "amount",
+          "operation": "average",
+          "result": "1,500",
+          "sourceRowCount": 3,
+          "sourceRowStart": 0,
+          "sourceValueCount": 2
+        }
+      ],
+      "groupBy": "team",
+      "ok": true,
+      "operations": [
+        "subtotal",
+        "sum",
+        "average"
+      ],
+      "report_version": "table-compute-v1",
+      "valueColumns": [
+        "amount"
+      ],
+      "warnings": []
+    }
+  },
+  "frozenFrom": "python-hwpx d980d310c947e2ae1418a3ca0a63c643e7fe195b (historical, pre-70d56ed)",
+  "schemaVersion": "hwpx.parity-golden/v1"
+}

@@ -69,16 +69,28 @@ def _public_names(module: ModuleType) -> list[str]:
 
 
 def _is_owned_member(value: Any, module: ModuleType) -> bool:
-    if _is_constant(value):
+    if _is_constant(value) or _is_dataclass_instance(value):
         return True
     owner = getattr(value, "__module__", None)
     return owner == module.__name__
 
 
+def _is_dataclass_instance(value: Any) -> bool:
+    """A module-level constant that is an *instance* of a dataclass (e.g. a
+    default policy object), as opposed to the dataclass type itself.
+
+    ``isinstance(value, type)`` in ``_describe`` already routes the type
+    itself to ``_describe_class``; this catches the separate case of a bound
+    instance sitting at module level as a constant.
+    """
+
+    return dataclasses.is_dataclass(value) and not isinstance(value, type)
+
+
 def _describe(value: Any) -> dict[str, Any]:
     if isinstance(value, type):
         return _describe_class(value)
-    if _is_constant(value):
+    if _is_constant(value) or _is_dataclass_instance(value):
         return {"kind": "constant", "value": _canonicalize(value)}
     # Functions, bound/unbound methods, staticmethod/classmethod descriptors
     # accessed off a module (already unwrapped by attribute lookup), and any
@@ -173,6 +185,14 @@ def _canonicalize(value: Any) -> Any:
         return [_canonicalize(item) for item in value]
     if isinstance(value, dict):
         return {str(key): _canonicalize(val) for key, val in sorted(value.items(), key=lambda kv: str(kv[0]))}
+    if _is_dataclass_instance(value):
+        return {
+            "$dataclass": type(value).__name__,
+            "fields": {
+                field.name: _canonicalize(getattr(value, field.name))
+                for field in sorted(dataclasses.fields(value), key=lambda f: f.name)
+            },
+        }
     if callable(value):
         name = getattr(value, "__name__", type(value).__name__)
         return f"<callable {name}{_signature_of(value)}>"

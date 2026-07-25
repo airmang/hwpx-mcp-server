@@ -1,0 +1,1036 @@
+{
+  "calls": {
+    "emptyPartial": {
+      "empty": {
+        "absentee": "",
+        "achieve_rate": [],
+        "achievement_std": [],
+        "affective": "",
+        "analysis": "",
+        "cautions": "",
+        "directions": "",
+        "levels": [],
+        "policies": "",
+        "purposes": "",
+        "ratio_header": [],
+        "ratio_rows": [],
+        "rubrics": [],
+        "schedule": [],
+        "teacher": "",
+        "title": ""
+      },
+      "s7Only": {
+        "absentee": "",
+        "achieve_rate": [],
+        "achievement_std": [],
+        "affective": "",
+        "analysis": "",
+        "cautions": "",
+        "directions": "",
+        "levels": [],
+        "policies": "",
+        "purposes": "",
+        "ratio_header": [],
+        "ratio_rows": [],
+        "rubrics": [],
+        "schedule": [],
+        "teacher": "",
+        "title": ""
+      },
+      "titleOnly": {
+        "absentee": "",
+        "achieve_rate": [],
+        "achievement_std": [],
+        "affective": "",
+        "analysis": "",
+        "cautions": "",
+        "directions": "",
+        "levels": [],
+        "policies": "",
+        "purposes": "",
+        "ratio_header": [],
+        "ratio_rows": [],
+        "rubrics": [],
+        "schedule": [],
+        "teacher": "",
+        "title": ""
+      }
+    },
+    "extraDataclasses": {
+      "RubricItem": {
+        "bases": [],
+        "fields": {
+          "levels": {
+            "hasDefault": true,
+            "type": "list[tuple[str, str]]"
+          },
+          "name": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "subtotal": {
+            "hasDefault": true,
+            "type": "bool"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "RubricSubArea": {
+        "bases": [],
+        "fields": {
+          "items": {
+            "hasDefault": true,
+            "type": "list[RubricItem]"
+          },
+          "label": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "points": {
+            "hasDefault": true,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      }
+    },
+    "fillCases": {
+      "all:synthetic": {
+        "dataLength": 103139,
+        "dataSha256": "1f44f96fb9d4cd8c0cb9f554f9aeac0b594df8357e77e397839d219d49b63bc5",
+        "fillResult": {
+          "applied": [],
+          "byteIdentical": false,
+          "changedParts": [
+            "Contents/section0.xml"
+          ],
+          "content_report": {
+            "achievement": {
+              "filled": 4,
+              "n": 1,
+              "skipped": []
+            },
+            "levels": {
+              "filled": 3,
+              "skipped": []
+            },
+            "ratio": {
+              "filled_cells": 7,
+              "rows_filled": 3,
+              "skipped": []
+            },
+            "rubrics": {
+              "filled": 12,
+              "rubrics": 1,
+              "skipped": []
+            },
+            "schedule": {
+              "filled": 4,
+              "rows": 1,
+              "skipped": [],
+              "unmerged": [
+                "split donor merge r3c2 (rowSpan 2) into 2 unit rows",
+                "split donor merge r3c3 (rowSpan 2) into 2 unit rows"
+              ]
+            },
+            "sections": {
+              "deferred": [
+                "analysis(§11): rich sub-structure kept generic"
+              ],
+              "filled": 3,
+              "skipped": []
+            }
+          },
+          "expected_skeleton": {
+            "achieve_rate": 1,
+            "achievement": 1,
+            "level": 1,
+            "minlevel": 0,
+            "ratio": 1,
+            "rubric": 1
+          },
+          "ok": true,
+          "openSafety": {
+            "ok": true,
+            "reopen": {
+              "error": null,
+              "ok": true
+            },
+            "summary": "editor-open safety verification passed",
+            "validateDocument": {
+              "errors": [],
+              "ok": true,
+              "warnings": []
+            },
+            "validatePackage": {
+              "blockingErrors": [],
+              "errors": [],
+              "ok": true,
+              "warnings": [
+                "Contents/content.hpf: manifest does not reference a version part; engine will fall back to 'version.xml'"
+              ]
+            }
+          },
+          "skipped": [],
+          "transcript": [
+            "delete_table #13 (성취율 variant) — keep only #14 (matches MD 3단계)",
+            "delete_table #15 (seokcha) — red/optional, gold removes it",
+            "delete_column #17 cols [1, 2] (정기시험) — 100% 수행 subject",
+            "delete_table #29 (submit) — red/optional, gold removes it",
+            "delete_table #30 (notice_star) — red/optional, gold removes it",
+            "delete_table #9 (surplus achievement example) — content needs 1, blank ships 2",
+            "delete_table #11 (surplus level example) — content needs 1, blank ships 2",
+            "delete_table #20 (surplus rubric example) — content needs 1, blank ships 3",
+            "delete_table #21 (surplus rubric example) — content needs 1, blank ships 3"
+          ],
+          "zipMethod": "partial-local-record-copy"
+        },
+        "structuralOps": {
+          "expected_skeleton": {
+            "achieve_rate": 1,
+            "achievement": 1,
+            "level": 1,
+            "minlevel": 0,
+            "ratio": 1,
+            "rubric": 1
+          },
+          "ops": [
+            {
+              "cols": [
+                1,
+                2
+              ],
+              "op": "delete_column",
+              "tableIndex": 17
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 30
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 29
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 21
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 20
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 15
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 13
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 11
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 9
+            }
+          ],
+          "transcript": [
+            "delete_table #13 (성취율 variant) — keep only #14 (matches MD 3단계)",
+            "delete_table #15 (seokcha) — red/optional, gold removes it",
+            "delete_column #17 cols [1, 2] (정기시험) — 100% 수행 subject",
+            "delete_table #29 (submit) — red/optional, gold removes it",
+            "delete_table #30 (notice_star) — red/optional, gold removes it",
+            "delete_table #9 (surplus achievement example) — content needs 1, blank ships 2",
+            "delete_table #11 (surplus level example) — content needs 1, blank ships 2",
+            "delete_table #20 (surplus rubric example) — content needs 1, blank ships 3",
+            "delete_table #21 (surplus rubric example) — content needs 1, blank ships 3"
+          ]
+        }
+      },
+      "clean:detailed": {
+        "dataLength": 97760,
+        "dataSha256": "0b4992374bad452e1fe2226cd68b0dc8563865415e0acbb4c813a508404345e4",
+        "fillResult": {
+          "applied": [],
+          "byteIdentical": false,
+          "changedParts": [
+            "Contents/section0.xml"
+          ],
+          "content_report": {
+            "achievement": {
+              "filled": 4,
+              "n": 1,
+              "skipped": []
+            },
+            "finalize": {
+              "affective_rows": 0,
+              "captions": 1,
+              "deleted": 21,
+              "skipped": [],
+              "teacher": true,
+              "title": true
+            },
+            "levels": {
+              "filled": 3,
+              "skipped": []
+            },
+            "ratio": {
+              "filled_cells": 7,
+              "rows_filled": 3,
+              "skipped": []
+            },
+            "rubrics": {
+              "filled": 1,
+              "rubrics": 1,
+              "skipped": []
+            },
+            "schedule": {
+              "filled": 4,
+              "rows": 1,
+              "skipped": [],
+              "unmerged": [
+                "split donor merge r3c2 (rowSpan 2) into 2 unit rows",
+                "split donor merge r3c3 (rowSpan 2) into 2 unit rows"
+              ]
+            },
+            "sections": {
+              "deferred": [
+                "analysis(§11): rich sub-structure kept generic"
+              ],
+              "filled": 3,
+              "skipped": []
+            }
+          },
+          "expected_skeleton": {
+            "achieve_rate": 1,
+            "achievement": 1,
+            "level": 1,
+            "minlevel": 0,
+            "ratio": 1,
+            "rubric": 1
+          },
+          "ok": true,
+          "openSafety": {
+            "ok": true,
+            "reopen": {
+              "error": null,
+              "ok": true
+            },
+            "summary": "editor-open safety verification passed",
+            "validateDocument": {
+              "errors": [],
+              "ok": true,
+              "warnings": []
+            },
+            "validatePackage": {
+              "blockingErrors": [],
+              "errors": [],
+              "ok": true,
+              "warnings": [
+                "Contents/content.hpf: manifest does not reference a version part; engine will fall back to 'version.xml'"
+              ]
+            }
+          },
+          "skipped": [],
+          "transcript": [
+            "delete_table #13 (성취율 variant) — keep only #14 (matches MD 3단계)",
+            "delete_table #15 (seokcha) — red/optional, gold removes it",
+            "delete_column #17 cols [1, 2] (정기시험) — 100% 수행 subject",
+            "delete_table #29 (submit) — red/optional, gold removes it",
+            "delete_table #30 (notice_star) — red/optional, gold removes it",
+            "delete_table #9 (surplus achievement example) — content needs 1, blank ships 2",
+            "delete_table #11 (surplus level example) — content needs 1, blank ships 2",
+            "delete_table #19 (surplus rubric example) — content needs 1, blank ships 3",
+            "delete_table #20 (surplus rubric example) — content needs 1, blank ships 3"
+          ],
+          "zipMethod": "partial-local-record-copy"
+        },
+        "structuralOps": {
+          "expected_skeleton": {
+            "achieve_rate": 1,
+            "achievement": 1,
+            "level": 1,
+            "minlevel": 0,
+            "ratio": 1,
+            "rubric": 1
+          },
+          "ops": [
+            {
+              "cols": [
+                1,
+                2
+              ],
+              "op": "delete_column",
+              "tableIndex": 17
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 30
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 29
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 20
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 19
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 15
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 13
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 11
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 9
+            }
+          ],
+          "transcript": [
+            "delete_table #13 (성취율 variant) — keep only #14 (matches MD 3단계)",
+            "delete_table #15 (seokcha) — red/optional, gold removes it",
+            "delete_column #17 cols [1, 2] (정기시험) — 100% 수행 subject",
+            "delete_table #29 (submit) — red/optional, gold removes it",
+            "delete_table #30 (notice_star) — red/optional, gold removes it",
+            "delete_table #9 (surplus achievement example) — content needs 1, blank ships 2",
+            "delete_table #11 (surplus level example) — content needs 1, blank ships 2",
+            "delete_table #19 (surplus rubric example) — content needs 1, blank ships 3",
+            "delete_table #20 (surplus rubric example) — content needs 1, blank ships 3"
+          ]
+        }
+      },
+      "clean:synthetic": {
+        "dataLength": 97806,
+        "dataSha256": "6a62ed970e976aaf6b131a74d4c7c0373d12bd949b6d3ebda7eadeade2f08d6d",
+        "fillResult": {
+          "applied": [],
+          "byteIdentical": false,
+          "changedParts": [
+            "Contents/section0.xml"
+          ],
+          "content_report": {
+            "achievement": {
+              "filled": 4,
+              "n": 1,
+              "skipped": []
+            },
+            "finalize": {
+              "affective_rows": 0,
+              "captions": 1,
+              "deleted": 21,
+              "skipped": [],
+              "teacher": true,
+              "title": true
+            },
+            "levels": {
+              "filled": 3,
+              "skipped": []
+            },
+            "ratio": {
+              "filled_cells": 7,
+              "rows_filled": 3,
+              "skipped": []
+            },
+            "rubrics": {
+              "filled": 12,
+              "rubrics": 1,
+              "skipped": []
+            },
+            "schedule": {
+              "filled": 4,
+              "rows": 1,
+              "skipped": [],
+              "unmerged": [
+                "split donor merge r3c2 (rowSpan 2) into 2 unit rows",
+                "split donor merge r3c3 (rowSpan 2) into 2 unit rows"
+              ]
+            },
+            "sections": {
+              "deferred": [
+                "analysis(§11): rich sub-structure kept generic"
+              ],
+              "filled": 3,
+              "skipped": []
+            }
+          },
+          "expected_skeleton": {
+            "achieve_rate": 1,
+            "achievement": 1,
+            "level": 1,
+            "minlevel": 0,
+            "ratio": 1,
+            "rubric": 1
+          },
+          "ok": true,
+          "openSafety": {
+            "ok": true,
+            "reopen": {
+              "error": null,
+              "ok": true
+            },
+            "summary": "editor-open safety verification passed",
+            "validateDocument": {
+              "errors": [],
+              "ok": true,
+              "warnings": []
+            },
+            "validatePackage": {
+              "blockingErrors": [],
+              "errors": [],
+              "ok": true,
+              "warnings": [
+                "Contents/content.hpf: manifest does not reference a version part; engine will fall back to 'version.xml'"
+              ]
+            }
+          },
+          "skipped": [],
+          "transcript": [
+            "delete_table #13 (성취율 variant) — keep only #14 (matches MD 3단계)",
+            "delete_table #15 (seokcha) — red/optional, gold removes it",
+            "delete_column #17 cols [1, 2] (정기시험) — 100% 수행 subject",
+            "delete_table #29 (submit) — red/optional, gold removes it",
+            "delete_table #30 (notice_star) — red/optional, gold removes it",
+            "delete_table #9 (surplus achievement example) — content needs 1, blank ships 2",
+            "delete_table #11 (surplus level example) — content needs 1, blank ships 2",
+            "delete_table #20 (surplus rubric example) — content needs 1, blank ships 3",
+            "delete_table #21 (surplus rubric example) — content needs 1, blank ships 3"
+          ],
+          "zipMethod": "partial-local-record-copy"
+        },
+        "structuralOps": {
+          "expected_skeleton": {
+            "achieve_rate": 1,
+            "achievement": 1,
+            "level": 1,
+            "minlevel": 0,
+            "ratio": 1,
+            "rubric": 1
+          },
+          "ops": [
+            {
+              "cols": [
+                1,
+                2
+              ],
+              "op": "delete_column",
+              "tableIndex": 17
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 30
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 29
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 21
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 20
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 15
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 13
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 11
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 9
+            }
+          ],
+          "transcript": [
+            "delete_table #13 (성취율 variant) — keep only #14 (matches MD 3단계)",
+            "delete_table #15 (seokcha) — red/optional, gold removes it",
+            "delete_column #17 cols [1, 2] (정기시험) — 100% 수행 subject",
+            "delete_table #29 (submit) — red/optional, gold removes it",
+            "delete_table #30 (notice_star) — red/optional, gold removes it",
+            "delete_table #9 (surplus achievement example) — content needs 1, blank ships 2",
+            "delete_table #11 (surplus level example) — content needs 1, blank ships 2",
+            "delete_table #20 (surplus rubric example) — content needs 1, blank ships 3",
+            "delete_table #21 (surplus rubric example) — content needs 1, blank ships 3"
+          ]
+        }
+      },
+      "structural:synthetic": {
+        "dataLength": 106207,
+        "dataSha256": "5e710d017f189490c26e023b72c9193d16ad38541c4ca5606b1e3c583af76f16",
+        "fillResult": {
+          "applied": [],
+          "byteIdentical": false,
+          "changedParts": [
+            "Contents/section0.xml"
+          ],
+          "content_report": {},
+          "expected_skeleton": {
+            "achieve_rate": 1,
+            "achievement": 1,
+            "level": 1,
+            "minlevel": 0,
+            "ratio": 1,
+            "rubric": 1
+          },
+          "ok": true,
+          "openSafety": {
+            "ok": true,
+            "reopen": {
+              "error": null,
+              "ok": true
+            },
+            "summary": "editor-open safety verification passed",
+            "validateDocument": {
+              "errors": [],
+              "ok": true,
+              "warnings": []
+            },
+            "validatePackage": {
+              "blockingErrors": [],
+              "errors": [],
+              "ok": true,
+              "warnings": [
+                "Contents/content.hpf: manifest does not reference a version part; engine will fall back to 'version.xml'"
+              ]
+            }
+          },
+          "skipped": [],
+          "transcript": [
+            "delete_table #13 (성취율 variant) — keep only #14 (matches MD 3단계)",
+            "delete_table #15 (seokcha) — red/optional, gold removes it",
+            "delete_column #17 cols [1, 2] (정기시험) — 100% 수행 subject",
+            "delete_table #29 (submit) — red/optional, gold removes it",
+            "delete_table #30 (notice_star) — red/optional, gold removes it",
+            "delete_table #9 (surplus achievement example) — content needs 1, blank ships 2",
+            "delete_table #11 (surplus level example) — content needs 1, blank ships 2",
+            "delete_table #20 (surplus rubric example) — content needs 1, blank ships 3",
+            "delete_table #21 (surplus rubric example) — content needs 1, blank ships 3"
+          ],
+          "zipMethod": "partial-local-record-copy"
+        },
+        "structuralOps": {
+          "expected_skeleton": {
+            "achieve_rate": 1,
+            "achievement": 1,
+            "level": 1,
+            "minlevel": 0,
+            "ratio": 1,
+            "rubric": 1
+          },
+          "ops": [
+            {
+              "cols": [
+                1,
+                2
+              ],
+              "op": "delete_column",
+              "tableIndex": 17
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 30
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 29
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 21
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 20
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 15
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 13
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 11
+            },
+            {
+              "op": "delete_table",
+              "tableIndex": 9
+            }
+          ],
+          "transcript": [
+            "delete_table #13 (성취율 variant) — keep only #14 (matches MD 3단계)",
+            "delete_table #15 (seokcha) — red/optional, gold removes it",
+            "delete_column #17 cols [1, 2] (정기시험) — 100% 수행 subject",
+            "delete_table #29 (submit) — red/optional, gold removes it",
+            "delete_table #30 (notice_star) — red/optional, gold removes it",
+            "delete_table #9 (surplus achievement example) — content needs 1, blank ships 2",
+            "delete_table #11 (surplus level example) — content needs 1, blank ships 2",
+            "delete_table #20 (surplus rubric example) — content needs 1, blank ships 3",
+            "delete_table #21 (surplus rubric example) — content needs 1, blank ships 3"
+          ]
+        }
+      }
+    },
+    "missingInputError": {
+      "message": "[Errno 2] No such file or directory: '__parity_fixture_missing__/missing-review.md'",
+      "type": "FileNotFoundError"
+    },
+    "parses": {
+      "detailed": {
+        "asDict": {
+          "absentee": "가. 처리 하나.",
+          "achieve_rate": [
+            [
+              "80% 이상",
+              "A"
+            ],
+            [
+              "60% 이상 ~ 80% 미만",
+              "B"
+            ],
+            [
+              "60% 미만",
+              "C"
+            ]
+          ],
+          "achievement_std": [
+            [
+              "[12합성01-01] 표준 하나",
+              "상1",
+              "중1",
+              "하1"
+            ]
+          ],
+          "affective": "- 요소 하나.",
+          "analysis": "- 활용 하나.",
+          "cautions": "- 유의 하나.",
+          "directions": "가. 방향 하나.",
+          "levels": [
+            [
+              "영역 가",
+              "A1",
+              "B1",
+              "C1"
+            ]
+          ],
+          "policies": "가. 방침 하나.",
+          "purposes": "가. 목적 하나.",
+          "ratio_header": [
+            "구분",
+            "① 영역 가",
+            "② 영역 나",
+            "합계"
+          ],
+          "ratio_rows": [
+            [
+              "영역 만점",
+              "60점(60%)",
+              "40점(40%)",
+              "100%"
+            ]
+          ],
+          "rubrics": [
+            {
+              "base_score": "18",
+              "criteria": "",
+              "long_score": "17",
+              "method": "☑ 산출물",
+              "points": 60,
+              "rows": [
+                [
+                  "항목1",
+                  "완비하여 산출함 **40** / 부분만 완성함 **20**"
+                ],
+                [
+                  "가. 소계",
+                  " **60**"
+                ],
+                [
+                  "기본점수 **18** · 장기 미인정 결석 **17**",
+                  ""
+                ]
+              ],
+              "standards": "[12합성01-01]",
+              "student_notes": "",
+              "subareas": [
+                {
+                  "items": [
+                    {
+                      "levels": [
+                        [
+                          "완비하여 산출함",
+                          "40"
+                        ],
+                        [
+                          "부분만 완성함",
+                          "20"
+                        ]
+                      ],
+                      "name": "항목1",
+                      "subtotal": false
+                    },
+                    {
+                      "levels": [
+                        [
+                          "",
+                          "60"
+                        ]
+                      ],
+                      "name": "가. 소계",
+                      "subtotal": true
+                    }
+                  ],
+                  "label": "가. 세부 하나",
+                  "points": 60
+                }
+              ],
+              "task": "합성 과제",
+              "title": "영역 가"
+            }
+          ],
+          "schedule": [
+            [
+              "8",
+              "3",
+              "단원1",
+              "[12합성01-01]",
+              "강의",
+              "주안점1"
+            ]
+          ],
+          "teacher": "홍길동",
+          "title": "2026학년도 2학기 3학년 「합성 과목」 교수학습운영 및 평가계획"
+        },
+        "expectedSkeleton": {
+          "achieve_rate": 1,
+          "achievement": 1,
+          "level": 1,
+          "minlevel": 0,
+          "ratio": 1,
+          "rubric": 1
+        },
+        "toDict": {
+          "achieve_rate_rows": 3,
+          "achievement_std_rows": 1,
+          "level_rows": 1,
+          "ratio_areas": 2,
+          "rubrics": [
+            {
+              "base_score": "18",
+              "long_score": "17",
+              "points": 60,
+              "rows": [
+                [
+                  "항목1",
+                  "완비하여 산출함 **40** / 부분만 완성함 **20**"
+                ],
+                [
+                  "가. 소계",
+                  " **60**"
+                ],
+                [
+                  "기본점수 **18** · 장기 미인정 결석 **17**",
+                  ""
+                ]
+              ],
+              "standards": "[12합성01-01]",
+              "subareas": [
+                {
+                  "items": [
+                    {
+                      "levels": [
+                        [
+                          "완비하여 산출함",
+                          "40"
+                        ],
+                        [
+                          "부분만 완성함",
+                          "20"
+                        ]
+                      ],
+                      "name": "항목1",
+                      "subtotal": false
+                    },
+                    {
+                      "levels": [
+                        [
+                          "",
+                          "60"
+                        ]
+                      ],
+                      "name": "가. 소계",
+                      "subtotal": true
+                    }
+                  ],
+                  "label": "가. 세부 하나",
+                  "points": 60
+                }
+              ],
+              "title": "영역 가"
+            }
+          ],
+          "schedule_rows": 1,
+          "teacher": "홍길동",
+          "title": "2026학년도 2학기 3학년 「합성 과목」 교수학습운영 및 평가계획"
+        }
+      },
+      "synthetic": {
+        "asDict": {
+          "absentee": "가. 처리 하나.",
+          "achieve_rate": [
+            [
+              "80% 이상",
+              "A"
+            ],
+            [
+              "60% 이상 ~ 80% 미만",
+              "B"
+            ],
+            [
+              "60% 미만",
+              "C"
+            ]
+          ],
+          "achievement_std": [
+            [
+              "[12합성01-01] 표준 하나",
+              "상1",
+              "중1",
+              "하1"
+            ]
+          ],
+          "affective": "- 요소 하나.",
+          "analysis": "- 활용 하나.",
+          "cautions": "- 유의 하나.",
+          "directions": "가. 방향 하나.",
+          "levels": [
+            [
+              "영역 가",
+              "A1",
+              "B1",
+              "C1"
+            ]
+          ],
+          "policies": "가. 방침 하나.",
+          "purposes": "가. 목적 하나.",
+          "ratio_header": [
+            "구분",
+            "① 영역 가",
+            "② 영역 나",
+            "합계"
+          ],
+          "ratio_rows": [
+            [
+              "영역 만점",
+              "60점(60%)",
+              "40점(40%)",
+              "100%"
+            ]
+          ],
+          "rubrics": [
+            {
+              "base_score": "",
+              "criteria": "",
+              "long_score": "",
+              "method": "",
+              "points": 60,
+              "rows": [
+                [
+                  "항목1",
+                  "완비 **40** / 부분 **20**"
+                ],
+                [
+                  "기본점수 **18** · 장기 미인정 결석 **17**",
+                  ""
+                ]
+              ],
+              "standards": "[12합성01-01]",
+              "student_notes": "",
+              "subareas": [],
+              "task": "",
+              "title": "영역 가"
+            }
+          ],
+          "schedule": [
+            [
+              "8",
+              "3",
+              "단원1",
+              "[12합성01-01]",
+              "강의",
+              "주안점1"
+            ]
+          ],
+          "teacher": "홍길동",
+          "title": "2026학년도 2학기 3학년 「합성 과목」 교수학습운영 및 평가계획"
+        },
+        "expectedSkeleton": {
+          "achieve_rate": 1,
+          "achievement": 1,
+          "level": 1,
+          "minlevel": 0,
+          "ratio": 1,
+          "rubric": 1
+        },
+        "toDict": {
+          "achieve_rate_rows": 3,
+          "achievement_std_rows": 1,
+          "level_rows": 1,
+          "ratio_areas": 2,
+          "rubrics": [
+            {
+              "base_score": "",
+              "long_score": "",
+              "points": 60,
+              "rows": [
+                [
+                  "항목1",
+                  "완비 **40** / 부분 **20**"
+                ],
+                [
+                  "기본점수 **18** · 장기 미인정 결석 **17**",
+                  ""
+                ]
+              ],
+              "standards": "[12합성01-01]",
+              "subareas": [],
+              "title": "영역 가"
+            }
+          ],
+          "schedule_rows": 1,
+          "teacher": "홍길동",
+          "title": "2026학년도 2학기 3학년 「합성 과목」 교수학습운영 및 평가계획"
+        }
+      }
+    }
+  },
+  "frozenFrom": "python-hwpx d980d310c947e2ae1418a3ca0a63c643e7fe195b (historical, pre-70d56ed)",
+  "schemaVersion": "hwpx.parity-golden/v1"
+}

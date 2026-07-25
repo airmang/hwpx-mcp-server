@@ -14,9 +14,18 @@ Optional or to bump the schema version deliberately.
 
 Frozen contracts: ``hwpx.mutation-report/v1``, ``hwpx.document_plan.v1``/``v2``,
 ``hwpx.agent-batch/v1``, ``hwpx.mixed-form-plan/v1`` (public plan).
+
+``hwpx.authoring`` (source of ``get_document_plan_schema`` and the two
+``DOCUMENT_PLAN_*_SCHEMA_VERSION`` constants) no longer exists in core as of
+python-hwpx 5.0 — this file reads the already-frozen
+``tests/parity_fingerprints/authoring.{json,golden.json}`` instead of
+importing it, rather than freezing a second copy of the same values.
 """
 
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 import pytest
 
@@ -26,11 +35,6 @@ from hwpx_mcp_server.office.agent.model import (
     validate_agent_batch,
 )
 from hwpx_mcp_server.office.agent.form_plan import MIXED_FORM_PLAN_SCHEMA, validate_mixed_form_request
-from hwpx.authoring import (
-    DOCUMENT_PLAN_SCHEMA_VERSION,
-    DOCUMENT_PLAN_V2_SCHEMA_VERSION,
-    get_document_plan_schema,
-)
 from hwpx.mutation_report import (
     MUTATION_REPORT_SCHEMA,
     MutationReport,
@@ -38,6 +42,25 @@ from hwpx.mutation_report import (
     PreservationSummary,
     VerificationSummary,
 )
+
+# hwpx.authoring is scheduled for deletion (already gone as of python-hwpx 5.0).
+# get_document_plan_schema()'s output and the two schema-version constants were
+# already captured for test_authoring_runtime_owner_parity.py — this file reuses
+# that same frozen record rather than freezing its own copy of the same values.
+_AUTHORING_FIXTURES = Path(__file__).parent.parent / "parity_fingerprints"
+_AUTHORING_FROZEN = json.loads(
+    (_AUTHORING_FIXTURES / "authoring.json").read_text(encoding="utf-8")
+)["modules"]["hwpx.authoring"]
+_AUTHORING_GOLDEN = json.loads(
+    (_AUTHORING_FIXTURES / "authoring.golden.json").read_text(encoding="utf-8")
+)["calls"]
+
+DOCUMENT_PLAN_SCHEMA_VERSION = _AUTHORING_FROZEN["DOCUMENT_PLAN_SCHEMA_VERSION"]["value"]
+DOCUMENT_PLAN_V2_SCHEMA_VERSION = _AUTHORING_FROZEN["DOCUMENT_PLAN_V2_SCHEMA_VERSION"]["value"]
+
+
+def get_document_plan_schema() -> dict[str, object]:
+    return _AUTHORING_GOLDEN["documentPlanSchema"]
 
 
 # --------------------------------------------------------------------------- #

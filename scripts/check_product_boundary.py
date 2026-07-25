@@ -57,7 +57,8 @@ FROZEN_CORE_VISUAL_RUNTIME_IMPORTS = (
 CANONICAL_AGENT_ROOT = "src/hwpx_mcp_server/office/agent"
 CANONICAL_AGENT_FILE_COUNT = 19
 CANONICAL_AUTHORING_ROOT = "src/hwpx_mcp_server/office/authoring"
-CANONICAL_AUTHORING_FILE_COUNT = 16
+# 17 since the 5.0 train: report_parser joined the owner it always belonged to.
+CANONICAL_AUTHORING_FILE_COUNT = 17
 ALLOWED_AGENT_CORE_IMPORTS = (
     "hwpx.document",
     "hwpx.mutation_report",

@@ -39,7 +39,7 @@ def test_owner_ledger_matches_the_frozen_source_and_package_plan() -> None:
         "default": 119,
         "advanced": 127,
         "skillRequired": 28,
-        "hash": "429cb6706323e762",
+        "hash": "9bfc7ec7b0c3c62b",
     }
 
 

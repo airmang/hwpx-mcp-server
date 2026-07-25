@@ -9,8 +9,8 @@
     "manifestSha256": "fb8a36922bb5b516dd84fec36bb9de079e651e1c87a5df78e1acd0a606c75b42"
   },
   "canonical": {
-    "pythonFiles": 16,
-    "loc": 7582,
+    "pythonFiles": 17,
+    "loc": 7759,
     "manifestSha256": "c4b5df99510eba8d90b9a19029eec2ee4775a82c110bf46c92ddca8276c20058",
     "profileAssets": 23,
     "profileBytes": 77471,
@@ -66,6 +66,6 @@
     "default": 119,
     "advanced": 127,
     "skillRequired": 28,
-    "hash": "429cb6706323e762"
+    "hash": "9bfc7ec7b0c3c62b"
   }
 }

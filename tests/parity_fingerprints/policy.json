@@ -1,0 +1,120 @@
+{
+  "frozenFrom": "python-hwpx d980d310c947e2ae1418a3ca0a63c643e7fe195b (historical, pre-70d56ed)",
+  "modules": {
+    "hwpx.tools.official_lint": {
+      "OFFICIAL_DOCUMENT_STYLE_REPORT_VERSION": {
+        "kind": "constant",
+        "value": "official-document-style-v1"
+      },
+      "inspect_official_document_style": {
+        "kind": "function",
+        "signature": "(source: 'Any', *, document_type: 'Any' = None) -> 'dict[str, Any]'"
+      }
+    },
+    "hwpx.tools.pii": {
+      "Confidence": {
+        "kind": "function",
+        "signature": "(*args, **kwargs)"
+      },
+      "DEFAULT_POLICY": {
+        "kind": "constant",
+        "value": {
+          "$dataclass": "PIIPolicy",
+          "fields": {
+            "contextual_enabled": true,
+            "machine_enabled": true,
+            "mask_char": "*",
+            "prefix_len": 1,
+            "suffix_len": 0
+          }
+        }
+      },
+      "PIIPolicy": {
+        "bases": [],
+        "fields": {
+          "contextual_enabled": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "machine_enabled": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "mask_char": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "prefix_len": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "suffix_len": {
+            "hasDefault": true,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "PIISpan": {
+        "bases": [
+          "dict"
+        ],
+        "kind": "class",
+        "methods": {}
+      },
+      "PiiLogFilter": {
+        "bases": [
+          "Filter"
+        ],
+        "kind": "class",
+        "methods": {
+          "filter": "(self, record: 'logging.LogRecord') -> 'bool'"
+        }
+      },
+      "Pseudonymizer": {
+        "bases": [],
+        "kind": "class",
+        "methods": {
+          "mapping": "(self) -> 'dict[str, str]'",
+          "token": "(self, value: 'str', *, kind: 'str' = '이름') -> 'str'"
+        }
+      },
+      "deidentify": {
+        "kind": "function",
+        "signature": "(value: 'str', *, salt: 'str', length: 'int' = 12) -> 'str'"
+      },
+      "detect_pii": {
+        "kind": "function",
+        "signature": "(text: 'str', policy: 'PIIPolicy' = PIIPolicy(mask_char='*', machine_enabled=True, contextual_enabled=True, prefix_len=1, suffix_len=0)) -> 'list[PIISpan]'"
+      },
+      "mask_pii": {
+        "kind": "function",
+        "signature": "(text: 'str', policy: 'PIIPolicy' = PIIPolicy(mask_char='*', machine_enabled=True, contextual_enabled=True, prefix_len=1, suffix_len=0)) -> 'str'"
+      },
+      "mask_value": {
+        "kind": "function",
+        "signature": "(value: 'str', pii_type: 'str', policy: 'PIIPolicy' = PIIPolicy(mask_char='*', machine_enabled=True, contextual_enabled=True, prefix_len=1, suffix_len=0)) -> 'str'"
+      },
+      "minimize_fields": {
+        "kind": "function",
+        "signature": "(record: 'Mapping[str, Any]', allowed: 'Iterable[str]', *, drop_empty: 'bool' = False) -> 'dict[str, Any]'"
+      },
+      "scrub_exception_message": {
+        "kind": "function",
+        "signature": "(msg: 'str', policy: 'PIIPolicy' = PIIPolicy(mask_char='*', machine_enabled=True, contextual_enabled=True, prefix_len=1, suffix_len=0)) -> 'str'"
+      }
+    },
+    "hwpx.tools.table_compute": {
+      "TABLE_COMPUTE_REPORT_VERSION": {
+        "kind": "constant",
+        "value": "table-compute-v1"
+      },
+      "table_compute": {
+        "kind": "function",
+        "signature": "(table: 'Mapping[str, Any] | Sequence[Mapping[str, Any]] | Sequence[Sequence[Any]]', *, value_columns: 'Sequence[str | int] | None' = None, operations: 'Sequence[str] | None' = None, append: 'str' = 'rows', group_by: 'str | int | None' = None, label_column: 'str | int | None' = None, labels: 'Mapping[str, str] | None' = None) -> 'dict[str, Any]'"
+      }
+    }
+  },
+  "schemaVersion": "hwpx.parity-fingerprint/v1"
+}

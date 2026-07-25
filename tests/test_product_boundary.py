@@ -24,7 +24,8 @@ def test_real_tree_satisfies_mcp_boundary() -> None:
     report = boundary.evaluate(ROOT)
     assert report["ok"], report["violations"]
     assert report["canonicalAgentPythonFiles"] == 19
-    assert report["canonicalAuthoringPythonFiles"] == 16
+    # 17 since the 5.0 train: report_parser joined the owner it always belonged to.
+    assert report["canonicalAuthoringPythonFiles"] == 17
 
 
 def test_new_direct_render_discovery_fails_closed(tmp_path) -> None:

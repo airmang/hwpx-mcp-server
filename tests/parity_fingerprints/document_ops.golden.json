@@ -1,0 +1,103 @@
+{
+  "calls": {
+    "comparisonPlan": {
+      "preset": "government_report",
+      "schemaVersion": "hwpx.document_plan.v2",
+      "sections": [
+        {
+          "blocks": [
+            {
+              "level": 1,
+              "text": "신구대조표",
+              "type": "heading"
+            },
+            {
+              "columnWidths": [
+                1,
+                4,
+                4
+              ],
+              "header": [
+                "구분",
+                "구",
+                "신"
+              ],
+              "headerShading": "EAF1FB",
+              "rows": [
+                [
+                  "변경",
+                  "제2조 예산",
+                  "제2조 예산 변경"
+                ],
+                [
+                  "추가",
+                  "",
+                  "제3조 시행"
+                ]
+              ],
+              "type": "table"
+            }
+          ]
+        }
+      ],
+      "title": "신구대조표"
+    },
+    "mailMerge": {
+      "exportText": "name=홍길동 / phone=010-****-****",
+      "projection": {
+        "createdCount": 1,
+        "fitAware": false,
+        "ok": true,
+        "openSafety": {
+          "checkedCount": 1,
+          "failureCount": 0,
+          "failures": [],
+          "ok": true
+        },
+        "placeholderKeys": [
+          "name",
+          "phone"
+        ],
+        "report_version": "mail-merge-v1",
+        "row": {
+          "created": true,
+          "fitFields": [],
+          "maskedFields": [
+            "phone"
+          ],
+          "missingKeys": [],
+          "ok": true,
+          "openSafety": {
+            "ok": true,
+            "reopen": {
+              "error": null,
+              "ok": true
+            },
+            "summary": "editor-open safety verification passed",
+            "validateDocument": {
+              "errors": [],
+              "ok": true,
+              "warnings": []
+            },
+            "validatePackage": {
+              "blockingErrors": [],
+              "errors": [],
+              "ok": true,
+              "warnings": [
+                "Contents/content.hpf: manifest does not reference a version part; engine will fall back to 'version.xml'"
+              ]
+            }
+          },
+          "reasons": [],
+          "replacedCount": 2,
+          "rowIndex": 1,
+          "unresolvedPlaceholders": []
+        },
+        "rowCount": 1,
+        "rowsWithIssues": []
+      }
+    }
+  },
+  "frozenFrom": "python-hwpx d980d310c947e2ae1418a3ca0a63c643e7fe195b (historical, pre-70d56ed)",
+  "schemaVersion": "hwpx.parity-golden/v1"
+}
