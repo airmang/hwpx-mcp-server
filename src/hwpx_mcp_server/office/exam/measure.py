@@ -10,7 +10,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 
-from hwpx.visual.block_splits import Block, detect_block_splits
+from ..rendering.block_splits import Block, detect_block_splits
 
 from ..form_fill.fit.wordbox import extract_glyph_boxes
 

@@ -9,7 +9,7 @@ from typing import Any
 
 from .fixture_corpus import FixtureCorpus
 from .page_qa import inspect_fixture_case
-from hwpx.visual.qa_contracts import (
+from .qa_contracts import (
     TAXONOMY_VERSION,
     DefectCategory,
     FindingSeverity,

@@ -19,8 +19,8 @@ one interface, plus a resolver that picks the best reachable one:
 ``RenderOracle`` is a backward-compatible alias of :class:`WindowsComOracle`.
 
 ``visual_check`` renders a before/after ``.hwpx`` pair through whichever backend
-it is given, scores the result with :mod:`hwpx.visual.diff`, and returns a
-:class:`hwpx.visual.report.VisualReport`. It only needs ``available()`` and
+it is given, scores the result with :mod:`.diff`, and returns a
+:class:`hwpx.quality.rendering.VisualReport`. It only needs ``available()`` and
 ``render_many()``, so it is backend-agnostic.
 
 Assurance is tiered and never blurred (implementation plan §0.0): off-oracle, or
@@ -44,10 +44,10 @@ import time
 from importlib import resources
 from pathlib import Path
 
-import hwpx.visual.detectors as detectors
-import hwpx.visual.diff as diff
+import hwpx_mcp_server.office.rendering.detectors as detectors
+import hwpx_mcp_server.office.rendering.diff as diff
 from hwpx.quality.rendering import EditMask, VisualReport
-from hwpx.visual.block_splits import Block, BlockSplit, detect_block_splits
+from .block_splits import Block, BlockSplit, detect_block_splits
 
 _BACKEND_SCRIPT = "_render_hwpx.ps1"
 _OPEN_RATE_SCRIPT = "_hancom_open_rate.ps1"

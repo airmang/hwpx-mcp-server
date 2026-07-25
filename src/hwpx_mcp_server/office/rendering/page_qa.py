@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from .fixture_corpus import FixtureCase, sha256_file
-from hwpx.visual.qa_contracts import (
+from .qa_contracts import (
     DefectCategory,
     Evidence,
     FindingSeverity,

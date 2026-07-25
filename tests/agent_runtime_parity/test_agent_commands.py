@@ -10,7 +10,7 @@ from hwpx import HwpxDocument, validate_editor_open_safety
 from hwpx_mcp_server.office.agent import AGENT_BATCH_SCHEMA, HwpxAgentDocument, apply_document_commands
 from hwpx.oxml.namespaces import HP
 from hwpx.quality import SavePipeline
-from hwpx.visual import NullOracle
+from hwpx.quality.rendering import UnavailableRenderBackend as NullOracle
 
 
 def _revision(path: Path) -> str:

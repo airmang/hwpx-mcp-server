@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from hwpx.visual.qa_contracts import (
+from .qa_contracts import (
     TAXONOMY_VERSION,
     DefectCategory,
     FindingSeverity,

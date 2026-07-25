@@ -66,7 +66,10 @@ def test_exam_uses_neutral_block_split_contract() -> None:
     source = (
         ROOT / "src" / "hwpx_mcp_server" / "office" / "exam" / "measure.py"
     ).read_text(encoding="utf-8")
-    assert "from hwpx.visual.block_splits import Block, detect_block_splits" in source
+    # The block-split contract lives with the rendering owner now, not in core.
+    # The point of the assertion is unchanged: exam consumes the shared
+    # geometry contract rather than carrying its own copy.
+    assert "from ..rendering.block_splits import Block, detect_block_splits" in source
     assert "hwpx.visual.oracle" not in source
 
 
@@ -103,5 +106,5 @@ def test_real_product_tree_passes_rendering_owner_gate() -> None:
     report = BOUNDARY["evaluate"](ROOT)
 
     assert report["ok"], report["violations"]
-    assert report["canonicalRenderingPythonFiles"] == 6
+    assert report["canonicalRenderingPythonFiles"] == 10
     assert report["canonicalRenderingResources"] == OWNER["resourceFiles"]

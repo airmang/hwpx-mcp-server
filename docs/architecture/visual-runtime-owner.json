@@ -11,15 +11,20 @@
   },
   "canonical": {
     "status": "canonical",
-    "pythonFiles": 6,
-    "loc": 2001,
-    "manifestSha256": "4b63f85703896fe8d5b17c9896b323c6b324cd66ff97d69e734b7415b9260a16"
+    "pythonFiles": 10,
+    "loc": 2704,
+    "manifestSha256": "8ceb4f808a6a024262629b73a1e1d262722ea347a5784e382a1ce10118e1b53a",
+    "frozenAtNote": "S-104 동결값 loc=2001 sha=4b63f85703896fe8…에서 재계산. 코드가 바뀐 게 아니라 소유자가 core에 있던 4개 모듈을 받았기 때문이다. 동결은 드리프트를 막으려는 것이지 이동을 막으려는 것이 아니므로, 이유와 함께 다시 얼린다."
   },
   "packageFiles": [
     "__init__.py",
+    "block_splits.py",
+    "detectors.py",
+    "diff.py",
     "fixture_corpus.py",
     "oracle.py",
     "page_qa.py",
+    "qa_contracts.py",
     "qa_metrics.py",
     "worker.py"
   ],
@@ -89,5 +94,6 @@
     "advanced": 127,
     "skillRequired": 28,
     "hash": "e592ede5b0eb1a35"
-  }
+  },
+  "packageFilesNote": "S-104가 동결한 6개에서 10개로 늘었다. 늘어난 4개(block_splits·detectors·diff·qa_contracts)는 신규 코드가 아니라 core가 계속 들고 있던 것이고, 이 소유자의 oracle이 그중 셋을 core에서 import하고 있었다. 5.0 경계 마감으로 실소유자에게 왔다."
 }

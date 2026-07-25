@@ -12,7 +12,7 @@ from hwpx_mcp_server.office.agent import HwpxAgentDocument
 from hwpx_mcp_server.office.agent.model import AgentContractError
 from hwpx_mcp_server.office.agent.blueprint import dump_document_blueprint, replay_document_blueprint
 from hwpx.quality import SavePipeline
-from hwpx.visual import NullOracle
+from hwpx.quality.rendering import UnavailableRenderBackend as NullOracle
 from hwpx.oxml.namespaces import HP
 
 PNG = (

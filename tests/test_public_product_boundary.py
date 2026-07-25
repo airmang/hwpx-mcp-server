@@ -57,8 +57,11 @@ def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
 
     assert project["project"]["version"] == "6.0.0"
     assert "python-hwpx>=5.0.0" in dependencies
-    assert optional_dependencies["oracle"] == ["python-hwpx[visual]>=5.0.0"]
-    assert optional_dependencies["vision"] == ["python-hwpx[visual]>=5.0.0"]
+    # The imaging stack is declared here since the 5.0 boundary closed: core
+    # stopped reading PDFs and images, so its `visual` extra is empty and
+    # deferring to it would have installed nothing.
+    assert optional_dependencies["oracle"] == ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
+    assert optional_dependencies["vision"] == ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
     assert "mcp==1.28.1" in dependencies
     assert "pydantic>=2.11,<3" in dependencies
 

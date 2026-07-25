@@ -15,15 +15,38 @@ from typing import Any
 from hwpx.quality import SavePipeline
 from hwpx.quality.rendering import EditMask, VisualReport
 
-from .oracle import (
-    MacHancomOracle,
-    NullOracle,
-    RenderBackend,
-    RenderOracle,
-    WindowsComOracle,
-    resolve_oracle,
-    visual_check,
+_ORACLE_EXPORTS = (
+    "MacHancomOracle",
+    "NullOracle",
+    "RenderBackend",
+    "RenderOracle",
+    "WindowsComOracle",
+    "resolve_oracle",
+    "visual_check",
 )
+
+
+def __getattr__(name: str) -> Any:
+    """Load the Hancom side only when someone asks for it.
+
+    Importing this package eagerly would drag the oracle in behind any import of
+    a neutral contract — ``block_splits``, ``detectors``, ``diff`` — because a
+    submodule import initialises its package first. Those contracts exist so
+    exam typesetting can compute question splits with no renderer present, and
+    that promise is worth nothing if reaching them starts one.
+
+    Core's ``hwpx.visual`` used the same lazy hook for the same reason. The move
+    to this owner dropped it, and the boundary test caught it.
+    """
+    if name in _ORACLE_EXPORTS:
+        import importlib
+
+        return getattr(importlib.import_module(f"{__name__}.oracle"), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted({*globals(), *_ORACLE_EXPORTS})
 
 
 class HancomRenderBackend:
@@ -46,7 +69,12 @@ class HancomRenderBackend:
         work_dir: str | None = None,
         keep_artifacts: bool = False,
     ) -> VisualReport:
-        return visual_check(
+        import sys
+
+        # Module-object lookup, not a direct submodule import: a test that
+        # patches ``rendering.visual_check`` must still win, and __getattr__
+        # only runs when the name is absent from the module dict.
+        return getattr(sys.modules[__name__], "visual_check")(
             before_hwpx,
             after_hwpx,
             oracle=self._oracle,
@@ -67,7 +95,9 @@ def resolve_hancom_backend(*, dpi: int = 150, **_options: Any) -> HancomRenderBa
 def resolve_hancom_oracle(*, dpi: int = 150, **_options: Any) -> Any:
     """Return the canonical Hancom transport at the MCP boundary."""
 
-    return resolve_oracle(dpi=dpi)
+    import sys
+
+    return getattr(sys.modules[__name__], "resolve_oracle")(dpi=dpi)
 
 
 @contextmanager

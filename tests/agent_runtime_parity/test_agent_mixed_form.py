@@ -32,7 +32,7 @@ from hwpx_mcp_server.office.agent import form_plan as mixed_form_module
 from hwpx_mcp_server.office.agent.catalog import agent_json_schemas
 from hwpx.oxml.namespaces import HP
 from hwpx.quality import SavePipeline
-from hwpx.visual import NullOracle
+from hwpx.quality.rendering import UnavailableRenderBackend as NullOracle
 
 
 def _append_native_field(

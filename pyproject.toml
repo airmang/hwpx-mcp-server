@@ -44,8 +44,11 @@ http = ["uvicorn>=0.30"]
 ingest = ["markitdown[pdf,docx,xlsx]>=0.1.6,<0.2"]
 # 직인 날인/검증의 한컴 렌더 오라클 경로(렌더→fitz word/image bbox). macOS+Hancom 필요;
 # 없으면 place_seal/check_seal_compliance가 renderChecked=false로 정직하게 degrade한다.
-oracle = ["python-hwpx[visual]>=5.0.0"]
-vision = ["python-hwpx[visual]>=5.0.0"]
+# The imaging stack is declared here now. Core stopped reading PDFs and images
+# at 5.0 — its `visual` extra is empty — and this package owns the render oracle,
+# the glyph detectors and the PDF rasteriser that need them.
+oracle = ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
+vision = ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
 test = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
@@ -93,7 +96,10 @@ where = ["src"]
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+# scripts/ carries the repository QA harnesses. The conformance runner and the
+# corpus drivers moved here in the 5.0 train with the rendering pipeline they
+# exercise, and their tests import them by bare name.
+pythonpath = ["src", "scripts"]
 addopts = "-q"
 
 [tool.mypy]

@@ -20,7 +20,12 @@ CORE_VISUAL_CONTRACT_CONSUMERS = frozenset(
     }
 )
 CANONICAL_RENDER_ROOT = "src/hwpx_mcp_server/office/rendering"
-CANONICAL_RENDER_FILE_COUNT = 6
+# Ten since the 5.0 boundary closed. Core was still holding block_splits,
+# detectors, diff and qa_contracts — and this owner imported three of them
+# from there — so they came here with the rest of the rendering runtime. The
+# count is a ratchet against drift, not a target; it moves when ownership
+# moves, with a reason.
+CANONICAL_RENDER_FILE_COUNT = 10
 CANONICAL_RENDER_RESOURCES = frozenset(
     {
         "_hancom_open_rate.ps1",

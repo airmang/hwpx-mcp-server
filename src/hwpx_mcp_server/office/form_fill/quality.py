@@ -26,7 +26,7 @@ concrete defects and their locations.
 Design rails: measure-first, no-silent-true, honest-defer. Every axis reports a
 ``status`` so a partial/undetectable measurement is visible, not disguised as a
 pass. Reuses the byte parsers in :mod:`hwpx.table_patch` and the render oracle in
-:mod:`hwpx.visual.oracle`.
+:mod:`..rendering.oracle`.
 """
 
 from __future__ import annotations

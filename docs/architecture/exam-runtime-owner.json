@@ -12,7 +12,8 @@
     "status": "canonical",
     "pythonFiles": 6,
     "loc": 806,
-    "manifestSha256": "2ffc011280ca599bd2012b06c5deb518ea58e4dc41d08aac59cae6769890f58a"
+    "manifestSha256": "7485965024224771d91ab6cc64bec34fd66e9488531e37b8fb910f879b646dda",
+    "refrozenNote": "2ffc011280ca599b…에서 재계산. measure.py가 block-split 계약을 core가 아니라 렌더 소유자에서 가져오도록 바뀌었다(5.0 경계 마감). 조판 로직은 그대로다."
   },
   "packageFiles": [
     "__init__.py",
