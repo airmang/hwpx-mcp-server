@@ -2,13 +2,53 @@
 
 ## Unreleased
 
+## [6.0.0] - unreleased
+
+The 5.0 train. `python-hwpx` 5.0 removes the application workflows it had been
+carrying as compatibility copies; this package, which has owned their canonical
+implementation since the 4.x line, becomes their only owner.
+
+### Changed — BREAKING
+
+- Version floors are now `python-hwpx>=5.0.0`, `hwpx-mcp-server>=6.0.0`, skill
+  `>=1.0.0`. A mixed install is exactly what these floors exist to prevent: core
+  5.0 no longer has the modules a 5.x server would reach for.
+- This package now declares the `hwpx` console command, which `python-hwpx` 5.0
+  stops declaring. Same command, same subcommands. Because declaring it requires
+  core `>=5.0.0`, no valid install ends up with two packages claiming the name.
+- Contract `429cb6706323e762` → `e592ede5b0eb1a35` at an unchanged 119 default /
+  127 advanced / 28 skill-required. Names, order, schemas, classifications and
+  error contracts are all identical — nothing a caller binds against moved. The
+  hash covers the version floors, which changed, and each tool's description:
+  `compose_exam` and `verify_question_splits` dropped an internal stage codename
+  from their Korean summaries. See `docs/tool-contract-delta-6.0.0.json`.
+- `office.document_ops.verify_redline` delegates to core rather than carrying a
+  parallel implementation. The owner's job is to *supply* a render backend, and
+  a behavioural test now enforces that it does: core degrades honestly when
+  nothing is injected, which is right for a library and wrong for the canonical
+  owner, since a caller reaching this surface asked for a Hancom-backed verdict.
+- `office.form_fill.fit.*` re-exports the neutral `hwpx.form_fit.*` contract
+  instead of duplicating it, which removed roughly 1,300 lines of second copy.
+- `office.authoring.report_parser` moved here from core.
+
 ### Documentation
-- Published the 2026-07-24 through 2026-10-31 compatibility/deprecation
-  observation. All 6 compatibility and 3 deprecated tools remain installed;
-  the opening decision is `extend` for every surface and removal count is zero.
-  The guide records canonical replacements, clean-install parity, rollback, and
-  the separately approved next-major removal gate. ToolSpec remains exactly
-  `119/127/28 @ 429cb6706323e762`.
+
+- The 2026-07-24 compatibility/deprecation observation was published for a
+  window running to 2026-10-31, with every surface decided `extend` and removal
+  count zero. This release supersedes it ahead of that date on an explicit owner
+  decision. The window's purpose is downstream notice and notice begins at
+  publication, so this shortens the notice period rather than satisfying it —
+  stated plainly here because the observation issues promised otherwise.
+- `docs/tool-contract-delta-6.0.0.json` records the contract delta and the
+  superseded intermediate hash.
+
+### Fixed
+
+- Five parity test files compared this package against core surfaces that 5.0
+  deletes. They now compare against fingerprints and goldens frozen from the
+  commit before removal, and each was checked for discrimination by tampering
+  with the frozen value — a parity test whose subject is gone can otherwise pass
+  by comparing nothing to nothing.
 
 ## [5.1.0] - 2026-07-22
 

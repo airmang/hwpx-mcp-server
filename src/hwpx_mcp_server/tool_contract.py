@@ -37,7 +37,7 @@ MIN_SKILL_VERSION = "1.0.0"
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "9bfc7ec7b0c3c62b"
+RELEASED_CONTRACT_HASH = "e592ede5b0eb1a35"
 
 
 class ToolClassification(str, Enum):

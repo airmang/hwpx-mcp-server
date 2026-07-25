@@ -45,7 +45,7 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
         "default": 119,
         "advanced": 127,
         "skillRequired": 28,
-        "hash": "9bfc7ec7b0c3c62b",
+        "hash": "e592ede5b0eb1a35",
     }
 
 
@@ -96,7 +96,7 @@ def test_tool_surface_remains_exactly_frozen() -> None:
     assert len(expected_tool_names(advanced=False)) == 119
     assert len(expected_tool_names(advanced=True)) == 127
     assert len(skill_required_tool_names()) == 28
-    assert contract_hash() == "9bfc7ec7b0c3c62b"
+    assert contract_hash() == "e592ede5b0eb1a35"
 
 
 def test_real_product_tree_passes_rendering_owner_gate() -> None:

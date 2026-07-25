@@ -455,7 +455,7 @@ def compose_exam(
     verify: bool = True,
     role_style_names: dict[str, str] | None = None,
 ) -> dict:
-    """출제 md를 학교 양식 .hwpx에 그 양식의 기존 스타일로 재조판합니다 (S-056 시험지 조판).
+    """출제 md를 학교 양식 .hwpx에 그 양식의 기존 스타일로 재조판합니다 (시험지 조판).
 
     각 문항이 단/쪽 경계에서 잘리지 않게(keep-together) 하고, 관리박스·머리글/꼬리글은
     무손실 보존하며, [그림N]/[표N]/[식N]은 텍스트 placeholder로 남깁니다(사람이 그림을
@@ -539,7 +539,7 @@ def verify_question_splits(
     valid_question_numbers: list[str] | None = None,
     marker_regex: str | None = None,
 ) -> dict:
-    """한컴 렌더로 시험지 .hwpx의 문항이 단/쪽 경계에서 잘렸는지(문항-split) 검증합니다 (S-056).
+    """한컴 렌더로 시험지 .hwpx의 문항이 단/쪽 경계에서 잘렸는지(문항-split) 검증합니다.
 
     오라클이 없으면 ``renderChecked=false`` 로 정직하게 degrade 합니다(임의 0 금지).
     한컴이 본문을 벡터 커브로 export 해 추출 텍스트에 조판 문항이 0개면(학교 원안지

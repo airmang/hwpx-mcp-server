@@ -1,9 +1,15 @@
 {
   "schemaVersion": "hwpx.tool-contract-delta/v1",
   "version": "6.0.0",
-  "note": "Floors only. The 5.0 train moves python-hwpx to 5.0.0, this package to 6.0.0, and the plugin to 1.0.0, and contract_hash() covers the floors — so the hash moves even though no tool did. Names, order, schemas, classifications and the default/advanced/skill-required split are all unchanged, which is what makes this a floors-only delta rather than a surface change.",
+  "note": "Floors, plus two description edits. The 5.0 train moves python-hwpx to 5.0.0, this package to 6.0.0, and the plugin to 1.0.0, and contract_hash() covers the floors. It also covers each bound tool's description, so removing an internal stage codename from two exam tool docstrings moves the hash as well. No name, order, schema, classification, error contract, or default/advanced/skill-required assignment changed: nothing a caller binds against is different.",
   "previousHash": "429cb6706323e762",
-  "hash": "9bfc7ec7b0c3c62b",
+  "hash": "e592ede5b0eb1a35",
+  "supersededHashes": [
+    {
+      "hash": "9bfc7ec7b0c3c62b",
+      "reason": "floors only, before the two exam descriptions were cleaned; never published"
+    }
+  ],
   "toolCounts": {
     "default": 119,
     "advanced": 127,
@@ -15,6 +21,16 @@
     "schemas",
     "classifications",
     "errorContracts"
+  ],
+  "descriptionChanges": [
+    {
+      "tool": "compose_exam",
+      "change": "dropped the internal stage codename; the Korean summary is otherwise identical"
+    },
+    {
+      "tool": "verify_question_splits",
+      "change": "dropped the internal stage codename; the Korean summary is otherwise identical"
+    }
   ],
   "floors": {
     "python-hwpx": "5.0.0",
