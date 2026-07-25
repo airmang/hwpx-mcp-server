@@ -64,7 +64,8 @@
   ],
   "approvedSiblingOwners": [],
   "forbiddenCoreCompatibilityImports": [
-    "hwpx.form_fit",
+    "hwpx.form_fit.seal",
+    "hwpx.form_fit.wordbox",
     "hwpx.visual.fixture_corpus",
     "hwpx.visual.hancom_worker",
     "hwpx.visual.oracle",

@@ -10,8 +10,8 @@
   },
   "canonical": {
     "pythonFiles": 15,
-    "loc": 6336,
-    "manifestSha256": "3ea2bc86ebca2cbe30a40a24cb6cfc0e11273517a151463dbe6957d75036a5f4"
+    "loc": 5060,
+    "manifestSha256": "8d5fd9a114d4a1904ccf53922499fd9fc451f9f822f47d997b093de004905c96"
   },
   "moduleMap": {
     "hwpx.fill_residue": "hwpx_mcp_server.office.form_fill.fill_residue",
@@ -40,6 +40,11 @@
   ],
   "approvedCoreImports": [
     "hwpx.document",
+    "hwpx.form_fit.apply",
+    "hwpx.form_fit.engine",
+    "hwpx.form_fit.measure",
+    "hwpx.form_fit.policy",
+    "hwpx.form_fit.report",
     "hwpx.oxml.namespaces",
     "hwpx.quality",
     "hwpx.table_patch",
@@ -50,7 +55,8 @@
   "forbiddenCoreCompatibilityImports": [
     "hwpx.fill_residue",
     "hwpx.form_fill",
-    "hwpx.form_fit",
+    "hwpx.form_fit.seal",
+    "hwpx.form_fit.wordbox",
     "hwpx.formfill_quality",
     "hwpx.guidance_scan",
     "hwpx.template_formfit"

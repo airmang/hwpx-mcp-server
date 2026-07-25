@@ -240,7 +240,11 @@ def verify_toc(
         refreshed = bool(refresher and refresher(path))
 
     if verify_render and oracle is not None and oracle.available():
-        report = toc_verify(path, oracle=oracle)
+        # Core matches headings but does not read PDFs; the imaging stack is
+        # this layer's, so the extractor is injected alongside the oracle.
+        from ..office.form_fill.fit.wordbox import extract_word_boxes
+
+        report = toc_verify(path, oracle=oracle, extract=extract_word_boxes)
     else:
         structural = structural_report(path)
         report = {

@@ -37,11 +37,15 @@
   ],
   "forbiddenCoreCompatibilityImports": [
     "hwpx.exam",
-    "hwpx.form_fit"
+    "hwpx.form_fit.seal",
+    "hwpx.form_fit.wordbox"
   ],
   "coreVisualContract": {
     "module": "hwpx.visual.block_splits",
-    "members": ["Block", "detect_block_splits"],
+    "members": [
+      "Block",
+      "detect_block_splits"
+    ],
     "status": "renderer-neutral core owner"
   },
   "retainedCorePrimitives": [

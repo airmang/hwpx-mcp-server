@@ -37,8 +37,17 @@ ALLOWED_RENDERING_CORE_IMPORTS = (
     "hwpx.visual.diff",
     "hwpx.visual.qa_contracts",
 )
+# Feature 049 D2: python-hwpx owns the neutral fit contract — policy, measure,
+# engine, report, apply — and the companion layers import it instead of keeping a
+# copy. Only its application half stays frozen: seal carries institutional rules
+# and wordbox needs an imaging stack, so both belong to this layer.
+FROZEN_CORE_FORM_FIT_APPLICATION = (
+    "hwpx.form_fit.seal",
+    "hwpx.form_fit.wordbox",
+)
+
 FROZEN_CORE_VISUAL_RUNTIME_IMPORTS = (
-    "hwpx.form_fit",
+    *FROZEN_CORE_FORM_FIT_APPLICATION,
     "hwpx.visual.fixture_corpus",
     "hwpx.visual.hancom_worker",
     "hwpx.visual.oracle",
@@ -98,6 +107,14 @@ CANONICAL_FORM_FILL_ROOT = "src/hwpx_mcp_server/office/form_fill"
 CANONICAL_FORM_FILL_FILE_COUNT = 15
 ALLOWED_FORM_FILL_CORE_IMPORTS = (
     "hwpx.document",
+    # Feature 049 D2: the neutral fit contract is core's, and this owner imports
+    # it rather than keeping a second copy. Named module by module on purpose —
+    # the package root re-exports seal and wordbox, which are application code.
+    "hwpx.form_fit.apply",
+    "hwpx.form_fit.engine",
+    "hwpx.form_fit.measure",
+    "hwpx.form_fit.policy",
+    "hwpx.form_fit.report",
     "hwpx.oxml.namespaces",
     "hwpx.quality",
     "hwpx.table_patch",
@@ -108,7 +125,10 @@ TEMPORARY_FORM_FILL_CORE_IMPORTS: tuple[str, ...] = ()
 FROZEN_CORE_FORM_FILL_IMPORTS = (
     "hwpx.fill_residue",
     "hwpx.form_fill",
-    "hwpx.form_fit",
+    # The package root stays frozen because importing it pulls in seal and
+    # wordbox; those two remain application code owned here.
+    "hwpx.form_fit.seal",
+    "hwpx.form_fit.wordbox",
     "hwpx.formfill_quality",
     "hwpx.guidance_scan",
     "hwpx.template_formfit",
@@ -131,7 +151,7 @@ ALLOWED_EXAM_CORE_IMPORTS = (
 )
 FROZEN_CORE_EXAM_IMPORTS = (
     "hwpx.exam",
-    "hwpx.form_fit",
+    *FROZEN_CORE_FORM_FIT_APPLICATION,
 )
 CANONICAL_DOCUMENT_OPS_ROOT = "src/hwpx_mcp_server/office/document_ops"
 CANONICAL_DOCUMENT_OPS_FILE_COUNT = 4
