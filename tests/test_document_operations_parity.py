@@ -22,11 +22,19 @@ from hwpx_mcp_server.office.document_ops import (
 
 
 class _UnavailableOracle:
+    """A core RenderBackend that reports itself unusable."""
+
     def available(self) -> bool:
         return False
 
-    def render_many(self, pairs: Any) -> Any:  # pragma: no cover
-        raise AssertionError("render_many must not run when unavailable")
+    def check(self, before_hwpx: Any, after_hwpx: Any, **_kwargs: Any) -> Any:
+        from hwpx.quality.rendering import VisualReport
+
+        return VisualReport(
+            ok=True,
+            render_checked=False,
+            warnings=["test backend is unavailable; nothing was rendered"],
+        )
 
 
 def _template(path: Path) -> None:
@@ -142,3 +150,30 @@ def test_unavailable_oracle_redline_receipt_is_exact(tmp_path: Path) -> None:
         after,
         oracle=oracle,
     )
+
+
+def test_canonical_owner_injects_a_backend_instead_of_degrading(monkeypatch) -> None:
+    """The owner's job is to supply a renderer, and it must actually do it.
+
+    Core's verify_redline degrades honestly when nothing is injected. That is
+    right for a library and wrong for the canonical owner: a caller reaching the
+    MCP surface asked for a Hancom-backed verdict. Before this feature an import
+    ban enforced the split; now that the owner delegates to core, the guard has
+    to be behavioural instead.
+    """
+
+    from hwpx_mcp_server.office.document_ops import redline as owner
+
+    supplied: list[object] = []
+
+    def _fake_core_verify(before, after, *, oracle=None):
+        supplied.append(oracle)
+        return {"report_version": "redline-verify-v1"}
+
+    monkeypatch.setattr(owner, "_core_verify_redline", _fake_core_verify)
+    owner.verify_redline("before.hwpx", "after.hwpx")
+
+    assert len(supplied) == 1
+    backend = supplied[0]
+    assert backend is not None, "the owner degraded instead of supplying a backend"
+    assert hasattr(backend, "available") and hasattr(backend, "check")

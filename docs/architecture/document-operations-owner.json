@@ -13,8 +13,8 @@
   "canonical": {
     "status": "canonical",
     "pythonFiles": 4,
-    "loc": 221,
-    "manifestSha256": "1897981af6c2620248d8fd2a2c5b04614ff8b99e10207011641163d3b7df2263"
+    "loc": 183,
+    "manifestSha256": "16fdc78fc1e13462809125a21bfbb54477d90ca84bd608361842926a0c99b62f"
   },
   "memberOwners": {
     "core": [
@@ -40,6 +40,7 @@
   },
   "approvedCoreImports": [
     "hwpx.document",
+    "hwpx.quality.rendering",
     "hwpx.tools.doc_diff",
     "hwpx.tools.mail_merge",
     "hwpx.tools.redline"
@@ -54,9 +55,6 @@
     ],
     "hwpx.tools.mail_merge": [
       "mail_merge"
-    ],
-    "hwpx.tools.redline": [
-      "verify_redline"
     ]
   },
   "siblingOwners": [

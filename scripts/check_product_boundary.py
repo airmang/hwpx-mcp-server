@@ -31,6 +31,7 @@ CANONICAL_RENDER_RESOURCES = frozenset(
 )
 ALLOWED_RENDERING_CORE_IMPORTS = (
     "hwpx.quality",
+    "hwpx.quality.rendering",
     "hwpx.visual.block_splits",
     "hwpx.visual.detectors",
     "hwpx.visual.diff",
@@ -136,15 +137,22 @@ CANONICAL_DOCUMENT_OPS_ROOT = "src/hwpx_mcp_server/office/document_ops"
 CANONICAL_DOCUMENT_OPS_FILE_COUNT = 4
 ALLOWED_DOCUMENT_OPS_CORE_IMPORTS = (
     "hwpx.document",
+    "hwpx.quality.rendering",
     "hwpx.tools.doc_diff",
     "hwpx.tools.mail_merge",
     "hwpx.tools.redline",
 )
+# Feature 049 D2: the ban targets core's *application* callables, not its neutral
+# contracts. hwpx.tools.redline.verify_redline used to resolve a Hancom oracle
+# itself, which made calling it a boundary violation. It no longer does — it
+# inspects structure and delegates rendering to an injected RenderBackend — so
+# the canonical owner calls it and supplies the backend instead of keeping a
+# second copy of the same judgement. build_comparison_table_plan and mail_merge
+# stay frozen: those still carry application policy.
 FROZEN_CORE_DOCUMENT_OPS_CALLABLES = {
     "hwpx": frozenset({"build_comparison_table_plan", "mail_merge"}),
     "hwpx.tools.doc_diff": frozenset({"build_comparison_table_plan"}),
     "hwpx.tools.mail_merge": frozenset({"mail_merge"}),
-    "hwpx.tools.redline": frozenset({"verify_redline"}),
 }
 
 

@@ -56,6 +56,7 @@
   },
   "approvedCoreImports": [
     "hwpx.quality",
+    "hwpx.quality.rendering",
     "hwpx.visual.block_splits",
     "hwpx.visual.detectors",
     "hwpx.visual.diff",
