@@ -238,7 +238,7 @@ def test_strict_handler_converts_gate_error_to_structured(tmp_path: Path, monkey
 
 def test_visual_complete_block_passthrough_shape():
     from hwpx.quality.report import VisualCompleteReport, OpenSafetyReport, SemanticReport, FormReport, LayoutReport, AestheticReport
-    from hwpx.visual.report import VisualReport
+    from hwpx.quality.rendering import VisualReport
 
     ok_report = VisualCompleteReport(
         ok=True, output_path="x.hwpx", visual_complete=False,

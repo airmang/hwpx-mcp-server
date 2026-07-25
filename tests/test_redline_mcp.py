@@ -7,7 +7,6 @@ import pytest
 
 import hwpx_mcp_server.server as server
 from hwpx.tools.redline import verify_redline
-from hwpx.visual import oracle as _core_oracle
 from hwpx_mcp_server.core.document import open_doc
 from hwpx_mcp_server.fastmcp_adapter import snapshot_runtime_tools
 from hwpx_mcp_server.office.rendering import oracle as _mcp_oracle
@@ -17,29 +16,24 @@ from hwpx_mcp_server.office.rendering import oracle as _mcp_oracle
 def _force_structural_oracle_degrade(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin the honest no-oracle degrade path so redline verification is deterministic.
 
-    On a macOS+Hancom dev box ``resolve_oracle()`` returns a live oracle, so
-    ``verify_redline`` attempts a real (~12s each) Hancom render whose success is
-    nondeterministic. When that render intermittently fails to emit a PDF,
-    ``visual_check`` returns ``render_checked=False`` with a non-empty ``errors``
-    list, ``verify_redline`` reports ``opensClean=False``, and the receipt test
-    flakes (~1 in 5 under load). This test verifies redline *structure*, not
-    rendering, and its assertions already tolerate the degrade (``opensClean``
-    may be ``None``). Force both oracle backends unavailable so the structural
-    degrade path is taken deterministically — matching the suite convention that
-    live-oracle checks are opt-in (HWPX_MAC_ORACLE_SMOKE).
+    On a macOS+Hancom dev box a live oracle is reachable, so the tool attempts a
+    real (~12s each) Hancom render whose success is nondeterministic. When that
+    render intermittently fails to emit a PDF the receipt reports
+    ``opensClean=False`` and this test flakes (~1 in 5 under load). It verifies
+    redline *structure*, not rendering, and its assertions already tolerate the
+    degrade, so the backend is forced unavailable — matching the suite convention
+    that live-oracle checks are opt-in via HWPX_MAC_ORACLE_SMOKE.
 
-    Both oracle modules must be patched. This test drives two runtimes: the MCP
-    tool (``server.add_tracked_edit`` -> ``office.document_ops.redline`` ->
-    ``office.rendering.oracle``) and the core compatibility callable
-    (``hwpx.tools.redline.verify_redline`` -> ``hwpx.visual.oracle``). Since the
-    visual runtime split these are distinct classes, so patching only the core
-    module leaves the MCP tool on a live backend and the flake returns. Compare
-    ``tests/test_visual_runtime_parity.py``, which patches both for the same reason.
+    One module is patched, not two. Core's ``verify_redline`` no longer resolves a
+    renderer: it takes an injected ``RenderBackend`` and degrades honestly without
+    one, so the only backend this test can reach is the canonical owner's. The
+    earlier version patched core's oracle as well, which was necessary while both
+    copies were live and is now dead weight — and patching a module the runtime
+    does not reach is exactly how this fixture became a silent no-op before.
     """
 
-    for module in (_core_oracle, _mcp_oracle):
-        monkeypatch.setattr(module.WindowsComOracle, "available", lambda self: False)
-        monkeypatch.setattr(module.MacHancomOracle, "available", lambda self: False)
+    monkeypatch.setattr(_mcp_oracle.WindowsComOracle, "available", lambda self: False)
+    monkeypatch.setattr(_mcp_oracle.MacHancomOracle, "available", lambda self: False)
 
 
 def _sha256(path: Path) -> str:
