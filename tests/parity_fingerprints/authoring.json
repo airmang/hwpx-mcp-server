@@ -1,0 +1,1129 @@
+{
+  "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
+  "modules": {
+    "hwpx.authoring": {
+      "AUTHORING_REPORT_VERSION": {
+        "kind": "constant",
+        "value": "hwpx-authoring-quality-v1"
+      },
+      "DEFAULT_STYLE_PRESET": {
+        "kind": "constant",
+        "value": "standard_korean_business"
+      },
+      "DOCUMENT_PLAN_SCHEMA_VERSION": {
+        "kind": "constant",
+        "value": "hwpx.document_plan.v1"
+      },
+      "DOCUMENT_PLAN_V2_SCHEMA_VERSION": {
+        "kind": "constant",
+        "value": "hwpx.document_plan.v2"
+      },
+      "DocumentBlock": {
+        "bases": [],
+        "fields": {
+          "data": {
+            "hasDefault": true,
+            "type": "dict[str, Any]"
+          },
+          "type": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "DocumentPlan": {
+        "bases": [],
+        "fields": {
+          "blocks": {
+            "hasDefault": true,
+            "type": "list[DocumentBlock]"
+          },
+          "builder_document": {
+            "hasDefault": true,
+            "type": "BuilderDocument | None"
+          },
+          "metadata": {
+            "hasDefault": true,
+            "type": "dict[str, str]"
+          },
+          "quality_gates": {
+            "hasDefault": true,
+            "type": "dict[str, Any]"
+          },
+          "schema_version": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "style_preset": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "subtitle": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "title": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "DocumentStylePreset": {
+        "bases": [],
+        "fields": {
+          "body_size": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "font": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "heading_bold": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "heading_color": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "heading_rule": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "heading_size": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "heading_underline": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "meta_color": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "meta_size": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "name": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "rule_color": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "subtitle_color": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "subtitle_italic": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "subtitle_size": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "table_header_bold": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "title_bold": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "title_color": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "title_rule": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "title_size": {
+            "hasDefault": true,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "ensure_tokens": "(self, document: 'HwpxDocument') -> 'dict[str, str]'"
+        }
+      },
+      "PlanValidationIssue": {
+        "bases": [],
+        "fields": {
+          "code": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "message": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "path": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "severity": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "suggestion": {
+            "hasDefault": true,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "PlanValidationReport": {
+        "bases": [],
+        "fields": {
+          "errors": {
+            "hasDefault": true,
+            "type": "tuple[str, ...]"
+          },
+          "issues": {
+            "hasDefault": true,
+            "type": "tuple[PlanValidationIssue, ...]"
+          },
+          "ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "schema_version": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "warnings": {
+            "hasDefault": true,
+            "type": "tuple[str, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "create_document_from_plan": {
+        "kind": "function",
+        "signature": "(plan: 'Mapping[str, Any] | DocumentPlan', *, preset: 'str | DocumentStylePreset | None' = None) -> 'HwpxDocument'"
+      },
+      "inspect_document_authoring_quality": {
+        "kind": "function",
+        "signature": "(source: 'str | Path | HwpxDocument', *, plan: 'Mapping[str, Any] | DocumentPlan | None' = None, quality_profile: 'str | Mapping[str, Any] | None' = None, verify_render: 'bool' = False) -> 'dict[str, Any]'"
+      },
+      "inspect_operating_plan_quality": {
+        "kind": "function",
+        "signature": "(source: 'str | Path | HwpxDocument', *, plan: 'Mapping[str, Any] | DocumentPlan | None' = None, profile: 'Mapping[str, Any] | None' = None) -> 'dict[str, Any]'"
+      },
+      "normalize_document_plan": {
+        "kind": "function",
+        "signature": "(plan: 'Mapping[str, Any] | DocumentPlan') -> 'DocumentPlan'"
+      },
+      "validate_document_plan": {
+        "kind": "function",
+        "signature": "(plan: 'Mapping[str, Any]') -> 'PlanValidationReport'"
+      }
+    },
+    "hwpx.builder": {
+      "BuilderSaveReport": {
+        "bases": [],
+        "fields": {
+          "editor_open_safety": {
+            "hasDefault": true,
+            "type": "EditorOpenSafetyReport | None"
+          },
+          "feature_flags": {
+            "hasDefault": true,
+            "type": "dict[str, bool]"
+          },
+          "hard_gates": {
+            "hasDefault": true,
+            "type": "dict[str, str]"
+          },
+          "id_integrity": {
+            "hasDefault": true,
+            "type": "IdIntegrityReport | None"
+          },
+          "metadata": {
+            "hasDefault": true,
+            "type": "dict[str, str] | None"
+          },
+          "path": {
+            "hasDefault": false,
+            "type": "str | PathLike[str]"
+          },
+          "reopened": {
+            "hasDefault": false,
+            "type": "ReopenReport"
+          },
+          "validate_document": {
+            "hasDefault": false,
+            "type": "ValidationReport"
+          },
+          "validate_package": {
+            "hasDefault": false,
+            "type": "PackageValidationReport"
+          },
+          "visual_complete": {
+            "hasDefault": true,
+            "type": "VisualCompleteReport | None"
+          },
+          "visual_review_required": {
+            "hasDefault": true,
+            "type": "bool"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "BuilderVerifyReport": {
+        "bases": [],
+        "fields": {
+          "byte_length": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "document_ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "editor_open_safety_ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "id_integrity_ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "idempotence": {
+            "hasDefault": true,
+            "type": "IdempotenceReport | None"
+          },
+          "idempotent": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "package_ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "paragraph_count": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "reconcile": {
+            "hasDefault": true,
+            "type": "PackageReconcileReport | None"
+          },
+          "reopen_error": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "reopen_ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "section_count": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "sections_reconciled": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "serialize_error": {
+            "hasDefault": true,
+            "type": "str | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "Bullet": {
+        "bases": [],
+        "fields": {
+          "items": {
+            "hasDefault": false,
+            "type": "Sequence[str]"
+          },
+          "level": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "style": {
+            "hasDefault": true,
+            "type": "str | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument', *, section_index: 'int' = 0, preset: '_BuilderPreset | None' = None) -> 'None'"
+        }
+      },
+      "Document": {
+        "bases": [],
+        "fields": {
+          "metadata": {
+            "hasDefault": true,
+            "type": "Metadata | None"
+          },
+          "preset": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "sections": {
+            "hasDefault": true,
+            "type": "Sequence[Section]"
+          },
+          "visual_review_required": {
+            "hasDefault": true,
+            "type": "bool | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "feature_flags": "(self) -> 'dict[str, bool]'",
+          "lower": "(self) -> 'HwpxDocument'",
+          "save_to_path": "(self, path: 'str | PathLike[str]') -> 'BuilderSaveReport'",
+          "verify": "(self) -> 'BuilderVerifyReport'"
+        }
+      },
+      "FIDELITY_CONTRACT": {
+        "kind": "constant",
+        "value": {
+          "does_not_prove": [
+            "visual layout fidelity in Hancom (line/page breaks, overlap) — needs the visual oracle / ComputerUse",
+            "every authored element round-tripped byte-for-byte: merges, shapes, BinData bytes, and equation script are not value-diffed",
+            "macOS Hancom acceptance for untested element combinations"
+          ],
+          "proves": [
+            "package opens as a valid HWPX (mimetype/OPC structure, required entries)",
+            "no dangling id references or orphan BinData (id_integrity)",
+            "no known editor-open breakage patterns (editor_open_safety)",
+            "re-saving reproduces identical part contents (idempotent serialization)",
+            "the document reopens with our reader (reopen)"
+          ]
+        }
+      },
+      "Footer": {
+        "bases": [],
+        "fields": {
+          "children": {
+            "hasDefault": true,
+            "type": "Sequence[Paragraph | PageNumber]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument', *, section_index: 'int' = 0, preset: '_BuilderPreset | None' = None) -> 'None'"
+        }
+      },
+      "Header": {
+        "bases": [],
+        "fields": {
+          "children": {
+            "hasDefault": true,
+            "type": "Sequence[Paragraph | PageNumber]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument', *, section_index: 'int' = 0, preset: '_BuilderPreset | None' = None) -> 'None'"
+        }
+      },
+      "Heading": {
+        "bases": [],
+        "fields": {
+          "level": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "text": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument', *, section_index: 'int' = 0, preset: '_BuilderPreset | None' = None) -> 'None'"
+        }
+      },
+      "Image": {
+        "bases": [],
+        "fields": {
+          "align": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "caption": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "image_format": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "path": {
+            "hasDefault": false,
+            "type": "str | PathLike[str] | bytes"
+          },
+          "width_mm": {
+            "hasDefault": true,
+            "type": "float | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument', *, section_index: 'int' = 0, preset: '_BuilderPreset | None' = None) -> 'None'"
+        }
+      },
+      "Margins": {
+        "bases": [],
+        "fields": {
+          "bottom_mm": {
+            "hasDefault": true,
+            "type": "float"
+          },
+          "footer_mm": {
+            "hasDefault": true,
+            "type": "float"
+          },
+          "gutter_mm": {
+            "hasDefault": true,
+            "type": "float"
+          },
+          "header_mm": {
+            "hasDefault": true,
+            "type": "float"
+          },
+          "left_mm": {
+            "hasDefault": true,
+            "type": "float"
+          },
+          "right_mm": {
+            "hasDefault": true,
+            "type": "float"
+          },
+          "top_mm": {
+            "hasDefault": true,
+            "type": "float"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "Metadata": {
+        "bases": [],
+        "fields": {
+          "author": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "organization": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "title": {
+            "hasDefault": true,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "as_dict": "(self) -> 'dict[str, str]'"
+        }
+      },
+      "NumberedList": {
+        "bases": [],
+        "fields": {
+          "items": {
+            "hasDefault": false,
+            "type": "Sequence[str]"
+          },
+          "level": {
+            "hasDefault": true,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument', *, section_index: 'int' = 0) -> 'None'"
+        }
+      },
+      "PageBreak": {
+        "bases": [],
+        "fields": {},
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument') -> 'None'"
+        }
+      },
+      "PageNumber": {
+        "bases": [],
+        "fields": {
+          "format": {
+            "hasDefault": true,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "PageSize": {
+        "bases": [],
+        "fields": {
+          "height_mm": {
+            "hasDefault": false,
+            "type": "float"
+          },
+          "orientation": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "width_mm": {
+            "hasDefault": false,
+            "type": "float"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "Paragraph": {
+        "bases": [],
+        "fields": {
+          "align": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "children": {
+            "hasDefault": true,
+            "type": "Sequence[Run | PageNumber]"
+          },
+          "style": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "text": {
+            "hasDefault": true,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument', *, preset: '_BuilderPreset | None' = None) -> 'None'"
+        }
+      },
+      "ReopenReport": {
+        "bases": [],
+        "fields": {
+          "document": {
+            "hasDefault": true,
+            "type": "Any | None"
+          },
+          "error": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "ok": {
+            "hasDefault": false,
+            "type": "bool"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "Run": {
+        "bases": [],
+        "fields": {
+          "bold": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "color": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "font": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "highlight": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "italic": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "size": {
+            "hasDefault": true,
+            "type": "int | float | None"
+          },
+          "strike": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "text": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "underline": {
+            "hasDefault": true,
+            "type": "bool"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "Section": {
+        "bases": [],
+        "fields": {
+          "children": {
+            "hasDefault": true,
+            "type": "Sequence[Heading | Paragraph | Bullet | NumberedList | Table | Image | Toc | NativeToc | PageBreak]"
+          },
+          "footer": {
+            "hasDefault": true,
+            "type": "Footer | None"
+          },
+          "header": {
+            "hasDefault": true,
+            "type": "Header | None"
+          },
+          "margins": {
+            "hasDefault": true,
+            "type": "Margins | None"
+          },
+          "page": {
+            "hasDefault": true,
+            "type": "PageSize | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument', *, section_index: 'int' = 0, preset: '_BuilderPreset | None' = None, native_toc_sink: 'list[tuple[int, NativeToc]] | None' = None) -> 'None'"
+        }
+      },
+      "Table": {
+        "bases": [],
+        "fields": {
+          "column_widths": {
+            "hasDefault": true,
+            "type": "Sequence[int | float]"
+          },
+          "header": {
+            "hasDefault": true,
+            "type": "Sequence[str]"
+          },
+          "header_shading": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "merges": {
+            "hasDefault": true,
+            "type": "Sequence[str]"
+          },
+          "rows": {
+            "hasDefault": true,
+            "type": "Sequence[Sequence[str]]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "lower": "(self, document: 'HwpxDocument', *, section_index: 'int' = 0, preset: '_BuilderPreset | None' = None) -> 'None'"
+        }
+      },
+      "approval_box": {
+        "kind": "function",
+        "signature": "(*, labels: 'Sequence[str] | None' = None, approver_rows: 'int' = 2, delegated: 'str | None' = None, header_shading: 'str' = 'EAF1FB') -> 'Table'"
+      }
+    },
+    "hwpx.design": {
+      "Block": {
+        "bases": [],
+        "fields": {
+          "columns": {
+            "hasDefault": true,
+            "type": "list[str]"
+          },
+          "role": {
+            "hasDefault": true,
+            "type": "BlockRole"
+          },
+          "rows": {
+            "hasDefault": true,
+            "type": "list[list[str]]"
+          },
+          "text": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "type": {
+            "hasDefault": false,
+            "type": "BlockType"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "from_dict": "(data: 'dict[str, Any]') -> \"'Block'\""
+        }
+      },
+      "ComposeResult": {
+        "bases": [],
+        "fields": {
+          "block_count": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "errors": {
+            "hasDefault": true,
+            "type": "list[str]"
+          },
+          "ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "output_path": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "profile": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "style_coverage": {
+            "hasDefault": false,
+            "type": "StyleCoverage"
+          },
+          "visual_complete": {
+            "hasDefault": false,
+            "type": "Any"
+          },
+          "warnings": {
+            "hasDefault": true,
+            "type": "list[str]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "DocumentPlan": {
+        "bases": [],
+        "fields": {
+          "blocks": {
+            "hasDefault": true,
+            "type": "list[Block]"
+          },
+          "profile": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "title": {
+            "hasDefault": true,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "from_dict": "(data: 'dict[str, Any]') -> \"'DocumentPlan'\"",
+          "iter_blocks": "(self) -> 'list[Block]'"
+        }
+      },
+      "Profile": {
+        "bases": [],
+        "fields": {
+          "id": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "manifest": {
+            "hasDefault": false,
+            "type": "dict[str, Any]"
+          },
+          "root": {
+            "hasDefault": false,
+            "type": "Path"
+          },
+          "template_bytes": {
+            "hasDefault": false,
+            "type": "bytes"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "fragment": "(self, role: 'str') -> 'etree._Element'",
+          "has_role": "(self, role: 'str') -> 'bool'",
+          "load": "(root: 'str | Path') -> \"'Profile'\"",
+          "roles": "property(self) -> 'list[str]'",
+          "style_coverage_threshold": "property(self) -> 'float'"
+        }
+      },
+      "ProfileRequiredError": {
+        "bases": [
+          "RuntimeError"
+        ],
+        "kind": "class",
+        "methods": {}
+      },
+      "StyleCoverage": {
+        "bases": [],
+        "fields": {
+          "coverage": {
+            "hasDefault": false,
+            "type": "float"
+          },
+          "covered": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "missing": {
+            "hasDefault": true,
+            "type": "list[tuple[str, str]]"
+          },
+          "referenced": {
+            "hasDefault": false,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "meets": "(self, threshold: 'float') -> 'bool'",
+          "ok": "property(self) -> 'bool'",
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "available_profiles": {
+        "kind": "function",
+        "signature": "() -> 'list[str]'"
+      },
+      "compose": {
+        "kind": "function",
+        "signature": "(plan: 'DocumentPlan | dict', *, profile: 'Profile | None' = None, output_path: 'str | PathLike[str] | None' = None, quality: 'QualityPolicy | None' = None, production: 'bool' = True) -> 'ComposeResult'"
+      },
+      "compose_bytes": {
+        "kind": "function",
+        "signature": "(plan: 'DocumentPlan | dict', **kwargs: 'Any') -> 'tuple[bytes, ComposeResult]'"
+      },
+      "load_profile": {
+        "kind": "function",
+        "signature": "(profile_id: 'str') -> 'Profile'"
+      },
+      "style_coverage": {
+        "kind": "function",
+        "signature": "(doc: 'Any', elements: 'list[etree._Element]') -> 'StyleCoverage'"
+      }
+    },
+    "hwpx.presets": {
+      "DEFAULT_PROPOSAL_SECTIONS": {
+        "kind": "constant",
+        "value": [
+          "추진 배경 및 문제 정의",
+          "제안 내용",
+          "구축 및 운영 계획",
+          "예산 및 자원 계획",
+          "기대 효과"
+        ]
+      },
+      "ProposalSection": {
+        "bases": [],
+        "fields": {
+          "bullets": {
+            "hasDefault": true,
+            "type": "list[str]"
+          },
+          "paragraphs": {
+            "hasDefault": true,
+            "type": "list[str]"
+          },
+          "title": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "ProposalSpec": {
+        "bases": [],
+        "fields": {
+          "author": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "budget_items": {
+            "hasDefault": true,
+            "type": "list[dict[str, str]]"
+          },
+          "closing": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "date": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "executive_summary": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "expected_outcomes": {
+            "hasDefault": true,
+            "type": "list[str]"
+          },
+          "metadata": {
+            "hasDefault": true,
+            "type": "dict[str, str]"
+          },
+          "organization": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "sections": {
+            "hasDefault": true,
+            "type": "list[ProposalSection]"
+          },
+          "subtitle": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "title": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "ProposalStylePreset": {
+        "bases": [],
+        "fields": {
+          "callout_bold": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "heading_bold": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "heading_underline": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "name": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "subtitle_italic": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "table_header_bold": {
+            "hasDefault": true,
+            "type": "bool"
+          },
+          "title_bold": {
+            "hasDefault": true,
+            "type": "bool"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "ensure_tokens": "(self, document: 'HwpxDocument') -> 'dict[str, str]'"
+        }
+      },
+      "create_proposal_document": {
+        "kind": "function",
+        "signature": "(spec: 'ProposalSpec | Mapping[str, Any]', *, preset: 'ProposalStylePreset | str | None' = None) -> 'HwpxDocument'"
+      },
+      "inspect_proposal_quality": {
+        "kind": "function",
+        "signature": "(source: 'str | Path | HwpxDocument') -> 'dict[str, Any]'"
+      },
+      "normalize_proposal_spec": {
+        "kind": "function",
+        "signature": "(spec: 'ProposalSpec | Mapping[str, Any]') -> 'ProposalSpec'"
+      }
+    },
+    "hwpx.tools.advanced_generators": {
+      "build_image_grid": {
+        "kind": "function",
+        "signature": "(images: 'Sequence[str | Mapping[str, Any]]', *, columns: 'int' = 2, image_width_mm: 'float | None' = None) -> 'dict[str, Any]'"
+      },
+      "build_meeting_nameplates": {
+        "kind": "function",
+        "signature": "(names: 'Sequence[str]', *, size: 'str' = '150x70', columns: 'int' = 2) -> 'dict[str, Any]'"
+      },
+      "build_organization_chart": {
+        "kind": "function",
+        "signature": "(hierarchy: 'Mapping[str, Any] | Sequence[Mapping[str, Any]]', *, max_depth: 'int' = 3) -> 'dict[str, Any]'"
+      }
+    },
+    "hwpx.tools.style_profile": {
+      "STYLE_PROFILE_COMPARISON_SCHEMA_VERSION": {
+        "kind": "constant",
+        "value": "hwpx.style-profile-comparison.v1"
+      },
+      "STYLE_PROFILE_SCHEMA_VERSION": {
+        "kind": "constant",
+        "value": "hwpx.style-profile.v1"
+      },
+      "TEMPLATE_REGISTRY_SCHEMA_VERSION": {
+        "kind": "constant",
+        "value": "hwpx.template-registry.v1"
+      },
+      "apply_style_profile_to_plan": {
+        "kind": "function",
+        "signature": "(document_plan: 'Mapping[str, Any]', style_profile: 'Mapping[str, Any]', *, overwrite: 'bool' = True) -> 'dict[str, Any]'"
+      },
+      "compare_style_profiles": {
+        "kind": "function",
+        "signature": "(reference: 'str | Path | Mapping[str, Any]', candidate: 'str | Path | Mapping[str, Any]', *, margin_tolerance_mm: 'float' = 1.0, table_weight_tolerance: 'float' = 0.1) -> 'dict[str, Any]'"
+      },
+      "describe_template": {
+        "kind": "function",
+        "signature": "(name: 'str', *, registry_path: 'str | Path | None' = None, values: 'Mapping[str, Any] | None' = None) -> 'dict[str, Any]'"
+      },
+      "extract_style_profile": {
+        "kind": "function",
+        "signature": "(source: 'str | Path | TemplateAnalysis') -> 'dict[str, Any]'"
+      },
+      "list_templates": {
+        "kind": "function",
+        "signature": "(*, registry_path: 'str | Path | None' = None) -> 'dict[str, Any]'"
+      },
+      "placeholder_fill_report": {
+        "kind": "function",
+        "signature": "(source_or_keys: 'str | Path | Sequence[str]', *, values: 'Mapping[str, Any] | None' = None) -> 'dict[str, Any]'"
+      },
+      "register_template": {
+        "kind": "function",
+        "signature": "(name: 'str', source: 'str | Path', *, registry_path: 'str | Path | None' = None, description: 'str' = '', tags: 'Sequence[str] | None' = None) -> 'dict[str, Any]'"
+      }
+    }
+  },
+  "schemaVersion": "hwpx.parity-fingerprint/v1"
+}

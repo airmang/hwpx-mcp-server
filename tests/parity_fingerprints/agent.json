@@ -1,0 +1,993 @@
+{
+  "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
+  "modules": {
+    "hwpx.agent": {
+      "AGENT_BATCH_RESULT_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-batch-result/v1"
+      },
+      "AGENT_BATCH_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-batch/v1"
+      },
+      "AGENT_CATALOG_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-catalog/v1"
+      },
+      "AGENT_COMMAND_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-command/v1"
+      },
+      "AGENT_ERROR_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-error/v1"
+      },
+      "AGENT_NODE_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-node/v1"
+      },
+      "AgentBatchResult": {
+        "bases": [],
+        "fields": {
+          "command_results": {
+            "hasDefault": true,
+            "type": "tuple[Mapping[str, Any], ...]"
+          },
+          "document_revision": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "dry_run": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "error": {
+            "hasDefault": true,
+            "type": "AgentError | None"
+          },
+          "input_revision": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "output_filename": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "rolled_back": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "semantic_diff": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          },
+          "verification_report": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "as_mutation_report": "(self) -> 'MutationReport'",
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "AgentContractError": {
+        "bases": [
+          "ValueError"
+        ],
+        "kind": "class",
+        "methods": {}
+      },
+      "AgentError": {
+        "bases": [],
+        "fields": {
+          "code": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "message": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "recoverability": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "suggestion": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "target": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "valid_values": {
+            "hasDefault": true,
+            "type": "tuple[str, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "AgentNode": {
+        "bases": [],
+        "fields": {
+          "child_count": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "children": {
+            "hasDefault": true,
+            "type": "tuple['AgentNode', ...]"
+          },
+          "editable_properties": {
+            "hasDefault": true,
+            "type": "tuple[str, ...]"
+          },
+          "kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "operations": {
+            "hasDefault": true,
+            "type": "tuple[str, ...]"
+          },
+          "path": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "readable_properties": {
+            "hasDefault": true,
+            "type": "tuple[str, ...]"
+          },
+          "revision": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "stability": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "stable_id": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "summary": {
+            "hasDefault": false,
+            "type": "Mapping[str, Any]"
+          },
+          "truncated_child_count": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "unsupported_child_count": {
+            "hasDefault": true,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'",
+          "volatile_path": "property(self) -> 'bool'"
+        }
+      },
+      "BLUEPRINT_CATALOG_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-blueprint-catalog/v1"
+      },
+      "BLUEPRINT_REPLAY_RESULT_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-blueprint-replay-result/v1"
+      },
+      "BLUEPRINT_REPLAY_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-blueprint-replay/v1"
+      },
+      "BLUEPRINT_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-blueprint/v1"
+      },
+      "BlueprintBundle": {
+        "bases": [],
+        "fields": {
+          "assets": {
+            "hasDefault": false,
+            "type": "Mapping[str, bytes]"
+          },
+          "bundle_sha256": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "manifest": {
+            "hasDefault": false,
+            "type": "Mapping[str, Any]"
+          },
+          "size": {
+            "hasDefault": false,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "BlueprintDumpResult": {
+        "bases": [],
+        "fields": {
+          "assets": {
+            "hasDefault": false,
+            "type": "Mapping[str, bytes]"
+          },
+          "bundle_bytes": {
+            "hasDefault": false,
+            "type": "bytes"
+          },
+          "bundle_sha256": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "manifest": {
+            "hasDefault": false,
+            "type": "Mapping[str, Any]"
+          },
+          "output_filename": {
+            "hasDefault": false,
+            "type": "str | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self, *, include_manifest: 'bool' = True) -> 'dict[str, Any]'"
+        }
+      },
+      "BlueprintReplayResult": {
+        "bases": [],
+        "fields": {
+          "blueprint_hash": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "dependency_maps": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          },
+          "document_revision": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "dry_run": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "error": {
+            "hasDefault": true,
+            "type": "AgentError | None"
+          },
+          "fidelity": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          },
+          "input_revision": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "node_map": {
+            "hasDefault": true,
+            "type": "Mapping[str, str]"
+          },
+          "ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "output_filename": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "rolled_back": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "root_path": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "semantic_diff": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          },
+          "verification_report": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "HwpxAgentDocument": {
+        "bases": [],
+        "kind": "class",
+        "methods": {
+          "close": "(self) -> 'None'",
+          "from_document": "(document: 'HwpxDocument', *, revision: 'str') -> \"'HwpxAgentDocument'\"",
+          "get": "(self, path: 'str' = '/', *, depth: 'int' = 1, child_limit: 'int' = 50, expected_revision: 'str | None' = None) -> 'AgentNode'",
+          "open": "(source: 'str | PathLike[str] | bytes') -> \"'HwpxAgentDocument'\"",
+          "query": "(self, selector: 'str', *, limit: 'int', node_depth: 'int' = 0, child_limit: 'int' = 20, expected_revision: 'str | None' = None) -> 'QueryResult'",
+          "records": "property(self) -> 'tuple[NodeRecord, ...]'",
+          "resolve_record": "(self, path: 'str', *, expected_revision: 'str | None' = None, require_stable: 'bool' = False) -> 'NodeRecord'"
+        }
+      },
+      "MIXED_FORM_COMPILED_PLAN_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.mixed-form-compiled-plan/v1"
+      },
+      "MIXED_FORM_LOCATOR_KINDS": {
+        "kind": "constant",
+        "value": [
+          "nativeField",
+          "labelCell",
+          "canonicalPath",
+          "bodyAnchor"
+        ]
+      },
+      "MIXED_FORM_PLAN_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.mixed-form-plan/v1"
+      },
+      "MIXED_FORM_REQUEST_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.mixed-form-request/v1"
+      },
+      "MixedFormPlan": {
+        "bases": [],
+        "fields": {
+          "batch": {
+            "hasDefault": false,
+            "type": "Mapping[str, Any]"
+          },
+          "input_revision": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "plan_hash": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "request_hash": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "resolutions": {
+            "hasDefault": false,
+            "type": "tuple[MixedFormResolution, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "MixedFormResolution": {
+        "bases": [],
+        "fields": {
+          "locator_kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "logical_column": {
+            "hasDefault": true,
+            "type": "int | None"
+          },
+          "logical_row": {
+            "hasDefault": true,
+            "type": "int | None"
+          },
+          "node_kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "operation_id": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "path": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "physical_column": {
+            "hasDefault": true,
+            "type": "int | None"
+          },
+          "physical_row": {
+            "hasDefault": true,
+            "type": "int | None"
+          },
+          "section": {
+            "hasDefault": true,
+            "type": "int | None"
+          },
+          "stability": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "table_index": {
+            "hasDefault": true,
+            "type": "int | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "NodeRecord": {
+        "bases": [],
+        "fields": {
+          "attributes": {
+            "hasDefault": true,
+            "type": "dict[str, str]"
+          },
+          "child_paths": {
+            "hasDefault": true,
+            "type": "list[str]"
+          },
+          "kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "native": {
+            "hasDefault": false,
+            "type": "Any"
+          },
+          "parent_path": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "path": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "search_text": {
+            "hasDefault": true,
+            "type": "str"
+          },
+          "stability": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "stable_id": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "summary": {
+            "hasDefault": false,
+            "type": "dict[str, Any]"
+          },
+          "unsupported_child_count": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "unsupported_child_kinds": {
+            "hasDefault": true,
+            "type": "Counter[str]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "mark_unsupported": "(self, local_name: 'str', count: 'int' = 1) -> 'None'"
+        }
+      },
+      "PathSegment": {
+        "bases": [],
+        "fields": {
+          "attribute": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "index": {
+            "hasDefault": true,
+            "type": "int | None"
+          },
+          "kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "value": {
+            "hasDefault": true,
+            "type": "str | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "canonical": "(self) -> 'str'"
+        }
+      },
+      "QueryResult": {
+        "bases": [],
+        "fields": {
+          "nodes": {
+            "hasDefault": false,
+            "type": "tuple[AgentNode, ...]"
+          },
+          "revision": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "selector": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "truncated": {
+            "hasDefault": false,
+            "type": "bool"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, object]'"
+        }
+      },
+      "ReplayPlan": {
+        "bases": [],
+        "fields": {
+          "dependency_decisions": {
+            "hasDefault": false,
+            "type": "tuple[dict[str, Any], ...]"
+          },
+          "mode": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "node_fidelity": {
+            "hasDefault": false,
+            "type": "tuple[dict[str, Any], ...]"
+          },
+          "root_id": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "root_kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "target_parent": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "SemanticPath": {
+        "bases": [],
+        "fields": {
+          "segments": {
+            "hasDefault": true,
+            "type": "tuple[PathSegment, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "canonical": "property(self) -> 'str'",
+          "child": "(self, segment: 'PathSegment') -> \"'SemanticPath'\"",
+          "parent": "property(self) -> \"'SemanticPath | None'\""
+        }
+      },
+      "SemanticSelector": {
+        "bases": [],
+        "fields": {
+          "steps": {
+            "hasDefault": false,
+            "type": "tuple[SelectorStep, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "agent_catalog": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, Any]'"
+      },
+      "agent_contract_manifest": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, Any]'"
+      },
+      "agent_json_schemas": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, Any]'"
+      },
+      "apply_document_commands": {
+        "kind": "function",
+        "signature": "(batch: 'Mapping[str, Any]', *, idempotency_store: 'IdempotencyStore | None' = None, fault_injector: 'FaultInjector | None' = None, domain_verifier: 'DomainVerifier | None' = None, save_pipeline: 'SavePipeline | None' = None) -> 'AgentBatchResult'"
+      },
+      "apply_mixed_form_fill": {
+        "kind": "function",
+        "signature": "(request: 'Mapping[str, Any]', *, idempotency_store: 'IdempotencyStore | None' = None, fault_injector: 'FaultInjector | None' = None, domain_verifier: 'DomainVerifier | None' = None, save_pipeline: 'SavePipeline | None' = None) -> 'AgentBatchResult'"
+      },
+      "apply_mixed_form_plan": {
+        "kind": "function",
+        "signature": "(plan: 'MixedFormPlan | Mapping[str, Any]', *, idempotency_store: 'IdempotencyStore | None' = None, fault_injector: 'FaultInjector | None' = None, domain_verifier: 'DomainVerifier | None' = None, save_pipeline: 'SavePipeline | None' = None) -> 'AgentBatchResult'"
+      },
+      "blueprint_catalog": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, Any]'"
+      },
+      "blueprint_catalog_hash": {
+        "kind": "function",
+        "signature": "() -> 'str'"
+      },
+      "blueprint_hash": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]') -> 'str'"
+      },
+      "blueprint_human_help": {
+        "kind": "function",
+        "signature": "() -> 'str'"
+      },
+      "blueprint_json_schemas": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, Any]'"
+      },
+      "blueprint_limits": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, int]'"
+      },
+      "build_blueprint_bundle": {
+        "kind": "function",
+        "signature": "(manifest: 'Mapping[str, Any]', assets: 'Mapping[str, bytes] | None' = None) -> 'bytes'"
+      },
+      "canonicalize_path": {
+        "kind": "function",
+        "signature": "(value: 'str') -> 'str'"
+      },
+      "catalog_hash": {
+        "kind": "function",
+        "signature": "() -> 'str'"
+      },
+      "dump_document_blueprint": {
+        "kind": "function",
+        "signature": "(source: 'str | os.PathLike[str] | bytes', *, path: 'str' = '/', mode: 'str' = 'portable', expected_revision: 'str | None' = None, output: 'str | os.PathLike[str] | None' = None, overwrite: 'bool' = False, include_assets: 'bool' = True, require_replayable: 'bool' = True) -> 'BlueprintDumpResult'"
+      },
+      "human_help": {
+        "kind": "function",
+        "signature": "(kind: 'str | None' = None) -> 'str'"
+      },
+      "mixed_form_json_schemas": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, Any]'"
+      },
+      "node_help": {
+        "kind": "function",
+        "signature": "(kind: 'str') -> 'dict[str, Any]'"
+      },
+      "parse_path": {
+        "kind": "function",
+        "signature": "(value: 'str') -> 'SemanticPath'"
+      },
+      "parse_selector": {
+        "kind": "function",
+        "signature": "(value: 'str') -> 'SemanticSelector'"
+      },
+      "plan_mixed_form_fill": {
+        "kind": "function",
+        "signature": "(request: 'Mapping[str, Any]') -> 'MixedFormPlan'"
+      },
+      "read_blueprint_bundle": {
+        "kind": "function",
+        "signature": "(source: 'str | os.PathLike[str] | bytes') -> 'BlueprintBundle'"
+      },
+      "repack_blueprint_bundle": {
+        "kind": "function",
+        "signature": "(source: 'str | os.PathLike[str] | bytes', destination: 'str | os.PathLike[str]', manifest: 'Mapping[str, Any]', *, overwrite: 'bool' = False) -> 'BlueprintBundle'"
+      },
+      "replay_document_blueprint": {
+        "kind": "function",
+        "signature": "(request: 'Mapping[str, Any]', *, idempotency_store: 'IdempotencyStore | None' = None, fault_injector: 'FaultInjector | None' = None, domain_verifier: 'DomainVerifier | None' = None, save_pipeline: 'SavePipeline | None' = None) -> 'BlueprintReplayResult'"
+      },
+      "validate_agent_batch": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]') -> 'dict[str, Any]'"
+      },
+      "validate_agent_command": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]') -> 'dict[str, Any]'"
+      },
+      "validate_blueprint_manifest": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]', *, verify_hash: 'bool' = True) -> 'dict[str, Any]'"
+      },
+      "validate_mixed_form_plan": {
+        "kind": "function",
+        "signature": "(value: 'MixedFormPlan | Mapping[str, Any]') -> 'MixedFormPlan'"
+      },
+      "validate_mixed_form_request": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]') -> 'dict[str, Any]'"
+      },
+      "validate_replay_request": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]') -> 'dict[str, Any]'"
+      },
+      "write_blueprint_bundle": {
+        "kind": "function",
+        "signature": "(destination: 'str | os.PathLike[str]', manifest: 'Mapping[str, Any]', assets: 'Mapping[str, bytes] | None' = None, *, overwrite: 'bool' = False) -> 'BlueprintBundle'"
+      }
+    },
+    "hwpx.agent.blueprint": {
+      "BLUEPRINT_CATALOG_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-blueprint-catalog/v1"
+      },
+      "BLUEPRINT_REPLAY_RESULT_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-blueprint-replay-result/v1"
+      },
+      "BLUEPRINT_REPLAY_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-blueprint-replay/v1"
+      },
+      "BLUEPRINT_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.agent-blueprint/v1"
+      },
+      "BlueprintBundle": {
+        "bases": [],
+        "fields": {
+          "assets": {
+            "hasDefault": false,
+            "type": "Mapping[str, bytes]"
+          },
+          "bundle_sha256": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "manifest": {
+            "hasDefault": false,
+            "type": "Mapping[str, Any]"
+          },
+          "size": {
+            "hasDefault": false,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "BlueprintDumpResult": {
+        "bases": [],
+        "fields": {
+          "assets": {
+            "hasDefault": false,
+            "type": "Mapping[str, bytes]"
+          },
+          "bundle_bytes": {
+            "hasDefault": false,
+            "type": "bytes"
+          },
+          "bundle_sha256": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "manifest": {
+            "hasDefault": false,
+            "type": "Mapping[str, Any]"
+          },
+          "output_filename": {
+            "hasDefault": false,
+            "type": "str | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self, *, include_manifest: 'bool' = True) -> 'dict[str, Any]'"
+        }
+      },
+      "BlueprintReplayResult": {
+        "bases": [],
+        "fields": {
+          "blueprint_hash": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "dependency_maps": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          },
+          "document_revision": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "dry_run": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "error": {
+            "hasDefault": true,
+            "type": "AgentError | None"
+          },
+          "fidelity": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          },
+          "input_revision": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "node_map": {
+            "hasDefault": true,
+            "type": "Mapping[str, str]"
+          },
+          "ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "output_filename": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "rolled_back": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "root_path": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "semantic_diff": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          },
+          "verification_report": {
+            "hasDefault": true,
+            "type": "Mapping[str, Any]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "ReplayPlan": {
+        "bases": [],
+        "fields": {
+          "dependency_decisions": {
+            "hasDefault": false,
+            "type": "tuple[dict[str, Any], ...]"
+          },
+          "mode": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "node_fidelity": {
+            "hasDefault": false,
+            "type": "tuple[dict[str, Any], ...]"
+          },
+          "root_id": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "root_kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "target_parent": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_dict": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "blueprint_catalog": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, Any]'"
+      },
+      "blueprint_catalog_hash": {
+        "kind": "function",
+        "signature": "() -> 'str'"
+      },
+      "blueprint_hash": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]') -> 'str'"
+      },
+      "blueprint_human_help": {
+        "kind": "function",
+        "signature": "() -> 'str'"
+      },
+      "blueprint_json_schemas": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, Any]'"
+      },
+      "blueprint_limits": {
+        "kind": "function",
+        "signature": "() -> 'dict[str, int]'"
+      },
+      "build_blueprint_bundle": {
+        "kind": "function",
+        "signature": "(manifest: 'Mapping[str, Any]', assets: 'Mapping[str, bytes] | None' = None) -> 'bytes'"
+      },
+      "canonical_manifest_bytes": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]', *, include_hash: 'bool' = False) -> 'bytes'"
+      },
+      "dump_document_blueprint": {
+        "kind": "function",
+        "signature": "(source: 'str | os.PathLike[str] | bytes', *, path: 'str' = '/', mode: 'str' = 'portable', expected_revision: 'str | None' = None, output: 'str | os.PathLike[str] | None' = None, overwrite: 'bool' = False, include_assets: 'bool' = True, require_replayable: 'bool' = True) -> 'BlueprintDumpResult'"
+      },
+      "read_blueprint_bundle": {
+        "kind": "function",
+        "signature": "(source: 'str | os.PathLike[str] | bytes') -> 'BlueprintBundle'"
+      },
+      "repack_blueprint_bundle": {
+        "kind": "function",
+        "signature": "(source: 'str | os.PathLike[str] | bytes', destination: 'str | os.PathLike[str]', manifest: 'Mapping[str, Any]', *, overwrite: 'bool' = False) -> 'BlueprintBundle'"
+      },
+      "replay_document_blueprint": {
+        "kind": "function",
+        "signature": "(request: 'Mapping[str, Any]', *, idempotency_store: 'IdempotencyStore | None' = None, fault_injector: 'FaultInjector | None' = None, domain_verifier: 'DomainVerifier | None' = None, save_pipeline: 'SavePipeline | None' = None) -> 'BlueprintReplayResult'"
+      },
+      "validate_blueprint_manifest": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]', *, verify_hash: 'bool' = True) -> 'dict[str, Any]'"
+      },
+      "validate_replay_request": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]') -> 'dict[str, Any]'"
+      },
+      "with_blueprint_hash": {
+        "kind": "function",
+        "signature": "(value: 'Mapping[str, Any]') -> 'dict[str, Any]'"
+      },
+      "write_blueprint_bundle": {
+        "kind": "function",
+        "signature": "(destination: 'str | os.PathLike[str]', manifest: 'Mapping[str, Any]', assets: 'Mapping[str, bytes] | None' = None, *, overwrite: 'bool' = False) -> 'BlueprintBundle'"
+      }
+    },
+    "hwpx.agent.cli": {
+      "EXIT_CONFLICT": {
+        "kind": "constant",
+        "value": 4
+      },
+      "EXIT_OK": {
+        "kind": "constant",
+        "value": 0
+      },
+      "EXIT_TARGET": {
+        "kind": "constant",
+        "value": 3
+      },
+      "EXIT_UNEXPECTED": {
+        "kind": "constant",
+        "value": 1
+      },
+      "EXIT_USAGE": {
+        "kind": "constant",
+        "value": 2
+      },
+      "EXIT_VERIFICATION": {
+        "kind": "constant",
+        "value": 5
+      },
+      "build_parser": {
+        "kind": "function",
+        "signature": "() -> 'argparse.ArgumentParser'"
+      },
+      "main": {
+        "kind": "function",
+        "signature": "(argv: 'Sequence[str] | None' = None, *, stdin: 'TextIO | None' = None, stdout: 'TextIO | None' = None, stderr: 'TextIO | None' = None) -> 'int'"
+      }
+    }
+  },
+  "schemaVersion": "hwpx.parity-fingerprint/v1"
+}

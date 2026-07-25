@@ -1,0 +1,628 @@
+{
+  "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
+  "modules": {
+    "hwpx.exam": {
+      "ComposePlan": {
+        "bases": [],
+        "fields": {
+          "profile": {
+            "hasDefault": false,
+            "type": "FormProfile"
+          },
+          "specs": {
+            "hasDefault": false,
+            "type": "list[ParaSpec]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "ComposeResult": {
+        "bases": [],
+        "fields": {
+          "needs_review": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "notes": {
+            "hasDefault": false,
+            "type": "tuple[str, ...]"
+          },
+          "out_path": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "overflow": {
+            "hasDefault": false,
+            "type": "int | None"
+          },
+          "placeholders_ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "render_checked": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "rounds": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "splits": {
+            "hasDefault": false,
+            "type": "int | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "ExamDoc": {
+        "bases": [],
+        "fields": {
+          "blocks": {
+            "hasDefault": true,
+            "type": "tuple[Question | QuestionSet, ...]"
+          },
+          "title": {
+            "hasDefault": true,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "iter_questions": "(self) -> 'Iterator[Question]'"
+        }
+      },
+      "ExamParseError": {
+        "bases": [
+          "ValueError"
+        ],
+        "kind": "class",
+        "methods": {}
+      },
+      "FormProfile": {
+        "bases": [],
+        "fields": {
+          "admin_box_index": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "ambiguous_indices": {
+            "hasDefault": false,
+            "type": "tuple[int, ...]"
+          },
+          "body_end": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "body_start": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "replaceable_indices": {
+            "hasDefault": false,
+            "type": "tuple[int, ...]"
+          },
+          "role_styles": {
+            "hasDefault": false,
+            "type": "dict[str, ResolvedStyle]"
+          },
+          "structural_indices": {
+            "hasDefault": false,
+            "type": "tuple[int, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "FormProfileError": {
+        "bases": [
+          "ValueError"
+        ],
+        "kind": "class",
+        "methods": {}
+      },
+      "ParaSpec": {
+        "bases": [],
+        "fields": {
+          "is_question_head": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "keep_with_next": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "question_number": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "role": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "text": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "Placeholder": {
+        "bases": [],
+        "fields": {
+          "id": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "raw_text": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "Question": {
+        "bases": [],
+        "fields": {
+          "choices": {
+            "hasDefault": true,
+            "type": "tuple[str, ...]"
+          },
+          "number": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "placeholders": {
+            "hasDefault": true,
+            "type": "tuple[Placeholder, ...]"
+          },
+          "points": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "stem": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "QuestionSet": {
+        "bases": [],
+        "fields": {
+          "members": {
+            "hasDefault": true,
+            "type": "tuple[Question, ...]"
+          },
+          "passage": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "rng": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "ResolvedStyle": {
+        "bases": [],
+        "fields": {
+          "char_pr_id": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "name": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "para_pr_id": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "style_id": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "SplitReport": {
+        "bases": [],
+        "fields": {
+          "kinds": {
+            "hasDefault": false,
+            "type": "dict[str, int]"
+          },
+          "n_blocks": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "n_glyphs": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "n_splits": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "split_ids": {
+            "hasDefault": false,
+            "type": "tuple[str, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "column_x_bounds": {
+        "kind": "function",
+        "signature": "(glyphs) -> 'list[tuple[float, float]]'"
+      },
+      "compose_exam_into_form": {
+        "kind": "function",
+        "signature": "(form_path: 'str', exam_md: 'str', out_path: 'str', *, oracle=None, max_rounds: 'int' = 2, role_style_names=None) -> 'ComposeResult'"
+      },
+      "group_question_blocks": {
+        "kind": "function",
+        "signature": "(glyphs, *, marker_re: 're.Pattern' = re.compile('^\\\\s*(\\\\d+)\\\\s*\\\\.'), valid_ids: 'set[str] | None' = None) -> 'list[Block]'"
+      },
+      "lower_exam": {
+        "kind": "function",
+        "signature": "(exam: 'ExamDoc', profile: 'FormProfile') -> 'list[ParaSpec]'"
+      },
+      "measure_question_splits": {
+        "kind": "function",
+        "signature": "(pdf_path: 'str', *, marker_re: 're.Pattern' = re.compile('^\\\\s*(\\\\d+)\\\\s*\\\\.'), valid_ids: 'set[str] | None' = None) -> 'SplitReport'"
+      },
+      "parse_exam_markdown": {
+        "kind": "function",
+        "signature": "(md: 'str', *, title: 'str' = '') -> 'ExamDoc'"
+      },
+      "profile_form": {
+        "kind": "function",
+        "signature": "(doc: 'HwpxDocument', *, role_style_names: 'Mapping[str, str] | None' = None) -> 'FormProfile'"
+      },
+      "replace_body_region": {
+        "kind": "function",
+        "signature": "(doc: 'HwpxDocument', profile: 'FormProfile', specs: 'list[ParaSpec]') -> 'dict[str, int]'"
+      }
+    },
+    "hwpx.exam.compose": {
+      "ComposePlan": {
+        "bases": [],
+        "fields": {
+          "profile": {
+            "hasDefault": false,
+            "type": "FormProfile"
+          },
+          "specs": {
+            "hasDefault": false,
+            "type": "list[ParaSpec]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "ComposeResult": {
+        "bases": [],
+        "fields": {
+          "needs_review": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "notes": {
+            "hasDefault": false,
+            "type": "tuple[str, ...]"
+          },
+          "out_path": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "overflow": {
+            "hasDefault": false,
+            "type": "int | None"
+          },
+          "placeholders_ok": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "render_checked": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "rounds": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "splits": {
+            "hasDefault": false,
+            "type": "int | None"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "ParaSpec": {
+        "bases": [],
+        "fields": {
+          "is_question_head": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "keep_with_next": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "question_number": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "role": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "text": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "compose_exam_into_form": {
+        "kind": "function",
+        "signature": "(form_path: 'str', exam_md: 'str', out_path: 'str', *, oracle=None, max_rounds: 'int' = 2, role_style_names=None) -> 'ComposeResult'"
+      },
+      "lower_exam": {
+        "kind": "function",
+        "signature": "(exam: 'ExamDoc', profile: 'FormProfile') -> 'list[ParaSpec]'"
+      },
+      "replace_body_region": {
+        "kind": "function",
+        "signature": "(doc: 'HwpxDocument', profile: 'FormProfile', specs: 'list[ParaSpec]') -> 'dict[str, int]'"
+      }
+    },
+    "hwpx.exam.ir": {
+      "ExamDoc": {
+        "bases": [],
+        "fields": {
+          "blocks": {
+            "hasDefault": true,
+            "type": "tuple[Question | QuestionSet, ...]"
+          },
+          "title": {
+            "hasDefault": true,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "iter_questions": "(self) -> 'Iterator[Question]'"
+        }
+      },
+      "Placeholder": {
+        "bases": [],
+        "fields": {
+          "id": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "raw_text": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "Question": {
+        "bases": [],
+        "fields": {
+          "choices": {
+            "hasDefault": true,
+            "type": "tuple[str, ...]"
+          },
+          "number": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "placeholders": {
+            "hasDefault": true,
+            "type": "tuple[Placeholder, ...]"
+          },
+          "points": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "stem": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "QuestionSet": {
+        "bases": [],
+        "fields": {
+          "members": {
+            "hasDefault": true,
+            "type": "tuple[Question, ...]"
+          },
+          "passage": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "rng": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      }
+    },
+    "hwpx.exam.measure": {
+      "SplitReport": {
+        "bases": [],
+        "fields": {
+          "kinds": {
+            "hasDefault": false,
+            "type": "dict[str, int]"
+          },
+          "n_blocks": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "n_glyphs": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "n_splits": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "split_ids": {
+            "hasDefault": false,
+            "type": "tuple[str, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "column_x_bounds": {
+        "kind": "function",
+        "signature": "(glyphs) -> 'list[tuple[float, float]]'"
+      },
+      "group_question_blocks": {
+        "kind": "function",
+        "signature": "(glyphs, *, marker_re: 're.Pattern' = re.compile('^\\\\s*(\\\\d+)\\\\s*\\\\.'), valid_ids: 'set[str] | None' = None) -> 'list[Block]'"
+      },
+      "measure_question_splits": {
+        "kind": "function",
+        "signature": "(pdf_path: 'str', *, marker_re: 're.Pattern' = re.compile('^\\\\s*(\\\\d+)\\\\s*\\\\.'), valid_ids: 'set[str] | None' = None) -> 'SplitReport'"
+      }
+    },
+    "hwpx.exam.parser": {
+      "ExamParseError": {
+        "bases": [
+          "ValueError"
+        ],
+        "kind": "class",
+        "methods": {}
+      },
+      "parse_exam_markdown": {
+        "kind": "function",
+        "signature": "(md: 'str', *, title: 'str' = '') -> 'ExamDoc'"
+      }
+    },
+    "hwpx.exam.profile": {
+      "DEFAULT_ROLE_STYLE_NAMES": {
+        "kind": "constant",
+        "value": {
+          "box": "박스안내용",
+          "box_guide": "(보기)박스안내용",
+          "choice1": "1행답항",
+          "choice2": "2행답항",
+          "choice3": "3행답항",
+          "choice5": "5행답항",
+          "normal": "바탕글",
+          "number": "문항자동번호넣기"
+        }
+      },
+      "FormProfile": {
+        "bases": [],
+        "fields": {
+          "admin_box_index": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "ambiguous_indices": {
+            "hasDefault": false,
+            "type": "tuple[int, ...]"
+          },
+          "body_end": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "body_start": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "replaceable_indices": {
+            "hasDefault": false,
+            "type": "tuple[int, ...]"
+          },
+          "role_styles": {
+            "hasDefault": false,
+            "type": "dict[str, ResolvedStyle]"
+          },
+          "structural_indices": {
+            "hasDefault": false,
+            "type": "tuple[int, ...]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "FormProfileError": {
+        "bases": [
+          "ValueError"
+        ],
+        "kind": "class",
+        "methods": {}
+      },
+      "REQUIRED_ROLES": {
+        "kind": "constant",
+        "value": [
+          "normal",
+          "number",
+          "choice1",
+          "choice5"
+        ]
+      },
+      "ResolvedStyle": {
+        "bases": [],
+        "fields": {
+          "char_pr_id": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "name": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "para_pr_id": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "style_id": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "profile_form": {
+        "kind": "function",
+        "signature": "(doc: 'HwpxDocument', *, role_style_names: 'Mapping[str, str] | None' = None) -> 'FormProfile'"
+      }
+    }
+  },
+  "schemaVersion": "hwpx.parity-fingerprint/v1"
+}

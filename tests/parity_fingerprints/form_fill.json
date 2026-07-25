@@ -1,0 +1,175 @@
+{
+  "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
+  "modules": {
+    "hwpx.guidance_scan": {
+      "Candidate": {
+        "bases": [],
+        "fields": {
+          "cell": {
+            "hasDefault": true,
+            "type": "CellLoc | None"
+          },
+          "confidence": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "location": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "signals": {
+            "hasDefault": false,
+            "type": "list[str]"
+          },
+          "text_preview": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "CellLoc": {
+        "bases": [],
+        "fields": {
+          "col": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "row": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "table_index": {
+            "hasDefault": false,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "label": "(self) -> 'str'"
+        }
+      },
+      "GuidanceReport": {
+        "bases": [],
+        "fields": {
+          "color_inventory": {
+            "hasDefault": false,
+            "type": "dict[str, dict]"
+          },
+          "conditional_choices": {
+            "hasDefault": false,
+            "type": "list[Candidate]"
+          },
+          "delete_candidates": {
+            "hasDefault": false,
+            "type": "list[Candidate]"
+          },
+          "empty_cell_candidates": {
+            "hasDefault": true,
+            "type": "list[Candidate]"
+          },
+          "legend": {
+            "hasDefault": false,
+            "type": "list[LegendBinding]"
+          },
+          "limitations": {
+            "hasDefault": true,
+            "type": "list[str]"
+          },
+          "modify_candidates_by_table": {
+            "hasDefault": false,
+            "type": "dict[str, dict]"
+          },
+          "placeholder_candidates": {
+            "hasDefault": false,
+            "type": "list[Candidate]"
+          },
+          "questions": {
+            "hasDefault": false,
+            "type": "list[str]"
+          },
+          "source": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "stats": {
+            "hasDefault": true,
+            "type": "dict[str, int]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_markdown": "(self) -> 'str'"
+        }
+      },
+      "LegendBinding": {
+        "bases": [],
+        "fields": {
+          "action": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "color_word": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "exact_hex": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "family": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "source_text": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "ScannedParagraph": {
+        "bases": [],
+        "fields": {
+          "body_index": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "cell": {
+            "hasDefault": false,
+            "type": "CellLoc | None"
+          },
+          "first_char_pr_id": {
+            "hasDefault": true,
+            "type": "str | None"
+          },
+          "section_index": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "spans": {
+            "hasDefault": false,
+            "type": "list[tuple[str, str, str]]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "colors": "(self) -> 'set[str]'",
+          "location": "(self) -> 'str'",
+          "text": "property(self) -> 'str'"
+        }
+      },
+      "is_form_instruction": {
+        "kind": "function",
+        "signature": "(text: 'str') -> 'bool'"
+      },
+      "scan_form_guidance": {
+        "kind": "function",
+        "signature": "(source: 'Union[str, Path, HwpxDocument]') -> 'GuidanceReport'"
+      }
+    }
+  },
+  "schemaVersion": "hwpx.parity-fingerprint/v1"
+}

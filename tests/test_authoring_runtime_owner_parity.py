@@ -1,38 +1,68 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Exact parity between the MCP authoring owner and core 4.x copy."""
+"""Parity between the MCP authoring owner and core's frozen 4.x shape.
+
+``hwpx.authoring``, ``hwpx.builder``, ``hwpx.design``, and ``hwpx.presets``
+are scheduled for physical deletion from core once python-hwpx is reduced to
+a library, so this file no longer imports them live. Instead:
+
+- Structural claims (exports, signatures, dataclass fields) compare the live
+  MCP module's ``tests.parity_fingerprint.fingerprint()`` against
+  ``tests/parity_fingerprints/authoring.json``, frozen from core while it
+  still existed.
+- Behavioural claims that need an actual computed value (plan schema,
+  normalize/validate output, the proposal spec, ``available_profiles()``,
+  and the exported text + open-safety of a plan-built and a builder-built
+  document) compare against ``tests/parity_fingerprints/authoring.golden.json``
+  — values captured from that same frozen core commit and confirmed
+  identical to MCP's own output at freeze time.
+
+``hwpx.tools.advanced_generators``, ``hwpx.tools.style_profile``,
+``hwpx.tools.template_analyzer``, and ``hwpx.tools.package_validator`` are
+*not* being deleted (they are plain ``hwpx.tools`` CLI/utility modules, not
+part of the authoring-runtime deletion) — those four stay imported live and
+compared directly, unchanged from before.
+
+Every assertion the pre-freeze version of this file made is still made here;
+none needed dropping.
+"""
 from __future__ import annotations
 
 import dataclasses
 import inspect
+import json
 from pathlib import Path
 from typing import Any
 
-import hwpx.authoring as core_authoring
-import hwpx.builder as core_builder
-import hwpx.design as core_design
-import hwpx.presets as core_presets
-import hwpx.tools.advanced_generators as core_generators
-import hwpx.tools.style_profile as core_style
 import hwpx.tools.template_analyzer as core_template
 from hwpx.tools.package_validator import validate_editor_open_safety
+from parity_fingerprint import fingerprint
 
 import hwpx_mcp_server.office.authoring as mcp_authoring
+import hwpx_mcp_server.office.authoring.advanced_generators as mcp_generators
 import hwpx_mcp_server.office.authoring.builder as mcp_builder
 import hwpx_mcp_server.office.authoring.design as mcp_design
 import hwpx_mcp_server.office.authoring.presets as mcp_presets
-import hwpx_mcp_server.office.authoring.advanced_generators as mcp_generators
 import hwpx_mcp_server.office.authoring.style_profile as mcp_style
 import hwpx_mcp_server.office.authoring.template_analyzer as mcp_template
 
+_FIXTURES = Path(__file__).parent / "parity_fingerprints"
+FROZEN = json.loads((_FIXTURES / "authoring.json").read_text(encoding="utf-8"))["modules"]
+GOLDEN = json.loads(
+    (_FIXTURES / "authoring.golden.json").read_text(encoding="utf-8")
+)["calls"]
 
-MODULE_PAIRS = (
-    (core_authoring, mcp_authoring),
-    (core_builder, mcp_builder),
-    (core_design, mcp_design),
-    (core_presets, mcp_presets),
-    (core_generators, mcp_generators),
-    (core_style, mcp_style),
-    (core_template, mcp_template),
+# hwpx.tools.template_analyzer stays core-native: it reads package structure
+# with hwpx.opc and the standard library only, so it is compared live.
+LIVE_MODULE_PAIRS = ((core_template, mcp_template),)
+FROZEN_MODULES = (
+    ("hwpx.authoring", mcp_authoring),
+    ("hwpx.builder", mcp_builder),
+    ("hwpx.design", mcp_design),
+    ("hwpx.presets", mcp_presets),
+    # Named explicitly as mcp-migrate in the standing ownership ledger despite
+    # sitting under hwpx.tools, and already carried by the MCP owner.
+    ("hwpx.tools.advanced_generators", mcp_generators),
+    ("hwpx.tools.style_profile", mcp_style),
 )
 
 
@@ -95,34 +125,49 @@ def _plan() -> dict[str, Any]:
     }
 
 
-def test_public_exports_and_signatures_are_exact() -> None:
-    for core_module, mcp_module in MODULE_PAIRS:
+def test_live_tools_public_exports_and_signatures_are_exact() -> None:
+    for core_module, mcp_module in LIVE_MODULE_PAIRS:
         _assert_public_parity(core_module, mcp_module)
 
 
-def test_document_plan_schema_normalization_validation_and_errors_are_exact() -> None:
+def test_frozen_authoring_modules_shape_matches_frozen_core() -> None:
+    for core_name, mcp_module in FROZEN_MODULES:
+        assert fingerprint(mcp_module) == FROZEN[core_name]
+
+
+def test_document_plan_schema_normalization_validation_and_errors_match_frozen_core() -> (
+    None
+):
     plan = _plan()
     invalid = {
         "schemaVersion": "hwpx.document_plan.v1",
         "blocks": [{}],
     }
 
-    assert core_authoring.get_document_plan_schema() == (
-        mcp_authoring.get_document_plan_schema()
-    )
-    assert core_authoring.normalize_document_plan(plan).to_dict() == (
+    assert mcp_authoring.get_document_plan_schema() == GOLDEN["documentPlanSchema"]
+    assert (
         mcp_authoring.normalize_document_plan(plan).to_dict()
+        == GOLDEN["normalizedPlan"]
     )
-    assert core_authoring.validate_document_plan(plan).to_dict() == (
+    assert (
         mcp_authoring.validate_document_plan(plan).to_dict()
+        == GOLDEN["validPlanReport"]
     )
-    assert core_authoring.validate_document_plan(invalid).to_dict() == (
+    assert (
         mcp_authoring.validate_document_plan(invalid).to_dict()
+        == GOLDEN["invalidPlanReport"]
     )
 
 
-def test_generators_proposal_and_style_profile_payloads_are_exact() -> None:
-    hierarchy = {"name": "대표", "children": [{"name": "팀"}]}
+def test_generators_and_style_profile_payloads_are_exact() -> None:
+    """build_* / apply_style_profile_to_plan match the frozen core output.
+
+    These two modules sit under ``hwpx.tools`` but the standing ownership ledger
+    names both explicitly as mcp-migrate, and the MCP owner already carries them,
+    so they leave with the rest of authoring. Their payloads are frozen like the
+    others rather than compared against a copy that is about to disappear.
+    """
+
     profile = {
         "schemaVersion": "hwpx.style-profile.v1",
         "page": {
@@ -139,78 +184,51 @@ def test_generators_proposal_and_style_profile_payloads_are_exact() -> None:
         "body": {"font": "함초롬바탕", "sizePt": 11},
     }
 
-    assert core_generators.build_image_grid(
+    assert mcp_generators.build_image_grid(
         ["a.png", "b.png"],
         columns=2,
         image_width_mm=50,
-    ) == mcp_generators.build_image_grid(
-        ["a.png", "b.png"],
-        columns=2,
-        image_width_mm=50,
-    )
-    assert core_generators.build_meeting_nameplates(
+    ) == GOLDEN["imageGrid"]
+    assert mcp_generators.build_meeting_nameplates(
         ["가", "나"],
         columns=2,
-    ) == mcp_generators.build_meeting_nameplates(
-        ["가", "나"],
-        columns=2,
+    ) == GOLDEN["meetingNameplates"]
+    hierarchy = {"name": "대표", "children": [{"name": "팀"}]}
+    assert mcp_generators.build_organization_chart(hierarchy) == GOLDEN["organizationChart"]
+    assert (
+        mcp_style.apply_style_profile_to_plan(_plan(), profile)
+        == GOLDEN["styleProfileApplied"]
     )
-    assert core_generators.build_organization_chart(
-        hierarchy
-    ) == mcp_generators.build_organization_chart(hierarchy)
+
+
+def test_proposal_spec_normalization_matches_frozen_core() -> None:
     assert dataclasses.asdict(
-        core_presets.normalize_proposal_spec(
-            {"title": "제안", "sections": [{"title": "배경"}]}
-        )
-    ) == dataclasses.asdict(
         mcp_presets.normalize_proposal_spec(
             {"title": "제안", "sections": [{"title": "배경"}]}
         )
-    )
-    assert core_style.apply_style_profile_to_plan(
-        _plan(),
-        profile,
-    ) == mcp_style.apply_style_profile_to_plan(_plan(), profile)
+    ) == GOLDEN["normalizedProposalSpec"]
 
 
-def test_document_plan_creation_save_reopen_and_open_safety_are_exact(
+def test_document_plan_creation_save_reopen_and_open_safety_match_frozen_core(
     tmp_path: Path,
 ) -> None:
-    core_path = tmp_path / "core-plan.hwpx"
     mcp_path = tmp_path / "mcp-plan.hwpx"
-    core_document = core_authoring.create_document_from_plan(_plan())
     mcp_document = mcp_authoring.create_document_from_plan(_plan())
     try:
-        assert core_document.export_text() == mcp_document.export_text()
-        core_document.save_to_path(core_path)
+        assert mcp_document.export_text() == GOLDEN["planDocument"]["exportText"]
         mcp_document.save_to_path(mcp_path)
     finally:
-        core_document.close()
         mcp_document.close()
 
-    core_safety = validate_editor_open_safety(core_path)
     mcp_safety = validate_editor_open_safety(mcp_path)
-    assert core_safety.ok is True
     assert mcp_safety.ok is True
-    assert core_safety.summary == mcp_safety.summary
+    assert mcp_safety.summary == GOLDEN["planDocument"]["openSafetySummary"]
 
 
-def test_builder_lowering_and_computed_fields_are_exact(tmp_path: Path) -> None:
-    core_path = tmp_path / "core-builder.hwpx"
+def test_builder_lowering_and_computed_fields_match_frozen_core(
+    tmp_path: Path,
+) -> None:
     mcp_path = tmp_path / "mcp-builder.hwpx"
-    core_plan = core_builder.Document(
-        sections=[
-            core_builder.Section(
-                children=[
-                    core_builder.Paragraph(text="{{ commas(1234567) }}"),
-                    core_builder.Table(
-                        header=["항목", "값"],
-                        rows=[["A", "1"]],
-                    ),
-                ]
-            )
-        ]
-    )
     mcp_plan = mcp_builder.Document(
         sections=[
             mcp_builder.Section(
@@ -224,31 +242,30 @@ def test_builder_lowering_and_computed_fields_are_exact(tmp_path: Path) -> None:
             )
         ]
     )
-    core_document = core_plan.lower()
     mcp_document = mcp_plan.lower()
     try:
-        assert core_document.export_text() == mcp_document.export_text()
-        core_document.save_to_path(core_path)
+        assert mcp_document.export_text() == GOLDEN["builderDocument"]["exportText"]
         mcp_document.save_to_path(mcp_path)
     finally:
-        core_document.close()
         mcp_document.close()
 
-    assert validate_editor_open_safety(core_path).ok is True
     assert validate_editor_open_safety(mcp_path).ok is True
 
 
-def test_design_profile_registry_and_template_analysis_are_exact(
+def test_design_profile_registry_matches_frozen_core_and_template_analysis_is_exact(
     tmp_path: Path,
 ) -> None:
+    # analyze_template lives in hwpx.tools.template_analyzer, which stays —
+    # compared live, same as before. Its input file no longer needs core's
+    # create_document_from_plan; the MCP owner builds an equivalent fixture.
     source = tmp_path / "source.hwpx"
-    document = core_authoring.create_document_from_plan(_plan())
+    document = mcp_authoring.create_document_from_plan(_plan())
     try:
         document.save_to_path(source)
     finally:
         document.close()
 
-    assert core_design.available_profiles() == mcp_design.available_profiles()
+    assert mcp_design.available_profiles() == GOLDEN["availableProfiles"]
     assert core_template.template_analysis_agent_schema() == (
         mcp_template.template_analysis_agent_schema()
     )

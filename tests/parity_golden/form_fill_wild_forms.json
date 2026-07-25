@@ -2405,7 +2405,7 @@
           "§0¶40 본문 조건부 블록 — 어느 쪽을 남길지 결정 필요: “※※※유의) 과목별로 아래 2개 중에서 해당하는 것만 남기고 나머지는 삭제!!!”",
           "§0¶1 본문 빈칸(◯◯◯) — 들어갈 실제 값은? “담당교사: ◯◯◯, ◯◯◯”"
         ],
-        "source": "/Users/wilycastle/Code/projects/hwpx/python-hwpx-s049/tests/fixtures/m105_evalplan/blank_form_3hak.hwpx",
+        "source": "<core-repo>/tests/fixtures/m105_evalplan/blank_form_3hak.hwpx",
         "stats": {
           "colored_runs": 226,
           "paragraphs": 696,
@@ -3932,7 +3932,7 @@
         "questions": [
           "색 범례 문장을 찾지 못함 — 색의 의미(유지/수정/삭제)를 알려달라."
         ],
-        "source": "/Users/wilycastle/Code/projects/hwpx/python-hwpx-s049/tests/fixtures/reader_robustness/irb_form_blank.hwpx",
+        "source": "<core-repo>/tests/fixtures/reader_robustness/irb_form_blank.hwpx",
         "stats": {
           "colored_runs": 0,
           "paragraphs": 3,
@@ -4424,7 +4424,7 @@
           "`#3A3C84`(other) run 3개의 의미가 범례에 없음 — 유지/수정/삭제 중 무엇인가? 예: 국민 주도 참여‧소통 거버넌스 구현",
           "색 범례 문장을 찾지 못함 — 색의 의미(유지/수정/삭제)를 알려달라."
         ],
-        "source": "/Users/wilycastle/Code/projects/hwpx/python-hwpx-s049/tests/fixtures/m2_corpus/public_official_table.hwpx",
+        "source": "<core-repo>/tests/fixtures/m2_corpus/public_official_table.hwpx",
         "stats": {
           "colored_runs": 7,
           "paragraphs": 113,

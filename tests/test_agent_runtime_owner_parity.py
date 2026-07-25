@@ -1,34 +1,41 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Exact parity between the MCP owner and the frozen core 4.x copy."""
+"""Parity between the MCP owner and core's frozen 4.x agent/blueprint/cli shape.
+
+``hwpx.agent`` (and its ``blueprint``/``cli`` submodules) is scheduled for
+physical deletion from core once python-hwpx is reduced to a library, so
+this file imports nothing from it. Instead:
+
+- Structural claims (exports, signatures, dataclass fields, the ``EXIT_*``
+  constants) compare the live MCP module's
+  ``tests.parity_fingerprint.fingerprint()`` against
+  ``tests/parity_fingerprints/agent.json``, frozen from core while it still
+  existed (see ``scripts/freeze_parity_fingerprints.py``).
+- Behavioural claims that need an actual computed value — schema/catalog
+  contents, command validation output, CLI stdout/stderr/exit codes — compare
+  against ``tests/parity_fingerprints/agent.golden.json``: values captured
+  from that same frozen core commit, confirmed deterministic (stable across
+  repeat calls) and confirmed identical to MCP's own output at freeze time.
+
+Every assertion the pre-freeze version of this file made is still made here;
+none needed dropping.
+"""
 from __future__ import annotations
 
-import inspect
 import io
+import json
 from collections.abc import Callable
-from typing import Any
+from pathlib import Path
 
 import pytest
+from parity_fingerprint import fingerprint
 
-import hwpx.agent as core_agent
-import hwpx.agent.blueprint as core_blueprint
-import hwpx.agent.cli as core_cli
 import hwpx_mcp_server.office.agent as mcp_agent
 import hwpx_mcp_server.office.agent.blueprint as mcp_blueprint
 import hwpx_mcp_server.office.agent.cli as mcp_cli
 
-
-def _assert_export_parity(left: Any, right: Any) -> None:
-    assert list(left.__all__) == list(right.__all__)
-    for name in left.__all__:
-        left_value = getattr(left, name)
-        right_value = getattr(right, name)
-        assert type(left_value).__name__ == type(right_value).__name__, name
-        if callable(left_value):
-            assert str(inspect.signature(left_value)) == str(
-                inspect.signature(right_value)
-            ), name
-        else:
-            assert left_value == right_value, name
+_FIXTURES = Path(__file__).parent / "parity_fingerprints"
+FROZEN = json.loads((_FIXTURES / "agent.json").read_text(encoding="utf-8"))["modules"]
+GOLDEN = json.loads((_FIXTURES / "agent.golden.json").read_text(encoding="utf-8"))["calls"]
 
 
 def _run_cli(
@@ -45,34 +52,33 @@ def _run_cli(
     return code, stdout.getvalue(), stderr.getvalue()
 
 
-def test_root_and_blueprint_public_exports_are_exact() -> None:
-    _assert_export_parity(core_agent, mcp_agent)
-    _assert_export_parity(core_blueprint, mcp_blueprint)
+def test_root_blueprint_and_cli_shape_matches_frozen_core() -> None:
+    assert fingerprint(mcp_agent) == FROZEN["hwpx.agent"]
+    assert fingerprint(mcp_blueprint) == FROZEN["hwpx.agent.blueprint"]
+    # Covers the EXIT_* constants too: they are simple int constants in
+    # hwpx.agent.cli's frozen fingerprint, so a value drift here fails this
+    # assertion instead of a separate constant-by-constant loop.
+    assert fingerprint(mcp_cli) == FROZEN["hwpx.agent.cli"]
 
 
-def test_generated_contracts_and_catalogs_are_exact() -> None:
-    assert core_agent.agent_contract_manifest() == mcp_agent.agent_contract_manifest()
-    assert core_agent.agent_catalog() == mcp_agent.agent_catalog()
-    assert core_agent.agent_json_schemas() == mcp_agent.agent_json_schemas()
-    assert core_agent.mixed_form_json_schemas() == mcp_agent.mixed_form_json_schemas()
-    assert core_blueprint.blueprint_catalog() == mcp_blueprint.blueprint_catalog()
-    assert (
-        core_blueprint.blueprint_json_schemas()
-        == mcp_blueprint.blueprint_json_schemas()
-    )
-    assert core_blueprint.blueprint_limits() == mcp_blueprint.blueprint_limits()
+def test_generated_contracts_and_catalogs_match_frozen_core_output() -> None:
+    assert mcp_agent.agent_contract_manifest() == GOLDEN["agentContractManifest"]
+    assert mcp_agent.agent_catalog() == GOLDEN["agentCatalog"]
+    assert mcp_agent.agent_json_schemas() == GOLDEN["agentJsonSchemas"]
+    assert mcp_agent.mixed_form_json_schemas() == GOLDEN["mixedFormJsonSchemas"]
+    assert mcp_blueprint.blueprint_catalog() == GOLDEN["blueprintCatalog"]
+    assert mcp_blueprint.blueprint_json_schemas() == GOLDEN["blueprintJsonSchemas"]
+    assert mcp_blueprint.blueprint_limits() == GOLDEN["blueprintLimits"]
 
 
-def test_normalized_command_result_and_error_shapes_are_exact() -> None:
+def test_normalized_command_result_and_error_shapes_match_frozen_core_output() -> None:
     command = {
         "commandId": "set-title",
         "op": "set",
         "path": "/section[1]/paragraph[1]",
         "properties": {"text": "동결"},
     }
-    assert core_agent.validate_agent_command(command) == mcp_agent.validate_agent_command(
-        command
-    )
+    assert mcp_agent.validate_agent_command(command) == GOLDEN["validateAgentCommand"]
 
     kwargs = {
         "code": "invalid_syntax",
@@ -82,18 +88,16 @@ def test_normalized_command_result_and_error_shapes_are_exact() -> None:
         "suggestion": "retry",
         "valid_values": ("a", "b"),
     }
-    assert core_agent.AgentError(**kwargs).to_dict() == mcp_agent.AgentError(
-        **kwargs
-    ).to_dict()
+    assert mcp_agent.AgentError(**kwargs).to_dict() == GOLDEN["agentErrorToDict"]
 
-    for provider in (core_agent, mcp_agent):
-        with pytest.raises(provider.AgentContractError) as caught:
-            provider.validate_agent_batch({})
-        payload = (caught.value.code, caught.value.target, str(caught.value))
-        if provider is core_agent:
-            core_payload = payload
-        else:
-            assert payload == core_payload
+    with pytest.raises(mcp_agent.AgentContractError) as caught:
+        mcp_agent.validate_agent_batch({})
+    payload = {
+        "code": caught.value.code,
+        "target": caught.value.target,
+        "message": str(caught.value),
+    }
+    assert payload == GOLDEN["validateAgentBatchEmptyError"]
 
 
 @pytest.mark.parametrize(
@@ -107,18 +111,13 @@ def test_normalized_command_result_and_error_shapes_are_exact() -> None:
         ["unknown-command"],
     ],
 )
-def test_cli_stdout_stderr_and_exit_codes_are_exact(args: list[str]) -> None:
-    assert _run_cli(core_cli.main, args) == _run_cli(mcp_cli.main, args)
+def test_cli_stdout_stderr_and_exit_codes_match_frozen_core_output(
+    args: list[str],
+) -> None:
+    code, stdout, stderr = _run_cli(mcp_cli.main, args)
+    expected = GOLDEN["cli"][" ".join(args)]
+    assert {"exitCode": code, "stdout": stdout, "stderr": stderr} == expected
 
 
-def test_cli_parser_and_exit_constants_are_exact() -> None:
-    assert core_cli.build_parser().prog == mcp_cli.build_parser().prog == "hwpx"
-    for name in (
-        "EXIT_OK",
-        "EXIT_UNEXPECTED",
-        "EXIT_USAGE",
-        "EXIT_TARGET",
-        "EXIT_CONFLICT",
-        "EXIT_VERIFICATION",
-    ):
-        assert getattr(core_cli, name) == getattr(mcp_cli, name)
+def test_cli_parser_prog_matches_frozen_core_output() -> None:
+    assert mcp_cli.build_parser().prog == GOLDEN["cliParserProg"] == "hwpx"

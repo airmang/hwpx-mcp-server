@@ -1,0 +1,305 @@
+{
+  "calls": {
+    "availableProfiles": [
+      "application_form",
+      "home_notice",
+      "official_notice",
+      "report"
+    ],
+    "builderDocument": {
+      "exportText": "1,234,567\n항목\t값\nA\t1",
+      "openSafetyOk": true,
+      "openSafetySummary": "editor-open safety verification passed"
+    },
+    "documentPlanSchema": {
+      "$id": "https://airmang.github.io/hwpx-plugins/schemas/document_plan.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": true,
+      "properties": {
+        "blocks": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "type": {
+                "description": "Block kind. Body fields depend on the type.",
+                "enum": [
+                  "bullets",
+                  "heading",
+                  "memo",
+                  "page_break",
+                  "paragraph",
+                  "table"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "schemaVersion": {
+          "description": "Plan schema version. Newer same-family versions validate best-effort.",
+          "enum": [
+            "hwpx.document_plan.v1",
+            "hwpx.document_plan.v2"
+          ],
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "blocks"
+      ],
+      "title": "HWPX Document Plan",
+      "type": "object"
+    },
+    "imageGrid": {
+      "columns": 2,
+      "imageWidthMm": 50.0,
+      "images": [
+        {
+          "caption": "a",
+          "path": "a.png"
+        },
+        {
+          "caption": "b",
+          "path": "b.png"
+        }
+      ],
+      "type": "image_grid"
+    },
+    "invalidPlanReport": {
+      "errors": [
+        "blocks[0].type is unsupported: ''"
+      ],
+      "issues": [
+        {
+          "code": "empty_title",
+          "message": "title is empty; generated document will start with blocks",
+          "path": "title",
+          "severity": "warning",
+          "suggestion": "Add a title or accept that generation starts with the first content block."
+        },
+        {
+          "code": "unsupported_block_type",
+          "message": "blocks[0].type is unsupported: ''",
+          "path": "blocks[0].type",
+          "severity": "error",
+          "suggestion": "Use one of: heading, paragraph, bullets, table, page_break, memo."
+        }
+      ],
+      "ok": false,
+      "repairHints": [
+        {
+          "action": "review",
+          "code": "empty_title",
+          "message": "Add a title or accept that generation starts with the first content block.",
+          "path": "title"
+        },
+        {
+          "action": "fix",
+          "code": "unsupported_block_type",
+          "message": "Use one of: heading, paragraph, bullets, table, page_break, memo.",
+          "path": "blocks[0].type"
+        }
+      ],
+      "schemaVersion": "hwpx.document_plan.v1",
+      "warnings": [
+        "title is empty; generated document will start with blocks"
+      ]
+    },
+    "meetingNameplates": {
+      "columnWidths": [
+        1,
+        1
+      ],
+      "header": [
+        "명패 1",
+        "명패 2"
+      ],
+      "metadata": {
+        "generator": "meeting_nameplates",
+        "size": "150x70"
+      },
+      "rows": [
+        [
+          "가",
+          "나"
+        ]
+      ],
+      "type": "table"
+    },
+    "normalizedPlan": {
+      "blocks": [
+        {
+          "level": 1,
+          "text": "개요",
+          "type": "heading"
+        },
+        {
+          "style": "body",
+          "text": "본문",
+          "type": "paragraph"
+        },
+        {
+          "caption": "",
+          "columns": [
+            {
+              "key": "item",
+              "label": "항목",
+              "widthWeight": 1
+            },
+            {
+              "key": "value",
+              "label": "값",
+              "widthWeight": 1
+            }
+          ],
+          "rows": [
+            {
+              "item": "A",
+              "value": "1"
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "metadata": {},
+      "qualityGates": {
+        "minNonEmptyParagraphs": 1,
+        "minTableCount": 0,
+        "reopen": true,
+        "requiredText": [],
+        "validateDocument": true,
+        "validatePackage": true,
+        "visualReviewRequired": true
+      },
+      "schemaVersion": "hwpx.document_plan.v1",
+      "stylePreset": "standard_korean_business",
+      "subtitle": "",
+      "title": "정본 parity"
+    },
+    "normalizedProposalSpec": {
+      "author": "",
+      "budget_items": [],
+      "closing": "",
+      "date": "",
+      "executive_summary": "",
+      "expected_outcomes": [],
+      "metadata": {},
+      "organization": "",
+      "sections": [
+        {
+          "bullets": [],
+          "paragraphs": [],
+          "title": "배경"
+        }
+      ],
+      "subtitle": "",
+      "title": "제안"
+    },
+    "organizationChart": {
+      "columnWidths": [
+        1,
+        1,
+        1
+      ],
+      "header": [
+        "1단계",
+        "2단계",
+        "3단계"
+      ],
+      "metadata": {
+        "generator": "organization_chart",
+        "maxDepth": 3
+      },
+      "rows": [
+        [
+          "대표",
+          "팀",
+          ""
+        ]
+      ],
+      "type": "table"
+    },
+    "planDocument": {
+      "exportText": "정본 parity\n개요\n본문\n항목\t값\nA\t1",
+      "openSafetyOk": true,
+      "openSafetySummary": "editor-open safety verification passed"
+    },
+    "styleProfileApplied": {
+      "schemaVersion": "hwpx.document_plan.v1",
+      "sections": [
+        {
+          "blocks": [
+            {
+              "level": 1,
+              "text": "개요",
+              "type": "heading"
+            },
+            {
+              "text": "본문",
+              "type": "paragraph"
+            },
+            {
+              "columns": [
+                {
+                  "key": "item",
+                  "label": "항목"
+                },
+                {
+                  "key": "value",
+                  "label": "값"
+                }
+              ],
+              "rows": [
+                {
+                  "item": "A",
+                  "value": "1"
+                }
+              ],
+              "type": "table"
+            }
+          ],
+          "margins": {
+            "bottomMm": 15,
+            "leftMm": 20,
+            "rightMm": 20,
+            "topMm": 15
+          },
+          "page": {
+            "heightMm": 210,
+            "orientation": "LANDSCAPE",
+            "widthMm": 297
+          }
+        }
+      ],
+      "styleProfile": {
+        "applied": true,
+        "schemaVersion": "hwpx.style-profile.v1",
+        "sourceName": null
+      },
+      "title": "정본 parity"
+    },
+    "validPlanReport": {
+      "errors": [],
+      "issues": [],
+      "ok": true,
+      "repairHints": [],
+      "schemaVersion": "hwpx.document_plan.v1",
+      "warnings": []
+    }
+  },
+  "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
+  "schemaVersion": "hwpx.parity-golden/v1"
+}

@@ -866,3 +866,4 @@ def mcp_server_factory(mcp_test_config: MCPTestConfig):
 @pytest.fixture()
 def mcp_client(mcp_server_factory) -> StdioMCPClient:
     return mcp_server_factory()
+

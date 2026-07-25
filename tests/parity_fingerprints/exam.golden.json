@@ -1,0 +1,268 @@
+{
+  "calls": {
+    "columnXBounds": [
+      [
+        10,
+        26
+      ],
+      [
+        330,
+        346
+      ]
+    ],
+    "composeResult": {
+      "resultProjection": {
+        "needs_review": true,
+        "notes": [
+          "composed 14 문항 into body [1..70]",
+          "oracle unavailable -> render_checked=false, needs_review=true (no silent true)"
+        ],
+        "out_path": "<output>",
+        "overflow": null,
+        "placeholders_ok": true,
+        "render_checked": false,
+        "rounds": 0,
+        "splits": null
+      },
+      "zipEntryNames": [
+        "BinData/image1.jpg",
+        "BinData/image2.bmp",
+        "BinData/image3.png",
+        "Contents/content.hpf",
+        "Contents/header.xml",
+        "Contents/section0.xml",
+        "META-INF/container.rdf",
+        "META-INF/container.xml",
+        "META-INF/manifest.xml",
+        "Preview/PrvImage.png",
+        "Preview/PrvText.txt",
+        "mimetype",
+        "settings.xml",
+        "version.xml"
+      ],
+      "zipEntrySha256": {
+        "BinData/image1.jpg": "dc0d38d11e888fc14117b045529e9eb28040d5e8a5c209b751a1ba191c803e37",
+        "BinData/image2.bmp": "866d09e47779f8c85d464570729070dff00adf0d23c852294870f7f64cc0f833",
+        "BinData/image3.png": "a1924a3f533c0d2cf870f1645c5dd985b62343bca03c6a23dced7306bc8bf7bb",
+        "Contents/content.hpf": "a960ae18f66ba068915b0140dc047bb4b1d187fbaa6ecf50c29919e3f06f1965",
+        "Contents/header.xml": "12b6df040b6fbd671b6f88f4e01ae215758de7b84abd89f33e27bc91b275092f",
+        "Contents/section0.xml": "eeabe9498ebab91f0301faa8725b58e55cf32f75848f323cb18abb08ac5bb8c4",
+        "META-INF/container.rdf": "0cfd814c20595c841e48e62fbf7591829f13c177fa92af634c8199f85ecf3a89",
+        "META-INF/container.xml": "5109d3a9249ec1058177fedab574c5d9616058aa92ebefcd33249ebb36a20f61",
+        "META-INF/manifest.xml": "2b4b155c1bb6a9ccc212fef113c4831d2f558e67cf1260eb314ce54f26fd32ea",
+        "Preview/PrvImage.png": "f526bb9726144f7cbad4d12755a1602a22f5c3c8a8e303b55eca799b8612fa14",
+        "Preview/PrvText.txt": "a862b26acbcbd1d4583eb8a6944700bf6d5abab6eb0be4a217f967af1858b9b7",
+        "mimetype": "5ab5230b5af04f78947736bf8dd1a269aa684e234f7f4a392efb85289d1655c2",
+        "settings.xml": "bb52e7b9b3217b47cf1e8a0402dafd3f7ac33582270b1c05fe1289d65e1cf3c7",
+        "version.xml": "d2c7efce141c8bcccc72749253d9c774d0c713792f02f03b97af7573652ef8f2"
+      }
+    },
+    "groupQuestionBlocks": [
+      [
+        "1",
+        [
+          "1",
+          ".",
+          "①",
+          "가"
+        ]
+      ],
+      [
+        "2",
+        [
+          "2",
+          "."
+        ]
+      ]
+    ],
+    "parseBadMarkdownError": {
+      "lineNo": 1,
+      "reason": "content before any 문항 / 세트 header",
+      "str": "line 1: content before any 문항 / 세트 header: '본문이 문항 헤더 없이 먼저 나온다.'",
+      "text": "본문이 문항 헤더 없이 먼저 나온다."
+    },
+    "parseGoodMarkdown": {
+      "docAsDict": {
+        "blocks": [
+          {
+            "choices": [
+              "① 가",
+              "② 나"
+            ],
+            "number": "1",
+            "placeholders": [
+              {
+                "id": "그림1",
+                "kind": "img",
+                "raw_text": "[그림1]"
+              }
+            ],
+            "points": "3",
+            "stem": "다음 중 옳은 것은? [그림1]"
+          },
+          {
+            "members": [
+              {
+                "choices": [
+                  "① 다"
+                ],
+                "number": "2",
+                "placeholders": [],
+                "points": null,
+                "stem": "둘째 발문"
+              },
+              {
+                "choices": [
+                  "① 라"
+                ],
+                "number": "3",
+                "placeholders": [],
+                "points": "2",
+                "stem": "셋째 발문"
+              }
+            ],
+            "passage": "공통 지문",
+            "rng": "2∼3"
+          }
+        ],
+        "title": "중간고사"
+      },
+      "questionNumbers": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    "profileFormAsDict": {
+      "admin_box_index": 0,
+      "ambiguous_indices": [],
+      "body_end": 70,
+      "body_start": 1,
+      "replaceable_indices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70
+      ],
+      "role_styles": {
+        "box": {
+          "char_pr_id": "8",
+          "name": "박스안내용",
+          "para_pr_id": "25",
+          "style_id": "7"
+        },
+        "box_guide": {
+          "char_pr_id": "26",
+          "name": "(보기)박스안내용",
+          "para_pr_id": "35",
+          "style_id": "6"
+        },
+        "choice1": {
+          "char_pr_id": "8",
+          "name": "1행답항",
+          "para_pr_id": "22",
+          "style_id": "2"
+        },
+        "choice2": {
+          "char_pr_id": "8",
+          "name": "2행답항",
+          "para_pr_id": "3",
+          "style_id": "3"
+        },
+        "choice3": {
+          "char_pr_id": "8",
+          "name": "3행답항",
+          "para_pr_id": "23",
+          "style_id": "4"
+        },
+        "choice5": {
+          "char_pr_id": "25",
+          "name": "5행답항",
+          "para_pr_id": "34",
+          "style_id": "5"
+        },
+        "normal": {
+          "char_pr_id": "8",
+          "name": "바탕글",
+          "para_pr_id": "0",
+          "style_id": "0"
+        },
+        "number": {
+          "char_pr_id": "25",
+          "name": "문항자동번호넣기",
+          "para_pr_id": "24",
+          "style_id": "1"
+        }
+      },
+      "structural_indices": []
+    }
+  },
+  "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
+  "schemaVersion": "hwpx.parity-golden/v1"
+}

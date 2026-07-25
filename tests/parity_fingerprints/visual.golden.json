@@ -1,0 +1,344 @@
+{
+  "calls": {
+    "fixtureQa": {
+      "metrics": {
+        "assurance": "fixture",
+        "cases": [
+          {
+            "caseId": "clean-parity",
+            "classification": "clean",
+            "expectedCritical": 0,
+            "predictedCritical": 0,
+            "renderChecked": false,
+            "status": "pass"
+          }
+        ],
+        "cleanFalseRejection95CI": [
+          0.0,
+          0.7934506856227626
+        ],
+        "cleanFalseRejectionRate": 0.0,
+        "counts": {
+          "cases": 1,
+          "expectedCritical": 0,
+          "falseNegative": 0,
+          "falsePositive": 0,
+          "predictedCritical": 0,
+          "truePositive": 0
+        },
+        "criticalPrecision": null,
+        "criticalPrecision95CI": null,
+        "criticalRecall": null,
+        "criticalRecall95CI": null,
+        "defectFalseAcceptance95CI": null,
+        "defectFalseAcceptanceRate": null,
+        "gateContract": {
+          "aggregateBounds": {
+            "cleanFalseRejectionUpper": false,
+            "criticalPrecisionLower": false,
+            "criticalRecallLower": false,
+            "defectFalseAcceptanceUpper": false
+          },
+          "failedRequirements": [
+            "category:text_clipping_overlap:minimum_samples",
+            "category:cell_overflow:minimum_samples",
+            "category:unexpected_blank_page:minimum_samples",
+            "category:leftover_guidance_placeholder_sample:minimum_samples",
+            "category:empty_required_field:minimum_samples",
+            "category:orphan_bullet_heading:minimum_samples",
+            "category:table_grid_border_anomaly:minimum_samples",
+            "category:font_color_alignment_inconsistency:minimum_samples",
+            "category:image_seal_misplacement:minimum_samples",
+            "category:header_footer_page_number_loss:minimum_samples",
+            "category:implausible_whitespace_density:minimum_samples",
+            "aggregate:criticalRecallLower",
+            "aggregate:criticalPrecisionLower",
+            "aggregate:defectFalseAcceptanceUpper",
+            "aggregate:cleanFalseRejectionUpper"
+          ],
+          "minimumCategorySamples": 5,
+          "requiredCategories": [
+            "text_clipping_overlap",
+            "cell_overflow",
+            "unexpected_blank_page",
+            "leftover_guidance_placeholder_sample",
+            "empty_required_field",
+            "orphan_bullet_heading",
+            "table_grid_border_anomaly",
+            "font_color_alignment_inconsistency",
+            "image_seal_misplacement",
+            "header_footer_page_number_loss",
+            "implausible_whitespace_density"
+          ],
+          "requiredCoveragePassed": false,
+          "requiredRecallBoundsPassed": false,
+          "scopeProvenance": {
+            "mode": "full_taxonomy",
+            "taxonomyVersion": "hwpx-visual-defects/1.0"
+          }
+        },
+        "gatePassed": false,
+        "perCategory": {
+          "cell_overflow": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "empty_required_field": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "font_color_alignment_inconsistency": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "header_footer_page_number_loss": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "image_seal_misplacement": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "implausible_whitespace_density": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "leftover_guidance_placeholder_sample": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "orphan_bullet_heading": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "table_grid_border_anomaly": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "text_clipping_overlap": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          },
+          "unexpected_blank_page": {
+            "fn": 0,
+            "fp": 0,
+            "minimumSamples": 5,
+            "precision": null,
+            "precision95CI": null,
+            "recall": null,
+            "recall95CI": null,
+            "recallLowerBoundPassed": false,
+            "required": true,
+            "sampleSufficient": false,
+            "tp": 0
+          }
+        },
+        "renderChecked": false,
+        "schema": "hwpx.visual-qa-metrics/v2",
+        "thresholds": {
+          "cleanFalseRejectionRate": 0.01,
+          "criticalPrecision": 0.9,
+          "criticalRecall": 0.95,
+          "defectFalseAcceptanceRate": 0.01
+        }
+      },
+      "qaToDict": {
+        "assurance": "fixture",
+        "critical_count": 0,
+        "expected_pages": [
+          0
+        ],
+        "findings": [],
+        "missing_pages": [],
+        "needs_review": false,
+        "pages": [
+          {
+            "coverage_complete": true,
+            "findings": [],
+            "page": 0,
+            "page_sha256": "feacad8adbd2fb856ac52acaab0eefbedfbf6f363b0096b1e5ea0141c7f8b7eb",
+            "status": "pass"
+          }
+        ],
+        "render_checked": false,
+        "status": "pass",
+        "taxonomy_version": "hwpx-visual-defects/1.0",
+        "unexpected_pages": []
+      },
+      "receipt": {
+        "assurance": "fixture",
+        "caseId": "clean-parity",
+        "pages": [
+          {
+            "page": 0,
+            "path": "page.png",
+            "sha256": "feacad8adbd2fb856ac52acaab0eefbedfbf6f363b0096b1e5ea0141c7f8b7eb"
+          }
+        ],
+        "realHancom": false,
+        "receiptVersion": "hwpx.fixture-render-receipt/v1",
+        "renderChecked": false,
+        "renderSource": "deterministic_fixture"
+      }
+    },
+    "structuralOnly": {
+      "backendType": "NullOracle",
+      "reportToDict": {
+        "after_page_count": null,
+        "before_page_count": null,
+        "diff_image": null,
+        "errors": [],
+        "max_diff_ratio": null,
+        "ok": true,
+        "original_render": null,
+        "output_render": null,
+        "overflow_detected": false,
+        "overlap_detected": false,
+        "page_count_changed": null,
+        "render_checked": false,
+        "table_break_detected": false,
+        "unexpected_diff_outside_mask": false,
+        "warnings": [
+          "RENDER_ORACLE_UNAVAILABLE: no Hancom reachable on this platform; structural degrade -- visual_complete is unverified, not confirmed."
+        ]
+      }
+    },
+    "worker": {
+      "failureToJson": {
+        "artifacts": [],
+        "hancom_build": null,
+        "job_id": "failure",
+        "page_count": 0,
+        "real_hancom": false,
+        "render_checked": false,
+        "retryable": false,
+        "schema_version": "hwpx.hancom-worker.v1",
+        "session_generation": 1,
+        "status": "unverified",
+        "terminal_reason": "INPUT_HASH_MISMATCH",
+        "worker_version": "parity"
+      },
+      "successToJson": {
+        "artifacts": [
+          {
+            "content_hash": "sha256:d736ca89acf484d4c5665d1e89a5bb5000c9effa43b7e2f09dbf17bc2ded10da",
+            "kind": "pdf",
+            "page_number": null,
+            "relative_path": "success/document.pdf",
+            "size_bytes": 23
+          },
+          {
+            "content_hash": "sha256:b9865c3e7427ff4039c54bf99321da8bdc54034f37c954d035f614e200b98a0c",
+            "kind": "page_png",
+            "page_number": 1,
+            "relative_path": "success/page-0001.png",
+            "size_bytes": 10
+          }
+        ],
+        "hancom_build": null,
+        "job_id": "success",
+        "page_count": 1,
+        "real_hancom": false,
+        "render_checked": false,
+        "retryable": false,
+        "schema_version": "hwpx.hancom-worker.v1",
+        "session_generation": 1,
+        "status": "succeeded",
+        "terminal_reason": "FAKE_RENDER_ONLY",
+        "worker_version": "parity"
+      }
+    }
+  },
+  "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
+  "schemaVersion": "hwpx.parity-golden/v1"
+}

@@ -1,5 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Behavior parity between the MCP owner and the frozen core 4.x copy."""
+"""Behavior parity between the MCP owner and the frozen core 4.x copy.
+
+``hwpx.form_fill`` and ``hwpx.form_fit`` are not being deleted from core (see
+the S-049 library-extraction plan) — MCP imports the fit family on purpose as
+a neutral contract, and core's split-run helpers stay as an independent
+compatibility copy. Both are compared against live below.
+
+``hwpx.guidance_scan`` *is* scheduled for deletion, so
+``test_instruction_lexicon_parity`` no longer imports it. Its expected
+outputs were captured once from core's ``is_form_instruction`` (commit
+recorded in ``tests/parity_fingerprints/form_fill.json``) into
+``instructionSamplesExpected`` in the scenarios fixture below, the same way
+``splitRun``/``fitCases`` already pin expected shapes as fixture data rather
+than live core calls.
+"""
 from __future__ import annotations
 
 import dataclasses
@@ -9,7 +23,7 @@ from typing import Any
 
 from hwpx import form_fill as frozen_split
 from hwpx import form_fit as frozen_fit
-from hwpx.guidance_scan import is_form_instruction as frozen_instruction
+
 from hwpx_mcp_server.office.form_fill import split_run as canonical_split
 from hwpx_mcp_server.office.form_fill.fit import (
     FitEngine,
@@ -22,7 +36,6 @@ from hwpx_mcp_server.office.form_fill.fit import (
 from hwpx_mcp_server.office.form_fill.guidance import (
     is_form_instruction,
 )
-
 
 SCENARIOS = json.loads(
     (
@@ -121,6 +134,6 @@ def test_fit_measurement_and_policy_parity() -> None:
 
 def test_instruction_lexicon_parity() -> None:
     samples = SCENARIOS["instructionSamples"]
-    assert [is_form_instruction(text) for text in samples] == [
-        frozen_instruction(text) for text in samples
-    ]
+    assert [is_form_instruction(text) for text in samples] == (
+        SCENARIOS["instructionSamplesExpected"]
+    )

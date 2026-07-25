@@ -1,5 +1,40 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Exact parity between the MCP owner and the frozen core 4.x compatibility API."""
+"""Parity between the MCP rendering owner and core's frozen 4.x visual shape.
+
+``hwpx.visual.oracle``/``page_qa``/``qa_metrics``/``fixture_corpus``/
+``hancom_worker`` — the application half of ``hwpx.visual`` — are scheduled
+for physical deletion from core once python-hwpx is reduced to a library, so
+this file no longer imports them. Instead:
+
+- Structural claims (exports, signatures, dataclass fields) compare the live
+  MCP modules' ``tests.parity_fingerprint.fingerprint()`` against
+  ``tests/parity_fingerprints/visual.json``, frozen from core while it still
+  existed.
+- Behavioural claims with a deterministic, fixed-input value (the
+  structural-only oracle report, the fixture/page-QA/metrics projections,
+  and the deterministic worker's success/failure JSON) compare against
+  ``tests/parity_fingerprints/visual.golden.json`` — values captured from
+  that same frozen core commit and confirmed identical to MCP's own output
+  at freeze time.
+
+One assertion genuinely could not be preserved and was reduced rather than
+dropped: ``test_reachable_selection_and_exhausted_budget_...`` used to prove
+core's *and* MCP's ``resolve_oracle`` pick the same backend class under the
+same monkeypatched availability. That needs live monkeypatching of
+``WindowsComOracle``/``MacHancomOracle`` class methods, which cannot be
+expressed against a frozen fingerprint or a golden value — there is no
+single "the call returned X" to snapshot; the point of the test is the
+branch it takes. It now monkeypatches and asserts only MCP's own class,
+checked against ``expectedBackend`` in
+``tests/visual_runtime_parity/fixtures/scenarios.json`` (already a fixture,
+not a core import) instead of against a live core call. This drops the "core
+and MCP agree" half of the claim; MCP's own selection behaviour and the
+render-doesn't-mutate-the-source guarantee are still fully exercised. See
+the task report for this gap.
+
+Every other assertion the pre-freeze version of this file made is still
+made here.
+"""
 
 from __future__ import annotations
 
@@ -7,13 +42,9 @@ import hashlib
 import json
 from pathlib import Path
 
+from parity_fingerprint import fingerprint
 from PIL import Image, ImageDraw
 
-import hwpx.visual.fixture_corpus as core_fixture
-import hwpx.visual.hancom_worker as core_worker
-import hwpx.visual.oracle as core_oracle
-import hwpx.visual.page_qa as core_page_qa
-import hwpx.visual.qa_metrics as core_metrics
 from hwpx_mcp_server.office.rendering import fixture_corpus as mcp_fixture
 from hwpx_mcp_server.office.rendering import oracle as mcp_oracle
 from hwpx_mcp_server.office.rendering import page_qa as mcp_page_qa
@@ -30,6 +61,13 @@ SCENARIOS = json.loads(
         / "scenarios.json"
     ).read_text(encoding="utf-8")
 )
+_PARITY_FIXTURES = Path(__file__).parent / "parity_fingerprints"
+FROZEN = json.loads((_PARITY_FIXTURES / "visual.json").read_text(encoding="utf-8"))[
+    "modules"
+]
+GOLDEN = json.loads(
+    (_PARITY_FIXTURES / "visual.golden.json").read_text(encoding="utf-8")
+)["calls"]
 
 
 def _scenario(identifier: str) -> dict[str, object]:
@@ -85,89 +123,88 @@ def test_frozen_scenario_corpus_covers_all_required_paths() -> None:
     }
 
 
-def test_structural_only_and_unreachable_reports_are_exact(
+def test_frozen_visual_modules_shape_matches_frozen_core() -> None:
+    # hwpx.visual.oracle.__all__ re-exports WordBox (from hwpx.form_fit.wordbox,
+    # for convenience) but hwpx_mcp_server.office.rendering.oracle does not —
+    # a pre-existing asymmetry, not something this freeze changed. The
+    # pre-freeze version of this file never asserted full __all__ parity for
+    # oracle either (unlike the agent/authoring/exam parity files), only
+    # specific behaviour; excluded here rather than silently made to pass.
+    oracle_fingerprint = fingerprint(mcp_oracle)
+    frozen_oracle = {
+        name: entry
+        for name, entry in FROZEN["hwpx.visual.oracle"].items()
+        if name != "WordBox"
+    }
+    assert oracle_fingerprint == frozen_oracle
+
+    assert fingerprint(mcp_page_qa) == FROZEN["hwpx.visual.page_qa"]
+    assert fingerprint(mcp_metrics) == FROZEN["hwpx.visual.qa_metrics"]
+    assert fingerprint(mcp_fixture) == FROZEN["hwpx.visual.fixture_corpus"]
+    assert fingerprint(mcp_worker) == FROZEN["hwpx.visual.hancom_worker"]
+
+
+def test_structural_only_report_matches_frozen_core(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("HWPX_ORACLE_STRUCTURAL_ONLY", "1")
-    core_backend = core_oracle.resolve_oracle()
     mcp_backend = mcp_oracle.resolve_oracle()
     expected = _scenario("structural-only")
 
-    assert type(core_backend).__name__ == type(mcp_backend).__name__ == (
-        expected["expectedBackend"]
-    )
-    core_report = core_oracle.visual_check(
-        "before.hwpx",
-        "after.hwpx",
-        oracle=core_backend,
+    assert type(mcp_backend).__name__ == expected["expectedBackend"] == (
+        GOLDEN["structuralOnly"]["backendType"]
     )
     mcp_report = mcp_oracle.visual_check(
         "before.hwpx",
         "after.hwpx",
         oracle=mcp_backend,
     )
-    assert core_report.to_dict() == mcp_report.to_dict()
-    assert core_report.render_checked is expected["renderChecked"]
-    assert str(expected["terminalReason"]) in core_report.warnings[0]
+    assert mcp_report.to_dict() == GOLDEN["structuralOnly"]["reportToDict"]
+    assert mcp_report.render_checked is expected["renderChecked"]
+    assert str(expected["terminalReason"]) in mcp_report.warnings[0]
 
 
-def test_reachable_selection_and_exhausted_budget_are_exact_and_non_mutating(
+def test_reachable_selection_and_exhausted_budget_do_not_mutate(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     monkeypatch.delenv("HWPX_ORACLE_STRUCTURAL_ONLY", raising=False)
     monkeypatch.setattr(
-        core_oracle.WindowsComOracle,
-        "available",
-        lambda self: False,
-    )
-    monkeypatch.setattr(
         mcp_oracle.WindowsComOracle,
         "available",
         lambda self: False,
     )
-    monkeypatch.setattr(core_oracle.MacHancomOracle, "available", lambda self: True)
     monkeypatch.setattr(mcp_oracle.MacHancomOracle, "available", lambda self: True)
 
-    core_backend = core_oracle.resolve_oracle(budget_seconds=0.0)
     mcp_backend = mcp_oracle.resolve_oracle(budget_seconds=0.0)
     expected = _scenario("reachable-mac-selection")
-    assert type(core_backend).__name__ == type(mcp_backend).__name__ == (
-        expected["expectedBackend"]
-    )
-    assert core_backend.budget_seconds == mcp_backend.budget_seconds == 0.0
+    assert type(mcp_backend).__name__ == expected["expectedBackend"]
+    assert mcp_backend.budget_seconds == 0.0
 
     source = tmp_path / "input.hwpx"
     source.write_bytes(b"immutable-input")
     before = hashlib.sha256(source.read_bytes()).hexdigest()
-    assert core_backend.render_pdf(str(source), str(tmp_path / "core.pdf")) is None
     assert mcp_backend.render_pdf(str(source), str(tmp_path / "mcp.pdf")) is None
     assert hashlib.sha256(source.read_bytes()).hexdigest() == before
-    assert not (tmp_path / "core.pdf").exists()
     assert not (tmp_path / "mcp.pdf").exists()
 
 
-def test_fixture_loader_page_qa_and_metrics_projections_are_exact(
+def test_fixture_loader_page_qa_and_metrics_projections_match_frozen_core(
     tmp_path: Path,
 ) -> None:
     manifest = _clean_fixture(tmp_path)
-    core_corpus = core_fixture.load_fixture_manifest(manifest)
     mcp_corpus = mcp_fixture.load_fixture_manifest(manifest)
 
-    assert core_corpus.receipt(core_corpus.cases[0]) == mcp_corpus.receipt(
-        mcp_corpus.cases[0]
+    assert mcp_corpus.receipt(mcp_corpus.cases[0]) == GOLDEN["fixtureQa"]["receipt"]
+    assert mcp_page_qa.inspect_fixture_case(mcp_corpus.cases[0]).to_dict() == (
+        GOLDEN["fixtureQa"]["qaToDict"]
     )
-    assert core_page_qa.inspect_fixture_case(
-        core_corpus.cases[0]
-    ).to_dict() == mcp_page_qa.inspect_fixture_case(
-        mcp_corpus.cases[0]
-    ).to_dict()
-    assert core_metrics.measure_fixture_corpus(
-        core_corpus
-    ) == mcp_metrics.measure_fixture_corpus(mcp_corpus)
+    assert mcp_metrics.measure_fixture_corpus(mcp_corpus) == (
+        GOLDEN["fixtureQa"]["metrics"]
+    )
 
 
-def test_serialized_worker_success_and_hash_failure_are_exact(
+def test_serialized_worker_success_and_hash_failure_match_frozen_core(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -180,48 +217,27 @@ def test_serialized_worker_success_and_hash_failure_are_exact(
         return [page]
 
     monkeypatch.setattr(
-        core_worker.SerializedHancomWorker,
-        "_rasterize",
-        staticmethod(fake_rasterize),
-    )
-    monkeypatch.setattr(
         mcp_worker.SerializedHancomWorker,
         "_rasterize",
         staticmethod(fake_rasterize),
     )
-    digest = core_worker.sha256_file(source)
-    core = core_worker.SerializedHancomWorker(
-        tmp_path / "core-worker",
-        session_factory=core_worker.DeterministicFakeSession,
-        worker_version="parity",
-    )
+    digest = mcp_worker.sha256_file(source)
     mcp = mcp_worker.SerializedHancomWorker(
         tmp_path / "mcp-worker",
         session_factory=mcp_worker.DeterministicFakeSession,
         worker_version="parity",
     )
     try:
-        core_success = core.render(
-            core_worker.WorkerJob("success", source, digest)
-        )
         mcp_success = mcp.render(mcp_worker.WorkerJob("success", source, digest))
-        assert json.loads(core_success.to_json()) == json.loads(
-            mcp_success.to_json()
-        )
-        assert core_success.terminal_reason == _scenario(
+        assert json.loads(mcp_success.to_json()) == GOLDEN["worker"]["successToJson"]
+        assert mcp_success.terminal_reason == _scenario(
             "deterministic-worker"
         )["terminalReason"]
 
-        core_failure = core.render(
-            core_worker.WorkerJob("failure", source, "sha256:wrong")
-        )
         mcp_failure = mcp.render(
             mcp_worker.WorkerJob("failure", source, "sha256:wrong")
         )
-        assert json.loads(core_failure.to_json()) == json.loads(
-            mcp_failure.to_json()
-        )
-        assert core_failure.terminal_reason == "INPUT_HASH_MISMATCH"
+        assert json.loads(mcp_failure.to_json()) == GOLDEN["worker"]["failureToJson"]
+        assert mcp_failure.terminal_reason == "INPUT_HASH_MISMATCH"
     finally:
-        core.close()
         mcp.close()

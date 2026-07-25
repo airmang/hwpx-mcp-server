@@ -31,6 +31,28 @@ PARITY_GOLDEN = json.loads(
         encoding="utf-8"
     )
 )["forms"]
+
+
+def _portable(value: Any) -> Any:
+    """Rewrite absolute fixture paths so the record is machine-independent.
+
+    These reports embed the source path they were given. Freezing that verbatim
+    would pin the golden to one checkout — it would fail on any other machine, and
+    the public-hygiene gate rejects workstation-shaped paths in tracked files for
+    exactly that reason. Both sides are normalised, so the comparison still covers
+    the path field's shape without pinning its prefix.
+    """
+
+    if isinstance(value, str):
+        marker = "/tests/fixtures/"
+        if marker in value:
+            return "<core-repo>/tests/fixtures/" + value.split(marker, 1)[1]
+        return value
+    if isinstance(value, dict):
+        return {k: _portable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_portable(v) for v in value]
+    return value
 WILD_FORMS = (
     (
         CORE_ROOT
@@ -102,8 +124,8 @@ def test_wild_form_read_only_behavior_is_exact_and_non_mutating(
         run_render=False,
     ).to_dict()
 
-    assert canonical_guidance == frozen["guidance"]
-    assert canonical_residue == frozen["residue"]
-    assert canonical_score == frozen["score"]
+    assert _portable(canonical_guidance) == _portable(frozen["guidance"])
+    assert _portable(canonical_residue) == _portable(frozen["residue"])
+    assert _portable(canonical_score) == _portable(frozen["score"])
     assert (_sha256(source), source.stat().st_mtime_ns) == before
     assert build_hwpx_open_safety_report(source)["ok"] is expected_open_safety

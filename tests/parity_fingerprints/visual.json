@@ -1,0 +1,464 @@
+{
+  "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
+  "modules": {
+    "hwpx.visual.fixture_corpus": {
+      "FIXTURE_MANIFEST_SCHEMA": {
+        "kind": "constant",
+        "value": "hwpx.visual-fixture-manifest/v1"
+      },
+      "FixtureAnnotation": {
+        "bases": [],
+        "fields": {
+          "bbox": {
+            "hasDefault": false,
+            "type": "NormalizedBBox"
+          },
+          "category": {
+            "hasDefault": false,
+            "type": "DefectCategory"
+          },
+          "label_status": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "labelers": {
+            "hasDefault": false,
+            "type": "tuple[str, ...]"
+          },
+          "page": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "severity": {
+            "hasDefault": false,
+            "type": "FindingSeverity"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "FixtureCase": {
+        "bases": [],
+        "fields": {
+          "annotations": {
+            "hasDefault": false,
+            "type": "tuple[FixtureAnnotation, ...]"
+          },
+          "case_id": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "classification": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "pages": {
+            "hasDefault": false,
+            "type": "tuple[FixturePage, ...]"
+          },
+          "provenance": {
+            "hasDefault": false,
+            "type": "dict[str, Any]"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "FixtureCorpus": {
+        "bases": [],
+        "fields": {
+          "assurance": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "cases": {
+            "hasDefault": false,
+            "type": "tuple[FixtureCase, ...]"
+          },
+          "root": {
+            "hasDefault": false,
+            "type": "Path"
+          },
+          "schema": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "taxonomy_version": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "receipt": "(self, case: 'FixtureCase') -> 'dict[str, Any]'"
+        }
+      },
+      "FixturePage": {
+        "bases": [],
+        "fields": {
+          "page": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "path": {
+            "hasDefault": false,
+            "type": "Path"
+          },
+          "sha256": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "load_fixture_manifest": {
+        "kind": "function",
+        "signature": "(path: 'str | Path', *, verify_hashes: 'bool' = True) -> 'FixtureCorpus'"
+      },
+      "sha256_file": {
+        "kind": "function",
+        "signature": "(path: 'str | Path') -> 'str'"
+      }
+    },
+    "hwpx.visual.hancom_worker": {
+      "DeterministicFakeSession": {
+        "bases": [],
+        "kind": "class",
+        "methods": {
+          "abort": "(self) -> 'None'",
+          "close": "(self) -> 'None'",
+          "render_pdf": "(self, source: 'Path', target: 'Path') -> 'Path | None'"
+        }
+      },
+      "PowerShellHancomSession": {
+        "bases": [],
+        "kind": "class",
+        "methods": {
+          "abort": "(self) -> 'None'",
+          "close": "(self) -> 'None'",
+          "render_pdf": "(self, source: 'Path', target: 'Path') -> 'Path | None'"
+        }
+      },
+      "SerializedHancomWorker": {
+        "bases": [],
+        "kind": "class",
+        "methods": {
+          "close": "(self) -> 'None'",
+          "render": "(self, job: 'WorkerJob') -> 'WorkerResult'"
+        }
+      },
+      "WORKER_SCHEMA_VERSION": {
+        "kind": "constant",
+        "value": "hwpx.hancom-worker.v1"
+      },
+      "WorkerArtifact": {
+        "bases": [],
+        "fields": {
+          "content_hash": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "kind": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "page_number": {
+            "hasDefault": true,
+            "type": "int | None"
+          },
+          "relative_path": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "size_bytes": {
+            "hasDefault": false,
+            "type": "int"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "WorkerJob": {
+        "bases": [],
+        "fields": {
+          "dpi": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "input_content_hash": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "input_path": {
+            "hasDefault": false,
+            "type": "Path"
+          },
+          "job_id": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "WorkerResult": {
+        "bases": [],
+        "fields": {
+          "artifacts": {
+            "hasDefault": true,
+            "type": "tuple[WorkerArtifact, ...]"
+          },
+          "hancom_build": {
+            "hasDefault": false,
+            "type": "str | None"
+          },
+          "job_id": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "page_count": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "real_hancom": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "render_checked": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "retryable": {
+            "hasDefault": false,
+            "type": "bool"
+          },
+          "schema_version": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "session_generation": {
+            "hasDefault": false,
+            "type": "int"
+          },
+          "status": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "terminal_reason": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "worker_version": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "to_json": "(self) -> 'str'"
+        }
+      },
+      "sha256_file": {
+        "kind": "function",
+        "signature": "(path: 'Path') -> 'str'"
+      }
+    },
+    "hwpx.visual.oracle": {
+      "Block": {
+        "bases": [],
+        "fields": {
+          "glyphs": {
+            "hasDefault": false,
+            "type": "list"
+          },
+          "id": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "BlockSplit": {
+        "bases": [],
+        "fields": {
+          "block_id": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "kind": {
+            "hasDefault": false,
+            "type": "str"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {}
+      },
+      "MacHancomOracle": {
+        "bases": [
+          "RenderBackend"
+        ],
+        "kind": "class",
+        "methods": {
+          "available": "(self) -> 'bool'",
+          "refresh_document": "(self, hwpx_path: 'str') -> 'bool'",
+          "render_pdf": "(self, hwpx_path: 'str', out_pdf: 'str | None' = None) -> 'str | None'"
+        }
+      },
+      "NullOracle": {
+        "bases": [
+          "RenderBackend"
+        ],
+        "kind": "class",
+        "methods": {
+          "available": "(self) -> 'bool'",
+          "render_pdf": "(self, hwpx_path: 'str', out_pdf: 'str | None' = None) -> 'str | None'"
+        }
+      },
+      "RenderBackend": {
+        "bases": [],
+        "kind": "class",
+        "methods": {
+          "available": "(self) -> 'bool'",
+          "check": "(self, before_hwpx: 'str | None', after_hwpx: 'str', *, edit_mask: 'EditMask | None' = None, diff_eps: 'float' = 0.005, dpi: 'int' = 150, work_dir: 'str | None' = None, keep_artifacts: 'bool' = False) -> 'VisualReport'",
+          "render_many": "(self, pairs: 'list[tuple[str, str]]') -> 'dict[str, str | None]'",
+          "render_pdf": "(self, hwpx_path: 'str', out_pdf: 'str | None' = None) -> 'str | None'"
+        }
+      },
+      "RenderOracle": {
+        "bases": [
+          "RenderBackend"
+        ],
+        "kind": "class",
+        "methods": {
+          "available": "(self) -> 'bool'",
+          "open_check_many": "(self, paths: 'list[str]') -> 'list[dict[str, object]]'",
+          "render_many": "(self, pairs: 'list[tuple[str, str]]') -> 'dict[str, str | None]'",
+          "render_pdf": "(self, hwpx_path: 'str', out_pdf: 'str | None' = None) -> 'str | None'"
+        }
+      },
+      "WindowsComOracle": {
+        "bases": [
+          "RenderBackend"
+        ],
+        "kind": "class",
+        "methods": {
+          "available": "(self) -> 'bool'",
+          "open_check_many": "(self, paths: 'list[str]') -> 'list[dict[str, object]]'",
+          "render_many": "(self, pairs: 'list[tuple[str, str]]') -> 'dict[str, str | None]'",
+          "render_pdf": "(self, hwpx_path: 'str', out_pdf: 'str | None' = None) -> 'str | None'"
+        }
+      },
+      "WordBox": {
+        "bases": [],
+        "fields": {
+          "block": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "line": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "page": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "text": {
+            "hasDefault": false,
+            "type": "str"
+          },
+          "word_no": {
+            "hasDefault": true,
+            "type": "int"
+          },
+          "x0": {
+            "hasDefault": false,
+            "type": "float"
+          },
+          "x1": {
+            "hasDefault": false,
+            "type": "float"
+          },
+          "y0": {
+            "hasDefault": false,
+            "type": "float"
+          },
+          "y1": {
+            "hasDefault": false,
+            "type": "float"
+          }
+        },
+        "kind": "dataclass",
+        "methods": {
+          "collides": "(self, other: \"'WordBox'\", *, area_eps: 'float' = 0.2) -> 'bool'",
+          "finite": "property(self) -> 'bool'",
+          "height": "property(self) -> 'float'",
+          "overlap_area": "(self, other: \"'WordBox'\") -> 'float'",
+          "to_tuple": "(self) -> 'tuple[float, float, float, float, str, int, int, int, int]'",
+          "width": "property(self) -> 'float'"
+        }
+      },
+      "detect_block_splits": {
+        "kind": "function",
+        "signature": "(blocks: 'list', column_x_bounds: 'list', page_height: 'float') -> 'list'"
+      },
+      "resolve_oracle": {
+        "kind": "function",
+        "signature": "(*, powershell: 'str | None' = None, timeout: 'float' = 300.0, dpi: 'int' = 150, osascript: 'str' = 'osascript', budget_seconds: 'float | None' = None) -> 'RenderBackend'"
+      },
+      "visual_check": {
+        "kind": "function",
+        "signature": "(before_hwpx: 'str | None', after_hwpx: 'str', *, oracle: 'RenderBackend', edit_mask: 'EditMask | None' = None, diff_eps: 'float' = 0.005, dpi: 'int' = 150, work_dir: 'str | None' = None, keep_artifacts: 'bool' = False) -> 'VisualReport'"
+      }
+    },
+    "hwpx.visual.page_qa": {
+      "DETECTORS": {
+        "kind": "constant",
+        "value": [
+          "<callable _blank_page(image) -> '_Signal | None'>",
+          "<callable _edge_clipping(image) -> '_Signal | None'>",
+          "<callable _dense_overlap_band(image) -> '_Signal | None'>",
+          "<callable _implausible_density(image) -> '_Signal | None'>"
+        ]
+      },
+      "DETECTOR_VERSION": {
+        "kind": "constant",
+        "value": "1.0.0"
+      },
+      "inspect_fixture_case": {
+        "kind": "function",
+        "signature": "(case: 'FixtureCase') -> 'VisualVerdict'"
+      },
+      "inspect_page_png": {
+        "kind": "function",
+        "signature": "(path: 'str | Path', *, page: 'int') -> 'PageVerdict'"
+      },
+      "inspect_page_set": {
+        "kind": "function",
+        "signature": "(pages: 'dict[int, str | Path]', *, expected_pages: 'Iterable[int]', assurance: 'str', render_checked: 'bool') -> 'VisualVerdict'"
+      }
+    },
+    "hwpx.visual.qa_metrics": {
+      "DEFAULT_MINIMUM_CATEGORY_SAMPLES": {
+        "kind": "constant",
+        "value": 5
+      },
+      "GATE_THRESHOLDS": {
+        "kind": "constant",
+        "value": {
+          "cleanFalseRejectionRate": 0.01,
+          "criticalPrecision": 0.9,
+          "criticalRecall": 0.95,
+          "defectFalseAcceptanceRate": 0.01
+        }
+      },
+      "measure_fixture_corpus": {
+        "kind": "function",
+        "signature": "(corpus: 'FixtureCorpus', *, required_categories: 'Iterable[DefectCategory | str] | None' = None, minimum_category_samples: 'int' = 5, required_categories_provenance: 'Mapping[str, Any] | None' = None) -> 'dict[str, Any]'"
+      }
+    }
+  },
+  "schemaVersion": "hwpx.parity-fingerprint/v1"
+}

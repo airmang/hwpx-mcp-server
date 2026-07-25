@@ -39,5 +39,6 @@
     "성취기준 [12합성01-01]을 평가한다",
     "※ 재시험은 실시하지 않는다.",
     ""
-  ]
+  ],
+  "instructionSamplesExpected": [true, true, false, false, false]
 }
