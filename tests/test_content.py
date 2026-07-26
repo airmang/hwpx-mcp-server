@@ -1263,6 +1263,23 @@ def test_add_table(tmp_path: Path):
     assert table["data"][0] == ["A", "B", "C"]
 
 
+def test_add_table_after_heading_uses_a_neutral_anchor(tmp_path: Path):
+    target = tmp_path / "heading-then-table.hwpx"
+    create_document(str(target))
+    add_heading(str(target), "번호 제목", level=1)
+
+    result = add_table(str(target), 1, 1, [["표 내용"]])
+    reopened = open_doc(str(target))
+    table_anchor = next(
+        paragraph for paragraph in reopened.paragraphs if paragraph.tables
+    )
+
+    assert table_anchor.para_pr_id_ref == "0"
+    assert table_anchor.style_id_ref == "0"
+    assert result["openSafety"]["ok"] is True
+    assert result["verificationReport"]["openSafety"]["ok"] is True
+
+
 def test_set_table_cell_text(tmp_path: Path):
     target = tmp_path / "test.hwpx"
     create_document(str(target))
