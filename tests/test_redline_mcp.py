@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 
 import hwpx_automation.server as server
+from hwpx import HwpxDocument
+from hwpx.oxml.body import TrackChangeMark
 from hwpx.tools.redline import verify_redline
 from hwpx_automation.core.document import open_doc
 from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
@@ -54,6 +56,46 @@ def _sample_edits(paragraph_index: int) -> list[dict[str, object]]:
     ]
 
 
+def _project_tracked_text(
+    document: HwpxDocument,
+    paragraph_index: int,
+    *,
+    accept: bool,
+) -> str:
+    output: list[str] = []
+    delete_depth = 0
+    insert_depth = 0
+    paragraph = document.paragraphs[paragraph_index]
+    for run in paragraph.runs:
+        for span in run.to_model().text_spans:
+            output.append(span.leading_text)
+            for markup in span.marks:
+                mark = markup.element
+                if isinstance(mark, TrackChangeMark):
+                    if mark.change_type == "delete":
+                        delete_depth += 1 if mark.is_begin else -1
+                    elif mark.change_type == "insert":
+                        insert_depth += 1 if mark.is_begin else -1
+                visible = delete_depth == 0 if accept else insert_depth == 0
+                if visible:
+                    output.append(markup.trailing_text)
+    return "".join(output)
+
+
+def _track_mark_sequence(
+    document: HwpxDocument,
+    paragraph_index: int,
+) -> list[tuple[str, str]]:
+    marks: list[tuple[str, str]] = []
+    paragraph = document.paragraphs[paragraph_index]
+    for run in paragraph.runs:
+        for span in run.to_model().text_spans:
+            for markup in span.marks:
+                if isinstance(markup.element, TrackChangeMark):
+                    marks.append((markup.element.name, markup.trailing_text))
+    return marks
+
+
 def test_add_tracked_edit_tool_is_exposed() -> None:
     assert "add_tracked_edit" in snapshot_runtime_tools(server.mcp)
 
@@ -90,6 +132,24 @@ def test_add_tracked_edit_writes_structural_redline_receipt(
     reopened = open_doc(str(destination))
     try:
         assert len(reopened.track_changes) >= 4
+        assert " ".join(
+            _project_tracked_text(
+                reopened,
+                paragraph_index,
+                accept=True,
+            ).split()
+        ) == "Alpha with new token. inserted"
+        assert " ".join(
+            _project_tracked_text(
+                reopened,
+                paragraph_index,
+                accept=False,
+            ).split()
+        ) == "Alpha delete target with old token."
+        sequence = _track_mark_sequence(reopened, paragraph_index)
+        replacement_insert = sequence.index(("insertBegin", "new token"))
+        prior_insert = sequence.index(("insertBegin", " inserted"))
+        assert replacement_insert < prior_insert
     finally:
         reopened.close()
 
