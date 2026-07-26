@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,16 @@ def _replace_last(text: str, before: str, after: str) -> str:
     return prefix + after + suffix
 
 
+def _shell_run_is_fail_closed(run: str) -> bool:
+    lines = [line.strip() for line in run.splitlines() if line.strip()]
+    if not lines or lines[0] != "set -euo pipefail":
+        return False
+    early_success = re.compile(
+        r"(?:^|[;&|])\s*(?:exit|return)\s+0(?:\s|;|$)|\|\|\s*true(?:\s|;|$)"
+    )
+    return not any(early_success.search(line) for line in lines)
+
+
 def _release_safety_failures(workflow: str) -> list[str]:
     failures: list[str] = []
     try:
@@ -45,6 +56,11 @@ def _release_safety_failures(workflow: str) -> list[str]:
         if job.get("continue-on-error", False):
             failures.append(f"{job_name} must not continue on error")
         for step in job.get("steps", []):
+            if "if" in step:
+                failures.append(
+                    f"{job_name} step must not have a condition: "
+                    f"{step.get('name', step.get('uses', '<unnamed>'))}"
+                )
             if step.get("continue-on-error", False):
                 failures.append(
                     f"{job_name} step must not continue on error: "
@@ -57,6 +73,8 @@ def _release_safety_failures(workflow: str) -> list[str]:
         failures.append("release must have exactly one distribution build step")
         return failures
     build = build_steps[0].get("run", "")
+    if not _shell_run_is_fail_closed(build):
+        failures.append("build step shell must fail closed")
     build_tokens = (
         'export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"',
         "python -m build",
@@ -109,6 +127,8 @@ def _release_safety_failures(workflow: str) -> list[str]:
         failures.append("remote hash verification must follow both publications")
     else:
         remote = remote_steps[0][1].get("run", "")
+        if not _shell_run_is_fail_closed(remote):
+            failures.append("remote hash verifier shell must fail closed")
         remote_tokens = (
             "https://pypi.org/pypi/hwpx-mcp-server/5.1.1/json",
             'item["digests"]["sha256"]',
@@ -175,6 +195,26 @@ def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> Non
             "release step must not continue on error",
         ),
         (
+            lambda text: text.replace(
+                "      - name: Verify PyPI and GitHub release hashes",
+                "      - name: Verify PyPI and GitHub release hashes\n"
+                "        if: false",
+                1,
+            ),
+            "release step must not have a condition",
+        ),
+        (
+            lambda text: text.replace(
+                "          set -euo pipefail\n"
+                "          export SOURCE_DATE_EPOCH=",
+                "          exit 0\n"
+                "          set -euo pipefail\n"
+                "          export SOURCE_DATE_EPOCH=",
+                1,
+            ),
+            "build step shell must fail closed",
+        ),
+        (
             lambda text: _replace_last(
                 text,
                 "python scripts/check_public_hygiene.py",
@@ -207,6 +247,14 @@ def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> Non
             "remote hash verification must follow both publications",
         ),
         (
+            lambda text: _replace_last(
+                text,
+                "          set -euo pipefail",
+                "          exit 0\n          set -euo pipefail",
+            ),
+            "remote hash verifier shell must fail closed",
+        ),
+        (
             lambda text: text.replace(
                 "sha256sum --check SHA256SUMS",
                 "sha256sum --version",
@@ -219,10 +267,13 @@ def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> Non
         "remove-needs",
         "always-run-release",
         "continue-on-error",
+        "conditional-remote-verification",
+        "early-success-build",
         "remove-artifact-hygiene",
         "hash-another-directory",
         "upload-another-directory",
         "remove-remote-verification",
+        "early-success-remote-verification",
         "remove-github-hash-check",
     ),
 )
