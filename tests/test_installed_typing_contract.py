@@ -35,7 +35,16 @@ def test_clean_wheel_proves_root_import_stays_lazy_and_mcp_free() -> None:
         'assert "hwpx_automation.api" not in sys.modules',
     )
     api_import = workflow.find("import hwpx_automation.api")
+    post_api_assertion = workflow.find(
+        'assert not any(name == "mcp" or name.startswith("mcp.")',
+        api_import,
+    )
 
-    assert -1 not in (root_import, lazy_assertion, api_import)
-    assert root_import < lazy_assertion < api_import
+    assert -1 not in (
+        root_import,
+        lazy_assertion,
+        api_import,
+        post_api_assertion,
+    )
+    assert root_import < lazy_assertion < api_import < post_api_assertion
     assert 'name == "mcp" or name.startswith("mcp.")' in workflow

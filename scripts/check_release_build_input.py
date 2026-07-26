@@ -39,6 +39,9 @@ def find_pollution(root: Path) -> list[Pollution]:
     must never interpret an incomplete scan as a clean release input.
     """
 
+    if root.is_symlink():
+        return [Pollution(kind="SYMLINK", path=".")]
+
     resolved = root.resolve(strict=True)
     if not resolved.is_dir():
         raise NotADirectoryError(f"release build input is not a directory: {root}")
@@ -59,16 +62,26 @@ def find_pollution(root: Path) -> list[Pollution]:
         filenames.sort()
 
         for name in dirnames:
+            candidate = current_path / name
+            if candidate.is_symlink():
+                relative = candidate.relative_to(resolved).as_posix()
+                findings.append(Pollution(kind="SYMLINK", path=relative))
+                continue
             kind = _DIRECTORY_KINDS.get(name)
             if kind is None and name.endswith(".egg-info"):
                 kind = "EGG_INFO"
             if kind is not None:
-                relative = (current_path / name).relative_to(resolved).as_posix()
+                relative = candidate.relative_to(resolved).as_posix()
                 findings.append(Pollution(kind=kind, path=relative))
 
         for name in filenames:
+            candidate = current_path / name
+            if candidate.is_symlink():
+                relative = candidate.relative_to(resolved).as_posix()
+                findings.append(Pollution(kind="SYMLINK", path=relative))
+                continue
             if name.endswith(".egg-info"):
-                relative = (current_path / name).relative_to(resolved).as_posix()
+                relative = candidate.relative_to(resolved).as_posix()
                 findings.append(Pollution(kind="EGG_INFO", path=relative))
 
     return sorted(findings)

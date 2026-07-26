@@ -162,6 +162,7 @@ jobs:
               for name in sys.modules
           )
           import hwpx_automation.api
+          assert not any(name == "mcp" or name.startswith("mcp.") for name in sys.modules)
           scripts = {
               item.name: item.value
               for item in entry_points(group="console_scripts")

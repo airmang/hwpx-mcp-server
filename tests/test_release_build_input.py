@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -68,6 +69,56 @@ def test_missing_supplied_root_fails_closed(tmp_path: Path) -> None:
 
     assert completed.returncode == 2
     assert "scan failed closed" in completed.stderr
+
+
+@pytest.mark.parametrize("link_kind", ["directory", "file"])
+def test_symlink_release_input_fails_closed_with_a_fixed_error_code(
+    tmp_path: Path,
+    link_kind: str,
+) -> None:
+    release_root = tmp_path / "archive"
+    package = release_root / "src" / "package"
+    package.mkdir(parents=True)
+
+    if link_kind == "directory":
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "ghost.py").write_text("GHOST = True\n", encoding="utf-8")
+        linked = package / "plain_name"
+        linked.symlink_to(outside, target_is_directory=True)
+    else:
+        outside = tmp_path / "outside.py"
+        outside.write_text("GHOST = True\n", encoding="utf-8")
+        linked = package / "plain.py"
+        linked.symlink_to(outside)
+
+    completed = _run_checker(release_root)
+
+    assert completed.returncode == 1
+    assert "[SYMLINK]" in completed.stderr
+    assert linked.relative_to(release_root).as_posix() in completed.stderr
+    assert "refusing to build" in completed.stderr
+
+
+def test_exact_current_git_archive_is_a_clean_release_input(tmp_path: Path) -> None:
+    archive_path = tmp_path / "source.tar"
+    with archive_path.open("wb") as output:
+        subprocess.run(
+            ["git", "archive", "--format=tar", "HEAD"],
+            cwd=ROOT,
+            stdout=output,
+            check=True,
+        )
+
+    release_root = tmp_path / "archive"
+    release_root.mkdir()
+    with tarfile.open(archive_path) as archive:
+        archive.extractall(release_root)
+
+    completed = _run_checker(release_root)
+
+    assert completed.returncode == 0, completed.stderr
+    assert "release build input is clean" in completed.stdout
 
 
 def test_release_builds_canonical_and_compat_from_one_exact_git_archive() -> None:
