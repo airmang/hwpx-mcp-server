@@ -8,6 +8,7 @@ import importlib.util
 import re
 from pathlib import Path
 from typing import Any
+from urllib.error import URLError
 
 try:
     import tomllib
@@ -57,6 +58,31 @@ Path("release-artifacts/SHA256SUMS").write_text(
 PY
 python scripts/check_public_hygiene.py
 """
+EXPECTED_PREPUBLISH_RUNS = {
+    "Install test dependencies": """\
+python -m pip install -e "../python-hwpx[visual,preview]"
+python -m pip install -e ".[test,typecheck]"
+""",
+    "Check public repository hygiene": "python scripts/check_public_hygiene.py",
+    "Run first-stage Ruff gate": "ruff check --select E9,F .",
+    "Run release type and architecture gates": """\
+python -m mypy
+pyright --pythonpath "$(command -v python)"
+python scripts/check_architecture_ratchets.py
+""",
+    "Run release-facing tests": "python -m pytest -q",
+    "Verify generated ToolSpec documentation": """\
+python scripts/render_tool_contract.py --check --skip-skill
+python scripts/render_contract_delta.py --check
+""",
+}
+FAIL_OPEN_RUN = re.compile(
+    r"(?:^|[;&|])\s*(?:exit|return)\s+0+\b"
+    r"|\|\|\s*(?:true|:)(?:\s|;|$)"
+    r"|(?:^|\s)set\s+\+e(?:\s|;|$)"
+    r"|(?:^|\s)trap\b[^\n]*\bERR\b",
+    re.MULTILINE,
+)
 
 
 def _verifier_module():
@@ -86,23 +112,53 @@ def _shell_run_is_fail_closed(run: str) -> bool:
     return not any(early_success.search(line) for line in lines)
 
 
+def _require_exact_named_runs(
+    failures: list[str],
+    *,
+    job_name: str,
+    job: dict[str, Any],
+    expected: dict[str, str],
+) -> None:
+    for step_name, expected_run in expected.items():
+        matches = [
+            step
+            for step in job.get("steps", [])
+            if step.get("name") == step_name
+        ]
+        if len(matches) != 1 or matches[0].get("run") != expected_run:
+            failures.append(f"{job_name} step must be exact: {step_name}")
+
+
 def _release_safety_failures(workflow: str) -> list[str]:
     failures: list[str] = []
     try:
-        jobs: dict[str, dict[str, Any]] = yaml.safe_load(workflow)["jobs"]
+        parsed = yaml.safe_load(workflow)
+        jobs: dict[str, dict[str, Any]] = parsed["jobs"]
         prepublish = jobs["prepublish"]
         release = jobs["release"]
     except (KeyError, TypeError, yaml.YAMLError) as exc:
         return [f"invalid release workflow structure: {exc}"]
 
+    if set(jobs) != {"prepublish", "release"}:
+        failures.append("release workflow must contain only the two expected jobs")
+    if parsed.get("defaults"):
+        failures.append("release workflow must not override the default run shell")
     if release.get("needs") != "prepublish":
         failures.append("release must need prepublish")
     for job_name, job in (("prepublish", prepublish), ("release", release)):
+        if job.get("defaults"):
+            failures.append(f"{job_name} must not override the default run shell")
         if "if" in job:
             failures.append(f"{job_name} must not override dependency status")
         if job.get("continue-on-error", False):
             failures.append(f"{job_name} must not continue on error")
         for step in job.get("steps", []):
+            shell = step.get("shell")
+            if shell not in (None, "bash"):
+                failures.append(
+                    f"{job_name} step has an unsafe custom shell: "
+                    f"{step.get('name', step.get('uses', '<unnamed>'))}"
+                )
             if "if" in step:
                 failures.append(
                     f"{job_name} step must not have a condition: "
@@ -113,6 +169,29 @@ def _release_safety_failures(workflow: str) -> list[str]:
                     f"{job_name} step must not continue on error: "
                     f"{step.get('name', step.get('uses', '<unnamed>'))}"
                 )
+            run = step.get("run")
+            if isinstance(run, str) and FAIL_OPEN_RUN.search(run):
+                failures.append(
+                    f"{job_name} step contains a fail-open shell construct: "
+                    f"{step.get('name', '<unnamed>')}"
+                )
+
+    _require_exact_named_runs(
+        failures,
+        job_name="prepublish",
+        job=prepublish,
+        expected=EXPECTED_PREPUBLISH_RUNS,
+    )
+    for job_name, job in jobs.items():
+        if job_name == "release":
+            continue
+        if any(
+            str(step.get("uses", "")).startswith(
+                (PYPI_ACTION, GITHUB_ACTION)
+            )
+            for step in job.get("steps", [])
+        ):
+            failures.append("publisher actions must exist only in release")
 
     steps = release.get("steps", [])
     build_steps = [step for step in steps if step.get("name") == BUILD_STEP]
@@ -302,6 +381,78 @@ def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> Non
             ),
             "remote hash verifier command must be exact",
         ),
+        (
+            lambda text: text.replace(
+                "jobs:\n",
+                "defaults:\n"
+                "  run:\n"
+                "    shell: bash -c 'bash \"$1\" || true' -- {0}\n"
+                "jobs:\n",
+                1,
+            ),
+            "release workflow must not override the default run shell",
+        ),
+        (
+            lambda text: text.replace(
+                "  release:\n    needs:",
+                "  release:\n"
+                "    defaults:\n"
+                "      run:\n"
+                "        shell: bash -c 'bash \"$1\" || true' -- {0}\n"
+                "    needs:",
+                1,
+            ),
+            "release must not override the default run shell",
+        ),
+        (
+            lambda text: text.replace(
+                "        run: python -m pytest -q",
+                "        run: |\n"
+                "          python -m pytest -q || :",
+                1,
+            ),
+            "prepublish step contains a fail-open shell construct",
+        ),
+        (
+            lambda text: text.replace(
+                "        run: python -m pytest -q",
+                "        run: |\n"
+                "          set +e\n"
+                "          python -m pytest -q",
+                1,
+            ),
+            "prepublish step contains a fail-open shell construct",
+        ),
+        (
+            lambda text: text.replace(
+                "      - name: Verify PyPI and GitHub release hashes\n",
+                "      - name: Verify PyPI and GitHub release hashes\n"
+                "        shell: bash -c 'bash \"$1\" || true' -- {0}\n",
+                1,
+            ),
+            "release step has an unsafe custom shell",
+        ),
+        (
+            lambda text: (
+                text
+                + "\n  rogue-publish:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - uses: pypa/gh-action-pypi-publish@"
+                "ba38be9e461d3875417946c167d0b5f3d385a247\n"
+            ),
+            "release workflow must contain only the two expected jobs",
+        ),
+        (
+            lambda text: text.replace(
+                "      - name: Check public repository hygiene",
+                "      - uses: pypa/gh-action-pypi-publish@"
+                "ba38be9e461d3875417946c167d0b5f3d385a247\n"
+                "      - name: Check public repository hygiene",
+                1,
+            ),
+            "publisher actions must exist only in release",
+        ),
     ),
     ids=(
         "remove-needs",
@@ -315,6 +466,13 @@ def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> Non
         "remove-remote-verification",
         "early-success-remote-verification",
         "remove-github-hash-check",
+        "workflow-default-shell-wrapper",
+        "job-default-shell-wrapper",
+        "prepublish-colon-fallback",
+        "prepublish-set-plus-e",
+        "remote-step-shell-wrapper",
+        "extra-publish-job",
+        "prepublish-publisher",
     ),
 )
 def test_release_provenance_mutations_fail_closed(
@@ -389,6 +547,95 @@ def test_release_hash_verifier_rejects_ambiguous_manifests(
 
     with pytest.raises(ValueError):
         verifier.read_manifest(manifest)
+
+
+class _PyPIResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args) -> None:
+        return None
+
+
+def test_verify_pypi_fetches_and_requires_the_exact_mapping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verifier = _verifier_module()
+    expected = {
+        "hwpx_mcp_server-5.1.1-py3-none-any.whl": "0" * 64,
+        "hwpx_mcp_server-5.1.1.tar.gz": "1" * 64,
+    }
+    payload = {
+        "urls": [
+            {
+                "filename": filename,
+                "digests": {"sha256": digest},
+            }
+            for filename, digest in expected.items()
+        ]
+    }
+    lookups: list[tuple[str, int]] = []
+
+    def open_pypi(url: str, *, timeout: int):
+        lookups.append((url, timeout))
+        return _PyPIResponse()
+
+    monkeypatch.setattr(verifier.urllib.request, "urlopen", open_pypi)
+    monkeypatch.setattr(verifier.json, "load", lambda _response: payload)
+
+    verifier.verify_pypi(expected, attempts=1, retry_seconds=0)
+
+    assert lookups == [(verifier.PYPI_URL, 20)]
+
+
+def test_verify_pypi_rejects_a_digest_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verifier = _verifier_module()
+    expected = {
+        "hwpx_mcp_server-5.1.1-py3-none-any.whl": "0" * 64,
+        "hwpx_mcp_server-5.1.1.tar.gz": "1" * 64,
+    }
+    payload = {
+        "urls": [
+            {
+                "filename": filename,
+                "digests": {"sha256": "f" * 64},
+            }
+            for filename in expected
+        ]
+    }
+    monkeypatch.setattr(
+        verifier.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: _PyPIResponse(),
+    )
+    monkeypatch.setattr(verifier.json, "load", lambda _response: payload)
+
+    with pytest.raises(RuntimeError, match="PyPI hashes differ"):
+        verifier.verify_pypi(expected, attempts=1, retry_seconds=0)
+
+
+def test_verify_pypi_exhausts_lookup_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verifier = _verifier_module()
+    attempts: list[str] = []
+
+    def fail_lookup(*_args, **_kwargs):
+        attempts.append("lookup")
+        raise URLError("offline")
+
+    monkeypatch.setattr(verifier.urllib.request, "urlopen", fail_lookup)
+    monkeypatch.setattr(verifier.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(RuntimeError, match="PyPI hash lookup failed"):
+        verifier.verify_pypi(
+            {"package.whl": "0" * 64, "package.tar.gz": "1" * 64},
+            attempts=3,
+            retry_seconds=0,
+        )
+    assert attempts == ["lookup", "lookup", "lookup"]
 
 
 def test_release_hash_verifier_main_wires_every_remote_check(
