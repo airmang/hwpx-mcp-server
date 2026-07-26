@@ -19,6 +19,7 @@ RELEASE = ROOT / ".github" / "workflows" / "release.yml"
 BUILD_STEP = "Build distributions"
 PYPI_ACTION = "pypa/gh-action-pypi-publish@"
 GITHUB_ACTION = "softprops/action-gh-release@"
+REMOTE_HASH_STEP = "Verify PyPI and GitHub release hashes"
 
 
 def _replace_last(text: str, before: str, after: str) -> str:
@@ -93,6 +94,30 @@ def _release_safety_failures(workflow: str) -> list[str]:
         for line in github[0][1].get("with", {}).get("files", "").splitlines()
     }:
         failures.append("GitHub release must upload dist and provenance manifest")
+
+    remote_steps = [
+        (index, step)
+        for index, step in enumerate(steps)
+        if step.get("name") == REMOTE_HASH_STEP
+    ]
+    if (
+        len(remote_steps) != 1
+        or len(pypi) != 1
+        or len(github) != 1
+        or remote_steps[0][0] <= max(pypi[0][0], github[0][0])
+    ):
+        failures.append("remote hash verification must follow both publications")
+    else:
+        remote = remote_steps[0][1].get("run", "")
+        remote_tokens = (
+            "https://pypi.org/pypi/hwpx-mcp-server/5.1.1/json",
+            'item["digests"]["sha256"]',
+            'gh release download "${GITHUB_REF_NAME}"',
+            "cmp release-artifacts/SHA256SUMS",
+            "sha256sum --check SHA256SUMS",
+        )
+        if any(token not in remote for token in remote_tokens):
+            failures.append("remote verifier must compare PyPI and GitHub hashes")
     return failures
 
 
@@ -173,6 +198,22 @@ def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> Non
             ),
             "GitHub release must upload dist and provenance manifest",
         ),
+        (
+            lambda text: text.replace(
+                "      - name: Verify PyPI and GitHub release hashes",
+                "      - name: Hash verification removed",
+                1,
+            ),
+            "remote hash verification must follow both publications",
+        ),
+        (
+            lambda text: text.replace(
+                "sha256sum --check SHA256SUMS",
+                "sha256sum --version",
+                1,
+            ),
+            "remote verifier must compare PyPI and GitHub hashes",
+        ),
     ),
     ids=(
         "remove-needs",
@@ -181,6 +222,8 @@ def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> Non
         "remove-artifact-hygiene",
         "hash-another-directory",
         "upload-another-directory",
+        "remove-remote-verification",
+        "remove-github-hash-check",
     ),
 )
 def test_release_provenance_mutations_fail_closed(
