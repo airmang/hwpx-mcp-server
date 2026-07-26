@@ -33,11 +33,13 @@
 [모델 컨텍스트 프로토콜(MCP)](https://modelcontextprotocol.io)은 `[mcp]` extra로
 추가하는 선택 어댑터입니다.
 
-| | 레포 | 역할 |
+| 계층 | 저장소 | 정본 책임 |
 |---|---|---|
-| 📦 | [`python-hwpx`](https://github.com/airmang/python-hwpx) | 순수 파이썬 HWPX 코어 |
-| ⚙️ | **`python-hwpx-automation`** | 고수준 Python 자동화·워크플로·선택 MCP 어댑터 (이 레포) |
-| 🎯 | [`hwpx-plugin`](https://github.com/airmang/hwpx-plugins) | 에이전트용 플러그인·스킬 번들 |
+| Core | [`python-hwpx`](https://github.com/airmang/python-hwpx) | HWPX package/object model·OPC/OXML·직렬화·재사용 primitive |
+| Automation | [`python-hwpx-automation`](https://github.com/airmang/python-hwpx-automation) | Python 자동화·워크플로·profile/policy·렌더·선택형 MCP adapter |
+| Judgment | [`hwpx-plugins`](https://github.com/airmang/hwpx-plugins) | 에이전트 intent/genre 판단·ambiguity 처리·plugin/skill 가이드 |
+
+이 저장소는 위 표의 Automation 정본입니다.
 
 ## Python 자동화 시작하기 (6.0 후보)
 
@@ -49,7 +51,11 @@ pip install python-hwpx-automation
 from hwpx_automation import create_document_from_plan
 
 document = create_document_from_plan(
-    {"title": "회의 결과", "blocks": [{"type": "paragraph", "text": "결정 사항"}]}
+    {
+        "schemaVersion": "hwpx.document_plan.v1",
+        "title": "회의 결과",
+        "blocks": [{"type": "paragraph", "text": "결정 사항"}],
+    }
 )
 document.save_to_path("meeting-result.hwpx")
 ```
