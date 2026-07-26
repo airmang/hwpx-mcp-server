@@ -31,17 +31,24 @@ jobs:
           "${PHASE0_VENV}/bin/python" -m pip check
           "${PHASE0_VENV}/bin/python" - <<'PY'
           from importlib.metadata import metadata, version
+          from packaging.requirements import Requirement
 
           assert version("python-hwpx") == "4.2.0"
           assert version("hwpx-mcp-server") == "5.1.1"
           requirements = [
-              item.replace(" ", "").casefold()
+              Requirement(item)
               for item in metadata("hwpx-mcp-server").get_all("Requires-Dist") or []
           ]
-          core = [item for item in requirements if item.startswith("python-hwpx")]
-          base = [item for item in core if ";" not in item]
+          core = [item for item in requirements if item.name == "python-hwpx"]
+          base = [item for item in core if item.marker is None]
           assert len(base) == 1, core
-          assert all(">=4.2.0" in item and "<5" in item for item in core), core
+          assert len(core) == 3, core
+          expected_specifiers = {">=4.2.0", "<5"}
+          assert all(
+              {str(specifier) for specifier in item.specifier}
+              == expected_specifiers
+              for item in core
+          ), core
           import hwpx_mcp_server
           PY
       - name: Install test dependencies

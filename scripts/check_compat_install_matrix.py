@@ -23,7 +23,6 @@ from typing import Any
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
-from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[1]
 PHASE0_LEGACY_VERSION = "5.1.1"
@@ -244,14 +243,12 @@ def _validate_phase0_legacy_wheel(
         raise RuntimeError(
             "public legacy wheel must declare one unconditional python-hwpx bound"
         )
+    expected_core_specifiers = frozenset({">=4.2.0", "<5"})
     unsafe_core_requirements = [
         item
         for item in core_requirements
-        if (
-            Version(PHASE0_CORE_VERSION) not in item.specifier
-            or Version("4.1.999") in item.specifier
-            or Version("5.0.0") in item.specifier
-        )
+        if frozenset(str(specifier) for specifier in item.specifier)
+        != expected_core_specifiers
     ]
     if unsafe_core_requirements:
         raise RuntimeError(

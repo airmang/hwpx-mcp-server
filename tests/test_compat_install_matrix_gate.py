@@ -90,6 +90,17 @@ def test_phase0_wheel_gate_requires_the_cap_and_frozen_modules(
             expected_modules=modules,
         )
 
+    near_major, _ = _phase0_wheel(
+        tmp_path,
+        requirement="python-hwpx>=4.2.0,<5.1,!=5.0.0",
+    )
+    with pytest.raises(RuntimeError, match=r">=4\.2\.0,<5"):
+        matrix._validate_phase0_legacy_wheel(
+            near_major,
+            expected_version="5.1.1",
+            expected_modules=modules,
+        )
+
 
 def test_phase0_install_pins_both_legacy_and_core(monkeypatch) -> None:
     calls: list[tuple[Path, tuple[str, ...]]] = []
