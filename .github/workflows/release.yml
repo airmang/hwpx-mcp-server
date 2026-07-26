@@ -251,11 +251,24 @@ jobs:
           Path('release_notes.md').write_text(section, encoding='utf-8')
           PY
 
+      - name: Prepare exact git-archive release input
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_SOURCE=$(mktemp -d \
+            "${RUNNER_TEMP}/python-hwpx-automation-release.XXXXXX")
+          git archive --format=tar "${GITHUB_SHA}" \
+            | tar --extract --directory="${RELEASE_SOURCE}"
+          python "${RELEASE_SOURCE}/scripts/check_release_build_input.py" \
+            --root "${RELEASE_SOURCE}"
+          echo "RELEASE_SOURCE=${RELEASE_SOURCE}" >> "${GITHUB_ENV}"
+
       - name: Build canonical distribution
         run: |
           python -m pip install --upgrade build twine
-          rm -rf dist build
-          python -m build --outdir dist/canonical
+          rm -rf dist
+          python -m build --outdir "${GITHUB_WORKSPACE}/dist/canonical" \
+            "${RELEASE_SOURCE}"
           twine check dist/canonical/*
           python scripts/check_public_hygiene.py
           python - <<'CHECK'
@@ -270,8 +283,9 @@ jobs:
 
       - name: Prebuild compatibility distribution before any publish
         run: |
-          rm -rf compat/hwpx-mcp-server/build dist/compat
-          python -m build --outdir dist/compat compat/hwpx-mcp-server
+          rm -rf dist/compat
+          python -m build --outdir "${GITHUB_WORKSPACE}/dist/compat" \
+            "${RELEASE_SOURCE}/compat/hwpx-mcp-server"
           twine check dist/compat/*
           # The hygiene scanner walks dist recursively. Run it again only after
           # the compatibility archives exist so all four release artifacts are

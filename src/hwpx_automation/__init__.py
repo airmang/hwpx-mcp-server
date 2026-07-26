@@ -8,7 +8,32 @@ transport users install ``python-hwpx-automation[mcp]`` and start
 
 from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    # Static re-exports give installed-package type checkers the same curated
+    # signatures as ``hwpx_automation.api``.  Runtime access remains lazy so a
+    # base import does not pull in the task graph or the optional MCP adapter.
+    from .api import (
+        CanonicalFormFillInput as CanonicalFormFillInput,
+        ComposeResult as ComposeResult,
+        DocumentPlan as DocumentPlan,
+        DocumentStylePreset as DocumentStylePreset,
+        EvalPlanContent as EvalPlanContent,
+        FormFillAnalyzeOptions as FormFillAnalyzeOptions,
+        FormFillPlanInput as FormFillPlanInput,
+        Rubric as Rubric,
+        analyze_form_fill as analyze_form_fill,
+        apply_form_fill as apply_form_fill,
+        compose_exam as compose_exam,
+        create_document_from_plan as create_document_from_plan,
+        fill_evalplan as fill_evalplan,
+        finalize_evalplan as finalize_evalplan,
+        normalize_document_plan as normalize_document_plan,
+        parse_evalplan_review as parse_evalplan_review,
+        parse_exam_markdown as parse_exam_markdown,
+        validate_document_plan as validate_document_plan,
+    )
 
 _CANONICAL_DISTRIBUTION = "python-hwpx-automation"
 

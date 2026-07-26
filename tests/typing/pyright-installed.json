@@ -1,0 +1,7 @@
+{
+  "include": ["installed_facade_smoke.py"],
+  "pythonVersion": "3.10",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "none",
+  "reportMissingTypeStubs": "none"
+}

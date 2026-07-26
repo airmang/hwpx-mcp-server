@@ -115,6 +115,8 @@ jobs:
           mkdir -p clean-src/python-hwpx clean-src/python-hwpx-automation
           git -C python-hwpx archive HEAD | tar -x -C clean-src/python-hwpx
           git -C python-hwpx-automation archive HEAD | tar -x -C clean-src/python-hwpx-automation
+          python clean-src/python-hwpx-automation/scripts/check_release_build_input.py \
+            --root clean-src/python-hwpx-automation
           python -m build --wheel --outdir candidate-wheelhouse clean-src/python-hwpx
           python -m build --wheel --outdir candidate-wheelhouse clean-src/python-hwpx-automation
           python python-hwpx-automation/scripts/check_public_hygiene.py
@@ -154,6 +156,11 @@ jobs:
           assert mcp_found is (os.environ["EXPECT_MCP"] == "present")
           assert importlib.util.find_spec("hwpx_automation.practice") is None
           import hwpx_automation
+          assert "hwpx_automation.api" not in sys.modules
+          assert not any(
+              name == "mcp" or name.startswith("mcp.")
+              for name in sys.modules
+          )
           import hwpx_automation.api
           scripts = {
               item.name: item.value
@@ -175,6 +182,19 @@ jobs:
               assert result.returncode == 2
               assert "python-hwpx-automation[mcp]" in result.stderr
           PY
+
+      - name: Type-check installed root and API facades
+        if: matrix.label == 'base'
+        working-directory: python-hwpx-automation
+        run: |
+          .clean-package/bin/python -m pip install \
+            "mypy>=1.10,<3" "pyright>=1.1.390,<2"
+          .clean-package/bin/python -m mypy \
+            --config-file tests/typing/mypy-installed.ini \
+            tests/typing/installed_facade_smoke.py
+          .clean-package/bin/python -m pyright \
+            --project tests/typing/pyright-installed.json \
+            --pythonpath "$(pwd)/.clean-package/bin/python"
 
   platform-oracle-smoke:
     name: Python 3.10 ${{ matrix.os }} clean oracle boundary
