@@ -219,6 +219,7 @@ def test_render_backend_unavailable_skips_render_pdf() -> None:
 
 def test_resolve_oracle_resolution_order(monkeypatch) -> None:
     # Windows COM preferred, then Mac GUI, else the Null degrade sentinel.
+    monkeypatch.delenv("HWPX_ORACLE_STRUCTURAL_ONLY", raising=False)
     monkeypatch.setattr(WindowsComOracle, "available", lambda self: False)
     monkeypatch.setattr(MacHancomOracle, "available", lambda self: False)
     assert isinstance(resolve_oracle(), NullOracle)
@@ -230,8 +231,11 @@ def test_resolve_oracle_resolution_order(monkeypatch) -> None:
     assert isinstance(resolve_oracle(), WindowsComOracle)
 
 
-def test_resolve_oracle_returns_render_backend() -> None:
+def test_resolve_oracle_returns_render_backend(monkeypatch) -> None:
+    monkeypatch.setattr(WindowsComOracle, "available", lambda self: False)
+    monkeypatch.setattr(MacHancomOracle, "available", lambda self: False)
     backend = resolve_oracle()
+    assert isinstance(backend, NullOracle)
     assert isinstance(backend, RenderBackend)
     assert hasattr(backend, "available") and hasattr(backend, "render_many")
 
@@ -259,8 +263,12 @@ def test_mac_oracle_unavailable_without_hancom(monkeypatch) -> None:
 
 
 @pytest.mark.skipif(
-    sys.platform != "darwin" or MacHancomOracle()._app_path() is None,
-    reason="macOS + Hancom Office HWP.app required",
+    not (
+        os.environ.get("HWPX_MAC_ORACLE_SMOKE")
+        and sys.platform == "darwin"
+        and MacHancomOracle()._app_path() is not None
+    ),
+    reason="set HWPX_MAC_ORACLE_SMOKE=1 on macOS + Hancom Office HWP.app",
 )
 def test_mac_oracle_available_on_this_mac() -> None:
     assert MacHancomOracle().available() is True
@@ -289,7 +297,10 @@ def _mac_oracle_ready() -> bool:
 
 
 @pytest.mark.skipif(
-    not (_mac_oracle_ready() and os.environ.get("HWPX_MAC_ORACLE_SMOKE")),
+    not (
+        os.environ.get("HWPX_MAC_ORACLE_SMOKE")
+        and _mac_oracle_ready()
+    ),
     reason="set HWPX_MAC_ORACLE_SMOKE=1 on macOS+Hancom+imaging to drive the GUI render smoke",
 )
 def test_mac_oracle_smoke_identical_doc(tmp_path) -> None:

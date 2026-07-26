@@ -20,10 +20,34 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+      - name: Observe Phase-0 legacy cap before resolving core 5
+        working-directory: python-hwpx-automation
+        run: |
+          PHASE0_VENV="${RUNNER_TEMP}/hwpx-phase0-legacy"
+          python -m venv "${PHASE0_VENV}"
+          "${PHASE0_VENV}/bin/python" -m pip install --only-binary=:all: \
+            "python-hwpx==4.2.0" \
+            "hwpx-mcp-server==5.1.1"
+          "${PHASE0_VENV}/bin/python" -m pip check
+          "${PHASE0_VENV}/bin/python" - <<'PY'
+          from importlib.metadata import metadata, version
+
+          assert version("python-hwpx") == "4.2.0"
+          assert version("hwpx-mcp-server") == "5.1.1"
+          requirements = [
+              item.replace(" ", "").casefold()
+              for item in metadata("hwpx-mcp-server").get_all("Requires-Dist") or []
+          ]
+          core = [item for item in requirements if item.startswith("python-hwpx")]
+          base = [item for item in core if ";" not in item]
+          assert len(base) == 1, core
+          assert all(">=4.2.0" in item and "<5" in item for item in core), core
+          import hwpx_mcp_server
+          PY
       - name: Install test dependencies
         working-directory: python-hwpx-automation
         run: |
-          # Release order is core -> automation -> compatibility -> plugin.
+          # Release order is legacy cap -> core -> automation -> compatibility -> plugin.
           # A tag release must observe the exact public core rather than a
           # sibling checkout or an unpublished branch.
           python -m pip install "python-hwpx[visual,preview]==5.0.0"
@@ -59,7 +83,7 @@ jobs:
       - name: Run release-facing tests
         working-directory: python-hwpx-automation
         run: python -m pytest -q
-      - name: Run public 5.1 to 6.0 compatibility install matrix
+      - name: Run public 5.1.1 to 6.0 compatibility install matrix
         working-directory: python-hwpx-automation
         run: |
           python -m pip install build
@@ -68,7 +92,8 @@ jobs:
           CORE_WHEEL=$(find .compat-core-wheel -name 'python_hwpx-*.whl' -print -quit)
           python scripts/check_compat_install_matrix.py \
             --core-wheel "${CORE_WHEEL}" \
-            --legacy-version 5.1.0
+            --legacy-version 5.1.1 \
+            --legacy-core-version 4.2.0
       - name: Verify generated ToolSpec documentation
         working-directory: python-hwpx-automation
         run: |

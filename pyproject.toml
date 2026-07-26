@@ -21,9 +21,10 @@ classifiers = [
 dependencies = [
     # 5.0 is the floor, not a preference: this package declares the `hwpx` console
     # name that core used to own, and core only stops declaring it at 5.0. Pinning
-    # the floor here is what makes "no valid install has two declarers" true rather
-    # than hopeful.
-    "python-hwpx>=5.0.0", # HWPX object model, OXML/OPC, format-native primitives
+    # the bounded major here is what makes "no valid install has two declarers"
+    # true rather than hopeful, and prevents the next core major from silently
+    # breaking an already-published automation line.
+    "python-hwpx>=5.0.0,<6", # HWPX object model, OXML/OPC, format-native primitives
 
     "pydantic>=2.11,<3",
     "cryptography>=42.0",

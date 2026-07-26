@@ -35,7 +35,7 @@ EXPECTED_SERVICE_LINES = {
     "_border_fill.py": 283,
     "content_layout.py": 322,
     "context.py": 213,
-    "form_fields.py": 526,
+    "form_fields.py": 557,
     "media.py": 178,
     "memo_style.py": 477,
     "package_validation.py": 166,

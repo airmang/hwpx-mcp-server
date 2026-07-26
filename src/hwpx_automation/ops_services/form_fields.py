@@ -6,6 +6,8 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import Any
 
+from hwpx.quality.rendering import RenderBackend
+
 from ..office.form_fill import (
     inspect_fill_residue as inspect_form_fill_residue,
 )
@@ -15,6 +17,7 @@ from ..office.form_fill import (
 from ..office.form_fill import (
     score_form_fill as score_canonical_form_fill,
 )
+from ..office.rendering import resolve_hancom_backend
 from ..storage import LocalDocumentStorage
 from ..workspace import (
     WorkspaceMissingParentGuard,
@@ -33,10 +36,25 @@ class FormFieldService:
         context: DocumentContext,
         save: SavePolicy,
         transactions: TransactionService,
+        *,
+        render_backend_factory: Callable[[], RenderBackend] | None = None,
     ) -> None:
         self._context = context
         self._save = save
         self._transactions = transactions
+        self._render_backend_factory = render_backend_factory
+
+    def _resolve_render_backend(self) -> RenderBackend:
+        """Return the application-owned renderer for every core fill verdict.
+
+        Core intentionally does not discover Hancom.  Keeping the factory at
+        this service boundary makes all three form-fill paths use the same
+        fail-closed injection seam, while tests can supply an observable
+        backend without replacing core's ``verify_fill`` judgement.
+        """
+
+        factory = self._render_backend_factory or resolve_hancom_backend
+        return factory()
 
     def list_form_fields(
         self,
@@ -134,7 +152,10 @@ class FormFieldService:
                 from hwpx.table_patch import verify_fill
 
                 report = verify_fill(
-                    source_path, result.data, require=(render_check == "required")
+                    source_path,
+                    result.data,
+                    oracle=self._resolve_render_backend(),
+                    require=(render_check == "required"),
                 )
                 payload["renderVerdict"] = {
                     "renderChecked": report.render_checked,
@@ -197,7 +218,12 @@ class FormFieldService:
             ) from exc
         after = self._context._resolve_path(path)
         before = self._context._resolve_path(before_path)
-        report = verify_fill(before, after, require=require)
+        report = verify_fill(
+            before,
+            after,
+            oracle=self._resolve_render_backend(),
+            require=require,
+        )
         return {
             "renderChecked": report.render_checked,
             "ok": report.ok,
@@ -470,7 +496,12 @@ class FormFieldService:
             try:
                 from hwpx.table_patch import verify_fill
 
-                verdict = verify_fill(blank, data, require=(render_check == "required"))
+                verdict = verify_fill(
+                    blank,
+                    data,
+                    oracle=self._resolve_render_backend(),
+                    require=(render_check == "required"),
+                )
                 payload["renderVerdict"] = {
                     "renderChecked": verdict.render_checked,
                     "ok": verdict.ok,

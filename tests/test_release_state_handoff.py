@@ -37,6 +37,34 @@ def test_prepublish_full_suite_installs_the_owned_oracle_runtime() -> None:
     )
 
 
+def test_phase0_legacy_cap_precedes_every_core_5_resolution() -> None:
+    steps = _prepublish_steps()
+    names = [str(step.get("name", "")) for step in steps]
+    phase0 = names.index("Observe Phase-0 legacy cap before resolving core 5")
+    dependencies = names.index("Install test dependencies")
+    matrix = names.index("Run public 5.1.1 to 6.0 compatibility install matrix")
+    assert phase0 < dependencies < matrix
+
+    phase0_run = str(steps[phase0]["run"])
+    assert '"python-hwpx==4.2.0"' in phase0_run
+    assert '"hwpx-mcp-server==5.1.1"' in phase0_run
+    assert '">=4.2.0"' in phase0_run
+    assert '"<5"' in phase0_run
+    assert "for item in core" in phase0_run
+    assert "python-hwpx==5.0.0" not in phase0_run
+
+    matrix_run = str(steps[matrix]["run"])
+    assert "--legacy-version 5.1.1" in matrix_run
+    assert "--legacy-core-version 4.2.0" in matrix_run
+
+    # Phase-0 is a safety prerequisite, not a promotion of the last observed
+    # coherent plugin stack (whose 0.8.0 bundle still pins MCP 5.1.0).
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+    assert '"primaryApplication": "5.1.0"' in workflow
+
+
 def test_automation_release_hands_off_without_global_promotion() -> None:
     steps = _release_steps()
     names = [str(step.get("name", "")) for step in steps]

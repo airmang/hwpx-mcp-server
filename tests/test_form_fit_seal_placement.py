@@ -321,7 +321,10 @@ def _red_ring_seal_png() -> bytes:
 
 
 @pytest.mark.skipif(
-    not (_mac_seal_oracle_ready() and os.environ.get("HWPX_MAC_ORACLE_SMOKE")),
+    not (
+        os.environ.get("HWPX_MAC_ORACLE_SMOKE")
+        and _mac_seal_oracle_ready()
+    ),
     reason="set HWPX_MAC_ORACLE_SMOKE=1 on macOS+Hancom to drive the 직인 placement smoke",
 )
 def test_mac_seal_placement_lands_on_anchor_smoke(tmp_path):

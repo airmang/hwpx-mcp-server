@@ -13,12 +13,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import hwpx
-import hwpx.table_patch as table_patch
 import pytest
+from hwpx import table_patch
+from hwpx.quality.rendering import VisualReport
 
-from hwpx_automation.hwpx_ops import HwpxOperationError, HwpxOps
 from hwpx_automation import server
+from hwpx_automation.hwpx_ops import HwpxOperationError, HwpxOps
 from hwpx_automation.mixed_form import FORM_VERIFICATION_RECEIPT_SCHEMA
+from hwpx_automation.ops_services import form_fields
 from hwpx_automation.tool_contract import bound_tool_registry
 
 _CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
@@ -203,6 +205,46 @@ def test_evalplan_server_preserves_domain_semantics_with_common_receipt(tmp_path
     assert receipt["sourcePreservation"]["ok"] is True
     assert receipt["openSafety"]["ok"] is True
     assert receipt["domain"]["status"] == "specialized-semantics-preserved"
+
+
+def test_evalplan_render_reaches_the_injected_backend(tmp_path, monkeypatch):
+    blank = tmp_path / "blank.hwpx"
+    review = tmp_path / "review.md"
+    shutil.copy(BLANK, blank)
+    review.write_text(SYNTHETIC_MD, encoding="utf-8")
+    calls: list[tuple[bytes | None, bytes]] = []
+
+    class RecordingBackend:
+        def available(self) -> bool:
+            return True
+
+        def check(self, before_hwpx, after_hwpx, **_kwargs):
+            calls.append(
+                (
+                    Path(before_hwpx).read_bytes() if before_hwpx else None,
+                    Path(after_hwpx).read_bytes(),
+                )
+            )
+            return VisualReport(ok=True, render_checked=True)
+
+    backend = RecordingBackend()
+    monkeypatch.setattr(
+        form_fields,
+        "resolve_hancom_backend",
+        lambda: backend,
+    )
+
+    result = HwpxOps(base_directory=tmp_path).apply_evalplan_fill(
+        "blank.hwpx",
+        "review.md",
+        output="filled.hwpx",
+        render_check="required",
+    )
+
+    assert result["renderVerdict"]["renderChecked"] is True
+    assert len(calls) == 1
+    assert calls[0][0] == blank.read_bytes()
+    assert calls[0][1] == (tmp_path / "filled.hwpx").read_bytes()
 
 
 def test_evalplan_required_render_failure_publishes_nothing(tmp_path, monkeypatch):

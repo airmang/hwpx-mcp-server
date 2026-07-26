@@ -59,6 +59,24 @@ def _compat_subprocess(script: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _compat_module(
+    module: str,
+    *arguments: str,
+) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(COMPAT_ROOT / "src"), str(ROOT / "src"), env.get("PYTHONPATH", "")]
+    )
+    return subprocess.run(
+        [sys.executable, "-m", module, *arguments],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
 def test_compat_metadata_exactly_delegates_to_canonical_distribution() -> None:
     data = tomllib.loads((COMPAT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = data["project"]
@@ -152,6 +170,57 @@ assert not files("hwpx_mcp_server").joinpath("identity.json").is_file()
     )
     assert completed.returncode == 0, completed.stderr
     assert "DeprecationWarning" in completed.stderr
+
+
+def test_legacy_resource_package_preserves_canonical_import_metadata() -> None:
+    completed = _compat_subprocess(
+        r"""
+import importlib
+import json
+from importlib.resources import files
+
+canonical = importlib.import_module("hwpx_automation.office.house_style")
+snapshot = {
+    "__name__": canonical.__name__,
+    "__spec__": canonical.__spec__,
+    "__loader__": canonical.__loader__,
+    "__package__": canonical.__package__,
+    "__path__": canonical.__path__,
+}
+legacy = importlib.import_module("hwpx_mcp_server.office.house_style")
+assert legacy is canonical
+assert canonical.__name__ == snapshot["__name__"]
+assert canonical.__spec__ is snapshot["__spec__"]
+assert canonical.__loader__ is snapshot["__loader__"]
+assert canonical.__package__ == snapshot["__package__"]
+assert canonical.__path__ is snapshot["__path__"]
+bank = files(legacy).joinpath("data").joinpath("bank.json")
+assert bank.is_file()
+payload = json.loads(bank.read_text(encoding="utf-8"))
+assert payload["schemaVersion"] == canonical.BANK_SCHEMA_VERSION
+legacy_bank = (
+    files("hwpx_mcp_server.office.house_style")
+    .joinpath("data")
+    .joinpath("bank.json")
+)
+assert legacy_bank.read_bytes() == bank.read_bytes()
+assert canonical.load_bank().schema_version == canonical.BANK_SCHEMA_VERSION
+"""
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_python_m_legacy_package_delegates_to_the_canonical_task_cli() -> None:
+    completed = _compat_module("hwpx_mcp_server", "--help")
+    assert completed.returncode == 0, completed.stderr
+    assert "usage: hwpx" in completed.stdout
+
+
+def test_python_m_legacy_deep_module_uses_alias_loader_code() -> None:
+    completed = _compat_module("hwpx_mcp_server.server", "--help")
+    assert completed.returncode == 0, completed.stderr
+    assert "usage:" in completed.stdout.casefold()
+    assert "_AliasLoader" not in completed.stderr
 
 
 def test_every_public_5_1_deep_module_aliases_the_canonical_object() -> None:

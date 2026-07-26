@@ -16,10 +16,18 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+import zipfile
+from email.parser import BytesParser
+from pathlib import Path, PurePosixPath
 from typing import Any
 
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
+from packaging.version import Version
+
 ROOT = Path(__file__).resolve().parents[1]
+PHASE0_LEGACY_VERSION = "5.1.1"
+PHASE0_CORE_VERSION = "4.2.0"
 _SOURCE_AFFECTING_ENV = (
     "PYTHONPATH",
     "PYTHONHOME",
@@ -115,6 +123,23 @@ def _pip(python: Path, *arguments: str) -> None:
     )
 
 
+def _install_phase0_legacy(
+    python: Path,
+    *,
+    legacy_version: str,
+    core_version: str,
+) -> None:
+    """Install the rollback leg without allowing pip to choose a future core."""
+
+    _pip(
+        python,
+        "install",
+        f"python-hwpx=={core_version}",
+        f"hwpx-mcp-server=={legacy_version}",
+    )
+    _pip(python, "check")
+
+
 def _probe(python: Path, script: str, *, cwd: Path) -> None:
     _run([str(python), "-c", script], cwd=cwd)
 
@@ -157,6 +182,95 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _wheel_python_modules(path: Path) -> list[str]:
+    modules: set[str] = set()
+    with zipfile.ZipFile(path) as archive:
+        for member in archive.namelist():
+            pure = PurePosixPath(member)
+            if (
+                pure.suffix != ".py"
+                or not pure.parts
+                or pure.parts[0] != "hwpx_mcp_server"
+            ):
+                continue
+            parts = list(pure.with_suffix("").parts)
+            if parts[-1] == "__init__":
+                parts.pop()
+            if parts:
+                modules.add(".".join(parts))
+    return sorted(modules)
+
+
+def _validate_phase0_legacy_wheel(
+    path: Path,
+    *,
+    expected_version: str,
+    expected_modules: list[str],
+) -> dict[str, Any]:
+    """Prove the public maintenance wheel is a cap-only legacy repair."""
+
+    with zipfile.ZipFile(path) as archive:
+        metadata_members = [
+            name
+            for name in archive.namelist()
+            if name.endswith(".dist-info/METADATA")
+        ]
+        if len(metadata_members) != 1:
+            raise RuntimeError(
+                "public legacy wheel must contain exactly one METADATA member"
+            )
+        metadata = BytesParser().parsebytes(archive.read(metadata_members[0]))
+
+    if metadata.get("Name") != "hwpx-mcp-server":
+        raise RuntimeError("public legacy wheel distribution identity drifted")
+    if metadata.get("Version") != expected_version:
+        raise RuntimeError(
+            "public legacy wheel version does not match the Phase-0 pin"
+        )
+
+    requirements = metadata.get_all("Requires-Dist") or []
+    parsed = [Requirement(item) for item in requirements]
+    core_requirements = [
+        item
+        for item in parsed
+        if canonicalize_name(item.name) == "python-hwpx"
+    ]
+    base_core_requirements = [
+        item for item in core_requirements if item.marker is None
+    ]
+    if len(base_core_requirements) != 1:
+        raise RuntimeError(
+            "public legacy wheel must declare one unconditional python-hwpx bound"
+        )
+    unsafe_core_requirements = [
+        item
+        for item in core_requirements
+        if (
+            Version(PHASE0_CORE_VERSION) not in item.specifier
+            or Version("4.1.999") in item.specifier
+            or Version("5.0.0") in item.specifier
+        )
+    ]
+    if unsafe_core_requirements:
+        raise RuntimeError(
+            "every public legacy python-hwpx requirement, including extras, "
+            "must require python-hwpx>=4.2.0,<5"
+        )
+
+    modules = _wheel_python_modules(path)
+    if modules != expected_modules:
+        raise RuntimeError(
+            "public Phase-0 wheel changed the frozen 5.1 module surface"
+        )
+    return {
+        "filename": path.name,
+        "sha256": _sha256(path),
+        "coreRequirement": str(base_core_requirements[0]),
+        "coreRequirements": [str(item) for item in core_requirements],
+        "moduleCount": len(modules),
+    }
 
 
 def _build_artifacts(clean_source: Path, output: Path) -> dict[str, Path]:
@@ -242,12 +356,13 @@ def _install_local(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--core-wheel", type=Path, required=True)
-    parser.add_argument("--legacy-version", default="5.1.0")
+    parser.add_argument("--legacy-version", default=PHASE0_LEGACY_VERSION)
+    parser.add_argument("--legacy-core-version", default=PHASE0_CORE_VERSION)
     parser.add_argument("--output", type=Path)
     parser.add_argument(
         "--skip-public-upgrade",
         action="store_true",
-        help="Skip the public 5.1 -> 6.0 and full-stack rollback probes.",
+        help="Skip the public 5.1.1 -> 6.0 and full-stack rollback probes.",
     )
     args = parser.parse_args(argv)
     core_wheel = args.core_wheel.expanduser().resolve()
@@ -262,10 +377,14 @@ def main(argv: list[str] | None = None) -> int:
             / "legacy-modules-5.1.0.json"
         ).read_text(encoding="utf-8")
     )
-    if args.legacy_version != inventory["sourceVersion"]:
+    if (
+        args.legacy_version != PHASE0_LEGACY_VERSION
+        or args.legacy_core_version != PHASE0_CORE_VERSION
+    ):
         parser.error(
-            "--legacy-version must match the frozen public module inventory "
-            f"({inventory['sourceVersion']})"
+            "the release gate requires the exact Phase-0 pair "
+            f"hwpx-mcp-server=={PHASE0_LEGACY_VERSION} and "
+            f"python-hwpx=={PHASE0_CORE_VERSION}"
         )
     legacy_modules = inventory["modules"]
     inventory_digest = hashlib.sha256(
@@ -622,19 +741,25 @@ assert old is new
                 public_wheelhouse,
                 "hwpx_mcp_server-*.whl",
             )
-            if (
-                public_legacy_wheel.name != inventory["sourceWheel"]
-                or _sha256(public_legacy_wheel)
-                != inventory["sourceWheelSha256"]
-            ):
-                raise RuntimeError(
-                    "downloaded public legacy wheel does not match the "
-                    "frozen module-inventory provenance"
-                )
-            _pip(
+            public_legacy_receipt = _validate_phase0_legacy_wheel(
+                public_legacy_wheel,
+                expected_version=args.legacy_version,
+                expected_modules=legacy_modules,
+            )
+            _install_phase0_legacy(
                 upgrade_python,
-                "install",
-                f"hwpx-mcp-server=={args.legacy_version}",
+                core_version=args.legacy_core_version,
+                legacy_version=args.legacy_version,
+            )
+            _probe(
+                upgrade_python,
+                f"""
+from importlib.metadata import version
+assert version("python-hwpx") == "{args.legacy_core_version}"
+assert version("hwpx-mcp-server") == "{args.legacy_version}"
+import hwpx_mcp_server
+""",
+                cwd=probe_cwd,
             )
             _pip(
                 upgrade_python,
@@ -725,15 +850,16 @@ assert namespace["__version__"] == "6.0.0"
                 "python-hwpx-automation",
                 "python-hwpx",
             )
-            _pip(
+            _install_phase0_legacy(
                 upgrade_python,
-                "install",
-                f"hwpx-mcp-server=={args.legacy_version}",
+                core_version=args.legacy_core_version,
+                legacy_version=args.legacy_version,
             )
             _probe(
                 upgrade_python,
                 f"""
 from importlib.metadata import version
+assert version("python-hwpx") == "{args.legacy_core_version}"
 assert version("hwpx-mcp-server") == "{args.legacy_version}"
 import hwpx_mcp_server
 """,
@@ -749,7 +875,10 @@ import hwpx_mcp_server
                     "shape": "ordinary-legacy-upgrade-and-full-stack-rollback",
                     "status": "pass",
                     "legacyVersion": args.legacy_version,
-                    "legacySourceWheelSha256": inventory[
+                    "legacyCoreVersion": args.legacy_core_version,
+                    "legacyPublicWheel": public_legacy_receipt,
+                    "moduleInventoryBaselineVersion": inventory["sourceVersion"],
+                    "moduleInventorySourceWheelSha256": inventory[
                         "sourceWheelSha256"
                     ],
                     "legacyModuleCount": len(legacy_modules),

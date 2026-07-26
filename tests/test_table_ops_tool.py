@@ -15,17 +15,20 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 import hwpx
-import hwpx.table_patch as table_patch
+import pytest
+from hwpx import table_patch
+from hwpx.quality.rendering import VisualReport
 
 pytest.importorskip(
     "hwpx.table_patch", reason="requires python-hwpx with byte-preserving form-fill"
 )
 
 from hwpx.table_patch import _direct_cells, _iter_table_spans, build_grid
-from hwpx_automation.hwpx_ops import HwpxOperationError, HwpxOps
+
 from hwpx_automation import server
+from hwpx_automation.hwpx_ops import HwpxOperationError, HwpxOps
+from hwpx_automation.ops_services import form_fields
 
 _CORE_REPO_PIN = os.environ.get("PYTHON_HWPX_REPO")
 CORE_REPO = (
@@ -140,6 +143,53 @@ def test_apply_table_ops_noop_materializes_distinct_output(tmp_path):
     assert result["byteIdentical"] is True
     assert result["openSafety"]["ok"] is True
     assert output.read_bytes() == source.read_bytes()
+
+
+@pytest.mark.skipif(not FIXT.exists(), reason="corpus fixture not available")
+def test_form_fill_paths_reach_the_injected_render_backend(
+    tmp_path,
+    monkeypatch,
+):
+    source = tmp_path / "doc.hwpx"
+    shutil.copy(FIXT, source)
+    calls: list[tuple[bytes | None, bytes]] = []
+
+    class RecordingBackend:
+        def available(self) -> bool:
+            return True
+
+        def check(self, before_hwpx, after_hwpx, **_kwargs):
+            calls.append(
+                (
+                    Path(before_hwpx).read_bytes() if before_hwpx else None,
+                    Path(after_hwpx).read_bytes(),
+                )
+            )
+            return VisualReport(ok=True, render_checked=True)
+
+    backend = RecordingBackend()
+    resolved: list[RecordingBackend] = []
+
+    def resolve_backend() -> RecordingBackend:
+        resolved.append(backend)
+        return backend
+
+    monkeypatch.setattr(form_fields, "resolve_hancom_backend", resolve_backend)
+    ops = HwpxOps(base_directory=tmp_path)
+
+    applied = ops.apply_table_ops(
+        "doc.hwpx",
+        [],
+        render_check="required",
+        dry_run=True,
+    )
+    verified = ops.verify_form_fill("doc.hwpx", "doc.hwpx", require=True)
+
+    assert applied["renderVerdict"]["renderChecked"] is True
+    assert verified["renderChecked"] is True
+    assert resolved == [backend, backend]
+    assert len(calls) == 2
+    assert all(after == source.read_bytes() for _before, after in calls)
 
 
 @pytest.mark.skipif(not FIXT.exists(), reason="corpus fixture not available")

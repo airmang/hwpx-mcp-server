@@ -207,7 +207,10 @@ def _mac_seal_oracle_ready() -> bool:
 
 
 @pytest.mark.skipif(
-    not (_mac_seal_oracle_ready() and __import__("os").environ.get("HWPX_MAC_ORACLE_SMOKE")),
+    not (
+        __import__("os").environ.get("HWPX_MAC_ORACLE_SMOKE")
+        and _mac_seal_oracle_ready()
+    ),
     reason="set HWPX_MAC_ORACLE_SMOKE=1 on macOS+Hancom to drive the seal MCP smoke",
 )
 def test_place_seal_mcp_full_loop_smoke(tmp_path):

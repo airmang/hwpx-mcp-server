@@ -88,10 +88,17 @@ def _clear_path_sandbox_for_inprocess_tests(
     Product code never opens the whole filesystem. Tests authorize their public
     fixtures and their one pytest temporary directory; individual security tests
     may replace this value with a narrower root.
+
+    The default suite is also structurally isolated from live GUI automation.
+    Real Hancom tests opt in explicitly with ``HWPX_MAC_ORACLE_SMOKE``; without
+    that signal, any incidental renderer resolution must degrade without
+    launching ``osascript``.
     """
 
     monkeypatch.delenv("HWPX_MCP_SANDBOX_ROOT", raising=False)
     monkeypatch.delenv("HWPX_MCP_WORKSPACE_ROOTS", raising=False)
+    if not os.environ.get("HWPX_MAC_ORACLE_SMOKE"):
+        monkeypatch.setenv("HWPX_ORACLE_STRUCTURAL_ONLY", "1")
     monkeypatch.setenv(
         "HWPX_AUTOMATION_WORKSPACE_ROOTS",
         json.dumps([str(_REPO_ROOT), str(tmp_path), str(_LOCAL_PYTHON_HWPX_REPO)]),

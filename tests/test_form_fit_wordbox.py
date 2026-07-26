@@ -1073,7 +1073,10 @@ def _mac_form_oracle_ready() -> bool:
 
 
 @pytest.mark.skipif(
-    not (_mac_form_oracle_ready() and os.environ.get("HWPX_MAC_ORACLE_SMOKE")),
+    not (
+        os.environ.get("HWPX_MAC_ORACLE_SMOKE")
+        and _mac_form_oracle_ready()
+    ),
     reason="set HWPX_MAC_ORACLE_SMOKE=1 on macOS+Hancom to drive the form-fill render smoke",
 )
 def test_mac_form_fill_overflow0_layout_stable_smoke(tmp_path):
@@ -1116,7 +1119,10 @@ def test_mac_form_fill_overflow0_layout_stable_smoke(tmp_path):
 
 
 @pytest.mark.skipif(
-    not (_mac_form_oracle_ready() and os.environ.get("HWPX_MAC_ORACLE_SMOKE")),
+    not (
+        os.environ.get("HWPX_MAC_ORACLE_SMOKE")
+        and _mac_form_oracle_ready()
+    ),
     reason="set HWPX_MAC_ORACLE_SMOKE=1 on macOS+Hancom to drive the 글자겹침 render smoke",
 )
 def test_mac_glyph_overprint_caught_smoke():
