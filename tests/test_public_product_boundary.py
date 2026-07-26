@@ -50,17 +50,34 @@ RETIRED_LEGACY_MODULES = {
 }
 
 
-def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
+def test_distribution_metadata_stays_on_the_compatible_core_major() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     dependencies = project["project"]["dependencies"]
     optional_dependencies = project["project"]["optional-dependencies"]
 
-    assert project["project"]["version"] == "5.1.0"
-    assert "python-hwpx>=4.2.0" in dependencies
-    assert optional_dependencies["oracle"] == ["python-hwpx[visual]>=4.0.0"]
-    assert optional_dependencies["vision"] == ["python-hwpx[visual]>=4.0.0"]
+    assert project["project"]["version"] == "5.1.1"
+    assert "python-hwpx>=4.2.0,<5" in dependencies
+    assert optional_dependencies["oracle"] == ["python-hwpx[visual]>=4.2.0,<5"]
+    assert optional_dependencies["vision"] == ["python-hwpx[visual]>=4.2.0,<5"]
+    python_hwpx_requirements = [
+        item
+        for item in (
+            *dependencies,
+            *optional_dependencies["oracle"],
+            *optional_dependencies["vision"],
+        )
+        if item.startswith("python-hwpx")
+    ]
+    assert len(python_hwpx_requirements) == 3
+    assert all(">=4.2.0" in item and "<5" in item for item in python_hwpx_requirements)
     assert "mcp==1.28.1" in dependencies
     assert "pydantic>=2.11,<3" in dependencies
+    use_cases = (ROOT / "docs" / "use-cases.md").read_text(encoding="utf-8")
+    assert "`python-hwpx >= 4.2.0,<5`" in use_cases
+    assert "`429cb6706323e762`" in use_cases
+    assert "대응 스킬 바닥은 `0.8.0`" in use_cases
+    assert "`f82caecbcfc742e9`" not in use_cases
+    assert "대응 스킬 바닥은 `0.5.0`" not in use_cases
 
 
 def _load_hygiene_module():
@@ -153,6 +170,55 @@ def test_public_hygiene_rejects_practice_source_and_wheel_members(
 
     assert any("hwpx_mcp_server/practice/runtime.py" in item for item in failures)
     assert any("HWPX_PRACTICE_ROOT" in item for item in failures)
+
+
+def test_public_hygiene_rejects_unbounded_core_wheel_metadata(
+    tmp_path: Path, monkeypatch
+) -> None:
+    hygiene = _load_hygiene_module()
+    dist = tmp_path / "dist"
+    dist.mkdir()
+
+    unsafe_wheel = dist / "hwpx_mcp_server-unsafe.whl"
+    with zipfile.ZipFile(unsafe_wheel, "w") as archive:
+        archive.writestr(
+            "hwpx_mcp_server-5.1.1.dist-info/METADATA",
+            "\n".join(
+                (
+                    "Metadata-Version: 2.4",
+                    "Name: hwpx-mcp-server",
+                    "Version: 5.1.1",
+                    "Requires-Dist: python-hwpx>=4.2.0",
+                    'Requires-Dist: python-hwpx[visual]>=4.2.0; extra == "oracle"',
+                    "",
+                )
+            ),
+        )
+
+    safe_wheel = dist / "hwpx_mcp_server-safe.whl"
+    with zipfile.ZipFile(safe_wheel, "w") as archive:
+        archive.writestr(
+            "hwpx_mcp_server-5.1.1.dist-info/METADATA",
+            "\n".join(
+                (
+                    "Metadata-Version: 2.4",
+                    "Name: hwpx-mcp-server",
+                    "Version: 5.1.1",
+                    "Requires-Dist: python-hwpx<5,>=4.2.0",
+                    (
+                        "Requires-Dist: python-hwpx[visual]<5,>=4.2.0; "
+                        'extra == "oracle"'
+                    ),
+                    "",
+                )
+            ),
+        )
+
+    monkeypatch.setattr(hygiene, "ROOT", tmp_path)
+    failures = hygiene._wheel_failures()
+
+    assert sum("unsafe python-hwpx requirement" in item for item in failures) == 2
+    assert all("hwpx_mcp_server-unsafe.whl" in item for item in failures)
 
 
 def test_source_tree_has_no_internal_practice_runtime_markers() -> None:

@@ -1,5 +1,16 @@
 # Changelog
 
+## [5.1.1] - 2026-07-26
+
+### Fixed
+- `python-hwpx` 기본 의존성과 `oracle`/`vision` extra를 모두
+  `>=4.2.0,<5`로 제한했습니다. `python-hwpx` 5.0에서 application surface가
+  companion 패키지로 이동한 뒤에도 기존의 상한 없는 `hwpx-mcp-server 5.1.0`
+  메타데이터는 core 5.x를 정상 의존성으로 받아들여, `pip check`는 통과하지만
+  서버 시작은 `MovedToCompanion`으로 실패할 수 있었습니다. 이 패치는 새 설치가
+  호환되는 core 4.2.x를 선택하게 하며 ToolSpec, 도구 이름·schema·분류,
+  계약 해시 `429cb6706323e762`와 런타임 동작은 바꾸지 않습니다.
+
 ## [5.1.0] - 2026-07-22
 
 ### Added

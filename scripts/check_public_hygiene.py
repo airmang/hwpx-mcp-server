@@ -121,6 +121,39 @@ def _wheel_failures() -> list[str]:
                 ]
                 if any(line.startswith("requires-dist: modelcontextprotocol") for line in requirements):
                     failures.append(f"{wheel.relative_to(ROOT)} declares modelcontextprotocol")
+                python_hwpx_requirements = [
+                    line
+                    for line in requirements
+                    if re.match(
+                        r"^requires-dist:\s*python-hwpx(?:\[|(?=[<>=!~;@\s]|$))",
+                        line,
+                    )
+                ]
+                if not python_hwpx_requirements:
+                    failures.append(
+                        f"{wheel.relative_to(ROOT)} does not declare python-hwpx"
+                    )
+                for line in python_hwpx_requirements:
+                    requirement = line.removeprefix("requires-dist:").split(";", 1)[0]
+                    match = re.fullmatch(
+                        r"\s*python-hwpx(?:\[[^\]]+\])?\s*(.*)",
+                        requirement,
+                    )
+                    specifier_text = (
+                        match.group(1).strip().strip("()") if match is not None else ""
+                    )
+                    specifiers = {
+                        item.strip()
+                        for item in specifier_text.split(",")
+                        if item.strip()
+                    }
+                    if ">=4.2.0" not in specifiers or not specifiers.intersection(
+                        {"<5", "<5.0", "<5.0.0"}
+                    ):
+                        failures.append(
+                            f"{wheel.relative_to(ROOT)} has unsafe python-hwpx "
+                            f"requirement: {line.removeprefix('requires-dist:').strip()}"
+                        )
     return failures
 
 

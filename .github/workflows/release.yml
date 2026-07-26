@@ -20,8 +20,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: airmang/python-hwpx
-          # Exact public python-hwpx 3.3.1 release commit, verified before the
-          # dependency-ordered hwpx-mcp-server 4.3.0 publication.
+          # Exact public python-hwpx 4.2.0 release commit, verified before the
+          # dependency-ordered hwpx-mcp-server 5.1.0 publication.
           ref: f6b79f010d40a190fa6a8391eb212835022b3851
           path: python-hwpx
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0

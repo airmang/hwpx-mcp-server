@@ -16,8 +16,8 @@ HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)
 
 현재 MCP 표면, document-plan, template-formfit, visual-review handoff
 워크플로의 문서화·테스트 기준 upstream 버전 바닥은
-`python-hwpx >= 3.3.1`입니다. 공개 설치 표면의 계약 해시는
-`f82caecbcfc742e9`이며 대응 스킬 바닥은 `0.5.0`입니다.
+`python-hwpx >= 4.2.0,<5`입니다. 공개 설치 표면의 계약 해시는
+`429cb6706323e762`이며 대응 스킬 바닥은 `0.8.0`입니다.
 
 선언형 document-plan 생성은 `validate_document_plan`으로 먼저 검증합니다.
 `ok=false`이면 `issues[].path`와 `repairHints[]`를 따라 JSON plan을 고친 뒤
@@ -231,7 +231,7 @@ hwpx-mcp-server
 
 업스트림 버전 참고:
 - `Python >= 3.10`
-- `python-hwpx >= 3.3.1`
+- `python-hwpx >= 4.2.0,<5`
 
 MCP 설정 예시:
 

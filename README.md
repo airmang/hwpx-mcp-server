@@ -55,7 +55,7 @@ macOS `/`)에서 띄우므로 이런 degenerate cwd는 거부되고 모든 문�
 
 > 비-HWPX 문서(PDF/DOCX/XLSX/HTML/TXT)를 `document_to_markdown`으로 읽으려면
 > `pip install "hwpx-mcp-server[ingest]"`로 MarkItDown adapter를 함께 설치합니다.
-> 요구 사항: `Python >= 3.10` · `python-hwpx >= 3.3.1`.
+> 요구 사항: `Python >= 3.10` · `python-hwpx >= 4.2.0,<5`.
 
 ## 무엇을 하나
 

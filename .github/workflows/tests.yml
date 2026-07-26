@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: airmang/python-hwpx
-          # Exact public python-hwpx 3.3.1 release commit.
+          # Exact public python-hwpx 4.2.0 release commit.
           ref: f6b79f010d40a190fa6a8391eb212835022b3851
           path: python-hwpx
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: airmang/python-hwpx
-          # Exact public python-hwpx 3.3.1 release commit.
+          # Exact public python-hwpx 4.2.0 release commit.
           ref: f6b79f010d40a190fa6a8391eb212835022b3851
           path: python-hwpx
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -117,6 +117,13 @@ jobs:
 
           requirements = metadata("hwpx-mcp-server").get_all("Requires-Dist") or []
           assert not any(item.casefold().startswith("modelcontextprotocol") for item in requirements)
+          core_requirements = [
+              item.replace(" ", "")
+              for item in requirements
+              if item.casefold().startswith("python-hwpx")
+          ]
+          assert len(core_requirements) == 3, core_requirements
+          assert all(">=4.2.0" in item and "<5" in item for item in core_requirements)
           found = importlib.util.find_spec("markitdown") is not None
           assert found is (os.environ["EXPECT_MARKITDOWN"] == "present")
           assert importlib.util.find_spec("hwpx_mcp_server.practice") is None
