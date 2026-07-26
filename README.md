@@ -17,7 +17,8 @@
 > **릴리스 상태 — 아직 공개되지 않은 6.0.0 후보입니다.** 이 checkout은
 > `python-hwpx 5.0.0 → python-hwpx-automation 6.0.0 → hwpx-plugin 1.0.0`
 > 후보와 계약 해시 `0ce938371f0b55a6`을 설명하지만, 아직 PyPI·GitHub
-> Release·marketplace에 발행되지 않았습니다. 현재 공개 정본은
+> Release·marketplace에 발행되지 않았습니다. 마지막으로 plugin 설치까지
+> 함께 검증한 완전한 공개 트레인은
 > `python-hwpx 4.2.0 → hwpx-mcp-server 5.1.0 → hwpx-plugin 0.8.0`,
 > 계약 해시 `429cb6706323e762`입니다. 아래 canonical 설치 명령은 6.0
 > 발행 후의 목표 표면이며, 그 전에는 공개 설치로 간주하지 마세요.
