@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Stateless HWPX MCP 서버."""
+"""Tracked-change automation handlers for the optional MCP adapter."""
 
 from __future__ import annotations
 

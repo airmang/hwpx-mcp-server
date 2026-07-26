@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Conformance runner + ``hwpx-conformance`` CLI (plan §2 Phase G).
+"""Repository-QA conformance runner (plan §2 Phase G).
 
 ``run_conformance`` walks a :class:`~conformance.corpus.ConformanceCorpus`,
 evaluates each case across the four badge tiers, and aggregates a
@@ -13,13 +13,15 @@ evaluates each case across the four badge tiers, and aggregates a
 
 Each tier evaluator reuses the engine that already ships: open-safety from
 ``tools.package_validator``, text from ``tools.text_extractor``, fit from
-``form_fit.measure``, render from ``visual.oracle`` — the conformance layer only
+``form_fit.measure``, and render from
+``hwpx_automation.office.rendering.oracle`` — the conformance layer only
 *scores a population*, it does not re-implement any check.
 
 CLI::
 
-    hwpx-conformance run [--corpus corpus.json] [--tier structural|oracle]
-                         [--out report/] [--check golden.json] [--update-golden golden.json]
+    python scripts/run_conformance.py run \
+      [--corpus corpus.json] [--tier structural|oracle] \
+      [--out report/] [--check golden.json] [--update-golden golden.json]
 """
 from __future__ import annotations
 
@@ -300,7 +302,7 @@ def run_conformance(
 # --------------------------------------------------------------------------- #
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="hwpx-conformance",
+        prog="python scripts/run_conformance.py",
         description="Score an HWPX corpus into VisualComplete badge tiers (plan §2 G).",
     )
     sub = parser.add_subparsers(dest="command", required=True)

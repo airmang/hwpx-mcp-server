@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Check MCP's application-layer ownership and dependency direction."""
+"""Check automation application ownership and dependency direction."""
 
 from __future__ import annotations
 
@@ -321,7 +321,7 @@ def _rendering_owner_import_violation(
     relative: str,
     imported: str,
 ) -> str | None:
-    """Reject application runtime and unapproved core seams in the MCP owner."""
+    """Reject runtime copies and unapproved core seams in the automation owner."""
 
     if not (
         relative == f"{CANONICAL_RENDER_ROOT}.py"
@@ -372,7 +372,7 @@ def evaluate(root: Path) -> dict[str, Any]:
     files = sorted(source.rglob("*.py"))
 
     if (root / "src" / "hwpx").exists():
-        violations.append("MCP repository must not own or vendor src/hwpx")
+        violations.append("automation repository must not own or vendor src/hwpx")
     render_root = root / CANONICAL_RENDER_ROOT
     render_files = sorted(render_root.rglob("*.py"))
     if len(render_files) != CANONICAL_RENDER_FILE_COUNT:
@@ -445,7 +445,7 @@ def evaluate(root: Path) -> dict[str, Any]:
             frozen_members = FROZEN_CORE_DOCUMENT_OPS_CALLABLES.get(imported)
             if frozen_members is not None and member in frozen_members:
                 violations.append(
-                    "MCP production imports frozen core document-ops callable: "
+                    "automation production imports frozen core document-ops callable: "
                     f"{relative} -> {imported}.{member}"
                 )
         for imported in imports:
@@ -454,7 +454,7 @@ def evaluate(root: Path) -> dict[str, Any]:
                 for prefix in FORBIDDEN_IMPORTS
             ):
                 violations.append(
-                    f"MCP imports skill implementation: {relative} -> {imported}"
+                    f"automation imports skill implementation: {relative} -> {imported}"
                 )
             rendering_violation = _rendering_owner_import_violation(
                 relative,
@@ -473,19 +473,20 @@ def evaluate(root: Path) -> dict[str, Any]:
                     )
                 else:
                     violations.append(
-                        "MCP production imports frozen core visual runtime: "
+                        "automation production imports frozen core visual runtime: "
                         f"{relative} -> {imported}"
                     )
             if imported == "hwpx.agent" or imported.startswith("hwpx.agent."):
                 violations.append(
-                    f"MCP production imports frozen core agent copy: {relative} -> {imported}"
+                    "automation production imports frozen core agent copy: "
+                    f"{relative} -> {imported}"
                 )
             if any(
                 imported == frozen or imported.startswith(f"{frozen}.")
                 for frozen in FROZEN_CORE_AUTHORING_IMPORTS
             ):
                 violations.append(
-                    "MCP production imports frozen core authoring copy: "
+                    "automation production imports frozen core authoring copy: "
                     f"{relative} -> {imported}"
                 )
             if any(
@@ -493,7 +494,7 @@ def evaluate(root: Path) -> dict[str, Any]:
                 for frozen in FROZEN_CORE_POLICY_IMPORTS
             ):
                 violations.append(
-                    "MCP production imports frozen core policy copy: "
+                    "automation production imports frozen core policy copy: "
                     f"{relative} -> {imported}"
                 )
             if any(
@@ -501,7 +502,7 @@ def evaluate(root: Path) -> dict[str, Any]:
                 for frozen in FROZEN_CORE_FORM_FILL_IMPORTS
             ):
                 violations.append(
-                    "MCP production imports frozen core form-fill copy: "
+                    "automation production imports frozen core form-fill copy: "
                     f"{relative} -> {imported}"
                 )
             if any(
@@ -509,7 +510,7 @@ def evaluate(root: Path) -> dict[str, Any]:
                 for frozen in FROZEN_CORE_EVALPLAN_IMPORTS
             ):
                 violations.append(
-                    "MCP production imports frozen core evalplan copy: "
+                    "automation production imports frozen core evalplan copy: "
                     f"{relative} -> {imported}"
                 )
             if any(
@@ -517,7 +518,7 @@ def evaluate(root: Path) -> dict[str, Any]:
                 for frozen in FROZEN_CORE_EXAM_IMPORTS
             ):
                 violations.append(
-                    "MCP production imports frozen core exam copy: "
+                    "automation production imports frozen core exam copy: "
                     f"{relative} -> {imported}"
                 )
             if relative.startswith(f"{CANONICAL_AGENT_ROOT}/") and (

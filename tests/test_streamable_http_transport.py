@@ -29,6 +29,7 @@ def test_mcp_server_health_reports_disconnect_and_path_diagnostics(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("HWPX_AUTOMATION_WORKSPACE_ROOTS", raising=False)
     monkeypatch.delenv("HWPX_MCP_WORKSPACE_ROOTS", raising=False)
     monkeypatch.setenv("HWPX_MCP_SANDBOX_ROOT", str(tmp_path))
     health = mcp_server_health()

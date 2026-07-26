@@ -39,7 +39,7 @@ def test_canonical_authoring_inventory_and_profile_assets_are_complete() -> None
         assert (profile / "template.hwpx").is_file()
 
 
-def test_all_authoring_production_bindings_use_the_mcp_owner() -> None:
+def test_all_authoring_production_bindings_use_the_automation_owner() -> None:
     bindings = (
         _shared.inspect_authoring_document_quality,
         authoring.build_document_from_plan,

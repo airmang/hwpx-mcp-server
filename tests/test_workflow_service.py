@@ -369,10 +369,16 @@ def test_unsupported_intent_and_incomplete_adapter_abstain_honestly(tmp_path):
 
 
 def test_store_default_is_env_controlled_and_never_uses_cwd(monkeypatch, tmp_path):
-    configured = tmp_path / "state" / "workflow.sqlite3"
-    monkeypatch.setenv("HWPX_WORKFLOW_STORE", str(configured))
-    assert default_workflow_store_path() == configured.resolve()
+    canonical = tmp_path / "canonical" / "workflow.sqlite3"
+    legacy = tmp_path / "legacy" / "workflow.sqlite3"
+    monkeypatch.delenv("HWPX_AUTOMATION_WORKFLOW_STORE", raising=False)
+    monkeypatch.setenv("HWPX_WORKFLOW_STORE", str(legacy))
+    assert default_workflow_store_path() == legacy.resolve()
 
+    monkeypatch.setenv("HWPX_AUTOMATION_WORKFLOW_STORE", str(canonical))
+    assert default_workflow_store_path() == canonical.resolve()
+
+    monkeypatch.delenv("HWPX_AUTOMATION_WORKFLOW_STORE")
     monkeypatch.delenv("HWPX_WORKFLOW_STORE")
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "xdg"))
     assert default_workflow_store_path() == (tmp_path / "xdg" / "hwpx-mcp-server" / "workflows.sqlite3")

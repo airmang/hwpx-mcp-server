@@ -1,6 +1,9 @@
-# Skill-First Workflows on the Current MCP Surface
+# Skill-First Workflows on the Automation MCP Adapter
 
-This guide assumes the current FastMCP server is the stable product surface and `python-hwpx` remains the upstream engine layer.
+This guide describes the unreleased 6.0 automation candidate's optional FastMCP
+adapter. The Python automation layer is the product surface and `python-hwpx`
+remains the upstream engine layer; the current public adapter is
+`hwpx-mcp-server` 5.1.0 until the new release is observed remotely.
 
 Scope for this pass:
 
@@ -15,7 +18,10 @@ and rollback procedure are in
 
 ## Current Tool Coverage
 
-`HWPX_MCP_ADVANCED=1` is required for package inspection and low-level validation. The canonical heterogeneous edit entry point, `apply_document_commands`, is available in the default profile.
+`HWPX_AUTOMATION_ADVANCED=1` is required for package inspection and low-level
+validation (`HWPX_MCP_ADVANCED=1` remains a 6.x fallback). The canonical
+heterogeneous edit entry point, `apply_document_commands`, is available in the
+default profile.
 
 | Workflow need | Existing MCP tools | Notes |
 |---|---|---|

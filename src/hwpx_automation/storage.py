@@ -35,6 +35,7 @@ from . import quality as quality_contract
 from .upstream import HwpxDocument, open_document, validate_document_path
 from .workspace import (
     LEGACY_SANDBOX_ROOT_ENV,
+    LEGACY_WORKSPACE_ROOTS_ENV,
     WORKSPACE_ROOTS_ENV,
     WorkspaceConfigurationError,
     WorkspaceMissingParentGuard,
@@ -111,7 +112,8 @@ class LocalDocumentStorage:
         elif base_directory is not None:
             self._workspace = WorkspaceResolver.from_roots([base_directory])
         else:
-            # Implicit cwd fallback. When neither HWPX_MCP_WORKSPACE_ROOTS nor the
+            # Implicit cwd fallback. When neither HWPX_AUTOMATION_WORKSPACE_ROOTS
+            # nor its supported HWPX_MCP_WORKSPACE_ROOTS fallback nor the
             # legacy root is configured and the cwd is degenerate (e.g. a GUI MCP
             # client launched from C:\Windows\System32 or /), defer the actionable
             # error to first use so import and startup do not crash and
@@ -121,6 +123,7 @@ class LocalDocumentStorage:
             except WorkspaceConfigurationError as exc:
                 if (
                     os.environ.get(WORKSPACE_ROOTS_ENV) is not None
+                    or os.environ.get(LEGACY_WORKSPACE_ROOTS_ENV) is not None
                     or os.environ.get(LEGACY_SANDBOX_ROOT_ENV) is not None
                 ):
                     raise

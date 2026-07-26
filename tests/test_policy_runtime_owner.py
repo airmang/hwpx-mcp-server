@@ -61,7 +61,7 @@ def test_canonical_policy_owner_inventory_is_complete() -> None:
     assert len(utilities.__all__) == 2
 
 
-def test_all_policy_production_bindings_use_the_mcp_owner() -> None:
+def test_all_policy_production_bindings_use_the_automation_owner() -> None:
     bindings = (
         quality_render.inspect_hwpx_official_document_style,
         specialized.DEFAULT_POLICY.__class__,

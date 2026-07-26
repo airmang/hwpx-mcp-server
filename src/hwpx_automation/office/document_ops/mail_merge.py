@@ -40,7 +40,7 @@ def build_mail_merge(
     fit_mode: str | None = None,
     max_lines: int = 1,
 ) -> dict[str, Any]:
-    """Run mail merge with MCP-owned fit and PII policies injected explicitly."""
+    """Run mail merge with automation-owned fit and PII policies."""
 
     fit_policy = None
     if fit_mode:

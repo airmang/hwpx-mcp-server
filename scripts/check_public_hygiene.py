@@ -6,13 +6,34 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import tarfile
 import zipfile
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+INTERNAL_STAGE_CODE = re.compile(
+    rb"(?<![A-Za-z0-9])(?:S-[0-9]{3}(?![0-9])|STG-[A-Za-z0-9]+)"
+)
+WORKSTATION_PATH = re.compile(
+    ("/" + "Users" + r"/[^/\s]+/").encode()
+    + b"|"
+    + ("/" + "home" + r"/[^/\s]+/").encode()
+    + b"|[A-Za-z]:\\\\[Uu]sers\\\\"
+)
+TEXT_ARTIFACT_SUFFIXES = (
+    ".cfg",
+    ".json",
+    ".md",
+    ".py",
+    ".rst",
+    ".toml",
+    ".txt",
+    ".yaml",
+    ".yml",
+)
 
-_MCP_INTERNAL_RUNTIME_MARKERS = (
+_AUTOMATION_INTERNAL_RUNTIME_MARKERS = (
     b"hwpx_automation.practice",
     b"hwpx.practice",
     b"private_practice",
@@ -47,15 +68,17 @@ def _project_kind() -> str:
         return "plugin"
     metadata = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     # 이름 하나로 판별하면 배포명이 바뀌는 순간 이 저장소가 core로 분류되고
-    # MCP 전용 금지 규칙이 통째로 건너뛰어진다. 실제로 6.0.0 재명명 뒤 게이트가
+    # automation 전용 금지 규칙이 통째로 건너뛰어진다. 실제로 6.0.0 재명명 뒤 게이트가
     # "[OK] public hygiene: core"를 내며 아무것도 검사하지 않았다.
     #
     # 이름 목록이 아니라 **구조**로 판별한다. 이 저장소만 응용 소유자 트리를
     # 갖는다.
     if (ROOT / "src" / "hwpx_automation").is_dir():
-        return "mcp"
+        return "automation"
+    # The legacy distribution name still identifies this same application
+    # repository while the 6.x compatibility line remains supported.
     if 'name = "hwpx-mcp-server"' in metadata:
-        return "mcp"
+        return "automation"
     return "core"
 
 
@@ -65,7 +88,7 @@ def _forbidden_path(path: str, kind: str) -> bool:
         return True
     if kind == "core":
         return path.startswith(("shared/hwpx/", "docs/superpowers/", "tests/evidence/", "examples/out/"))
-    if kind == "mcp":
+    if kind == "automation":
         return (
             path.startswith("docs/superpowers/")
             or path.startswith("src/hwpx_automation/practice/")
@@ -96,6 +119,30 @@ def _text_bytes(path: Path) -> bytes | None:
     return data
 
 
+def _artifact_text_failure(
+    artifact: Path,
+    member: str,
+    data: bytes,
+) -> list[str]:
+    basename = Path(member).name
+    if not (
+        member.casefold().endswith(TEXT_ARTIFACT_SUFFIXES)
+        or basename in {"METADATA", "PKG-INFO"}
+    ):
+        return []
+    try:
+        artifact_name: Path | str = artifact.relative_to(ROOT)
+    except ValueError:
+        artifact_name = artifact
+    display = f"{artifact_name}!{member}"
+    failures: list[str] = []
+    if INTERNAL_STAGE_CODE.search(data):
+        failures.append(f"internal Stage code in public artifact: {display}")
+    if WORKSTATION_PATH.search(data):
+        failures.append(f"workstation-shaped path in public artifact: {display}")
+    return failures
+
+
 def _wheel_failures() -> list[str]:
     failures: list[str] = []
     rejected = (
@@ -107,7 +154,7 @@ def _wheel_failures() -> list[str]:
         ".omx/",
         "hwpx_automation/practice/",
     )
-    for wheel in sorted((ROOT / "dist").glob("*.whl")):
+    for wheel in sorted((ROOT / "dist").rglob("*.whl")):
         with zipfile.ZipFile(wheel) as archive:
             names = archive.namelist()
             for name in names:
@@ -115,12 +162,15 @@ def _wheel_failures() -> list[str]:
                     failures.append(f"{wheel.relative_to(ROOT)} contains {name}")
                 if name.endswith(".py"):
                     data = archive.read(name)
-                    for marker in _MCP_INTERNAL_RUNTIME_MARKERS:
+                    for marker in _AUTOMATION_INTERNAL_RUNTIME_MARKERS:
                         if marker in data:
                             failures.append(
                                 f"{wheel.relative_to(ROOT)} contains internal runtime marker "
                                 f"{marker.decode('ascii')!r} in {name}"
                             )
+                failures.extend(
+                    _artifact_text_failure(wheel, name, archive.read(name))
+                )
             for name in names:
                 if not name.endswith(".dist-info/METADATA"):
                     continue
@@ -134,13 +184,40 @@ def _wheel_failures() -> list[str]:
     return failures
 
 
-def _mcp_runtime_failures(tracked: list[str]) -> list[str]:
+def _sdist_failures() -> list[str]:
+    failures: list[str] = []
+    for sdist in sorted((ROOT / "dist").rglob("*.tar.gz")):
+        with tarfile.open(sdist, "r:gz") as archive:
+            for member in archive.getmembers():
+                if not member.isfile():
+                    continue
+                extracted = archive.extractfile(member)
+                if extracted is None:
+                    continue
+                failures.extend(
+                    _artifact_text_failure(sdist, member.name, extracted.read())
+                )
+    return failures
+
+
+def _shipped_source_stage_failures(tracked: list[str]) -> list[str]:
+    failures: list[str] = []
+    for rel in tracked:
+        if rel != "pyproject.toml" and not rel.startswith("src/hwpx_automation/"):
+            continue
+        data = _text_bytes(ROOT / rel)
+        if data is not None and INTERNAL_STAGE_CODE.search(data):
+            failures.append(f"internal Stage code in shipped source: {rel}")
+    return failures
+
+
+def _automation_runtime_failures(tracked: list[str]) -> list[str]:
     failures: list[str] = []
     for rel in tracked:
         if not rel.startswith("src/") or not rel.endswith(".py"):
             continue
         data = (ROOT / rel).read_bytes()
-        for marker in _MCP_INTERNAL_RUNTIME_MARKERS:
+        for marker in _AUTOMATION_INTERNAL_RUNTIME_MARKERS:
             if marker in data:
                 failures.append(
                     f"internal runtime marker {marker.decode('ascii')!r}: {rel}"
@@ -202,12 +279,6 @@ def main() -> int:
     tracked_ignored = _git_paths("ls-files", "-ci", "--exclude-standard")
     failures.extend(f"tracked file is ignored: {path}" for path in tracked_ignored)
 
-    workstation_path = re.compile(
-        ("/" + "Users" + r"/[^/\s]+/").encode()
-        + b"|"
-        + ("/" + "home" + r"/[^/\s]+/").encode()
-        + b"|[A-Za-z]:\\\\[Uu]sers\\\\"
-    )
     private_markers = [b">" + b"ko" + b"kyu" + b"<"]
     private_markers.extend(
         value.strip().encode("utf-8")
@@ -219,16 +290,18 @@ def main() -> int:
         data = _text_bytes(ROOT / rel)
         if data is None:
             continue
-        if workstation_path.search(data):
+        if WORKSTATION_PATH.search(data):
             failures.append(f"workstation-shaped path: {rel}")
         if any(marker in data for marker in private_markers):
             failures.append(f"private-origin marker: {rel}")
 
-    failures.extend(_hwpx_member_failures(tracked, workstation_path, private_markers))
+    failures.extend(_hwpx_member_failures(tracked, WORKSTATION_PATH, private_markers))
     failures.extend(_action_pin_failures(tracked))
-    if kind == "mcp":
-        failures.extend(_mcp_runtime_failures(tracked))
+    failures.extend(_shipped_source_stage_failures(tracked))
+    if kind == "automation":
+        failures.extend(_automation_runtime_failures(tracked))
     failures.extend(_wheel_failures())
+    failures.extend(_sdist_failures())
     if failures:
         for failure in failures:
             print(f"[FAIL] {failure}")

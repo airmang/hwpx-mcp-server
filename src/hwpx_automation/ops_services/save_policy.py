@@ -83,7 +83,7 @@ class SavePolicy:
                 document, target, quality=quality
             )
         except quality_contract.CapabilitySkewError as exc:
-            # Fail closed on core/mcp/plugin skew (plan §2 Phase F).
+            # Fail closed on core/automation/plugin skew (plan §2 Phase F).
             raise self._context._new_error(
                 "CAPABILITY_SKEW",
                 f"capability handshake skew; writes are blocked: {exc}",

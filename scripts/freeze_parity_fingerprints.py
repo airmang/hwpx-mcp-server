@@ -4,14 +4,14 @@
 ``python-hwpx`` is being reduced to a library: ``hwpx.agent``,
 ``hwpx.authoring``/``builder``/``design``/``presets``, ``hwpx.exam``,
 ``hwpx.guidance_scan``, and the application half of ``hwpx.visual`` are
-scheduled for physical deletion from core once the MCP server is the
-canonical owner of that runtime. Five MCP tests assert "the MCP copy matches
+scheduled for physical deletion from core once the automation package is the
+canonical owner of that runtime. Five parity tests assert "the automation copy matches
 core's public shape" by importing both sides live; once core's side is
 deleted those imports break and the assertions have no subject.
 
 This script captures each of those core modules' public shape — via
 ``tests/parity_fingerprint.fingerprint()`` — into a checked-in JSON file
-*while core still has them*, so the tests can compare the live MCP module's
+*while core still has them*, so the tests can compare the live automation module's
 fingerprint against a frozen record instead of a live core import.
 
 Usage::
@@ -22,8 +22,10 @@ Usage::
 
 Core is resolved the same way ``tests/conftest.py`` resolves it for the test
 suite: an explicit ``PYTHON_HWPX_REPO`` pin, else the sibling worktree
-matching this repo's name (``hwpx-mcp-server-X`` -> ``python-hwpx-X``), else
-whatever ``hwpx`` is importable as. Never a bare unpinned ``../python-hwpx``.
+matching this repo's canonical or compatibility checkout name
+(``python-hwpx-automation-X``/``hwpx-mcp-server-X`` -> ``python-hwpx-X``),
+else whatever ``hwpx`` is importable as. Never a bare unpinned
+``../python-hwpx``.
 
 python-hwpx 5.0 (commit ``70d56ed``) physically removed a second wave of
 modules — agent, authoring, exam (already handled above), eval-plan,
@@ -68,7 +70,7 @@ from parity_fingerprint import fingerprint
 # hwpx.visual.oracle is NOT included in "exam": the exam parity test only
 # used core's NullOracle/WordBox as convenience fixture inputs (never
 # compared hwpx.visual.oracle's shape against anything), and the rewritten
-# test builds those fixtures from hwpx.form_fit.wordbox (stays) and the MCP
+# test builds those fixtures from hwpx.form_fit.wordbox (stays) and the automation
 # owner's own NullOracle instead. The "visual" domain freezes the full
 # hwpx.visual.oracle surface for hwpx_automation.office.rendering.oracle.
 DOMAINS: dict[str, tuple[str, ...]] = {
@@ -83,7 +85,7 @@ DOMAINS: dict[str, tuple[str, ...]] = {
         "hwpx.design",
         "hwpx.presets",
         # The standing ownership ledger names these two explicitly as
-        # mcp-migrate, and the MCP owner already carries both, so they go with
+        # automation-migrate, and the automation owner already carries both, so they go with
         # the rest of authoring rather than staying live because they happen to
         # sit under hwpx.tools.
         "hwpx.tools.advanced_generators",
@@ -136,7 +138,11 @@ HISTORICAL_DOMAINS: dict[str, tuple[str, ...]] = {
 
 
 def _matching_core_repo() -> Path:
-    return ROOT.parent / ROOT.name.replace("hwpx-mcp-server", "python-hwpx", 1)
+    name = ROOT.name
+    for prefix in ("python-hwpx-automation", "hwpx-mcp-server"):
+        if prefix in name:
+            return ROOT.parent / name.replace(prefix, "python-hwpx", 1)
+    return ROOT.parent / f".no-matching-core-for-{name}"
 
 
 def resolve_core_repo() -> Path:

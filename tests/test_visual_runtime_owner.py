@@ -59,7 +59,7 @@ def test_canonical_rendering_inventory_is_exact() -> None:
     assert canonical["status"] == "canonical"
 
 
-def test_production_runtime_symbols_resolve_to_mcp_owner() -> None:
+def test_production_runtime_symbols_resolve_to_automation_owner() -> None:
     bindings = (
         rendering.resolve_oracle,
         rendering.MacHancomOracle,
@@ -80,4 +80,4 @@ def test_tool_contract_is_exactly_unchanged() -> None:
     assert len(expected_tool_names(advanced=False)) == 119
     assert len(expected_tool_names(advanced=True)) == 127
     assert len(skill_required_tool_names()) == 28
-    assert contract_hash() == "e592ede5b0eb1a35"
+    assert contract_hash() == "0ce938371f0b55a6"

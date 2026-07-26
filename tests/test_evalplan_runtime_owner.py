@@ -48,13 +48,13 @@ def test_canonical_evalplan_inventory_is_complete() -> None:
     # 일을 막는다. 5.0 트레인에서 패키지가 hwpx_automation으로 바뀌며 파일
     # 내용이 달라져 함께 갱신했다 — LOC 2798은 그대로다.
     assert expected["manifestSha256"] == (
-        "ba65da4b137cc6b9737b3a44f9a84fbdd04787454f47fa7d8ab3a86533f75e3a"
+        "8db0d06b5035723d391a1a3589e7c8d2ca09945b3ad9734af60b12df2c8d252a"
     )
     assert hashlib.sha256(payload).hexdigest() == expected["manifestSha256"]
     assert canonical.__all__ == runtime.__all__
 
 
-def test_public_evalplan_bindings_use_the_mcp_owner() -> None:
+def test_public_evalplan_bindings_use_the_automation_owner() -> None:
     for name in canonical.__all__:
         binding = getattr(canonical, name)
         assert binding.__module__ == (

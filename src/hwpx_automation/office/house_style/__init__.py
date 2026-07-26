@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Typed house-style data service owned by the MCP application layer."""
+"""Typed house-style data service owned by the automation application layer."""
 from __future__ import annotations
 
 import copy

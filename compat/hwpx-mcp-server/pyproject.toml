@@ -17,7 +17,11 @@ description = "Compatibility shell — installs python-hwpx-automation[mcp] unde
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = ["python-hwpx-automation[mcp]==6.0.0"]
+
+[project.scripts]
+"hwpx-mcp-server" = "hwpx_automation.mcp_cli:main"
 
 # extra도 그대로 미러링한다. 런타임 오류 메시지가 사용자에게
 # `pip install "hwpx-mcp-server[ingest]"` 를 안내하는데, 셸에 그 extra가 없으면
@@ -32,7 +36,8 @@ oracle = ["python-hwpx-automation[oracle]==6.0.0"]
 vision = ["python-hwpx-automation[vision]==6.0.0"]
 
 [project.urls]
-Homepage = "https://github.com/airmang/hwpx-mcp-server"
+Homepage = "https://github.com/airmang/python-hwpx-automation"
+Issues = "https://github.com/airmang/python-hwpx-automation/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

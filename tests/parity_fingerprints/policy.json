@@ -13,8 +13,8 @@
     },
     "hwpx.tools.pii": {
       "Confidence": {
-        "kind": "function",
-        "signature": "(*args, **kwargs)"
+        "kind": "type_alias",
+        "value": "typing.Literal['high', 'low']"
       },
       "DEFAULT_POLICY": {
         "kind": "constant",

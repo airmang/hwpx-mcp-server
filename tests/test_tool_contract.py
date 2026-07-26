@@ -22,6 +22,7 @@ from hwpx_automation.fastmcp_adapter import (
 from hwpx_automation.tool_contract import (
     BASELINE_TOOL_SPECS,
     DOMAIN_SPECS,
+    MIN_AUTOMATION_VERSION,
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
@@ -155,16 +156,22 @@ def test_artifact_materializing_render_tools_are_marked_mutating() -> None:
 
 
 def test_release_contract_versions_counts_and_hash_are_exact() -> None:
-    assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
+    assert (
+        MIN_PYTHON_HWPX,
+        MIN_AUTOMATION_VERSION,
+        MIN_MCP_VERSION,
+        MIN_SKILL_VERSION,
+    ) == (
         "5.0.0",
+        "6.0.0",
         "6.0.0",
         "1.0.0",
     )
     assert len(expected_tool_names(advanced=False)) == 119
     assert len(expected_tool_names(advanced=True)) == 127
     assert len(skill_required_tool_names()) == 28
-    assert RELEASED_CONTRACT_HASH == "e592ede5b0eb1a35"
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "e592ede5b0eb1a35"
+    assert RELEASED_CONTRACT_HASH == "0ce938371f0b55a6"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "0ce938371f0b55a6"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 
@@ -365,7 +372,7 @@ def test_missing_frozen_core_authoring_symbol_does_not_break_mcp_startup() -> No
 
     code = """
 import hwpx
-assert not hasattr(hwpx, 'create_document_from_plan'), (
+assert 'create_document_from_plan' not in dir(hwpx), (
     'core still exposes an authoring name this package owns'
 )
 import hwpx_automation.server  # noqa: F401

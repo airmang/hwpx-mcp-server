@@ -6,7 +6,6 @@ import base64
 import json
 import logging
 import math
-import os
 import re
 import shutil
 import subprocess
@@ -14,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
+from ..configuration import env_value
 from ..hwp_converter import HwpConversionError, convert_hwp_to_hwpx
 from ..upstream import (
     export_document,
@@ -72,7 +72,7 @@ def _preview_slug(path: Path) -> str:
 
 
 def _chrome_executable() -> str | None:
-    env_path = os.environ.get("HWPX_MCP_CHROME_PATH")
+    env_path = env_value("CHROME_PATH")
     if env_path and Path(env_path).exists():
         return env_path
     for candidate in _CHROME_CANDIDATES:
@@ -267,7 +267,8 @@ class PreviewExportService:
                 "backend": None,
                 "message": (
                     "No screenshot backend available. Install playwright browsers "
-                    "or set HWPX_MCP_CHROME_PATH to a Chrome executable. "
+                    "or set HWPX_AUTOMATION_CHROME_PATH (legacy HWPX_MCP_CHROME_PATH) "
+                    "to a Chrome executable. "
                     f"Playwright import error: {playwright_error}"
                 ),
             }
@@ -500,7 +501,8 @@ class PreviewExportService:
         if status in {"blocked", "partial"}:
             suggestion = (
                 "Open preview.html manually or install a headless browser backend "
-                "(Playwright browsers or Chrome via HWPX_MCP_CHROME_PATH) and rerun render_preview."
+                "(Playwright browsers or Chrome via HWPX_AUTOMATION_CHROME_PATH; "
+                "legacy HWPX_MCP_CHROME_PATH is also accepted) and rerun render_preview."
             )
 
         visual_review = {

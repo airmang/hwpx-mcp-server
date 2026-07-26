@@ -12,13 +12,18 @@
   "canonical": {
     "status": "canonical",
     "pythonFiles": 10,
-    "loc": 2704,
-    "manifestSha256": "9587ff0e479f7d221e5202a51ee3635293794a16272e1e89a68b9a3dfd1e7676",
+    "loc": 2718,
+    "manifestSha256": "1ecd84fee985862dc93318b545498b151bfc9118b72acff2944b5c20d9121158",
+    "nomenclatureRefrozenFrom": {
+      "loc": 2704,
+      "manifestSha256": "9587ff0e479f7d221e5202a51ee3635293794a16272e1e89a68b9a3dfd1e7676",
+      "reason": "Canonical product ownership wording changed from MCP to automation; protocol and behavior are unchanged."
+    },
     "frozenAtNote": "S-104 동결값 loc=2001 sha=4b63f85703896fe8…에서 재계산. 코드가 바뀐 게 아니라 소유자가 core에 있던 4개 모듈을 받았기 때문이다. 동결은 드리프트를 막으려는 것이지 이동을 막으려는 것이 아니므로, 이유와 함께 다시 얼린다.",
     "refrozenFrom": {
       "loc": 2704,
-      "manifestSha256": "8ceb4f808a6a024262629b73a1e1d262722ea347a5784e382a1ce10118e1b53a",
-      "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
+      "manifestSha256": "0b858d49694b9b11293b52b379a4351a55504e56ee9cc17707399c6821f9f02e",
+      "reason": "Lazy automation rendering exports gained TYPE_CHECKING declarations and a runtime patch-preserving resolver; runtime behavior and tool contract are unchanged."
     }
   },
   "packageFiles": [
@@ -49,7 +54,7 @@
       "hwpx.visual.qa_contracts",
       "hwpx.visual.report"
     ],
-    "mcpRuntime": [
+    "automationRuntime": [
       "Hancom discovery and binding",
       "Windows COM and Mac GUI oracle execution",
       "serialized worker lifecycle and runtime policy",
@@ -90,15 +95,15 @@
   ],
   "compatibilityPolicy": {
     "coreLine": "4.x",
-    "featureWork": "MCP canonical owner only",
+    "featureWork": "automation canonical owner only",
     "mirrors": "correctness-or-security-only with parity test and receipt",
-    "removalGate": "S-106 observation followed by separately approved S-107 core major"
+    "removalGate": "public observation followed by a separately approved core major"
   },
   "toolContract": {
     "default": 119,
     "advanced": 127,
     "skillRequired": 28,
-    "hash": "e592ede5b0eb1a35"
+    "hash": "0ce938371f0b55a6"
   },
-  "packageFilesNote": "S-104가 동결한 6개에서 10개로 늘었다. 늘어난 4개(block_splits·detectors·diff·qa_contracts)는 신규 코드가 아니라 core가 계속 들고 있던 것이고, 이 소유자의 oracle이 그중 셋을 core에서 import하고 있었다. 5.0 경계 마감으로 실소유자에게 왔다."
+  "packageFilesNote": "이전 6-file 동결에서 10개로 늘었다. 늘어난 4개(block_splits·detectors·diff·qa_contracts)는 신규 코드가 아니라 core가 계속 들고 있던 것이고, 이 소유자의 oracle이 그중 셋을 core에서 import하고 있었다. 5.0 경계 마감으로 실소유자에게 왔다."
 }

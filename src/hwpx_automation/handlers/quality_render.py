@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Stateless HWPX MCP 서버."""
+"""Quality and render automation handlers for the optional MCP adapter."""
 
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ from hwpx import (
     inspect_reference_consistency as inspect_hwpx_reference_consistency,
 )
 
+from ..configuration import env_float, env_value
+from ..identity import product_identity
 from ..fastmcp_adapter import snapshot_runtime_tools
 from ..office.authoring import (
     inspect_operating_plan_quality as inspect_operating_plan_document_quality,
@@ -50,7 +52,6 @@ from ..workspace import (
 from ._shared import (
     _capability_block,
     _diff_sources,
-    _env_float,
     _inspect_authoring_quality,
     _package_version,
     _proposal_quality_fallback,
@@ -262,7 +263,7 @@ def describe_capabilities(domain: str | None = None) -> dict:
 
 def mcp_server_health() -> dict:
     """MCP 서버 transport와 timeout/keepalive 점검 정보를 반환합니다."""
-    transport = os.environ.get("HWPX_MCP_TRANSPORT", "stdio")
+    transport = env_value("TRANSPORT", "stdio")
     try:
         workspace = WorkspaceResolver.from_environment().describe()
     except WorkspaceConfigurationError as exc:
@@ -328,7 +329,14 @@ def mcp_server_health() -> dict:
         if values:
             surface_details.append(f"{label}: {', '.join(values)}")
     return {
-        "server": "hwpx-mcp-server",
+        "server": "python-hwpx-automation",
+        "serverInfo": {
+            "name": "python-hwpx-automation",
+            "canonicalMcpConsole": "hwpx-automation-mcp",
+            "compatibilityMcpConsoles": ["hwpx-mcp-server"],
+            "hostConfigKeyRole": "host-local-alias",
+        },
+        "productIdentity": product_identity(),
         "version": _package_version("python-hwpx-automation"),
         "pythonHwpxVersion": _package_version("python-hwpx"),
         "skillBundleVersion": os.environ.get("HWPX_SKILL_VERSION", "unknown"),
@@ -379,9 +387,8 @@ def mcp_server_health() -> dict:
             "pageAndTableInternals": "HWP units are internal implementation details; MCP tools should prefer mm/pt/% labels.",
             "verification": "public unit conversions are enforced by the automated test suite",
         },
-        "fetch_timeout_seconds": _env_float(
-            "HWPX_MCP_FETCH_TIMEOUT_SECONDS",
-            _DEFAULT_FETCH_TIMEOUT_SECONDS,
+        "fetch_timeout_seconds": env_float(
+            "FETCH_TIMEOUT_SECONDS", _DEFAULT_FETCH_TIMEOUT_SECONDS
         ),
         "max_chars": default_max_chars(),
         "workspace": workspace,

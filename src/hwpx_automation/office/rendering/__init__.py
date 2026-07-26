@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Canonical Hancom rendering owner for the MCP application layer.
+"""Canonical Hancom rendering owner for the automation application layer.
 
 The package owns runtime discovery, renderer execution, serialized worker
 policy, fixture orchestration, and visual-QA measurement.  ``python-hwpx``
@@ -10,10 +10,21 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from hwpx.quality import SavePipeline
 from hwpx.quality.rendering import EditMask, VisualReport
+
+if TYPE_CHECKING:
+    from .oracle import (
+        MacHancomOracle,
+        NullOracle,
+        RenderBackend,
+        RenderOracle,
+        WindowsComOracle,
+        resolve_oracle,
+        visual_check,
+    )
 
 _ORACLE_EXPORTS = (
     "MacHancomOracle",
@@ -49,6 +60,13 @@ def __dir__() -> list[str]:
     return sorted({*globals(), *_ORACLE_EXPORTS})
 
 
+def _runtime_export(name: str) -> Any:
+    """Resolve a lazy export while preserving an explicit runtime patch."""
+
+    value = globals().get(name)
+    return value if value is not None else __getattr__(name)
+
+
 class HancomRenderBackend:
     """Adapt a discovered Hancom render transport to the core check protocol."""
 
@@ -69,12 +87,10 @@ class HancomRenderBackend:
         work_dir: str | None = None,
         keep_artifacts: bool = False,
     ) -> VisualReport:
-        import sys
-
-        # Module-object lookup, not a direct submodule import: a test that
+        # Module-dict lookup, not a direct submodule import: a test that
         # patches ``rendering.visual_check`` must still win, and __getattr__
         # only runs when the name is absent from the module dict.
-        return getattr(sys.modules[__name__], "visual_check")(
+        return _runtime_export("visual_check")(
             before_hwpx,
             after_hwpx,
             oracle=self._oracle,
@@ -93,16 +109,14 @@ def resolve_hancom_backend(*, dpi: int = 150, **_options: Any) -> HancomRenderBa
 
 
 def resolve_hancom_oracle(*, dpi: int = 150, **_options: Any) -> Any:
-    """Return the canonical Hancom transport at the MCP boundary."""
+    """Return the canonical Hancom transport at the automation boundary."""
 
-    import sys
-
-    return getattr(sys.modules[__name__], "resolve_oracle")(dpi=dpi)
+    return _runtime_export("resolve_oracle")(dpi=dpi)
 
 
 @contextmanager
 def bind_document_rendering(document: Any) -> Iterator[None]:
-    """Temporarily bind MCP-owned rendering to one core document save."""
+    """Temporarily bind automation-owned rendering to one core document save."""
 
     sentinel = object()
     previous = getattr(document, "_save_pipeline", sentinel)

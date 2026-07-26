@@ -11,7 +11,8 @@
 대응하는 ``hwpx_automation`` 모듈을 로드해 옛 이름으로도 등록한다. 서브모듈을
 하나씩 베껴 적는 방식이면 새 이름에 무언가 추가될 때마다 여기가 낡는다.
 
-한 major 동안만 산다. 그동안 접근할 때마다 새 경로를 알려준다.
+    6.x 동안 지원한다. 제거는 7.0 이전에는 하지 않으며 최소 90일 공개
+    관찰과 별도 오너 승인이 필요하다.
 """
 
 from __future__ import annotations
@@ -21,13 +22,21 @@ import sys
 import warnings
 from importlib.abc import Loader, MetaPathFinder
 from importlib.machinery import ModuleSpec
+from importlib.metadata import PackageNotFoundError, version
 from types import ModuleType
 from typing import Any, Sequence
 
-__all__: list[str] = []
+__all__ = ["__version__"]
 
 _OLD = "hwpx_mcp_server"
 _NEW = "hwpx_automation"
+
+try:
+    __version__ = version("hwpx-mcp-server")
+except PackageNotFoundError:
+    # Source-tree execution only. A valid installed compatibility shell always
+    # has its own metadata and an exact canonical dependency.
+    __version__ = importlib.import_module(_NEW).__version__
 
 
 def _warn(old_name: str) -> None:
@@ -66,8 +75,15 @@ class _AliasFinder(MetaPathFinder):
         new_name = fullname.replace(_OLD, _NEW, 1)
         try:
             importlib.import_module(new_name)
-        except ImportError:
-            return None
+        except ModuleNotFoundError as exc:
+            # Only translate "the requested canonical module does not exist"
+            # into the normal legacy-module-not-found result.  A dependency
+            # imported *inside* an existing canonical module must retain its
+            # original traceback; swallowing it hid broken optional/runtime
+            # dependencies as a misleading migration error.
+            if exc.name == new_name:
+                return None
+            raise
         _warn(fullname)
         return ModuleSpec(fullname, _AliasLoader(new_name))
 

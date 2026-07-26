@@ -17,9 +17,12 @@ from pathlib import Path, PurePath, PureWindowsPath
 from typing import Iterable
 from urllib.parse import unquote, urlsplit
 
+from .configuration import canonical_env_name, legacy_env_name
 
-WORKSPACE_ROOTS_ENV = "HWPX_MCP_WORKSPACE_ROOTS"
-LEGACY_SANDBOX_ROOT_ENV = "HWPX_MCP_SANDBOX_ROOT"
+
+WORKSPACE_ROOTS_ENV = canonical_env_name("WORKSPACE_ROOTS")
+LEGACY_WORKSPACE_ROOTS_ENV = legacy_env_name("WORKSPACE_ROOTS")
+LEGACY_SANDBOX_ROOT_ENV = legacy_env_name("SANDBOX_ROOT")
 
 
 class WorkspaceConfigurationError(RuntimeError):
@@ -408,6 +411,13 @@ class WorkspaceResolver:
         explicit = os.environ.get(WORKSPACE_ROOTS_ENV)
         if explicit is not None:
             return cls(_normalize_roots(_split_roots(explicit)), WORKSPACE_ROOTS_ENV)
+
+        legacy_roots = os.environ.get(LEGACY_WORKSPACE_ROOTS_ENV)
+        if legacy_roots is not None:
+            return cls(
+                _normalize_roots(_split_roots(legacy_roots)),
+                LEGACY_WORKSPACE_ROOTS_ENV,
+            )
 
         legacy = os.environ.get(LEGACY_SANDBOX_ROOT_ENV)
         if legacy is not None:

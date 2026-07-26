@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Behavior parity between the MCP owner and the frozen core 4.x copy.
+"""Behavior parity between the automation owner and the frozen core 4.x copy.
 
 ``hwpx.evalplan_fill`` is gone from core as of python-hwpx 5.0. Structural
-claims (exports, signatures, dataclass fields) compare the live MCP module's
+claims (exports, signatures, dataclass fields) compare the live automation module's
 ``tests.parity_fingerprint.fingerprint()`` against
 ``tests/parity_fingerprints/evalplan.json``. ``RubricItem``/``RubricSubArea``
 are reachable module attributes but not in ``__all__`` (``Rubric.items``

@@ -240,7 +240,7 @@ class ConformanceCorpus:
 
     @classmethod
     def bundled(cls) -> "ConformanceCorpus":
-        """The packaged public corpus shipped under ``hwpx/conformance/corpus``."""
+        """The public repository-QA corpus under ``scripts/conformance/corpus``."""
 
         # The corpus travels with this harness, which lives outside the shipped
         # package as of 5.0 — importlib.resources would look in site-packages and

@@ -4,13 +4,14 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from ..configuration import env_value
 from ..storage import LocalDocumentStorage, require_hwpx_editor_open_safe
 from ..upstream import HwpxDocument, blank_document_template_bytes, open_document
 
 
 def _local_storage() -> LocalDocumentStorage:
     return LocalDocumentStorage(
-        auto_backup=os.environ.get("HWPX_MCP_AUTOBACKUP", "1") == "1",
+        auto_backup=env_value("AUTOBACKUP", "1") == "1",
     )
 
 

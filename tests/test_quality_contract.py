@@ -55,7 +55,9 @@ def test_dry_run_also_reports_visual_complete(tmp_path: Path):
 def test_doctor_reports_capability_handshake():
     cap = mcp_server_health()["capability"]
     assert cap["handshake"] == "hwpx.capability.v1"
-    assert set(cap["versions"]) == {"core", "mcp", "plugin"}
+    assert set(cap["versions"]) == {"core", "automation", "mcp", "plugin"}
+    assert cap["versions"]["automation"] == cap["versions"]["mcp"]
+    assert cap["minAutomationVersion"] == cap["minMcpVersion"]
     assert cap["savePipelineAvailable"] is True
     assert isinstance(cap["hash"], str) and cap["ok"] is True
     assert cap["writesBlocked"] is False
@@ -80,8 +82,14 @@ def test_resolve_policy_strict_and_dict_override():
 # Fail-closed on capability skew.
 # --------------------------------------------------------------------------- #
 _SKEW = {
-    "versions": {"core": "2.11.1", "mcp": "2.4.1", "plugin": "x"},
+    "versions": {
+        "core": "2.11.1",
+        "automation": "2.4.1",
+        "mcp": "2.4.1",
+        "plugin": "x",
+    },
     "minPythonHwpx": "2.24.1",
+    "minAutomationVersion": "2.18.1",
     "minMcpVersion": "2.18.1",
     "minSkillVersion": "0.1.25",
     "savePipelineAvailable": False,

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
-from pathlib import Path
 import zipfile
+from pathlib import Path
 
 try:
     import tomllib
@@ -14,6 +14,7 @@ from hwpx_automation import server
 from hwpx_automation.tool_contract import (
     BASELINE_TOOL_SPECS,
     DOMAIN_SPECS,
+    MIN_AUTOMATION_VERSION,
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
@@ -22,7 +23,6 @@ from hwpx_automation.tool_contract import (
     expected_tool_names,
     skill_required_tool_names,
 )
-
 
 ROOT = Path(__file__).resolve().parents[1]
 REMOVED_PRACTICE_TOOLS = {
@@ -108,8 +108,14 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
     assert len(default) == 119
     assert len(advanced) == 127
     assert len(skill_required_tool_names()) == 28
-    assert (MIN_PYTHON_HWPX, MIN_MCP_VERSION, MIN_SKILL_VERSION) == (
+    assert (
+        MIN_PYTHON_HWPX,
+        MIN_AUTOMATION_VERSION,
+        MIN_MCP_VERSION,
+        MIN_SKILL_VERSION,
+    ) == (
         "5.0.0",
+        "6.0.0",
         "6.0.0",
         "1.0.0",
     )
@@ -141,9 +147,9 @@ def test_public_hygiene_rejects_practice_source_and_wheel_members(
     hygiene = _load_hygiene_module()
 
     assert hygiene._forbidden_path(
-        "src/hwpx_automation/practice/runtime.py", "mcp"
+        "src/hwpx_automation/practice/runtime.py", "automation"
     )
-    assert hygiene._forbidden_path("tests/test_practice_runtime.py", "mcp")
+    assert hygiene._forbidden_path("tests/test_practice_runtime.py", "automation")
 
     dist = tmp_path / "dist"
     dist.mkdir()
@@ -170,4 +176,4 @@ def test_source_tree_has_no_internal_practice_runtime_markers() -> None:
         if path.is_file()
     ]
 
-    assert hygiene._mcp_runtime_failures(tracked_source) == []
+    assert hygiene._automation_runtime_failures(tracked_source) == []

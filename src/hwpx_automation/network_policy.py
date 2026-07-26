@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import ipaddress
-import os
 import socket
 import ssl
 from dataclasses import dataclass
@@ -19,8 +18,11 @@ from urllib.request import (
     build_opener,
 )
 
+from .configuration import canonical_env_name, env_value, legacy_env_name
 
-ALLOW_PRIVATE_NETWORK_ENV = "HWPX_MCP_ALLOW_PRIVATE_NETWORK"
+
+ALLOW_PRIVATE_NETWORK_ENV = canonical_env_name("ALLOW_PRIVATE_NETWORK")
+LEGACY_ALLOW_PRIVATE_NETWORK_ENV = legacy_env_name("ALLOW_PRIVATE_NETWORK")
 
 
 class NetworkPolicyError(ValueError):
@@ -34,8 +36,13 @@ class NetworkPolicyError(ValueError):
         return {"reason": self.reason}
 
 
-def _env_enabled(name: str) -> bool:
-    return os.environ.get(name, "").strip().casefold() in {"1", "true", "yes", "on"}
+def _private_network_enabled() -> bool:
+    return (env_value("ALLOW_PRIVATE_NETWORK", "") or "").strip().casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,7 +53,7 @@ class NetworkPolicy:
     @classmethod
     def from_environment(cls, *, allow_http: bool = False) -> "NetworkPolicy":
         return cls(
-            allow_private_network=_env_enabled(ALLOW_PRIVATE_NETWORK_ENV),
+            allow_private_network=_private_network_enabled(),
             allow_http=allow_http,
         )
 

@@ -6,6 +6,24 @@
       "official_notice",
       "report"
     ],
+    "templateAnalysisAgentSchema": {
+      "analysisSchemaVersion": "hwpx.template-analysis.v2",
+      "description": "Agent-oriented fields for template form-fit planning.",
+      "fieldGuide": {
+        "char_properties[].flags": "Decoded bold, italic, underline, and strikeout booleans.",
+        "section_layouts[].computed_body_width": "Writable body width in HWP units after page margins and gutter.",
+        "table_summaries[].cells[].margin": "Cell margin attributes in HWP units.",
+        "table_summaries[].cells[].runs[].style": "Run charPrIDRef resolved to decoded style flags and font faces.",
+        "table_summaries[].cells[].vert_align": "Cell subList vertical alignment.",
+        "table_summaries[].column_widths.widths": "Per-column widths reconstructed only from non-colspan cells."
+      },
+      "recommendedUse": [
+        "Choose target cells by row/col and span before planning replacements.",
+        "Use computed_body_width and column_widths to size generated tables.",
+        "Preserve run charPrIDRef when replacing text in styled cells."
+      ],
+      "schemaVersion": "hwpx.template-analysis.agent-schema.v1"
+    },
     "builderDocument": {
       "exportText": "1,234,567\n항목\t값\nA\t1",
       "openSafetyOk": true,

@@ -10,6 +10,7 @@ import pytest
 import hwpx_automation.workspace as workspace_module
 from hwpx_automation.workspace import (
     LEGACY_SANDBOX_ROOT_ENV,
+    LEGACY_WORKSPACE_ROOTS_ENV,
     WORKSPACE_ROOTS_ENV,
     WorkspaceConfigurationError,
     WorkspacePathError,
@@ -1007,5 +1008,25 @@ def test_explicit_invalid_env_root_fails_fast_not_deferred(
     monkeypatch.setenv(WORKSPACE_ROOTS_ENV, str(tmp_path / "does-not-exist"))
     # Explicit configuration errors surface at construction (fail fast); only the
     # unconfigured cwd fallback is deferred.
+    with pytest.raises(WorkspaceConfigurationError):
+        LocalDocumentStorage(auto_backup=False)
+
+
+@pytest.mark.parametrize(
+    "variable",
+    [WORKSPACE_ROOTS_ENV, LEGACY_WORKSPACE_ROOTS_ENV],
+)
+def test_canonical_and_legacy_invalid_workspace_roots_fail_fast(
+    variable: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hwpx_automation.storage import LocalDocumentStorage
+
+    monkeypatch.delenv(WORKSPACE_ROOTS_ENV, raising=False)
+    monkeypatch.delenv(LEGACY_WORKSPACE_ROOTS_ENV, raising=False)
+    monkeypatch.delenv(LEGACY_SANDBOX_ROOT_ENV, raising=False)
+    monkeypatch.setenv(variable, str(tmp_path / "does-not-exist"))
+
     with pytest.raises(WorkspaceConfigurationError):
         LocalDocumentStorage(auto_backup=False)

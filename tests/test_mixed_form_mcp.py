@@ -1320,6 +1320,7 @@ def test_canonical_apply_cleans_parent_swap_during_guarded_publish(
     source = root / "source.hwpx"
     output = parent / "output.hwpx"
     _build_fixture(source)
+    monkeypatch.delenv("HWPX_AUTOMATION_WORKSPACE_ROOTS", raising=False)
     monkeypatch.setenv("HWPX_MCP_WORKSPACE_ROOTS", str(root))
     compiled = server.analyze_form_fill(plan=_plan(source, output))["compiledPlan"]
     real_link = workspace_module.os.link
@@ -2748,6 +2749,7 @@ def test_specialized_snapshot_symlink_swap_never_reads_outside_bytes(
     secret_revision = "sha256:" + hashlib.sha256(secret).hexdigest()
     observed_revision_inputs: list[bytes] = []
     real_revision = mixed_form_adapter._revision_bytes
+    monkeypatch.delenv("HWPX_AUTOMATION_WORKSPACE_ROOTS", raising=False)
     monkeypatch.setenv("HWPX_MCP_WORKSPACE_ROOTS", str(root))
 
     def observe_revision(data: bytes) -> str:

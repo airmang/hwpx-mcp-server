@@ -15,7 +15,7 @@ Entry points::
 
     from conformance import ConformanceCorpus, run_conformance
     report = run_conformance(ConformanceCorpus.bundled())
-    # or: hwpx-conformance run --tier structural
+    # or: python scripts/run_conformance.py run --tier structural
 """
 from __future__ import annotations
 

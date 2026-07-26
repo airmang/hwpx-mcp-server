@@ -1014,7 +1014,7 @@ def _v2_toc_computed_field_issues(
     return issues
 
 
-# --- M3 (S-057) document-type -> design profile routing ------------------------
+# --- document-type -> design profile routing ----------------------------------
 # Maps a plan's document_type (Korean label or profile id) to a committed
 # hwpx.design profile. When it resolves, create_document_from_plan composes from
 # the harvested, Hancom-opens-clean profile skeleton instead of the from-scratch

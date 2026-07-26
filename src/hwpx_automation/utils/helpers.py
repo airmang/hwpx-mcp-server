@@ -1,18 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
-import os
-
+from ..configuration import env_int
 from ..workspace import WorkspaceResolver
 
 
 def default_max_chars() -> int:
-    raw = os.environ.get("HWPX_MCP_MAX_CHARS", "10000")
-    try:
-        value = int(raw)
-    except ValueError:
-        value = 10000
-    return max(1, value)
+    return max(1, env_int("MAX_CHARS", 10000))
 
 
 MAX_CHARS = default_max_chars()

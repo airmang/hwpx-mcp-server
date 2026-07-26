@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Stateless HWPX MCP 서버."""
+"""FastMCP runtime adapter for the canonical automation application."""
 
 from __future__ import annotations
 
 import json
-import os
 import re
 from typing import Any, cast
 
@@ -13,6 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from hwpx_automation.office.agent import AgentContractError
 
 from . import __version__
+from .configuration import env_value
 from . import quality as quality_contract
 from .errors import build_error_payload, mcp_code_for_error
 from .hwpx_ops import HwpxOperationError
@@ -138,7 +138,7 @@ def _gate_or_plain_error(
         return _error_data(
             build_error_payload(
                 code=gate.code,
-                message="설치된 core/MCP/plugin 기능 계약이 일치하지 않아 쓰기를 차단했습니다.",
+                message="설치된 core/automation/plugin 기능 계약이 일치하지 않아 쓰기를 차단했습니다.",
                 details={"capability": gate.state},
             ),
             tool_name=tool_name,
@@ -271,11 +271,11 @@ async def _strict_call_tool_handler(req: mcp_types.CallToolRequest):
 
 
 def _advanced_enabled() -> bool:
-    return os.environ.get("HWPX_MCP_ADVANCED", "0") == "1"
+    return env_value("ADVANCED", "0") == "1"
 
 
 def _compose_runtime(*, advanced: bool, replace: bool) -> tuple[FastMCP, Any]:
-    composed = FastMCP("hwpx-mcp-server")
+    composed = FastMCP("python-hwpx-automation")
     if replace:
         RUNTIME_SERVICES.reconfigure_runtime(
             mcp=composed,

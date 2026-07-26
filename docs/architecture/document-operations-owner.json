@@ -14,7 +14,12 @@
     "status": "canonical",
     "pythonFiles": 4,
     "loc": 183,
-    "manifestSha256": "504480de77ec0053f713725629ff675b46b4c35257ceb7644ee002e6d9743548",
+    "manifestSha256": "0211ca145d4d0c83dbbdb36f26e29009ec158ce29c6110d26b5d8bfa1ecb0da2",
+    "nomenclatureRefrozenFrom": {
+      "loc": 183,
+      "manifestSha256": "504480de77ec0053f713725629ff675b46b4c35257ceb7644ee002e6d9743548",
+      "reason": "Canonical product ownership wording changed from MCP to automation; behavior is unchanged."
+    },
     "refrozenFrom": {
       "loc": 183,
       "manifestSha256": "16fdc78fc1e13462809125a21bfbb54477d90ca84bd608361842926a0c99b62f",
@@ -26,21 +31,21 @@
       "hwpx.tools.doc_diff.diff_paragraphs",
       "hwpx.tools.doc_diff.doc_diff",
       "hwpx.tools.doc_diff.inspect_reference_consistency",
-      "hwpx.tools.mail_merge.load_mail_merge_rows",
       "hwpx.tools.mail_merge.inspect_mail_merge_placeholders",
+      "hwpx.tools.mail_merge.load_mail_merge_rows",
       "hwpx.tools.mail_merge.merge_template_rows",
       "hwpx.tools.redline.author_demo_redline",
-      "hwpx.tools.redline.inspect_redline_structure"
+      "hwpx.tools.redline.inspect_redline_structure",
+      "hwpx.tools.redline.verify_redline"
     ],
-    "mcpCanonical": [
+    "automationCanonical": [
       "office.document_ops.comparison.build_comparison_table_plan",
       "office.document_ops.mail_merge.build_mail_merge",
       "office.document_ops.redline.verify_redline"
     ],
     "coreCompatibility": [
       "hwpx.tools.doc_diff.build_comparison_table_plan",
-      "hwpx.tools.mail_merge.mail_merge",
-      "hwpx.tools.redline.verify_redline"
+      "hwpx.tools.mail_merge.mail_merge"
     ]
   },
   "approvedCoreImports": [
@@ -75,14 +80,14 @@
   ],
   "compatibilityPolicy": {
     "coreLine": "4.x",
-    "featureWork": "MCP canonical owner or generic core seam only",
+    "featureWork": "automation canonical owner or generic core seam only",
     "mirrors": "correctness-or-security-only with parity test and receipt",
-    "removalGate": "S-106 observation followed by separately approved S-107 core major"
+    "removalGate": "public observation followed by a separately approved core major"
   },
   "toolContract": {
     "default": 119,
     "advanced": 127,
     "skillRequired": 28,
-    "hash": "e592ede5b0eb1a35"
+    "hash": "0ce938371f0b55a6"
   }
 }

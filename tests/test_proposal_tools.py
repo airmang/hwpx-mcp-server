@@ -20,6 +20,7 @@ def _spec() -> dict:
 
 
 def test_create_and_inspect_proposal_document(tmp_path, monkeypatch):
+    monkeypatch.delenv("HWPX_AUTOMATION_WORKSPACE_ROOTS", raising=False)
     monkeypatch.setenv("HWPX_MCP_SANDBOX_ROOT", str(tmp_path))
     filename = str(tmp_path / "proposal.hwpx")
     result = server.create_proposal_document(filename, _spec())

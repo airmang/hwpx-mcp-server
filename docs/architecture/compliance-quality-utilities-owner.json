@@ -76,7 +76,7 @@
   ],
   "compatibilityPolicy": {
     "coreLine": "4.x",
-    "featureWork": "MCP canonical owner only",
+    "featureWork": "automation canonical owner only",
     "mirrors": "correctness-or-security-only with parity test and receipt",
     "removalGate": "public observation followed by separately approved core major"
   },
@@ -84,6 +84,6 @@
     "default": 119,
     "advanced": 127,
     "skillRequired": 28,
-    "hash": "e592ede5b0eb1a35"
+    "hash": "0ce938371f0b55a6"
   }
 }

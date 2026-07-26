@@ -10,7 +10,7 @@ be asked to upgrade before a fix is provided.
 Do not disclose vulnerabilities in a public issue, discussion, or pull request.
 Use GitHub's private vulnerability reporting form:
 
-<https://github.com/airmang/hwpx-mcp-server/security/advisories/new>
+<https://github.com/airmang/python-hwpx-automation/security/advisories/new>
 
 Include the affected version, transport, workspace-root configuration, a minimal
 reproducer, impact, and any suggested mitigation. We aim to acknowledge a report

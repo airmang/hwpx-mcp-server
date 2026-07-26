@@ -53,7 +53,7 @@ def test_canonical_inventory_and_provenance_are_exact() -> None:
     assert OWNER["canonical"]["status"] == "canonical"
 
 
-def test_production_handler_is_bound_to_mcp_owner() -> None:
+def test_production_handler_is_bound_to_automation_owner() -> None:
     assert specialized.compose_exam_into_form is exam.compose_exam_into_form
     assert specialized.measure_question_splits is exam.measure_question_splits
     assert specialized.ExamParseError is exam.ExamParseError
@@ -68,4 +68,4 @@ def test_tool_contract_is_exactly_unchanged() -> None:
     assert len(expected_tool_names(advanced=False)) == 119
     assert len(expected_tool_names(advanced=True)) == 127
     assert len(skill_required_tool_names()) == 28
-    assert contract_hash() == "e592ede5b0eb1a35"
+    assert contract_hash() == "0ce938371f0b55a6"

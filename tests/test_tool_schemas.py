@@ -56,5 +56,6 @@ def test_contract_payload_is_deterministic_and_contains_bound_schemas():
     first = contract_payload()
     second = contract_payload()
     assert first == second
+    assert first["minAutomationVersion"] == first["minMcpVersion"] == "6.0.0"
     assert len(first["tools"]) == 127
     assert all(tool["inputSchema"] and tool["outputSchema"] for tool in first["tools"])

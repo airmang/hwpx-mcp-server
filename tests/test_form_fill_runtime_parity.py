@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Behavior parity between the MCP owner and the frozen core 4.x copy.
+"""Behavior parity between the automation owner and the frozen core 4.x copy.
 
 ``hwpx.form_fit`` is not being deleted from core — MCP imports the fit family
 on purpose as a neutral contract (core's own table/field APIs call it too).
@@ -9,7 +9,7 @@ It is compared against live below, unchanged.
 python-hwpx 5.0. ``test_instruction_lexicon_parity`` already didn't need a
 live import (captured earlier into ``instructionSamplesExpected`` in the
 scenarios fixture below). ``test_split_run_scan_fill_and_refusal_parity``
-did need one — it compared core's split-run helpers against the MCP owner's.
+did need one — it compared core's split-run helpers against the automation owner's.
 Its expected outputs are now read from
 ``tests/parity_fingerprints/form_fill_module.golden.json``, captured from a
 scratch git worktree at the commit before removal (see

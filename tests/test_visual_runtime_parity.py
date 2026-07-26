@@ -7,7 +7,7 @@ for physical deletion from core once python-hwpx is reduced to a library, so
 this file no longer imports them. Instead:
 
 - Structural claims (exports, signatures, dataclass fields) compare the live
-  MCP modules' ``tests.parity_fingerprint.fingerprint()`` against
+  automation modules' ``tests.parity_fingerprint.fingerprint()`` against
   ``tests/parity_fingerprints/visual.json``, frozen from core while it still
   existed.
 - Behavioural claims with a deterministic, fixed-input value (the

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Shared path handling for the corpus QA scripts.
 
-This lived in corpus_pii_leak_sweep, whose PII rules moved to the MCP owner in
+This lived in corpus_pii_leak_sweep, whose PII rules moved to automation in
 5.0. Re-rooting a recorded output path against a corpus directory has nothing to
 do with personal information, and two scripts already depended on it, so it moves
 here instead of leaving with the part that did.

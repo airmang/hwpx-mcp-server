@@ -54,7 +54,7 @@ def test_canonical_form_fill_inventory_is_complete() -> None:
     assert len(canonical.__all__) == 25
 
 
-def test_all_form_fill_application_bindings_use_the_mcp_owner() -> None:
+def test_all_form_fill_application_bindings_use_the_automation_owner() -> None:
     """Workflow, seal, and residue behaviour is this layer's and must resolve here."""
 
     bindings = (

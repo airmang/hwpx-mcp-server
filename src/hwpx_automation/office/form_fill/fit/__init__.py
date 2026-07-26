@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Form-fit decision, reporting, and geometry owned by the MCP layer."""
+"""Form-fit decision, reporting, and geometry owned by the automation layer."""
 
 import hwpx_automation.office.form_fill.fit.seal as seal
 import hwpx_automation.office.form_fill.fit.wordbox as wordbox

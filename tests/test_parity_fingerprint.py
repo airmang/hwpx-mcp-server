@@ -4,6 +4,8 @@ a live module against a JSON file frozen in a previous process."""
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from types import ModuleType
 
 from parity_fingerprint import fingerprint
 
@@ -22,3 +24,14 @@ def test_fingerprint_output_is_json_serialisable_and_round_trips() -> None:
         result = fingerprint(module)
         text = json.dumps(result, sort_keys=True, ensure_ascii=False)
         assert json.loads(text) == result
+
+
+def test_parameterized_type_alias_has_a_cross_minor_kind() -> None:
+    module = ModuleType("synthetic_alias_owner")
+    module.__all__ = ["ValueSanitizer"]
+    module.ValueSanitizer = Callable[[str], str]  # type: ignore[attr-defined]
+
+    assert fingerprint(module)["ValueSanitizer"] == {
+        "kind": "type_alias",
+        "value": "collections.abc.Callable[[str], str]",
+    }

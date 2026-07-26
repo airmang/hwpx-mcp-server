@@ -5,13 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "python-hwpx-automation"
 version = "6.0.0"
-description = "MCP server for reading, editing, inspecting, and validating local HWPX documents with AI agents."
+description = "Task-oriented HWPX document automation for Python, with an optional MCP adapter."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10"
-keywords = ["hwpx", "hancom", "mcp", "model-context-protocol", "document-automation", "ai-agent"]
+keywords = ["hwpx", "hancom", "document-automation", "workflow", "mcp", "ai-agent"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -55,10 +55,13 @@ oracle = ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
 vision = ["pymupdf>=1.24", "pillow>=10.0", "numpy>=1.26"]
 test = [
     "pytest>=8.0",
+    "build>=1.2",
     # PEP 440 비교. 핀 검사가 5.0.0rc1을 5.0.0으로 오판하지 않게.
     "packaging>=23.0",
     "pytest-cov>=5.0",
     "jsonschema>=4.22",
+    # Parse the checked-in GitHub workflow and freeze cross-platform shell semantics.
+    "pyyaml>=6.0",
     "olefile>=0.47",
     "uvicorn>=0.30",
     "numpy>=1.26",
@@ -71,19 +74,16 @@ typecheck = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/airmang/hwpx-mcp-server"
-Issues = "https://github.com/airmang/hwpx-mcp-server/issues"
+Homepage = "https://github.com/airmang/python-hwpx-automation"
+Issues = "https://github.com/airmang/python-hwpx-automation/issues"
 
 [project.scripts]
-"hwpx-mcp-server" = "hwpx_automation.server:main"
 # Inherited from python-hwpx 5.0, which no longer declares it. Same command, same
-# subcommands; the agent runtime it drives has been canonical here since S-097.
+# subcommands; the agent runtime it drives is canonical in this package.
 "hwpx" = "hwpx_automation.office.agent.cli:main"
-
-# Co-located development: resolve python-hwpx from the sibling checkout.
-# This affects local `uv` resolution only; published metadata keeps the >=5.0.0 floor.
-[tool.uv.sources]
-python-hwpx = { path = "../python-hwpx", editable = true }
+# Canonical optional-adapter command. The bounded 6.x compatibility distribution
+# owns the old console so each executable has exactly one distribution owner.
+"hwpx-automation-mcp" = "hwpx_automation.mcp_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -97,6 +97,7 @@ where = ["src"]
 include = ["hwpx_automation*"]
 
 [tool.setuptools.package-data]
+"hwpx_automation" = ["identity.json", "public-modules.json", "py.typed"]
 "hwpx_automation.office.house_style" = ["data/*.json"]
 "hwpx_automation.office.authoring.design" = ["profiles/*/*", "profiles/*/fragments/*"]
 "hwpx_automation.office.rendering" = [
@@ -115,6 +116,12 @@ addopts = "-q"
 
 [tool.mypy]
 python_version = "3.10"
+# Type-check the product surface against the declared 3.10 language level,
+# independently of optional runtime dependency stubs installed in the runner.
+# Newer NumPy releases legitimately use newer stub syntax; parsing those stubs
+# under a 3.10 target made a clean `[oracle,test,typecheck]` install fail before
+# mypy reached this package even though third-party imports are already skipped.
+no_site_packages = true
 files = [
     "src/hwpx_automation/handlers",
     "src/hwpx_automation/ops_services",
@@ -145,8 +152,8 @@ warn_unused_ignores = false
 [tool.pyright]
 pythonVersion = "3.10"
 typeCheckingMode = "basic"
-# S-082: pyright now covers the same surface as mypy. The former exclusion
-# ("legacy dynamic python-hwpx objects") became stale after the S-080
+# Pyright now covers the same surface as mypy. The former exclusion
+# ("legacy dynamic python-hwpx objects") became stale after the architecture
 # decomposition and typing work — the whole set measures zero errors in basic
 # mode. New modules must enter BOTH gates or carry an itemized exclusion here.
 include = [
@@ -165,14 +172,14 @@ include = [
 ]
 reportMissingTypeStubs = false
 
-# Itemized residual exclusions (S-082). Every file below stays under mypy
+# Itemized residual exclusions. Every file below stays under mypy
 # (implicit_optional=true); pyright is deferred for exactly one reason:
 # [schema-frozen] tool-facing signatures use implicit-Optional defaults that
 #   generate the advertised FastMCP input schemas — rewriting them to explicit
 #   Optional changes the published contract and belongs to a contract-changing
 #   release, not a typing ramp.
 # The former [dynamic-seam] set (ops_services/{form_fields,save_policy,tables,
-#   transactions}.py and workflow/service.py) is resolved (S-088 P2): the core
+#   transactions}.py and workflow/service.py) is resolved: the core
 #   Path/str seam is typed and the guarded exact-sidecar publication is narrowed
 #   to LocalDocumentStorage at the consumers, so all five now pass pyright basic
 #   inside the gate with no exclusion.

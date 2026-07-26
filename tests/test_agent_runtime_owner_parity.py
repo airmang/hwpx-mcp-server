@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Parity between the MCP owner and core's frozen 4.x agent/blueprint/cli shape.
+"""Parity between the automation owner and core's frozen 4.x agent/blueprint/cli shape.
 
 ``hwpx.agent`` (and its ``blueprint``/``cli`` submodules) is scheduled for
 physical deletion from core once python-hwpx is reduced to a library, so
 this file imports nothing from it. Instead:
 
 - Structural claims (exports, signatures, dataclass fields, the ``EXIT_*``
-  constants) compare the live MCP module's
+  constants) compare the live automation module's
   ``tests.parity_fingerprint.fingerprint()`` against
   ``tests/parity_fingerprints/agent.json``, frozen from core while it still
   existed (see ``scripts/freeze_parity_fingerprints.py``).

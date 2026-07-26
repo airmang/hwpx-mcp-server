@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Verification/orchestration primitives for :func:`hwpx.agent.commands.apply_document_commands`.
 
-Split out of ``commands.py`` (S-088 P3, agent/commands.py:apply_document_commands
+Split out of ``commands.py`` so ``agent/commands.py:apply_document_commands``
 complexity decomposition) to keep that module under its enforced line-count
 ratchet.  Everything here is self-contained -- it depends only on
 ``hwpx.agent.model``/``hwpx.agent.document`` and absolute ``hwpx`` imports, never

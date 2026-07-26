@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Stateless HWPX MCP 서버."""
+"""Read and export automation handlers for the optional MCP adapter."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from urllib.request import Request
 from hwpx.ingest import DocumentIngestError, DocumentIngestor
 from hwpx.tools import read_fidelity as _read_fidelity
 
+from ..configuration import env_float, env_int
 from ..core.content import (
     collect_full_text,
     get_paragraph_text_from_doc,
@@ -37,10 +38,7 @@ from ..upstream import (
     open_document,
 )
 from ..utils.helpers import default_max_chars, resolve_path, truncate_response
-from ._shared import (
-    _env_float,
-    _with_document_state,
-)
+from ._shared import _with_document_state
 
 _OUTPUT_MODES = {"full", "chunks"}
 
@@ -88,17 +86,6 @@ def _deep_mask_pii(obj: Any, mask: bool = True) -> Any:
     return obj
 
 
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    try:
-        parsed = int(raw)
-    except ValueError:
-        return default
-    return max(1, parsed)
-
-
 def _normalize_output_mode(output: str | None) -> str:
     value = (output or "full").strip().lower()
     if value not in _OUTPUT_MODES:
@@ -117,7 +104,7 @@ def _normalize_chunk_strategy(chunk_strategy: str | None) -> str:
 
 def _resolve_chunk_size(max_chars_per_chunk: int | None) -> int:
     if max_chars_per_chunk is None:
-        return _env_int("HWPX_MCP_MAX_CHARS_PER_CHUNK", _DEFAULT_MAX_CHARS_PER_CHUNK)
+        return max(1, env_int("MAX_CHARS_PER_CHUNK", _DEFAULT_MAX_CHARS_PER_CHUNK))
     if max_chars_per_chunk <= 0:
         raise ValueError("max_chars_per_chunk must be greater than 0")
     return max_chars_per_chunk
@@ -135,10 +122,8 @@ def _looks_like_figure_caption(text: str) -> bool:
 
 
 def _download_hwpx_from_url(url: str, *, max_input_bytes: int) -> bytes:
-    request = Request(url, headers={"User-Agent": "hwpx-mcp-server/2"})
-    timeout = _env_float(
-        "HWPX_MCP_FETCH_TIMEOUT_SECONDS", _DEFAULT_FETCH_TIMEOUT_SECONDS
-    )
+    request = Request(url, headers={"User-Agent": "python-hwpx-automation/6"})
+    timeout = env_float("FETCH_TIMEOUT_SECONDS", _DEFAULT_FETCH_TIMEOUT_SECONDS)
     try:
         with open_url(
             request,
@@ -168,7 +153,7 @@ def _load_hwpx_payload(
     if use_base64 == use_url:
         raise ValueError("provide exactly one of hwpx_base64 or url")
 
-    max_input_bytes = _env_int("HWPX_MCP_MAX_INPUT_BYTES", _DEFAULT_MAX_INPUT_BYTES)
+    max_input_bytes = max(1, env_int("MAX_INPUT_BYTES", _DEFAULT_MAX_INPUT_BYTES))
     if use_base64:
         try:
             payload = base64.b64decode((hwpx_base64 or "").strip(), validate=True)

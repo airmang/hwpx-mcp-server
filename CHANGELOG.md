@@ -4,24 +4,59 @@
 
 ## [6.0.0] - unreleased
 
-The 5.0 train. `python-hwpx` 5.0 removes the application workflows it had been
-carrying as compatibility copies; this package, which has owned their canonical
-implementation since the 4.x line, becomes their only owner.
+The core-5.0/automation-6.0 train. `python-hwpx` 5.0 removes the application
+workflows it had been carrying as compatibility copies. The existing
+`hwpx-mcp-server` repository and history are renamed in place to
+`python-hwpx-automation`; this is the one canonical implementation, not a fork.
+
+### Added
+
+- The canonical distribution/import pair is now
+  `python-hwpx-automation` / `hwpx_automation`.
+- The base install exposes a curated task API and `python -m hwpx_automation`
+  without importing the optional MCP SDK.
+- `hwpx-automation-mcp` is the canonical MCP console. The existing
+  `hwpx-mcp-server` distribution, import namespace, and console remain bounded
+  6.x compatibility surfaces.
+- `hwpx_automation/identity.json` records canonical, compatibility, and
+  host-local identifiers. Compatibility removal is not before 7.0 and requires
+  at least 90 days of public notice/observation plus separate owner approval.
+- Native macOS and Windows jobs build clean core/canonical `[oracle]` wheels on
+  the minimum Python 3.10, then execute PyMuPDF extraction, Pillow
+  rasterization, and NumPy pixel access before verifying labelled
+  structural-only oracle degradation and the fail-closed MCP-without-`[mcp]`
+  path. No GUI application is launched.
 
 ### Changed — BREAKING
 
-- Version floors are now `python-hwpx>=5.0.0`, `hwpx-mcp-server>=6.0.0`, skill
+- Version floors are now `python-hwpx>=5.0.0`,
+  `python-hwpx-automation>=6.0.0`, skill
   `>=1.0.0`. A mixed install is exactly what these floors exist to prevent: core
   5.0 no longer has the modules a 5.x server would reach for.
 - This package now declares the `hwpx` console command, which `python-hwpx` 5.0
   stops declaring. Same command, same subcommands. Because declaring it requires
   core `>=5.0.0`, no valid install ends up with two packages claiming the name.
-- Contract `429cb6706323e762` → `e592ede5b0eb1a35` at an unchanged 119 default /
+- MCP `serverInfo.name`, health identity, and argparse program name now use the
+  canonical automation identity. Host configuration keys such as `hwpx` remain
+  host-local aliases.
+- `HWPX_AUTOMATION_*` is the canonical environment prefix. Existing
+  `HWPX_MCP_*` keys and the existing workflow-state path remain supported
+  fallbacks through 6.x to avoid silent configuration or state loss.
+- Frozen wire/receipt names that contain `mcp` remain exact in 6.x and are
+  classified explicitly in the identity manifest: `hwpx.mcp-error/v1`,
+  `versions.mcp`, `minMcpVersion`, `MIN_MCP_VERSION`, the `hwpx-mcp.*`
+  architecture receipts, and `mcpRuntimeMembers`. They are compatibility
+  identifiers, not product-ownership claims.
+- Contract `429cb6706323e762` → `0ce938371f0b55a6` at an unchanged 119 default /
   127 advanced / 28 skill-required. Names, order, schemas, classifications and
   error contracts are all identical — nothing a caller binds against moved. The
-  hash covers the version floors, which changed, and each tool's description:
-  `compose_exam` and `verify_question_splits` dropped an internal stage codename
-  from their Korean summaries. See `docs/tool-contract-delta-6.0.0.json`.
+  hash covers the version floors and identity/description/availability guidance:
+  `minAutomationVersion` is canonical while `minMcpVersion` remains an additive
+  6.x compatibility alias,
+  `compose_exam` and `verify_question_splits` dropped an internal stage codename,
+  and advanced-profile guidance names `HWPX_AUTOMATION_ADVANCED` first while
+  retaining `HWPX_MCP_ADVANCED` as a 6.x fallback. See
+  `docs/tool-contract-delta-6.0.0.json`.
 - `office.document_ops.verify_redline` delegates to core rather than carrying a
   parallel implementation. The owner's job is to *supply* a render backend, and
   a behavioural test now enforces that it does: core degrades honestly when
@@ -41,6 +76,11 @@ implementation since the 4.x line, becomes their only owner.
   stated plainly here because the observation issues promised otherwise.
 - `docs/tool-contract-delta-6.0.0.json` records the contract delta and the
   superseded intermediate hash.
+- Release state now advances at the coherent three-stack boundary. The
+  automation tag keeps `release-approved` and the old `currentPublic`, attaches
+  a plugin handoff receipt after observing canonical/compatibility publication,
+  and permits `released` only after the plugin GitHub Release, marketplace
+  entry, and a real marketplace install are also observed.
 
 ### Fixed
 
@@ -49,6 +89,17 @@ implementation since the 4.x line, becomes their only owner.
   commit before removal, and each was checked for discrimination by tampering
   with the frozen value — a parity test whose subject is gone can otherwise pass
   by comparing nothing to nothing.
+- Canonical office owners and architecture ledgers now consistently say
+  automation owner/application layer. MCP wording remains only where it names
+  the optional protocol adapter or a classified frozen compatibility identifier.
+- Retained core document-operation and form-fit primitives now have exact
+  module/symbol and installed-source-origin gates. A full transitive import of
+  all 172 base-public automation modules must make zero attempts to load the
+  removed `hwpx.form_fit.seal` or `hwpx.form_fit.wordbox` modules.
+- The guidance tool tests no longer skip on the deliberately removed
+  `hwpx.guidance_scan` compatibility module; all seven now exercise the
+  canonical automation owner. The release suite also installs `[oracle]`, so
+  imaging-path tests cannot disappear behind missing-extra skips.
 
 ## [5.1.0] - 2026-07-22
 

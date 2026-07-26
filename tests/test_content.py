@@ -1449,6 +1449,7 @@ def test_resolve_path_allows_absolute_paths_inside_sandbox_and_guides_outside(
     sandbox.mkdir()
     inside = sandbox / "doc.hwpx"
     outside = tmp_path / "outside.hwpx"
+    monkeypatch.delenv("HWPX_AUTOMATION_WORKSPACE_ROOTS", raising=False)
     monkeypatch.delenv("HWPX_MCP_WORKSPACE_ROOTS", raising=False)
     monkeypatch.setenv("HWPX_MCP_SANDBOX_ROOT", str(sandbox))
 

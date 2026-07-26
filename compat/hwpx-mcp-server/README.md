@@ -12,7 +12,14 @@ pip install hwpx-mcp-server          # 계속 동작 — automation[mcp]를 끌�
 pip install python-hwpx-automation   # 새 이름. MCP 없이 파이썬 API만
 ```
 
-`hwpx-mcp-server` 명령과 MCP server id는 **바뀌지 않았습니다.**
+기존 `hwpx-mcp-server` 명령은 6.x 호환 alias로 유지됩니다. 정식 MCP 명령은
+`hwpx-automation-mcp`, MCP `serverInfo.name`은 `python-hwpx-automation`입니다.
+호스트 설정의 `hwpx` key는 protocol identity가 아니라 각 호스트의 local alias입니다.
 
-`import hwpx_mcp_server`도 한 major 동안 동작하며 `DeprecationWarning`을 냅니다.
-새 이름은 `hwpx_automation`입니다.
+`import hwpx_mcp_server`와 공개 deep import는 6.x 동안 동작하며
+`DeprecationWarning`을 냅니다. 새 이름은 `hwpx_automation`입니다. 제거는 7.0
+이전에는 하지 않으며 최소 90일 공개 관찰과 별도 오너 승인이 필요합니다.
+
+`importlib.resources`의 package data는 복제하지 않습니다. 리소스 소비자는
+`importlib.resources.files("hwpx_automation")`을 사용해야 하며, 호환 셸에는
+shim 외의 구현·데이터 사본이 없습니다.

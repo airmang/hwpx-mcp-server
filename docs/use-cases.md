@@ -1,23 +1,32 @@
-# 🔧 HWPX MCP 서버 — 이런 것도 가능합니다
+# 🔧 python-hwpx-automation — 이런 것도 가능합니다
 
-> AI와 함께하는 한글(HWPX) 문서 자동화의 새로운 가능성
+> Python 자동화와 선택 MCP 어댑터로 여는 한글(HWPX) 문서 워크플로
 
 ---
 
-## HWPX MCP 서버란?
+## python-hwpx-automation이란?
 
-HWPX MCP 서버는 AI 어시스턴트(Claude, GPT 등)가 한글 문서(`.hwpx`)를 **직접 읽고, 쓰고, 편집**할 수 있게 해주는 도구입니다.
+`python-hwpx-automation`은 `python-hwpx` 위에서 한글 문서(`.hwpx`)를
+읽고, 쓰고, 편집하는 고수준 Python 자동화 제품입니다. AI 어시스턴트 연결은
+기본 제품과 분리된 선택 MCP 어댑터입니다.
 
 기존에는 한글 파일을 열어서 일일이 수작업으로 처리해야 했던 일을, 이제 자연어 요청으로 자동화할 수 있습니다.
 
-5.0.0 major 경계의 기본 모드 119개(고급 모드 포함 총 127개)의 도구로 문서 생성,
+이 문서는 아직 공개되지 않은 6.0.0 source candidate를 기준으로 합니다.
+후보 좌표는 `python-hwpx 5.0.0 → python-hwpx-automation 6.0.0 →
+hwpx-plugin 1.0.0`, 계약 해시는 `0ce938371f0b55a6`입니다. 현재 공개
+정본은 `python-hwpx 4.2.0 → hwpx-mcp-server 5.1.0 → hwpx-plugin 0.8.0`,
+계약 해시는 `429cb6706323e762`입니다. 원격 발행이 관찰되기 전에는 후보 좌표를
+현재 공개 릴리스라고 부르지 않습니다.
+
+6.0.0 후보의 기본 모드 119개(고급 모드 포함 총 127개)의 도구로 문서 생성,
 선언형 document-plan 생성, 운영 계획서 품질 프로필, 검색, 치환, 표 편집,
 서식 적용, HWPX repair/recover까지 처리할 수 있습니다.
 
-현재 MCP 표면, document-plan, form-fill, visual-review handoff 워크플로의
-문서화·테스트 기준 upstream 버전 바닥은 `python-hwpx >= 4.2.0`입니다.
-현재 설치 계약의 정본은 기본 119개/고급 127개/스킬 필수 28개,
-해시 `429cb6706323e762`이며 대응 스킬 바닥은 `0.8.0`입니다.
+후보 MCP 표면, document-plan, form-fill, visual-review handoff 워크플로의
+문서화·테스트 기준 upstream 버전 바닥은 `python-hwpx >= 5.0.0`입니다.
+후보 설치 계약은 기본 119개/고급 127개/스킬 필수 28개이며, automation
+바닥은 `6.0.0`, skill 바닥은 `1.0.0`입니다.
 호환·deprecated 도구는
 2026-10-31까지 모두 유지하며, 신규 호출의 canonical 경로와 rollback은
 [compatibility observation](compatibility-observation.md)을 따릅니다.
@@ -226,15 +235,18 @@ ZIP open이 실패하면 `recover=true`를 사용하고, `crcOk`,
 
 ```bash
 # 설치
-pip install python-hwpx-automation[mcp]
+pip install "python-hwpx-automation[mcp]"
 
 # 실행
-hwpx-mcp-server
+hwpx-automation-mcp
 ```
 
 업스트림 버전 참고:
 - `Python >= 3.10`
-- `python-hwpx >= 3.3.1`
+- `python-hwpx >= 5.0.0`
+
+6.x 호환 기간에는 기존 `hwpx-mcp-server` distribution과 console도
+동작하지만, 새 설정과 문서는 canonical 이름을 사용합니다.
 
 MCP 설정 예시:
 
@@ -242,8 +254,12 @@ MCP 설정 예시:
 {
   "mcpServers": {
     "hwpx": {
-      "command": "hwpx-mcp-server",
-      "args": []
+      "command": "uvx",
+      "args": [
+        "--from",
+        "python-hwpx-automation[mcp]==6.0.0",
+        "hwpx-automation-mcp"
+      ]
     }
   }
 }
@@ -289,12 +305,15 @@ Current workflow boundary:
 Layer ownership:
 
 - `python-hwpx` stays the upstream engine for HWPX/package behavior.
-- `hwpx-mcp-server` exposes the stable MCP product surface through `src/hwpx_automation/server.py`.
+- `python-hwpx-automation` owns the task API and exposes its optional MCP
+  adapter through `src/hwpx_automation/server.py`.
 - Skills and workflow examples orchestrate those tools; they do not replace core editing logic.
 
 ## Agent-first proposal document generation
 
-The MCP server generates proposal/planning documents through the canonical document-plan path and inspects the result with `inspect_document_quality`.
+The automation application generates proposal/planning documents through the
+canonical document-plan path and exposes the same flow through its optional MCP
+adapter. It inspects the result with `inspect_document_quality`.
 
 Recommended flow:
 

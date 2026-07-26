@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Hancom-bound redline verification at the MCP application boundary."""
+"""Hancom-bound redline verification at the automation application boundary."""
 
 from __future__ import annotations
 

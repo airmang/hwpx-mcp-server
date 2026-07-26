@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""MCP-owned HWPX quality-generation workflow.
+"""Automation-owned HWPX quality-generation workflow.
 
-The workflow is intentionally centered in ``hwpx-mcp-server`` rather than the
-core ``python-hwpx`` package.  It lets agents start from a form HWPX plus an
+The workflow is intentionally centered in ``python-hwpx-automation`` rather
+than the core ``python-hwpx`` package. It lets agents start from a form HWPX plus an
 idea/brief, apply a built-in quality profile, generate a candidate document,
 inspect quality, and return revision evidence without requiring a per-run
 quality-sample file.

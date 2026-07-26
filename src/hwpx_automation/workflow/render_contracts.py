@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Shared render contracts — the leaf both queue and transport sides import.
 
-S-081 extracted these from :mod:`rendering`/:mod:`render_queue` to remove the
+These contracts were extracted from :mod:`rendering`/:mod:`render_queue` to remove the
 last package import cycle: the v2 job/receipt/status models and the submission
 signature live here, and both former owners re-export them for compatibility.
 This module may import only the standard library and pydantic.

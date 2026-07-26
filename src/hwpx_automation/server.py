@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 
+from .configuration import env_int, env_value
 from .handlers import _shared, authoring, quality_render, read_export, specialized
 from . import quality as _quality_contract
 from .hwpx_ops import HwpxOps
@@ -34,17 +35,6 @@ measure_question_splits = specialized.measure_question_splits
 render_glyph_boxes = specialized.render_glyph_boxes
 extract_image_boxes = specialized.extract_image_boxes
 RemoteRenderClientV2 = _shared.RemoteRenderClientV2
-
-
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    try:
-        parsed = int(raw)
-    except ValueError:
-        return default
-    return max(1, parsed)
 
 
 # Explicit stable re-exports.  These are the exact objects in TOOL_BINDINGS.
@@ -192,22 +182,22 @@ def _replace_ops(ops: HwpxOps) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="hwpx-mcp-server")
+    parser = argparse.ArgumentParser(prog="hwpx-automation-mcp")
     parser.add_argument(
         "--transport",
         choices=("stdio", "streamable-http", "http"),
-        default=os.environ.get("HWPX_MCP_TRANSPORT", "stdio"),
+        default=env_value("TRANSPORT", "stdio"),
         help="MCP transport to use",
     )
     parser.add_argument(
         "--host",
-        default=os.environ.get("HWPX_MCP_HOST", "127.0.0.1"),
+        default=env_value("HOST", "127.0.0.1"),
         help="Host interface for streamable HTTP transport",
     )
     parser.add_argument(
         "--port",
         type=int,
-        default=_env_int("HWPX_MCP_PORT", 8000),
+        default=max(1, env_int("PORT", 8000)),
         help="TCP port for streamable HTTP transport",
     )
     parser.add_argument(
@@ -226,7 +216,8 @@ def main(argv: list[str] | None = None) -> None:
     try:
         storage = LocalDocumentStorage(auto_backup=False)
     except WorkspaceConfigurationError as exc:
-        # Explicit HWPX_MCP_WORKSPACE_ROOTS / --workspace-root configuration is
+        # Explicit HWPX_AUTOMATION_WORKSPACE_ROOTS (or its supported 6.x
+        # HWPX_MCP_WORKSPACE_ROOTS fallback) / --workspace-root configuration is
         # invalid: fail fast so the operator fixes the value. An unconfigured
         # degenerate cwd instead defers inside LocalDocumentStorage so the server
         # still boots and every document tool call reports WORKSPACE_ROOT_INVALID.

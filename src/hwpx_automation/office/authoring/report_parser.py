@@ -1,6 +1,6 @@
 """Parse pasted government-report text into a document-plan v2 mapping.
 
-Moved here in the 5.0 train. It had stayed in python-hwpx through the S-099
+Moved here in the 5.0 train. It had stayed in python-hwpx through the
 authoring migration, even though a Korean government report is an institutional
 genre and document-plan v2 is this layer's schema — and this package was already
 reaching into core to serve it as the parse_government_report_text tool.

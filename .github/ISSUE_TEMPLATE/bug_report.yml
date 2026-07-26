@@ -42,7 +42,7 @@ body:
     attributes:
       label: 버전
       description: "`mcp_server_health` 도구를 호출한 결과의 `version` 필드를 붙여넣어 주세요."
-      placeholder: "version: 4.3.0"
+      placeholder: "예: version: 5.1.0 (공개 정본) 또는 6.0.0 (후보)"
     validations:
       required: true
   - type: input
@@ -50,7 +50,7 @@ body:
     attributes:
       label: 환경
       description: OS / Python 버전 / 실행 방법(pip·uvx·plugin 등)
-      placeholder: "예: macOS 15 / Python 3.12 / uvx hwpx-mcp-server"
+      placeholder: "예: macOS 15 / Python 3.12 / hwpx-automation-mcp"
   - type: dropdown
     id: hancom-verified
     attributes:

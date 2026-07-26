@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import runpy
 from pathlib import Path
 
+import hwpx
 from hwpx_automation.handlers import authoring, specialized, tracked_changes
 from hwpx_automation.office.authoring import style_profile
 from hwpx_automation.tool_contract import (
@@ -26,6 +28,23 @@ OWNER = json.loads(
         / "document-operations-owner.json"
     ).read_text(encoding="utf-8")
 )
+RETAINED_CORE_SYMBOLS = {
+    "hwpx.tools.doc_diff": (
+        "diff_paragraphs",
+        "doc_diff",
+        "inspect_reference_consistency",
+    ),
+    "hwpx.tools.mail_merge": (
+        "inspect_mail_merge_placeholders",
+        "load_mail_merge_rows",
+        "merge_template_rows",
+    ),
+    "hwpx.tools.redline": (
+        "author_demo_redline",
+        "inspect_redline_structure",
+        "verify_redline",
+    ),
+}
 
 
 def _manifest() -> list[dict[str, str | int]]:
@@ -63,11 +82,21 @@ def test_owner_ledger_matches_source_inventory_and_contract() -> None:
         module: frozenset(names)
         for module, names in OWNER["forbiddenCoreCompatibilityCallables"].items()
     } == BOUNDARY["FROZEN_CORE_DOCUMENT_OPS_CALLABLES"]
+    assert OWNER["memberOwners"]["core"] == sorted(
+        f"{module}.{name}"
+        for module, names in RETAINED_CORE_SYMBOLS.items()
+        for name in names
+    )
+    assert set(OWNER["memberOwners"]) == {
+        "automationCanonical",
+        "core",
+        "coreCompatibility",
+    }
     assert OWNER["toolContract"] == {
         "default": 119,
         "advanced": 127,
         "skillRequired": 28,
-        "hash": "e592ede5b0eb1a35",
+        "hash": "0ce938371f0b55a6",
     }
 
 
@@ -102,6 +131,18 @@ def test_production_bindings_use_only_the_canonical_owner() -> None:
     )
 
 
+def test_retained_document_operation_symbols_have_exact_core_origins() -> None:
+    core_root = Path(hwpx.__file__).resolve().parent
+    for module_name, names in RETAINED_CORE_SYMBOLS.items():
+        module = importlib.import_module(module_name)
+        module_path = Path(module.__file__).resolve()
+        assert module_path.is_relative_to(core_root)
+        assert not module_path.is_relative_to(ROOT / "src" / "hwpx_automation")
+        for name in names:
+            value = getattr(module, name)
+            assert value.__module__ == module_name
+
+
 def test_boundary_rejects_frozen_callable_and_unapproved_seams() -> None:
     check = BOUNDARY["_document_ops_owner_import_violation"]
     canonical = (
@@ -122,4 +163,4 @@ def test_real_product_tree_and_tool_surface_are_exact() -> None:
     assert len(expected_tool_names(advanced=False)) == 119
     assert len(expected_tool_names(advanced=True)) == 127
     assert len(skill_required_tool_names()) == 28
-    assert contract_hash() == "e592ede5b0eb1a35"
+    assert contract_hash() == "0ce938371f0b55a6"

@@ -426,7 +426,7 @@ class FormFieldService:
         except Exception as exc:  # pragma: no cover - broken package guard
             raise self._context._new_error(
                 "EVALPLAN_FILL_UNAVAILABLE",
-                "installed hwpx-mcp-server does not provide the evalplan runtime",
+                "installed python-hwpx-automation does not provide the evalplan runtime",
             ) from exc
 
         blank = self._context._resolve_path(path)

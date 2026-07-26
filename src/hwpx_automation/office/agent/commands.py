@@ -39,7 +39,7 @@ from .story import (
     try_parse_header_story_path,
 )
 # Verification/orchestration primitives for apply_document_commands live in
-# _batch_verification (S-088 P3 split, keeps this file under its line-count
+# _batch_verification (split out to keep this file under its line-count
 # ratchet). _error_from_exception/_member_diff/_quality_policy/_revision are
 # re-exported here (explicit `as` aliases) because blueprint/replay.py still
 # imports them from this module.

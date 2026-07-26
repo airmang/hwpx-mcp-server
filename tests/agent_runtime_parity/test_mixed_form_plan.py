@@ -409,7 +409,7 @@ def test_evalplan_remains_available_and_exam_is_not_imported() -> None:
     import hwpx_automation.office.agent.form_plan as form_plan
 
     # hwpx.evalplan_fill no longer exists in core (removed in python-hwpx
-    # 5.0); the MCP owner is now the only implementation, so "evalplan is
+    # 5.0); the automation owner is now the only implementation, so "evalplan is
     # still available" points at hwpx_automation.office.evalplan.runtime.
     import hwpx_automation.office.evalplan.runtime as evalplan_runtime
 

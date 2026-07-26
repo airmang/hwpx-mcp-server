@@ -303,7 +303,7 @@ def apply_form_fill_workflow(
         doc = open_doc(str(tmp_destination))
         applied: list[dict[str, Any]] = []
         for _raw_mapping in plan.get("mappings", {}).get("resolved", []):
-            # PII compliance (S-059): mask the merged-in value (machine set on by
+            # PII compliance: mask the merged-in value (machine set on by
             # default) so neither the output doc nor the applied[] echo leaks raw PII.
             mapping = dict(_raw_mapping)
             if mask and mapping.get("value") is not None:

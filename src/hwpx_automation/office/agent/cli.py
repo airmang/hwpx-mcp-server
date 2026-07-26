@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import re
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -51,8 +52,23 @@ class CliUsageError(ValueError):
     pass
 
 
+class _HelpFormatter(argparse.HelpFormatter):
+    """Keep public CLI help byte-stable across supported Python minors."""
+
+    def __init__(self, prog: str) -> None:
+        super().__init__(prog, width=80)
+
+
 class _Parser(argparse.ArgumentParser):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("formatter_class", _HelpFormatter)
+        super().__init__(*args, **kwargs)
+
     def error(self, message: str) -> None:  # type: ignore[override]
+        # Python 3.10 quotes every choice while later argparse versions do not.
+        # Normalize only the parenthesized choice list; keep the invalid value's
+        # own quotes intact.
+        message = re.sub(r"'([^']*)'(?=, |\))", r"\1", message)
         raise CliUsageError(message)
 
 

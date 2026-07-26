@@ -2,7 +2,7 @@
 """apply_evalplan_fill MCP tool — the whole-form 평가계획 recipe surface.
 
 Uses the core repository's public blank form fixture (no owner PII) with the
-canonical MCP-owned evaluation-plan runtime and a synthetic review markdown.
+canonical automation-owned evaluation-plan runtime and a synthetic review markdown.
 """
 
 from __future__ import annotations

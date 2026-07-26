@@ -569,7 +569,7 @@ def test_compiled_plan_hash_rejects_tampering(tmp_path: Path) -> None:
 
 def test_evalplan_and_exam_remain_separate_from_mixed_contract() -> None:
     # hwpx.evalplan_fill no longer exists in core (removed in python-hwpx 5.0);
-    # the MCP owner is now the only implementation, so the "evalplan is still
+    # the automation owner is now the only implementation, so "evalplan is still
     # its own thing, not folded into the mixed-form contract" check points at
     # hwpx_automation.office.evalplan.runtime instead.
     from hwpx_automation.office.evalplan.runtime import fill_evalplan

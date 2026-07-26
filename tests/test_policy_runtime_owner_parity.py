@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Exact parity between the MCP owner and frozen core 4.x policy copies.
+"""Exact parity between the automation owner and frozen core 4.x policy copies.
 
 ``hwpx.tools.page_guard`` is not being removed (module-ownership ledger:
 "page-guard CLI retained") — it stays imported live and compared directly,
@@ -7,7 +7,7 @@ unchanged below.
 
 ``hwpx.tools.official_lint``, ``hwpx.tools.pii``, and ``hwpx.tools.table_compute``
 *are* all gone as of python-hwpx 5.0. Structural claims (exports, signatures,
-the two report-version constants) compare the live MCP modules'
+the two report-version constants) compare the live automation modules'
 ``tests.parity_fingerprint.fingerprint()`` against
 ``tests/parity_fingerprints/policy.json``. Behavioural claims (the lint/PII
 calls, the table computation, and the two public error shapes) compare

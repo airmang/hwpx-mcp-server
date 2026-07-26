@@ -25,11 +25,11 @@ reduced to a library, so this file no longer imports it. Instead:
 
 ``hwpx.oxml.document``, ``hwpx.document`` and ``hwpx.tools.package_validator``
 are not being deleted and stay imported live, unchanged from before.
-``WordBox`` comes from the MCP owner: core keeps the neutral fit contract —
+``WordBox`` comes from the automation owner: core keeps the neutral fit contract —
 policy, measure, engine, report, apply — but ``form_fit.wordbox`` is the
 application half, since reading a PDF needs an imaging stack. ``hwpx.visual.oracle`` *is* scheduled for
 deletion, but this file only ever used its ``NullOracle`` as an inert
-constructor argument — the MCP owner's own ``NullOracle`` fills that role
+constructor argument — the automation owner's own ``NullOracle`` fills that role
 just as well, so this file does not need visual.oracle frozen at all.
 
 Every assertion the pre-freeze version of this file made is still made here;

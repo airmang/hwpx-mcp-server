@@ -108,7 +108,7 @@ class DeterministicFixtureAdapter:
 
 
 class CoreDeterministicAdapter:
-    """Run the MCP-owned full-page detector orchestrator behind the adapter boundary."""
+    """Run the automation-owned full-page detectors behind the adapter boundary."""
 
     adapter_id = "python-hwpx-deterministic"
 

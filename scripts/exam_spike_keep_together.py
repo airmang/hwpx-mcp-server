@@ -188,7 +188,7 @@ def _build_variant(bed_path: str | None, variant: str, out_path: str) -> str:
 # Measurement.
 # ---------------------------------------------------------------------------
 # NOTE: _column_x_bounds, _group_blocks, and _measure_splits are now thin
-# wrappers that delegate to the MCP owner's exam.measure (DRY).  The spike passes its
+# wrappers that delegate to the automation owner's exam.measure (DRY). The spike passes its
 # own [[QNN]] marker so the grouping semantics are identical to before.
 
 def _group_blocks(glyphs) -> list[Block]:

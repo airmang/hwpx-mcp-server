@@ -3,7 +3,7 @@
   "release": "5.1.0",
   "changeKind": "additive-optional-parameter",
   "releaseStatus": "released",
-  "note": "S-095 HLP productization. apply_evalplan_fill gains a phase selector so the driver-free clean path (fill + core finalize) is reachable through the MCP surface in one call. The live contract_hash() has moved to PENDING_CONTRACT_HASH; RELEASED_CONTRACT_HASH stays frozen at the 5.0.0 receipt until the release train collapses the two. Not yet released.",
+  "note": "Released 5.1.0 receipt. apply_evalplan_fill gained a phase selector so the driver-free clean path (fill + core finalize) is reachable through the MCP surface in one call. The final observed contract hash is 429cb6706323e762.",
   "baseline": {
     "versions": {
       "pythonHwpx": "4.0.0",
@@ -80,8 +80,8 @@
   ],
   "coreDependency": {
     "capability": "hwpx.evalplan_fill.fill_evalplan(phase='clean') + finalize_evalplan",
-    "floorBumped": false,
-    "failClosed": "phase not in {structural, all, clean} raises EVALPLAN_PHASE_INVALID before any core call. phase='clean' is inert against a core build whose fill_evalplan lacks the clean branch (it degrades to 'all'); MIN_PYTHON_HWPX stays 4.0.0 in this branch. The released constant only flips at the release train."
+    "floorBumped": true,
+    "failClosed": "phase not in {structural, all, clean} raises EVALPLAN_PHASE_INVALID before any core call. The released distribution requires python-hwpx>=4.2.0, the first public core with the clean branch; resolver validation prevents the stale-core degradation path in a valid 5.1.0 install."
   },
-  "proof": "Holding version coordinates, classification, counts, domains, and every other tool fixed, the canonical payload delta is confined to apply_evalplan_fill: its inputSchema gains one optional string property (phase, default 'all'), which is not added to the required list. No tool is added, removed, renamed, or reclassified; the output schema is unchanged (contentReport is a free-form object that already carries the new finalize report); mutation/profile/skill-required flags are unchanged. Contract hash c2cd81fdb3089bae -> 41a685020447bd8b (recorded as PENDING_CONTRACT_HASH until release)."
+  "proof": "Holding classification, counts, domains, and every other tool fixed, the canonical payload delta is confined to the dependency/version floors and apply_evalplan_fill: its inputSchema gains one optional string property (phase, default 'all'), which is not added to the required list. No tool is added, removed, renamed, or reclassified; the output schema is unchanged (contentReport is a free-form object that already carries the new finalize report); mutation/profile/skill-required flags are unchanged. The observed released contract hash is c2cd81fdb3089bae -> 429cb6706323e762."
 }

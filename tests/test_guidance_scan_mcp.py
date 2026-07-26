@@ -2,7 +2,8 @@
 """scan_form_guidance MCP tool — universal form-fill Stage 1 recon surface.
 
 Uses the in-repo public blank evaluation-plan form fixture (no owner PII).
-Skips until the installed python-hwpx provides hwpx.guidance_scan.
+The guidance implementation is owned by ``hwpx_automation``; core 5.0 no
+longer provides the removed ``hwpx.guidance_scan`` compatibility module.
 """
 
 from __future__ import annotations
@@ -12,10 +13,6 @@ from pathlib import Path
 
 import pytest
 import hwpx
-
-pytest.importorskip(
-    "hwpx.guidance_scan", reason="requires python-hwpx with guidance_scan"
-)
 
 from hwpx_automation.hwpx_ops import HwpxOps
 from hwpx_automation.tool_contract import bound_tool_registry

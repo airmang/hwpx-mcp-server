@@ -16,43 +16,79 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          path: hwpx-mcp-server
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          repository: airmang/python-hwpx
-          # Exact public python-hwpx 3.3.1 release commit, verified before the
-          # dependency-ordered hwpx-mcp-server 4.3.0 publication.
-          ref: f6b79f010d40a190fa6a8391eb212835022b3851
-          path: python-hwpx
+          path: python-hwpx-automation
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
         run: |
-          python scripts/check_pinned_core_satisfies_floor.py ../python-hwpx
-          python -m pip install -e "../python-hwpx[visual,preview]"
-          python -m pip install -e ".[mcp,test,typecheck]"
+          # Release order is core -> automation -> compatibility -> plugin.
+          # A tag release must observe the exact public core rather than a
+          # sibling checkout or an unpublished branch.
+          python -m pip install "python-hwpx[visual,preview]==5.0.0"
+          python -m pip install -e ".[mcp,oracle,test,typecheck]"
+      - name: Observe public core dependency remote truth
+        working-directory: python-hwpx-automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from importlib.metadata import version
+          assert version("python-hwpx") == "5.0.0"
+          PY
+          gh release view v5.0.0 \
+            --repo airmang/python-hwpx \
+            --json tagName,isDraft,isPrerelease \
+            --jq 'select(.tagName == "v5.0.0" and (.isDraft | not) and (.isPrerelease | not)) | .tagName' \
+            | grep -Fx v5.0.0
       - name: Check public repository hygiene
-        working-directory: hwpx-mcp-server
-        run: python scripts/check_public_hygiene.py
+        working-directory: python-hwpx-automation
+        run: |
+          python scripts/check_public_hygiene.py
+          python scripts/check_transition_identity.py
       - name: Run first-stage Ruff gate
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
         run: ruff check --select E9,F .
       - name: Run release type and architecture gates
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
         run: |
           python -m mypy
           pyright --pythonpath "$(command -v python)"
           python scripts/check_architecture_ratchets.py
       - name: Run release-facing tests
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
         run: python -m pytest -q
+      - name: Run public 5.1 to 6.0 compatibility install matrix
+        working-directory: python-hwpx-automation
+        run: |
+          python -m pip install build
+          python -m pip wheel --no-deps --wheel-dir .compat-core-wheel \
+            "python-hwpx==5.0.0"
+          CORE_WHEEL=$(find .compat-core-wheel -name 'python_hwpx-*.whl' -print -quit)
+          python scripts/check_compat_install_matrix.py \
+            --core-wheel "${CORE_WHEEL}" \
+            --legacy-version 5.1.0
       - name: Verify generated ToolSpec documentation
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
         run: |
           python scripts/render_tool_contract.py --check --skip-skill
           python scripts/render_contract_delta.py --check
+      - name: Set up minimum supported Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.10"
+      - name: Gate minimum-Python clean wheel and optional boundaries
+        working-directory: python-hwpx-automation
+        run: |
+          python -m pip install "build>=1.2"
+          mkdir -p .minimum-core-wheel
+          python -m pip wheel --no-deps --wheel-dir .minimum-core-wheel \
+            "python-hwpx==5.0.0"
+          CORE_WHEEL=$(find .minimum-core-wheel -name 'python_hwpx-5.0.0-*.whl' -print -quit)
+          test -n "${CORE_WHEEL}"
+          python scripts/check_platform_optional_smoke.py \
+            --core-wheel "${CORE_WHEEL}"
 
   release:
     needs: prepublish
@@ -84,6 +120,17 @@ jobs:
           PY
           )
 
+          COMPAT_VERSION=$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          data = tomllib.loads(
+              Path('compat/hwpx-mcp-server/pyproject.toml').read_text(encoding='utf-8')
+          )
+          print(data['project']['version'])
+          PY
+          )
+
           CHANGELOG_VERSION=$(python - <<'PY'
           import re
           from pathlib import Path
@@ -105,6 +152,7 @@ jobs:
 
           echo "Tag version: ${TAG_VERSION}"
           echo "pyproject version: ${PYPROJECT_VERSION}"
+          echo "compat pyproject version: ${COMPAT_VERSION}"
           echo "changelog version: ${CHANGELOG_VERSION}"
 
           if [[ "${TAG_VERSION}" != "${PYPROJECT_VERSION}" ]]; then
@@ -112,10 +160,69 @@ jobs:
             exit 1
           fi
 
+          if [[ "${TAG_VERSION}" != "${COMPAT_VERSION}" ]]; then
+            echo "태그 버전(${TAG_VERSION})과 compat 버전(${COMPAT_VERSION})이 일치하지 않습니다." >&2
+            exit 1
+          fi
+
           if [[ "${TAG_VERSION}" != "${CHANGELOG_VERSION}" ]]; then
             echo "태그 버전(${TAG_VERSION})과 changelog 최신 버전(${CHANGELOG_VERSION})이 일치하지 않습니다." >&2
             exit 1
           fi
+
+          python - <<'PY'
+          import json
+          import re
+          import tomllib
+          from pathlib import Path
+
+          identity = json.loads(
+              Path("src/hwpx_automation/identity.json").read_text(encoding="utf-8")
+          )
+          release_state = identity["releaseState"]
+          if release_state["status"] != "release-approved":
+              raise SystemExit(
+                  "tag publish에는 별도 오너 승인 뒤의 release-approved 상태가 "
+                  "필요합니다. released는 plugin/marketplace/실제 설치까지 "
+                  "전체 3스택 원격 정본을 관찰한 뒤의 상태이므로 tag 전에 "
+                  "사용하면 안 됩니다."
+              )
+
+          version = tomllib.loads(
+              Path("pyproject.toml").read_text(encoding="utf-8")
+          )["project"]["version"]
+          candidate = release_state["candidate"]
+          current = release_state["currentPublic"]
+          if version != candidate["canonicalAutomation"]:
+              raise SystemExit(
+                  "release-approved candidate 버전이 tag와 일치하지 않습니다."
+              )
+          if current != {
+              "pythonHwpx": "4.2.0",
+              "primaryDistribution": "hwpx-mcp-server",
+              "primaryApplication": "5.1.0",
+              "plugin": "0.8.0",
+              "contractHash": "429cb6706323e762",
+          }:
+              raise SystemExit(
+                  "전체 3스택 원격 관찰 전 currentPublic를 candidate로 미리 "
+                  "승격하면 안 됩니다."
+              )
+          readme = Path("README.md").read_text(encoding="utf-8")
+          if "<!-- release-state: release-approved -->" not in readme:
+              raise SystemExit("README release-state: release-approved 표시가 없습니다.")
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          heading = re.search(
+              rf"^## \[{re.escape(version)}\] - (\d{{4}}-\d{{2}}-\d{{2}})$",
+              changelog,
+              re.MULTILINE,
+          )
+          if heading is None:
+              raise SystemExit(
+                  "tag release 전 CHANGELOG의 해당 버전 heading을 "
+                  "'## [x.y.z] - YYYY-MM-DD'로 확정해야 합니다."
+              )
+          PY
 
       - name: Extract latest changelog section for release notes
         run: |
@@ -144,33 +251,179 @@ jobs:
           Path('release_notes.md').write_text(section, encoding='utf-8')
           PY
 
-      - name: Build distributions
+      - name: Build canonical distribution
         run: |
           python -m pip install --upgrade build twine
           rm -rf dist build
-          python -m build
-          # 호환 배포도 함께 만든다. 이게 없으면 `pip install hwpx-mcp-server`와
-          # `uvx hwpx-mcp-server`가 6.0.0에서 끊긴다 — README와 수백 곳의 MCP
-          # 클라이언트 설정이 그 이름을 부르는데도.
-          rm -rf compat/hwpx-mcp-server/build
-          python -m build --outdir dist compat/hwpx-mcp-server
-          twine check dist/*
+          python -m build --outdir dist/canonical
+          twine check dist/canonical/*
           python scripts/check_public_hygiene.py
-          # 두 배포가 다 나왔는지 확인한다. 없는 것을 조용히 넘기면 절반만
-          # 발행되고, 그 절반이 옛 이름 쪽이다.
           python - <<'CHECK'
           import pathlib, sys
-          names = {p.name.split("-")[0] for p in pathlib.Path("dist").glob("*.whl")}
-          missing = {"python_hwpx_automation", "hwpx_mcp_server"} - names
-          if missing:
-              sys.exit(f"dist에 빠진 배포: {sorted(missing)} (있는 것: {sorted(names)})")
-          print(f"두 배포 확인: {sorted(names)}")
+          names = {
+              p.name.split("-")[0]
+              for p in pathlib.Path("dist/canonical").glob("*.whl")
+          }
+          if names != {"python_hwpx_automation"}:
+              sys.exit(f"canonical artifact selection failed: {sorted(names)}")
           CHECK
 
-      - name: Generate release SBOM
+      - name: Prebuild compatibility distribution before any publish
+        run: |
+          rm -rf compat/hwpx-mcp-server/build dist/compat
+          python -m build --outdir dist/compat compat/hwpx-mcp-server
+          twine check dist/compat/*
+          # The hygiene scanner walks dist recursively. Run it again only after
+          # the compatibility archives exist so all four release artifacts are
+          # covered before the first upload.
+          python scripts/check_public_hygiene.py
+          python - <<'CHECK'
+          import pathlib, sys
+          names = {
+              p.name.split("-")[0]
+              for p in pathlib.Path("dist/compat").glob("*.whl")
+          }
+          if names != {"hwpx_mcp_server"}:
+              sys.exit(f"compat artifact selection failed: {sorted(names)}")
+          CHECK
+
+      - name: Publish canonical automation to PyPI
+        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
+        with:
+          packages-dir: dist/canonical/
+
+      - name: Observe canonical PyPI truth before compatibility publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          for attempt in 1 2 3 4 5 6; do
+            rm -rf .canonical-remote
+            python -m venv .canonical-remote
+            if .canonical-remote/bin/python -m pip install \
+              "python-hwpx-automation[mcp]==${VERSION}"; then
+              .canonical-remote/bin/python - <<'PY'
+          import os
+          from importlib.metadata import version
+          expected = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          assert version("python-hwpx-automation") == expected
+          import hwpx_automation
+          import hwpx_automation.server
+          PY
+              break
+            fi
+            if [[ "${attempt}" == "6" ]]; then
+              echo "canonical PyPI artifact did not become observable" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Verify compatibility artifact resolves canonical remote
+        run: |
+          python -m venv .compat-candidate
+          .compat-candidate/bin/python -m pip install dist/compat/*.whl
+          .compat-candidate/bin/python -m pip check
+          .compat-candidate/bin/python - <<'PY'
+          from importlib.metadata import version
+          assert version("hwpx-mcp-server") == version("python-hwpx-automation")
+          import hwpx_mcp_server
+          import hwpx_mcp_server.office.exam
+          PY
+
+      - name: Publish compatibility shell to PyPI
+        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
+        with:
+          packages-dir: dist/compat/
+
+      - name: Observe compatibility PyPI truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          for attempt in 1 2 3 4 5 6; do
+            rm -rf .compat-remote
+            python -m venv .compat-remote
+            if .compat-remote/bin/python -m pip install \
+              "hwpx-mcp-server==${VERSION}"; then
+              .compat-remote/bin/python -m pip check
+              .compat-remote/bin/python - <<'PY'
+          import hwpx_mcp_server.office.exam
+          import hwpx_automation.office.exam
+          PY
+              break
+            fi
+            if [[ "${attempt}" == "6" ]]; then
+              echo "compatibility PyPI artifact did not become observable" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Write release-approved plugin handoff receipt
+        run: |
+          mkdir -p release-artifacts
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          identity = json.loads(
+              Path("src/hwpx_automation/identity.json").read_text(encoding="utf-8")
+          )
+          release_state = identity["releaseState"]
+          if release_state["status"] != "release-approved":
+              raise SystemExit("handoff receipt requires release-approved")
+          candidate = release_state["candidate"]
+          current_public = release_state["currentPublic"]
+          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          if version not in {
+              candidate["canonicalAutomation"],
+              candidate["compatibility"],
+          }:
+              raise SystemExit("tag does not match the automation train")
+
+          receipt = {
+              "schemaVersion": "python-hwpx-automation.plugin-handoff/v1",
+              "globalReleaseState": "release-approved",
+              "currentPublic": current_public,
+              "candidate": candidate,
+              "observedRemoteTruth": {
+                  "pythonHwpxPyPIAndGitHubRelease": candidate["pythonHwpx"],
+                  "canonicalAutomationPyPI": candidate["canonicalAutomation"],
+                  "compatibilityPyPI": candidate["compatibility"],
+              },
+              "automationGitHubRelease": {
+                  "tag": os.environ["GITHUB_REF_NAME"],
+                  "evidence": "this receipt is valid when attached to the successful release",
+              },
+              "remainingBeforeGlobalPromotion": {
+                  "pluginGitHubRelease": candidate["plugin"],
+                  "marketplaceEntry": candidate["plugin"],
+                  "realMarketplaceInstall": {
+                      "plugin": candidate["plugin"],
+                      "contractHash": candidate["contractHash"],
+                  },
+              },
+              "promotionForbiddenUntilRemainingObserved": True,
+          }
+          output = Path(
+              "release-artifacts/"
+              f"python-hwpx-automation-{os.environ['GITHUB_REF_NAME']}"
+              "-plugin-handoff.json"
+          )
+          output.write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True)
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Generate release SBOM after both automation PyPI observations
         run: |
           python -m venv .sbom-runtime
-          .sbom-runtime/bin/python -m pip install dist/*.whl
+          .sbom-runtime/bin/python -m pip install \
+            dist/canonical/*.whl dist/compat/*.whl
           python -m venv .sbom-tool
           .sbom-tool/bin/python -m pip install "cyclonedx-bom==7.3.0"
           mkdir -p release-artifacts
@@ -179,15 +432,39 @@ jobs:
             --mc-type application \
             --output-reproducible \
             --output-format JSON \
-            --output-file "release-artifacts/hwpx-mcp-server-${GITHUB_REF_NAME}.cdx.json"
-
-      - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
+            --output-file "release-artifacts/python-hwpx-automation-${GITHUB_REF_NAME}.cdx.json"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           body_path: release_notes.md
           files: |
-            dist/*
+            dist/canonical/*
+            dist/compat/*
             release-artifacts/*
+
+      - name: Observe automation GitHub Release and record plugin handoff
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RECEIPT_NAME="python-hwpx-automation-${GITHUB_REF_NAME}-plugin-handoff.json"
+          gh release view "${GITHUB_REF_NAME}" \
+            --json tagName,isDraft,isPrerelease \
+            --jq 'select((.isDraft | not) and (.isPrerelease | not)) | .tagName' \
+            | grep -Fx "${GITHUB_REF_NAME}"
+          gh release view "${GITHUB_REF_NAME}" \
+            --json assets --jq '.assets[].name' \
+            | grep -Fx "${RECEIPT_NAME}"
+          {
+            echo "### Automation publication observed; plugin handoff ready"
+            echo
+            echo "Core, canonical automation, compatibility, and this GitHub"
+            echo "Release have remote evidence. The global state remains"
+            echo "release-approved and currentPublic remains 4.2/5.1/0.8."
+            echo "Pass ${RECEIPT_NAME} to plugin publication. Only after the"
+            echo "plugin GitHub Release, marketplace entry, and a real marketplace"
+            echo "install are observed may a follow-up commit promote the coherent"
+            echo "5.0/6.0/1.0 stack to released."
+          } >> "${GITHUB_STEP_SUMMARY}"

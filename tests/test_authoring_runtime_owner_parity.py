@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Parity between the MCP authoring owner and core's frozen 4.x shape.
+"""Parity between the automation authoring owner and core's frozen 4.x shape.
 
 ``hwpx.authoring``, ``hwpx.builder``, ``hwpx.design``, and ``hwpx.presets``
 are scheduled for physical deletion from core once python-hwpx is reduced to
 a library, so this file no longer imports them live. Instead:
 
 - Structural claims (exports, signatures, dataclass fields) compare the live
-  MCP module's ``tests.parity_fingerprint.fingerprint()`` against
+  automation module's ``tests.parity_fingerprint.fingerprint()`` against
   ``tests/parity_fingerprints/authoring.json``, frozen from core while it
   still existed.
 - Behavioural claims that need an actual computed value (plan schema,
@@ -16,11 +16,10 @@ a library, so this file no longer imports them live. Instead:
   — values captured from that same frozen core commit and confirmed
   identical to MCP's own output at freeze time.
 
-``hwpx.tools.advanced_generators``, ``hwpx.tools.style_profile``,
-``hwpx.tools.template_analyzer``, and ``hwpx.tools.package_validator`` are
-*not* being deleted (they are plain ``hwpx.tools`` CLI/utility modules, not
-part of the authoring-runtime deletion) — those four stay imported live and
-compared directly, unchanged from before.
+The neutral part of ``hwpx.tools.template_analyzer`` remains in core and is
+compared live. Its agent-oriented schema member moved to the automation owner,
+so that one member is compared against its pre-removal frozen value instead of
+being incorrectly required on core 5.0.
 
 Every assertion the pre-freeze version of this file made is still made here;
 none needed dropping.
@@ -51,16 +50,18 @@ GOLDEN = json.loads(
     (_FIXTURES / "authoring.golden.json").read_text(encoding="utf-8")
 )["calls"]
 
-# hwpx.tools.template_analyzer stays core-native: it reads package structure
-# with hwpx.opc and the standard library only, so it is compared live.
+# The neutral template analyzer stays core-native: it reads package structure
+# with hwpx.opc and the standard library only, so its shared surface is compared
+# live. The agent-schema helper is the one automation-only member.
 LIVE_MODULE_PAIRS = ((core_template, mcp_template),)
+AUTOMATION_ONLY_TEMPLATE_MEMBERS = ("template_analysis_agent_schema",)
 FROZEN_MODULES = (
     ("hwpx.authoring", mcp_authoring),
     ("hwpx.builder", mcp_builder),
     ("hwpx.design", mcp_design),
     ("hwpx.presets", mcp_presets),
     # Named explicitly as mcp-migrate in the standing ownership ledger despite
-    # sitting under hwpx.tools, and already carried by the MCP owner.
+    # sitting under hwpx.tools, and already carried by the automation owner.
     ("hwpx.tools.advanced_generators", mcp_generators),
     ("hwpx.tools.style_profile", mcp_style),
 )
@@ -87,10 +88,16 @@ def _public_names(module: Any) -> list[str]:
     )
 
 
-def _assert_public_parity(left: Any, right: Any) -> None:
+def _assert_public_parity(
+    left: Any,
+    right: Any,
+    *,
+    right_only: tuple[str, ...] = (),
+) -> None:
     left_names = _public_names(left)
     right_names = _public_names(right)
-    assert left_names == right_names
+    assert [name for name in right_names if name not in right_only] == left_names
+    assert [name for name in right_names if name in right_only] == list(right_only)
     for name in left_names:
         left_value = getattr(left, name)
         right_value = getattr(right, name)
@@ -127,7 +134,11 @@ def _plan() -> dict[str, Any]:
 
 def test_live_tools_public_exports_and_signatures_are_exact() -> None:
     for core_module, mcp_module in LIVE_MODULE_PAIRS:
-        _assert_public_parity(core_module, mcp_module)
+        _assert_public_parity(
+            core_module,
+            mcp_module,
+            right_only=AUTOMATION_ONLY_TEMPLATE_MEMBERS,
+        )
 
 
 def test_frozen_authoring_modules_shape_matches_frozen_core() -> None:
@@ -163,7 +174,7 @@ def test_generators_and_style_profile_payloads_are_exact() -> None:
     """build_* / apply_style_profile_to_plan match the frozen core output.
 
     These two modules sit under ``hwpx.tools`` but the standing ownership ledger
-    names both explicitly as mcp-migrate, and the MCP owner already carries them,
+    names both explicitly as automation-migrate, and the automation owner carries them,
     so they leave with the rest of authoring. Their payloads are frozen like the
     others rather than compared against a copy that is about to disappear.
     """
@@ -257,7 +268,7 @@ def test_design_profile_registry_matches_frozen_core_and_template_analysis_is_ex
 ) -> None:
     # analyze_template lives in hwpx.tools.template_analyzer, which stays —
     # compared live, same as before. Its input file no longer needs core's
-    # create_document_from_plan; the MCP owner builds an equivalent fixture.
+    # create_document_from_plan; the automation owner builds an equivalent fixture.
     source = tmp_path / "source.hwpx"
     document = mcp_authoring.create_document_from_plan(_plan())
     try:
@@ -266,8 +277,10 @@ def test_design_profile_registry_matches_frozen_core_and_template_analysis_is_ex
         document.close()
 
     assert mcp_design.available_profiles() == GOLDEN["availableProfiles"]
-    assert core_template.template_analysis_agent_schema() == (
+    assert not hasattr(core_template, "template_analysis_agent_schema")
+    assert (
         mcp_template.template_analysis_agent_schema()
+        == GOLDEN["templateAnalysisAgentSchema"]
     )
     assert dataclasses.asdict(core_template.analyze_template(source)) == (
         dataclasses.asdict(mcp_template.analyze_template(source))

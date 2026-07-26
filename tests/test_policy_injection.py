@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""PII policy injection remains explicit at MCP-owned workflow seams."""
+"""PII policy injection remains explicit at automation-owned workflow seams."""
 from __future__ import annotations
 
 import importlib

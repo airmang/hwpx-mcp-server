@@ -20,24 +20,44 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Mapping
 
-from .fastmcp_adapter import (
-    describe_callables,
-    register_canonical_tool,
-    snapshot_runtime_tools,
-)
-
-
 MIN_PYTHON_HWPX = "5.0.0"
 # The 5.0 train: core drops the workflow surfaces and the `hwpx` console name,
 # this package picks the name up, and the plugin pins both. The three move
 # together — a mixed set is what "no valid install has two declarers" rules out.
-MIN_MCP_VERSION = "6.0.0"
+MIN_AUTOMATION_VERSION = "6.0.0"
+# Compatibility alias retained in the 6.x contract payload for existing health
+# and plugin consumers. New code and documentation use the automation name.
+MIN_MCP_VERSION = MIN_AUTOMATION_VERSION
 MIN_SKILL_VERSION = "1.0.0"
 # Frozen release receipt for non-runtime services. Runtime construction still
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "e592ede5b0eb1a35"
+RELEASED_CONTRACT_HASH = "0ce938371f0b55a6"
+
+
+def describe_callables(entries: Any) -> Any:
+    """Load the optional FastMCP schema adapter only for explicit binding."""
+
+    from .fastmcp_adapter import describe_callables as implementation
+
+    return implementation(entries)
+
+
+def register_canonical_tool(*args: Any, **kwargs: Any) -> Any:
+    """Load the optional FastMCP registrar only for explicit registration."""
+
+    from .fastmcp_adapter import register_canonical_tool as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def snapshot_runtime_tools(mcp: Any) -> Any:
+    """Load the optional FastMCP snapshot adapter only for runtime validation."""
+
+    from .fastmcp_adapter import snapshot_runtime_tools as implementation
+
+    return implementation(mcp)
 
 
 class ToolClassification(str, Enum):
@@ -225,7 +245,7 @@ _COMPATIBILITY_REPLACEMENTS: dict[str, tuple[str, ...]] = {
     "fill_by_path": ("analyze_form_fill", "apply_form_fill", "verify_form_fill"),
 }
 
-# 5.0.0 major boundary (S-091): the three template-formfit facades demote from
+# At the 5.0.0 major boundary, the three template-formfit facades demote from
 # COMPATIBILITY to DEPRECATED. Their handlers and behaviour are unchanged; they
 # now carry the one-transition deprecation guidance toward the canonical
 # analyze/apply/verify_form_fill trio, exactly like the former stub group.
@@ -502,7 +522,10 @@ def _build_baseline_tool_specs() -> tuple[ToolSpec, ...]:
                 if internal
                 else AvailabilityReason(
                     code=AvailabilityReasonCode.PROFILE_DISABLED,
-                    message="set HWPX_MCP_ADVANCED=1 before server import",
+                    message=(
+                        "set HWPX_AUTOMATION_ADVANCED=1 before server import "
+                        "(HWPX_MCP_ADVANCED remains a 6.x fallback)"
+                    ),
                 )
                 if profile is ToolProfile.ADVANCED
                 else None
@@ -695,6 +718,7 @@ def contract_payload() -> dict[str, Any]:
     return {
         "schemaVersion": "hwpx.tool-contract.v2",
         "minPythonHwpx": MIN_PYTHON_HWPX,
+        "minAutomationVersion": MIN_AUTOMATION_VERSION,
         "minMcpVersion": MIN_MCP_VERSION,
         "minSkillVersion": MIN_SKILL_VERSION,
         "tools": [_tool_payload(spec, bound[spec.name]) for spec in TOOL_SPECS],
@@ -703,6 +727,11 @@ def contract_payload() -> dict[str, Any]:
 
 
 def contract_hash() -> str:
+    # Non-MCP automation services use the frozen release receipt without
+    # importing or constructing FastMCP. Once the optional adapter binds the
+    # canonical registry, recompute from live schemas and fail tests on drift.
+    if _BOUND_TOOL_REGISTRY is None:
+        return RELEASED_CONTRACT_HASH
     raw = json.dumps(contract_payload(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
@@ -727,6 +756,9 @@ def bind_tool_specs(
     degraded partial registry.
     """
 
+    # Keep the static ToolSpec/classification contract importable in the base
+    # automation distribution.  FastMCP is an optional adapter and is loaded
+    # only when a caller explicitly binds the MCP schema surface.
     specs = TOOL_SPECS if advanced is None else active_tool_specs(advanced=advanced)
     resolved: list[tuple[ToolSpec, Callable[..., Any], inspect.Signature]] = []
     errors: list[str] = []
@@ -922,6 +954,7 @@ __all__ = [
     "BASELINE_TOOL_SPECS",
     "BoundToolSpec",
     "DOMAIN_SPECS",
+    "MIN_AUTOMATION_VERSION",
     "MIN_MCP_VERSION",
     "MIN_PYTHON_HWPX",
     "MIN_SKILL_VERSION",

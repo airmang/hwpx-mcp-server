@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Stateless HWPX MCP 서버."""
+"""Shared automation handlers used by the optional MCP adapter."""
 
 from __future__ import annotations
 
@@ -287,7 +287,7 @@ def _proposal_quality_fallback(path: str) -> dict:
 
 
 def _capability_block(tool_surface_skew: bool, surface_details: list[str]) -> dict:
-    """Core/mcp/plugin capability handshake (plan §2 Phase F).
+    """Core/automation/plugin capability handshake (plan §2 Phase F).
 
     Versions + a fingerprint hash + skew. Writes fail closed on a *version* skew
     (the SavePipeline gate would otherwise be unavailable). Tool-surface skew is
@@ -304,6 +304,8 @@ def _capability_block(tool_surface_skew: bool, surface_details: list[str]) -> di
         "handshake": "hwpx.capability.v1",
         "versions": state["versions"],
         "minPythonHwpx": state["minPythonHwpx"],
+        "minAutomationVersion": state["minAutomationVersion"],
+        # 6.x compatibility alias for existing health consumers.
         "minMcpVersion": state["minMcpVersion"],
         "minSkillVersion": state["minSkillVersion"],
         "savePipelineAvailable": state["savePipelineAvailable"],
@@ -317,7 +319,7 @@ def _capability_block(tool_surface_skew: bool, surface_details: list[str]) -> di
             "Capability handshake OK; general saves use SavePipeline, while guarded "
             "byte-preserving form writers return open-safety receipts."
             if not skew
-            else "Capability skew: install the contract-required core/MCP/plugin versions and restart the host."
+            else "Capability skew: install the contract-required core/automation/plugin versions and restart the host."
         ),
     }
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Thin transport adapter for the canonical MCP semantic agent runtime.
+"""Thin MCP transport adapter for the canonical automation agent runtime.
 
 This module deliberately owns no path grammar, selector parser, document
 projection, or mutation compiler. Those semantics live in

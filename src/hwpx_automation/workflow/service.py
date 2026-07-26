@@ -30,6 +30,9 @@ from .rendering import NullRenderClientV2, RenderClientV2, RenderJobV2, RenderSt
 
 
 def default_workflow_store_path() -> Path:
+    configured = os.environ.get("HWPX_AUTOMATION_WORKFLOW_STORE")
+    if configured:
+        return Path(configured).expanduser().resolve()
     configured = os.environ.get("HWPX_WORKFLOW_STORE")
     if configured:
         return Path(configured).expanduser().resolve()
@@ -479,6 +482,8 @@ class WorkflowService:
             "unresolvedFindings": [] if record.state == WorkflowState.COMPLETED else self._findings(stop_reason),
             "versions": {
                 "workflow": WORKFLOW_SCHEMA_VERSION,
+                "automation": _package_version("python-hwpx-automation"),
+                # 6.x compatibility alias.
                 "mcp": _package_version("python-hwpx-automation"),
                 "pythonHwpx": _package_version("python-hwpx"),
             },
@@ -740,6 +745,8 @@ class WorkflowService:
             "unresolvedFindings": [{"code": reason, "severity": "review"}],
             "versions": {
                 "workflow": WORKFLOW_SCHEMA_VERSION,
+                "automation": _package_version("python-hwpx-automation"),
+                # 6.x compatibility alias.
                 "mcp": _package_version("python-hwpx-automation"),
                 "pythonHwpx": _package_version("python-hwpx"),
             },

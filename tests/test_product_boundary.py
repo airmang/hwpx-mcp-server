@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Positive and negative fixtures for the MCP ownership check."""
+"""Positive and negative fixtures for the automation ownership check."""
 from __future__ import annotations
 
 import importlib.util

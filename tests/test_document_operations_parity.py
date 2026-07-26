@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Exact parity between core 4.x compatibility and MCP canonical owners.
+"""Exact parity between core 4.x compatibility and automation canonical owners.
 
 ``hwpx.tools.redline`` (``author_demo_redline``, ``verify_redline``) is not
 being removed — the module-ownership ledger keeps it as core's tracked-change

@@ -24,7 +24,7 @@ BuilderChild = (
 _HWP_UNITS_PER_MM = 7200 / 25.4
 _A4_HWP_SIZE = (59528, 84188)
 
-# S-024 SPIKE: builder presets hook at Document.lower(), where a single
+# Builder presets hook at Document.lower(), where a single
 # preset context can be passed into Heading/Run/Bullet lowering without
 # changing default node contracts or the plan-v1 authoring style-token path.
 
@@ -270,7 +270,7 @@ class Toc:
 
 @dataclass(frozen=True)
 class NativeToc:
-    """Hancom-native TABLEOFCONTENTS field block (M7 / S-062 contract).
+    """Hancom-native TABLEOFCONTENTS field block.
 
     Unlike :class:`Toc` (a static ``text\\tpage`` plaintext list), this lowers
     to the measured native field region via

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Stateless HWPX MCP 서버."""
+"""Stateless specialized automation handlers for the optional MCP adapter."""
 
 from __future__ import annotations
 
@@ -263,15 +263,6 @@ def _nearest_rect(rects: list, center: tuple[float, float]):
     )
 
 
-def _is_oracle_unavailable(exc: RuntimeError) -> bool:
-    """Recognize both the canonical and frozen core compatibility exception."""
-
-    return isinstance(exc, OracleUnavailable) or (
-        exc.__class__.__name__ == "OracleUnavailable"
-        and exc.__class__.__module__ == "hwpx.form_fit.wordbox"
-    )
-
-
 def _check_seal_compliance_impl(
     path: str,
     sender_text: str,
@@ -291,9 +282,7 @@ def _check_seal_compliance_impl(
     try:
         boxes, _sizes, backend = render_glyph_boxes(path, out_pdf=pdf)
         seal_rects = extract_image_boxes(pdf)
-    except RuntimeError as exc:
-        if not _is_oracle_unavailable(exc):
-            raise
+    except OracleUnavailable as exc:
         return {
             "ok": False,
             "renderChecked": False,
@@ -364,9 +353,7 @@ def place_seal(
     else:
         try:
             boxes, _sizes, backend = render_glyph_boxes(path)
-        except RuntimeError as exc:
-            if not _is_oracle_unavailable(exc):
-                raise
+        except OracleUnavailable as exc:
             return {
                 "ok": False,
                 "filename": filename,

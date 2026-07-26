@@ -8,10 +8,10 @@ JSON-serialisable ``dict``. It does not capture behaviour: calling a function
 twice with the same arguments is not part of the fingerprint, only the fact
 that the function exists and what it is called with.
 
-This exists so that "does the MCP owner still match core's public shape" can
+This exists so that "does the automation owner still match core's public shape" can
 be checked after core's copy is deleted: freeze core's fingerprint once
 (``scripts/freeze_parity_fingerprints.py``) while the module still exists,
-commit the JSON, and compare the live MCP module's fingerprint against the
+commit the JSON, and compare the live automation module's fingerprint against the
 frozen record forever after.
 
 Deliberately excluded from scope: return values, side effects, raised
@@ -26,7 +26,7 @@ from __future__ import annotations
 import dataclasses
 import inspect
 from types import ModuleType
-from typing import Any
+from typing import Any, get_origin
 
 __all__ = ["fingerprint"]
 
@@ -38,7 +38,8 @@ def fingerprint(module: ModuleType) -> dict[str, Any]:
 
     Keyed by public top-level name (no leading underscore), sorted. Each
     entry records a ``kind`` of ``"function"``, ``"class"``, ``"dataclass"``,
-    or ``"constant"`` and kind-specific detail (see module docstring).
+    ``"type_alias"``, or ``"constant"`` and kind-specific detail (see module
+    docstring).
 
     Names re-exported from *other* modules are included exactly as declared
     in ``module.__all__`` when present — an explicit ``__all__`` is the
@@ -88,6 +89,12 @@ def _is_dataclass_instance(value: Any) -> bool:
 
 
 def _describe(value: Any) -> dict[str, Any]:
+    # Parameterized runtime type aliases changed their ``isinstance(...,
+    # type)`` answer between Python 3.10 and 3.14. Classifying them before the
+    # class branch keeps a frozen fingerprint stable across every supported
+    # Python minor.
+    if get_origin(value) is not None:
+        return {"kind": "type_alias", "value": str(value)}
     if isinstance(value, type):
         return _describe_class(value)
     if _is_constant(value) or _is_dataclass_instance(value):

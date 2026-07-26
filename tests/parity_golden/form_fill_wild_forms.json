@@ -4551,6 +4551,6 @@
     }
   },
   "frozenFrom": "python-hwpx 503d652a730c6d9e4ab27c274a641684dbf77cb7",
-  "note": "Outputs of the core 4.x guidance/residue/score callables on the checked-in wild forms, recorded before those modules are removed. The gate compares the canonical MCP owner against this record instead of against a live copy.",
+  "note": "Outputs of the core 4.x guidance/residue/score callables on the checked-in wild forms, recorded before those modules are removed. The gate compares the canonical automation owner against this record instead of against a live copy.",
   "schemaVersion": "hwpx.wild-form-parity-golden/v1"
 }

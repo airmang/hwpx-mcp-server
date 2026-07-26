@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Canonical MCP owner for evaluation-plan application behavior."""
+"""Canonical automation owner for evaluation-plan application behavior."""
 
 from .runtime import (
     EvalPlanContent,

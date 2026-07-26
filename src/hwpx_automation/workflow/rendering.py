@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Transport-neutral render boundary consumed by the S-067 workflow engine.
+"""Transport-neutral render boundary consumed by the workflow engine.
 
-S-067 never claims that this interface rendered a document.  S-068 supplies a
+The base workflow never claims that this interface rendered a document. A later
 real-Hancom backend and provenance receipts behind this frozen contract.
 """
 
@@ -12,7 +12,7 @@ from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-# Shared v2 contracts live in the leaf module (S-081 cycle removal); they are
+# Shared v2 contracts live in the leaf module that removed the import cycle; they are
 # re-exported here so existing importers keep working unchanged.
 from .render_contracts import (  # noqa: F401 - compatibility re-exports
     RENDER_SCHEMA_VERSION_V2,
@@ -72,7 +72,7 @@ class RenderReceipt(BaseModel):
 
 @runtime_checkable
 class RenderBackend(Protocol):
-    """Stable S-068 provider boundary; implementations may be local or remote."""
+    """Stable provider boundary; implementations may be local or remote."""
 
     def capabilities(self) -> dict[str, object]: ...
 
@@ -123,7 +123,15 @@ class NullRenderClientV2:
 class QueueRenderClientV2:
     """Trusted local client for the authenticated private durable queue."""
 
-    def __init__(self, queue: object, *, secret: bytes, principal_id: str = "hwpx-mcp-server") -> None:
+    def __init__(
+        self,
+        queue: object,
+        *,
+        secret: bytes,
+        # Compatibility-preserved through 6.x: this value participates in
+        # signed queue authorization, so renaming it would strand queued jobs.
+        principal_id: str = "hwpx-mcp-server",
+    ) -> None:
         self.queue = queue
         self.secret = secret
         self.principal_id = principal_id
@@ -151,7 +159,7 @@ class QueueRenderClientV2:
 
 
 class NullRenderBackend:
-    """Honest S-067 default: render evidence is unavailable, never silently true."""
+    """Honest default: render evidence is unavailable, never silently true."""
 
     def capabilities(self) -> dict[str, object]:
         return {

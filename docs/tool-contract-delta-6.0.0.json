@@ -1,13 +1,21 @@
 {
   "schemaVersion": "hwpx.tool-contract-delta/v1",
   "version": "6.0.0",
-  "note": "Floors, plus two description edits. The 5.0 train moves python-hwpx to 5.0.0, this package to 6.0.0, and the plugin to 1.0.0, and contract_hash() covers the floors. It also covers each bound tool's description, so removing an internal stage codename from two exam tool docstrings moves the hash as well. No name, order, schema, classification, error contract, or default/advanced/skill-required assignment changed: nothing a caller binds against is different.",
+  "note": "Floors plus identity/description-only guidance edits. The 5.0/6.0 train moves python-hwpx to 5.0.0, python-hwpx-automation to 6.0.0, and the plugin to 1.0.0, and contract_hash() covers the floors. The payload now names minAutomationVersion canonically while retaining minMcpVersion as a 6.x compatibility alias. It also covers bound descriptions and declared availability guidance: two exam summaries dropped an internal codename, and the eight profile-gated tools now name HWPX_AUTOMATION_ADVANCED first while documenting HWPX_MCP_ADVANCED as a 6.x fallback. No name, order, schema, classification, error contract, or default/advanced/skill-required assignment changed.",
   "previousHash": "429cb6706323e762",
-  "hash": "e592ede5b0eb1a35",
+  "hash": "0ce938371f0b55a6",
   "supersededHashes": [
     {
       "hash": "9bfc7ec7b0c3c62b",
       "reason": "floors only, before the two exam descriptions were cleaned; never published"
+    },
+    {
+      "hash": "e592ede5b0eb1a35",
+      "reason": "candidate before canonical HWPX_AUTOMATION_ADVANCED guidance replaced the legacy-first wording; never published"
+    },
+    {
+      "hash": "9abec41b740f3e0e",
+      "reason": "candidate before minAutomationVersion became canonical and minMcpVersion was documented as a 6.x alias; never published"
     }
   ],
   "toolCounts": {
@@ -22,6 +30,24 @@
     "classifications",
     "errorContracts"
   ],
+  "supersededCandidateProof": {
+    "comparedHash": "9abec41b740f3e0e",
+    "onlyChangedPayloadFields": [
+      "minAutomationVersion",
+      "contractHash"
+    ],
+    "unchangedDigests": {
+      "orderedNames": "c2b482e0597393f2a0415dd11405f728bea87ae57b9f0694635d790ed86aa297",
+      "profiles": "9d67d54916c70c5538160c450eeb9bf15cc5e9a95c742496aca77206eb9de3cd",
+      "classifications": "9318ef6d296679f907a2e256851f274b83fc74b2d90a30ca8e78d633fe7779bc",
+      "skillRequired": "901313a49697bd15edd0d7058e377868018ade3f5cfee6d0f61dc43af86efeba",
+      "inputSchemas": "a0989b1333066c985977bb8ce7d90314f5931251cd265f77ae9ce6833dc4c997",
+      "outputSchemas": "6699d210535241ef580f005cbafa15fa5391caa269523420468b6005a5b046d1",
+      "replacementTools": "fc3a0d4caa7fd55f98441e88243eecfd369d586ca57cd539ad1ef452857d8868",
+      "mutates": "e61329386b27a0478aa5c9aff4d77223d473c131b8808a0d750d617c08532161",
+      "schemaBindings": "78d6da7a2c04f71375ab8fa2115d3f9c6331bd006fce2d723ed73487f208d492"
+    }
+  },
   "descriptionChanges": [
     {
       "tool": "compose_exam",
@@ -30,11 +56,24 @@
     {
       "tool": "verify_question_splits",
       "change": "dropped the internal stage codename; the Korean summary is otherwise identical"
+    },
+    {
+      "tools": [
+        "package_parts",
+        "package_get_xml",
+        "package_get_text",
+        "object_find_by_tag",
+        "object_find_by_attr",
+        "validate_structure",
+        "lint_text_conventions",
+        "score_form_fill"
+      ],
+      "change": "profile-gated availability guidance names HWPX_AUTOMATION_ADVANCED first and retains HWPX_MCP_ADVANCED as a 6.x fallback"
     }
   ],
   "floors": {
     "python-hwpx": "5.0.0",
-    "hwpx-mcp-server": "6.0.0",
+    "python-hwpx-automation": "6.0.0",
     "hwpx-skill": "1.0.0"
   }
 }

@@ -1,0 +1,2 @@
+# Repository QA is exercised before release; it is not part of the runtime sdist.
+prune tests

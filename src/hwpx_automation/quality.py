@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""MCP quality contract (VisualComplete Phase F).
+"""Automation quality contract (VisualComplete Phase F).
 
 Every write funnels through the one ``python-hwpx`` SavePipeline gate and reports a
 uniform ``VisualCompleteReport``. This module owns:
@@ -13,7 +13,7 @@ uniform ``VisualCompleteReport``. This module owns:
 * :class:`QualityGateError` — raised when an elevated policy's gate fails so the
   write is **withheld** (fail-closed) and the model sees the structured error.
 * the **capability handshake** (:func:`capability_state` / :func:`assert_write_capability`)
-  — core/mcp/plugin versions + a hash that **fails closed on skew** (e.g. a
+  — core/automation/plugin versions + a hash that **fails closed on skew** (e.g. a
   ``python-hwpx`` too old to expose the SavePipeline gate).
 """
 from __future__ import annotations
@@ -25,12 +25,14 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any, Mapping
 
+from .configuration import canonical_env_name, env_value
 try:
     import tomllib
 except ModuleNotFoundError:  # Python 3.10 runtime compatibility
     import tomli as tomllib
 
 from .tool_contract import (
+    MIN_AUTOMATION_VERSION,
     MIN_MCP_VERSION,
     MIN_PYTHON_HWPX,
     MIN_SKILL_VERSION,
@@ -65,8 +67,8 @@ def _record_gate_error(err: Any) -> None:
     global _LAST_GATE_ERROR
     _LAST_GATE_ERROR = err
 
-_QUALITY_ENV = "HWPX_MCP_QUALITY"  # global default policy (transparent|strict)
-_REQUIRE_CAPABILITY_ENV = "HWPX_MCP_REQUIRE_CAPABILITY"  # set "0" to disable fail-closed
+_QUALITY_ENV = canonical_env_name("QUALITY")
+_REQUIRE_CAPABILITY_ENV = canonical_env_name("REQUIRE_CAPABILITY")
 
 
 # --------------------------------------------------------------------------- #
@@ -145,7 +147,8 @@ _POLICY_KEY_MAP = {
 def resolve_policy(quality: Mapping[str, Any] | str | None) -> Any:
     """Map a model-facing ``quality`` block to a ``QualityPolicy``.
 
-    ``None`` → the ``HWPX_MCP_QUALITY`` env default → transparent. A string picks a
+    ``None`` → the ``HWPX_AUTOMATION_QUALITY`` env default (with the supported
+    6.x ``HWPX_MCP_QUALITY`` fallback) → transparent. A string picks a
     named policy (``transparent`` / ``strict``). A dict elevates from transparent
     with camelCase overrides (``renderCheck`` / ``overflowPolicy`` / ``layoutLint`` …).
     """
@@ -153,7 +156,7 @@ def resolve_policy(quality: Mapping[str, Any] | str | None) -> Any:
     from hwpx.quality import QualityPolicy
 
     if quality is None:
-        quality = os.environ.get(_QUALITY_ENV) or "transparent"
+        quality = env_value("QUALITY", "transparent") or "transparent"
 
     if isinstance(quality, str):
         mode = quality.strip().lower()
@@ -249,10 +252,10 @@ def save_through_pipeline(document: Any, output_path: Any, *, quality: Any = Non
 # Capability handshake (fail-closed on skew).
 # --------------------------------------------------------------------------- #
 def capability_state() -> dict[str, Any]:
-    """Core/mcp/plugin versions + a fingerprint hash + any version skew."""
+    """Core/automation/plugin versions + a fingerprint hash + any version skew."""
 
     core = package_version("python-hwpx")
-    mcp = package_version("python-hwpx-automation")
+    automation = package_version("python-hwpx-automation")
     plugin = os.environ.get("HWPX_SKILL_VERSION", "unknown")
     has_pipeline = _quality_available()
 
@@ -261,10 +264,12 @@ def capability_state() -> dict[str, Any]:
         skew.append("python-hwpx is missing the hwpx.quality SavePipeline gate")
     elif _version_lt(core, MIN_PYTHON_HWPX):
         skew.append(f"python-hwpx {core} < required {MIN_PYTHON_HWPX}")
-    if mcp == "unknown":
-        skew.append("hwpx-mcp-server version is unresolved")
-    elif _version_lt(mcp, MIN_MCP_VERSION):
-        skew.append(f"hwpx-mcp-server {mcp} < required {MIN_MCP_VERSION}")
+    if automation == "unknown":
+        skew.append("python-hwpx-automation version is unresolved")
+    elif _version_lt(automation, MIN_AUTOMATION_VERSION):
+        skew.append(
+            f"python-hwpx-automation {automation} < required {MIN_AUTOMATION_VERSION}"
+        )
     if plugin != "unknown" and _version_lt(plugin, MIN_SKILL_VERSION):
         skew.append(f"hwpx skill {plugin} < required {MIN_SKILL_VERSION}")
 
@@ -272,7 +277,7 @@ def capability_state() -> dict[str, Any]:
         "|".join(
             [
                 "core", core,
-                "mcp", mcp,
+                "automation", automation,
                 "plugin", plugin,
                 "pipeline", str(has_pipeline),
                 "toolContract", contract_hash(),
@@ -281,8 +286,16 @@ def capability_state() -> dict[str, Any]:
     ).hexdigest()[:16]
 
     return {
-        "versions": {"core": core, "mcp": mcp, "plugin": plugin},
+        "versions": {
+            "core": core,
+            "automation": automation,
+            # 6.x compatibility alias.
+            "mcp": automation,
+            "plugin": plugin,
+        },
         "minPythonHwpx": MIN_PYTHON_HWPX,
+        "minAutomationVersion": MIN_AUTOMATION_VERSION,
+        # 6.x compatibility alias.
         "minMcpVersion": MIN_MCP_VERSION,
         "minSkillVersion": MIN_SKILL_VERSION,
         "savePipelineAvailable": has_pipeline,
@@ -294,7 +307,7 @@ def capability_state() -> dict[str, Any]:
 
 
 def fail_closed_enabled() -> bool:
-    return os.environ.get(_REQUIRE_CAPABILITY_ENV, "1") != "0"
+    return env_value("REQUIRE_CAPABILITY", "1") != "0"
 
 
 def assert_write_capability() -> None:
@@ -302,7 +315,8 @@ def assert_write_capability() -> None:
 
     Fail-closed: a write must not proceed when the installed quality stack can't
     honour the gate (e.g. a stale python-hwpx). Disable with
-    ``HWPX_MCP_REQUIRE_CAPABILITY=0`` for an expert/debug bypass.
+    ``HWPX_AUTOMATION_REQUIRE_CAPABILITY=0`` for an expert/debug bypass. The
+    old ``HWPX_MCP_REQUIRE_CAPABILITY`` spelling remains a 6.x fallback.
     """
 
     if not fail_closed_enabled():
@@ -313,7 +327,7 @@ def assert_write_capability() -> None:
 
 
 class CapabilitySkewError(RuntimeError):
-    """The core/mcp/plugin capability handshake detected skew; writes fail closed."""
+    """The core/automation/plugin handshake detected skew; writes fail closed."""
 
     code = "CAPABILITY_SKEW"
 

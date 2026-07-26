@@ -92,7 +92,16 @@ def _validate_workflow_receipt(receipt: Any, run_id: str, client_id: str) -> lis
     if not data.get("toolSpecHash"):
         failures.append(f"{run_id}:missing_tool_spec_hash")
     versions = data.get("versions")
-    if not isinstance(versions, Mapping) or not versions.get("mcp") or not versions.get("pythonHwpx"):
+    automation_version = (
+        versions.get("automation") or versions.get("mcp")
+        if isinstance(versions, Mapping)
+        else None
+    )
+    if (
+        not isinstance(versions, Mapping)
+        or not automation_version
+        or not versions.get("pythonHwpx")
+    ):
         failures.append(f"{run_id}:missing_stack_versions")
     if data.get("terminal") is not True:
         failures.append(f"{run_id}:workflow_not_terminal")

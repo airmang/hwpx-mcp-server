@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Canonical MCP owner for application-level form-fill behavior."""
+"""Canonical automation owner for application-level form-fill behavior."""
 
 import hwpx_automation.office.form_fill.fit as fit
 from .fill_residue import (

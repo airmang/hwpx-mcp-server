@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The canonical MCP VisualComplete render gate.
+"""The canonical automation VisualComplete render gate.
 
 The oracle is the *renderer*, not the *transport*: any reachable Hancom (한글)
 is a faithful backend (implementation plan §0.0). This module ships two, behind

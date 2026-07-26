@@ -103,6 +103,28 @@ def test_place_seal_degrades_without_oracle(tmp_path, monkeypatch):
     assert _pic_count(path) == 0  # nothing stamped
 
 
+def test_place_seal_does_not_swallow_removed_core_exception_by_name(
+    tmp_path, monkeypatch
+):
+    class LegacyOracleUnavailable(RuntimeError):
+        pass
+
+    LegacyOracleUnavailable.__name__ = "OracleUnavailable"
+    LegacyOracleUnavailable.__module__ = "hwpx.form_fit.wordbox"
+
+    def _removed_core_exception(*args, **kwargs):
+        raise LegacyOracleUnavailable("removed core compatibility class")
+
+    monkeypatch.setattr(
+        specialized_handler, "render_glyph_boxes", _removed_core_exception
+    )
+    path = _make_form(tmp_path)
+    with pytest.raises(
+        LegacyOracleUnavailable, match="removed core compatibility class"
+    ):
+        server.place_seal(path, SENDER, PNG_1X1)
+
+
 def test_place_seal_sender_absent_in_render_fails_closed(tmp_path, monkeypatch):
     monkeypatch.setattr(
         specialized_handler, "render_glyph_boxes",
@@ -172,7 +194,7 @@ def test_check_seal_compliance_degrades_without_oracle(tmp_path, monkeypatch):
 
 
 def _mac_seal_oracle_ready() -> bool:
-    # Gate on the canonical MCP owners, because the smoke below drives the MCP
+    # Gate on the canonical automation owners; the smoke below drives the MCP
     # surface. The core compatibility copies are distinct classes since the
     # visual/form-fill runtime splits, so gating on them can mis-fire.
     try:

@@ -22,7 +22,7 @@ from .render_security import (
     RenderSecurityViolation,
     validate_render_input,
 )
-# Shared contracts come from the leaf module (S-081 cycle removal);
+# Shared contracts come from the leaf module that removed the import cycle;
 # sign_submission is re-exported for existing importers of this module.
 from .render_contracts import (  # noqa: F401 - compatibility re-export
     RenderJobV2,

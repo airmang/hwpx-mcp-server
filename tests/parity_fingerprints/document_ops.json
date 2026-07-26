@@ -33,8 +33,8 @@
         "value": "mail-merge-v1"
       },
       "ValueSanitizer": {
-        "kind": "function",
-        "signature": "(*args, **kwargs)"
+        "kind": "type_alias",
+        "value": "collections.abc.Callable[[str], str]"
       },
       "inspect_mail_merge_placeholders": {
         "kind": "function",

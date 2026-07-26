@@ -15,32 +15,35 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          path: hwpx-mcp-server
+          path: python-hwpx-automation
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: airmang/python-hwpx
-          # Exact public python-hwpx 3.3.1 release commit.
-          ref: f6b79f010d40a190fa6a8391eb212835022b3851
+          # During the unpublished train this repository variable may name the
+          # clean candidate branch. After core 5.0 lands, main is authoritative.
+          ref: ${{ vars.PYTHON_HWPX_CANDIDATE_REF || 'main' }}
           path: python-hwpx
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Pinned core satisfies the declared floor
         run: python scripts/check_pinned_core_satisfies_floor.py ../python-hwpx
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
       - run: python -m pip install -e "../python-hwpx[visual,preview]"
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
       # [mcp]를 뺄 수 없다: 아래 단계가 hwpx_automation.server를 import하고
-      # 그건 mcp SDK를 필요로 한다. 6.0.0에서 mcp가 필수 의존에서 extra로
-      # 빠지면서 여기 명시가 의무가 됐다.
-      - run: python -m pip install -e ".[mcp,test,typecheck]"
-        working-directory: hwpx-mcp-server
+      # 그건 mcp SDK를 필요로 한다. [oracle]도 이 저장소가 core에서 인수한
+      # 렌더/wordbox 소유자의 정적 타입 검사를 위해 필요하다.
+      - run: python -m pip install -e ".[mcp,oracle,test,typecheck]"
+        working-directory: python-hwpx-automation
       - run: python scripts/check_public_hygiene.py
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
+      - run: python scripts/check_transition_identity.py
+        working-directory: python-hwpx-automation
       - name: Ruff source and touched-seam gates
         run: |
           ruff check --select E9,F .
@@ -59,20 +62,26 @@ jobs:
             src/hwpx_automation/workflow/service.py \
             scripts/check_architecture_ratchets.py \
             tests/test_architecture_ratchets.py
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
       - name: Static type gates
         run: |
           python -m mypy
           pyright --pythonpath "$(command -v python)"
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
       - run: python scripts/check_architecture_ratchets.py
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
+      - name: Run structural conformance golden
+        run: |
+          python scripts/run_conformance.py run \
+            --tier structural \
+            --check tests/conformance/golden/structural.json
+        working-directory: python-hwpx-automation
       - run: python -m pytest -q
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
       - run: |
           python scripts/render_tool_contract.py --check --skip-skill
           python scripts/render_contract_delta.py --check
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
 
   clean-package-install:
     runs-on: ubuntu-latest
@@ -83,33 +92,39 @@ jobs:
           - label: base
             extras: ""
             markitdown: absent
+            mcp: absent
           - label: all-runtime-extras
-            extras: "[hwp,http,ingest,oracle,vision]"
+            extras: "[mcp,hwp,http,ingest,oracle,vision]"
             markitdown: present
+            mcp: present
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          path: hwpx-mcp-server
+          path: python-hwpx-automation
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: airmang/python-hwpx
-          # Exact public python-hwpx 3.3.1 release commit.
-          ref: f6b79f010d40a190fa6a8391eb212835022b3851
+          ref: ${{ vars.PYTHON_HWPX_CANDIDATE_REF || 'main' }}
           path: python-hwpx
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - name: Build exact core and server wheels
+      - name: Build exact core and automation wheels from clean archives
         run: |
           python -m pip install build
-          python -m build --wheel --outdir candidate-wheelhouse python-hwpx
-          python -m build --wheel --outdir candidate-wheelhouse hwpx-mcp-server
-          python hwpx-mcp-server/scripts/check_public_hygiene.py
+          mkdir -p clean-src/python-hwpx clean-src/python-hwpx-automation
+          git -C python-hwpx archive HEAD | tar -x -C clean-src/python-hwpx
+          git -C python-hwpx-automation archive HEAD | tar -x -C clean-src/python-hwpx-automation
+          python -m build --wheel --outdir candidate-wheelhouse clean-src/python-hwpx
+          python -m build --wheel --outdir candidate-wheelhouse clean-src/python-hwpx-automation
+          python python-hwpx-automation/scripts/check_public_hygiene.py
+          python python-hwpx-automation/scripts/check_transition_identity.py
       - name: Install wheel in a clean environment
-        working-directory: hwpx-mcp-server
+        working-directory: python-hwpx-automation
         env:
           EXTRAS: ${{ matrix.extras }}
           EXPECT_MARKITDOWN: ${{ matrix.markitdown }}
+          EXPECT_MCP: ${{ matrix.mcp }}
         run: |
           python -m venv .clean-package
           CORE_WHEEL=$(find ../candidate-wheelhouse -name 'python_hwpx-*.whl' -print -quit)
@@ -120,12 +135,68 @@ jobs:
           .clean-package/bin/python - <<'PY'
           import importlib.util
           import os
-          from importlib.metadata import metadata
+          import subprocess
+          import sys
+          from importlib.metadata import entry_points, metadata
 
-          requirements = metadata("hwpx-mcp-server").get_all("Requires-Dist") or []
-          assert not any(item.casefold().startswith("modelcontextprotocol") for item in requirements)
+          requirements = metadata("python-hwpx-automation").get_all("Requires-Dist") or []
+          mcp_requirements = [
+              item for item in requirements if item.casefold().startswith("mcp")
+          ]
+          assert mcp_requirements
+          assert all(
+              "extra ==" in item and "mcp" in item.split(";", 1)[-1]
+              for item in mcp_requirements
+          )
           found = importlib.util.find_spec("markitdown") is not None
           assert found is (os.environ["EXPECT_MARKITDOWN"] == "present")
+          mcp_found = importlib.util.find_spec("mcp") is not None
+          assert mcp_found is (os.environ["EXPECT_MCP"] == "present")
           assert importlib.util.find_spec("hwpx_automation.practice") is None
-          import hwpx_automation.server
+          import hwpx_automation
+          import hwpx_automation.api
+          scripts = {
+              item.name: item.value
+              for item in entry_points(group="console_scripts")
+              if item.name in {"hwpx", "hwpx-automation-mcp", "hwpx-mcp-server"}
+          }
+          assert scripts == {
+              "hwpx": "hwpx_automation.office.agent.cli:main",
+              "hwpx-automation-mcp": "hwpx_automation.mcp_cli:main",
+          }
+          if mcp_found:
+              import hwpx_automation.server
+          else:
+              result = subprocess.run(
+                  [sys.executable, "-m", "hwpx_automation.mcp_cli", "--help"],
+                  text=True,
+                  capture_output=True,
+              )
+              assert result.returncode == 2
+              assert "python-hwpx-automation[mcp]" in result.stderr
           PY
+
+  platform-oracle-smoke:
+    name: Python 3.10 ${{ matrix.os }} clean oracle boundary
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          path: python-hwpx-automation
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: airmang/python-hwpx
+          ref: ${{ vars.PYTHON_HWPX_CANDIDATE_REF || 'main' }}
+          path: python-hwpx
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.10"
+      - name: Build and smoke clean canonical oracle wheel
+        working-directory: python-hwpx-automation
+        run: |
+          python -m pip install "build>=1.2"
+          python scripts/check_platform_optional_smoke.py --core-repo ../python-hwpx

@@ -41,11 +41,11 @@
     "hwpx.tools.toc_author",
     "hwpx.tools.validator"
   ],
-  "temporaryProgramDependencies": {
-    "hwpx.tools.official_lint": "S-100",
-    "hwpx.tools.page_guard": "S-100",
-    "hwpx.visual": "S-104",
-    "hwpx.tools.mail_merge": "S-105"
+  "resolvedProgramOwners": {
+    "hwpx.tools.official_lint": "hwpx_automation.office.compliance.official_lint",
+    "hwpx.tools.page_guard": "hwpx_automation.office.quality.page_guard",
+    "hwpx.visual application runtime": "hwpx_automation.office.rendering",
+    "hwpx.tools.mail_merge.mail_merge": "hwpx_automation.office.document_ops.mail_merge.build_mail_merge"
   },
   "forbiddenCoreCompatibilityImports": [
     "hwpx.authoring",
@@ -58,7 +58,7 @@
   ],
   "compatibilityPolicy": {
     "coreLine": "4.x",
-    "featureWork": "MCP canonical owner only",
+    "featureWork": "automation canonical owner only",
     "mirrors": "correctness-or-security-only with parity test and receipt",
     "removalGate": "public observation followed by separately approved core major"
   },
@@ -66,6 +66,6 @@
     "default": 119,
     "advanced": 127,
     "skillRequired": 28,
-    "hash": "e592ede5b0eb1a35"
+    "hash": "0ce938371f0b55a6"
   }
 }

@@ -734,7 +734,7 @@ def extract_cell_clips(pdf_path: str, *, page: int | None = None) -> list[Rect]:
     Borders-only (``strategy="lines_strict"``): a cell rectangle is defined by its
     *drawn borders*, not by the text inside it. The ``find_tables`` default snaps
     edges to glyph positions, so a filled value can appear to *escape* a clip that
-    was mis-sized around the very text it holds — a false overflow. S-094 P3
+    was mis-sized around the very text it holds — a false overflow. Corpus analysis
     measured this: the only 3 corpus pairs that flagged ``newOverflow`` (the nts
     forms) all had the fill value escaping a text-snapped clip under the default,
     and 0 escapes under ``lines_strict``; there were no real escapes to mask.
@@ -925,7 +925,7 @@ class LayoutSignature:
     default snaps table edges to *text* positions, so injecting a value into a
     previously-empty cell makes it hallucinate a phantom ``(2,2)``/``(1,2)`` table
     or wobble a real one by ±1 row/col even when the drawn grid and page count are
-    unchanged. S-094 P3 measured this on the frozen corpus (all 6 "table-shape"
+    unchanged. This was measured on the frozen corpus (all 6 "table-shape"
     differential failures were page-stable phantoms; under ``lines_strict`` blank
     and filled agree, 0 regressions across 31 pairs; ``sen-24`` has byte-identical
     drawn rectangles yet the default strategy still invented a ``(1,2)`` table from
@@ -972,7 +972,7 @@ def extract_layout_signature(pdf_path: str) -> LayoutSignature:
                 # Borders-only ("lines_strict"): a *structural* fingerprint must
                 # not react to cell text. The default strategy snaps to glyph
                 # positions and invents phantom tables from a fill's added text
-                # (S-094 P3). Bordered form grids are detected identically either
+                # on the frozen corpus. Bordered form grids are detected identically either
                 # way; the text-sensitivity is the only difference we drop.
                 found = page.find_tables(strategy="lines_strict")
                 tables = found.tables if found is not None else []

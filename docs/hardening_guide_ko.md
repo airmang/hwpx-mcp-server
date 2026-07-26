@@ -1,14 +1,16 @@
-# HWPX MCP 서버 하드닝 가이드
+# python-hwpx-automation 하드닝 가이드
+
+> 아래 5.0/6.0/1.0 좌표는 아직 공개되지 않은 source candidate입니다.
+> 현재 공개 정본은 core 4.2.0 / `hwpx-mcp-server` 5.1.0 / plugin 0.8.0,
+> 계약 해시 `429cb6706323e762`입니다.
 
 ## 공개 계약과 프로필
 
 - 도구 등록, 입력·출력 스키마, health/capability 표면과 생성 문서는 하나의
-  `ToolSpec` 레지스트리에서 만들어집니다. 5.0.0 major 경계는 기본 119개, 고급 모드
-  포함 127개 도구와 28개 skill-required 도구를 유지하며 계약 해시는
-  `c9a451a7c003752a`입니다(전환 stub 5종 제거 + template-formfit facade 3종
-  deprecated 강등). 직전 4.4.1 공개 릴리스는 기본 121개·고급 132개·해시
-  `c89cbc5f98eb5367`였습니다. 최소 좌표는 core `3.3.1`, MCP `4.3.0`, skill
-  `0.5.0`입니다.
+  `ToolSpec` 레지스트리에서 만들어집니다. `python-hwpx-automation` 6.0.0은
+  기본 119개, 고급 모드 포함 127개 도구와 28개 skill-required 도구를 유지하며
+  계약 해시는 `0ce938371f0b55a6`입니다. 최소 좌표는 core `5.0.0`,
+  automation `6.0.0`, skill `1.0.0`입니다.
 - 4.0.0의 `f46ec677231b3a20`, 4.1.0의 `c127914cc3f4480e`, 4.2.1의 `fff2c9093ca4677b`,
   4.3.0의 `f82caecbcfc742e9`, 4.4.x의 `c89cbc5f98eb5367`는 역사적 계약입니다. 최소
   버전 좌표도 canonical payload에 포함되므로 도구 이름·순서·스키마가 같더라도 다른
@@ -18,8 +20,8 @@
   있습니다. 실제 호스트에 노출되는 계약은 `docs/tool-contract.generated.json`과
   `docs/tool-contract.md`에서 확인합니다.
 - 기본 프로필을 운영 표면으로 사용하세요. package inspection과 저수준 검증
-  도구가 꼭 필요한 경우에만 `HWPX_MCP_ADVANCED=1`을 설정하고 호스트를 다시
-  시작합니다.
+  도구가 꼭 필요한 경우에만 `HWPX_AUTOMATION_ADVANCED=1`을 설정하고 호스트를 다시
+  시작합니다. 기존 `HWPX_MCP_ADVANCED=1`도 6.x fallback으로 지원합니다.
 - `plan_edit` → `preview_edit` → `apply_edit`와 `analyze_quality_generation` /
   `apply_quality_generation`는 5.0.0 major 경계에서 **제거**되었습니다(별칭·유령
   래퍼 없음). 신규 자동화는 `apply_document_commands`, 문서 생성은
@@ -28,7 +30,8 @@
 
 ## 작업공간·네트워크 경계
 
-- `HWPX_MCP_WORKSPACE_ROOTS`에는 허용할 절대 디렉터리를 JSON 배열로 지정합니다.
+- `HWPX_AUTOMATION_WORKSPACE_ROOTS`에는 허용할 절대 디렉터리를 JSON 배열로
+  지정합니다. 기존 `HWPX_MCP_WORKSPACE_ROOTS`는 6.x fallback입니다.
   상대경로는 첫 root를 기준으로 해석되고, 절대경로는 나열된 root 중 하나에 속해야
   합니다. traversal, workspace 밖 경로, symlink escape는 정형 MCP 오류로
   거부됩니다.
@@ -45,8 +48,9 @@
   차단해야 합니다.
 - URL 입력, HTTP document storage, 원격 render transport는 기본적으로 HTTPS와 공개
   주소만 허용합니다. DNS 결과 전체, redirect 대상, 실제 연결 피어를 각각 검사합니다.
-  `HWPX_MCP_ALLOW_PRIVATE_NETWORK=1`은 신뢰된 사설/루프백 HTTPS 서비스가 반드시
-  필요한 경우에만 사용하며 링크로컬·metadata·예약 주소는 계속 차단됩니다.
+  `HWPX_AUTOMATION_ALLOW_PRIVATE_NETWORK=1`은 신뢰된 사설/루프백 HTTPS
+  서비스가 반드시 필요한 경우에만 사용하며 링크로컬·metadata·예약 주소는
+  계속 차단됩니다. 기존 `HWPX_MCP_ALLOW_PRIVATE_NETWORK`는 6.x fallback입니다.
 
 ## 저장·검증 경계
 
@@ -69,8 +73,9 @@
   않고 원본 바이트 복구본을 남깁니다. 운영자는 실패 조사와 복구가 끝난 뒤에만 해당
   `.recovery` 파일을 정리해야 합니다.
 - capability skew는 기본적으로 쓰기를 fail-closed로 막습니다. 진단 목적의
-  `HWPX_MCP_REQUIRE_CAPABILITY=0`은 계약 불일치를 이해한 운영자만 제한적으로
-  사용해야 합니다.
+  `HWPX_AUTOMATION_REQUIRE_CAPABILITY=0`은 계약 불일치를 이해한 운영자만
+  제한적으로 사용해야 합니다. 기존 `HWPX_MCP_REQUIRE_CAPABILITY`은 6.x
+  fallback입니다.
 
 ## 오류와 운영 점검
 
@@ -81,4 +86,8 @@
 - 릴리스 검증은 `.venv/bin/pytest -q`, `.venv/bin/ruff check src tests`,
   `.venv/bin/python scripts/render_tool_contract.py --check --skip-skill`,
   `.venv/bin/python scripts/render_contract_delta.py --check`,
-  `.venv/bin/python scripts/check_public_hygiene.py`를 모두 통과해야 합니다.
+  `.venv/bin/python scripts/check_public_hygiene.py`,
+  `.venv/bin/python scripts/run_conformance.py run --tier structural
+  --check tests/conformance/golden/structural.json`를 모두 통과해야 합니다. 공개 합성
+  코퍼스의 생성기는 `python scripts/conformance_corpus_build.py`이며 출력은
+  `scripts/conformance/corpus`입니다.

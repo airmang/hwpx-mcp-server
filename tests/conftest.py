@@ -23,9 +23,17 @@ import pytest
 builtins.ET = _ET
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_MATCHING_CORE_REPO = _REPO_ROOT.parent / _REPO_ROOT.name.replace(
-    "hwpx-mcp-server", "python-hwpx", 1
-)
+
+
+def _matching_core_repo() -> Path:
+    name = _REPO_ROOT.name
+    for prefix in ("python-hwpx-automation", "hwpx-mcp-server"):
+        if prefix in name:
+            return _REPO_ROOT.parent / name.replace(prefix, "python-hwpx", 1)
+    return _REPO_ROOT.parent / f".no-matching-core-for-{name}"
+
+
+_MATCHING_CORE_REPO = _matching_core_repo()
 
 
 def _resolve_python_hwpx_paths() -> tuple[Path, Path | None]:
@@ -69,8 +77,9 @@ def _clear_path_sandbox_for_inprocess_tests(
 ) -> None:
     """Give each test explicit repository and temporary workspace roots.
 
-    The MCP server CLI (`python -m hwpx_automation.server`) enables sandboxing in
-    `main()` via `os.environ.setdefault("HWPX_MCP_SANDBOX_ROOT", cwd)`.
+    The automation CLI resolves `HWPX_AUTOMATION_WORKSPACE_ROOTS` first, then
+    the supported 6.x `HWPX_MCP_WORKSPACE_ROOTS`/`HWPX_MCP_SANDBOX_ROOT`
+    fallbacks, and finally a non-degenerate cwd.
 
     But unit tests often operate on pytest tmp directories and may call helpers
     directly in-process. If the environment variable is already set in the
@@ -82,8 +91,9 @@ def _clear_path_sandbox_for_inprocess_tests(
     """
 
     monkeypatch.delenv("HWPX_MCP_SANDBOX_ROOT", raising=False)
+    monkeypatch.delenv("HWPX_MCP_WORKSPACE_ROOTS", raising=False)
     monkeypatch.setenv(
-        "HWPX_MCP_WORKSPACE_ROOTS",
+        "HWPX_AUTOMATION_WORKSPACE_ROOTS",
         json.dumps([str(_REPO_ROOT), str(tmp_path), str(_LOCAL_PYTHON_HWPX_REPO)]),
     )
     from hwpx_automation import server as server_module
@@ -479,12 +489,19 @@ class StdioMCPClient:
     def _build_env(self) -> dict[str, str]:
         env = os.environ.copy()
         env.update(self.extra_env)
-        if not {
+        workspace_keys = {
+            "HWPX_AUTOMATION_WORKSPACE_ROOTS",
             "HWPX_MCP_WORKSPACE_ROOTS",
             "HWPX_MCP_SANDBOX_ROOT",
-        }.intersection(self.extra_env):
-            env["HWPX_MCP_WORKSPACE_ROOTS"] = json.dumps([str(self.cwd)])
+        }
+        if not workspace_keys.intersection(self.extra_env):
+            env["HWPX_AUTOMATION_WORKSPACE_ROOTS"] = json.dumps([str(self.cwd)])
+            env.pop("HWPX_MCP_WORKSPACE_ROOTS", None)
             env.pop("HWPX_MCP_SANDBOX_ROOT", None)
+        elif "HWPX_AUTOMATION_WORKSPACE_ROOTS" not in self.extra_env:
+            # A test explicitly exercising a 6.x fallback must not inherit the
+            # canonical value from the parent pytest process.
+            env.pop("HWPX_AUTOMATION_WORKSPACE_ROOTS", None)
         env["PYTHONPATH"] = _pythonpath_with_local_sources(env.get("PYTHONPATH", ""))
         return env
 
@@ -866,4 +883,3 @@ def mcp_server_factory(mcp_test_config: MCPTestConfig):
 @pytest.fixture()
 def mcp_client(mcp_server_factory) -> StdioMCPClient:
     return mcp_server_factory()
-

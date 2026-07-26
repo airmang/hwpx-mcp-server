@@ -40,7 +40,8 @@ EXPECTED_SERVICE_LINES = {
     "memo_style.py": 477,
     "package_validation.py": 166,
     "planning.py": 201,
-    "preview_export.py": 583,
+    # S-108: canonical Chrome-path guidance names the 6.x fallback explicitly.
+    "preview_export.py": 585,
     "read_query.py": 601,
     "save_policy.py": 604,
     "tables.py": 539,
@@ -49,7 +50,8 @@ EXPECTED_SERVICE_LINES = {
 
 EXPECTED_FACADE_LINES = {
     "hwpx_ops.py": 1439,
-    "server.py": 268,
+    # S-108: shared identity/config helpers replaced duplicated MCP-era parsing.
+    "server.py": 259,
 }
 
 PRIVATE_ATTRIBUTES = ("_mcp_server", "_tool_manager", "_tools")
