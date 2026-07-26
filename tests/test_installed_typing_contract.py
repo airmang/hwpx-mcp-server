@@ -48,3 +48,17 @@ def test_clean_wheel_proves_root_import_stays_lazy_and_mcp_free() -> None:
     )
     assert root_import < lazy_assertion < api_import < post_api_assertion
     assert 'name == "mcp" or name.startswith("mcp.")' in workflow
+
+
+def test_root_facade_types_live_in_a_stub_without_runtime_import_edges() -> None:
+    runtime = (ROOT / "src" / "hwpx_automation" / "__init__.py").read_text(
+        encoding="utf-8",
+    )
+    stub = (ROOT / "src" / "hwpx_automation" / "__init__.pyi").read_text(
+        encoding="utf-8",
+    )
+    project = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert "TYPE_CHECKING" not in runtime
+    assert "from .api import" in stub
+    assert "*.pyi" in project

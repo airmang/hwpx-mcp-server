@@ -97,7 +97,12 @@ where = ["src"]
 include = ["hwpx_automation*"]
 
 [tool.setuptools.package-data]
-"hwpx_automation" = ["identity.json", "public-modules.json", "py.typed"]
+"hwpx_automation" = [
+    "identity.json",
+    "public-modules.json",
+    "py.typed",
+    "*.pyi",
+]
 "hwpx_automation.office.house_style" = ["data/*.json"]
 "hwpx_automation.office.authoring.design" = ["profiles/*/*", "profiles/*/fragments/*"]
 "hwpx_automation.office.rendering" = [
