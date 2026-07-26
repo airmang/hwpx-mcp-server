@@ -4,13 +4,96 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 CI lane
     import tomli as tomllib
 
+import pytest
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE = ROOT / ".github" / "workflows" / "release.yml"
+BUILD_STEP = "Build distributions"
+PYPI_ACTION = "pypa/gh-action-pypi-publish@"
+GITHUB_ACTION = "softprops/action-gh-release@"
+
+
+def _replace_last(text: str, before: str, after: str) -> str:
+    prefix, separator, suffix = text.rpartition(before)
+    assert separator
+    return prefix + after + suffix
+
+
+def _release_safety_failures(workflow: str) -> list[str]:
+    failures: list[str] = []
+    try:
+        jobs: dict[str, dict[str, Any]] = yaml.safe_load(workflow)["jobs"]
+        prepublish = jobs["prepublish"]
+        release = jobs["release"]
+    except (KeyError, TypeError, yaml.YAMLError) as exc:
+        return [f"invalid release workflow structure: {exc}"]
+
+    if release.get("needs") != "prepublish":
+        failures.append("release must need prepublish")
+    for job_name, job in (("prepublish", prepublish), ("release", release)):
+        if "if" in job:
+            failures.append(f"{job_name} must not override dependency status")
+        if job.get("continue-on-error", False):
+            failures.append(f"{job_name} must not continue on error")
+        for step in job.get("steps", []):
+            if step.get("continue-on-error", False):
+                failures.append(
+                    f"{job_name} step must not continue on error: "
+                    f"{step.get('name', step.get('uses', '<unnamed>'))}"
+                )
+
+    steps = release.get("steps", [])
+    build_steps = [step for step in steps if step.get("name") == BUILD_STEP]
+    if len(build_steps) != 1:
+        failures.append("release must have exactly one distribution build step")
+        return failures
+    build = build_steps[0].get("run", "")
+    build_tokens = (
+        'export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"',
+        "python -m build",
+        "twine check dist/*",
+        'artifacts = sorted(path for path in Path("dist").iterdir() if path.is_file())',
+        'Path("release-artifacts/SHA256SUMS").write_text(',
+        "python scripts/check_public_hygiene.py",
+    )
+    if any(token not in build for token in build_tokens):
+        failures.append("build step must build, hash, and hygiene-check the same dist")
+    else:
+        offsets = [build.index(token) for token in build_tokens]
+        if offsets != sorted(offsets):
+            failures.append("build/hash/hygiene operations are out of order")
+
+    pypi = [
+        (index, step)
+        for index, step in enumerate(steps)
+        if str(step.get("uses", "")).startswith(PYPI_ACTION)
+    ]
+    github = [
+        (index, step)
+        for index, step in enumerate(steps)
+        if str(step.get("uses", "")).startswith(GITHUB_ACTION)
+    ]
+    build_index = steps.index(build_steps[0])
+    if len(pypi) != 1 or pypi[0][0] <= build_index:
+        failures.append("PyPI publish must consume the one checked build")
+    elif pypi[0][1].get("with", {}).get("packages-dir", "dist/") != "dist/":
+        failures.append("PyPI publish must use dist/")
+    if len(github) != 1 or github[0][0] <= build_index:
+        failures.append("GitHub release must consume the one checked build")
+    elif not {"dist/*", "release-artifacts/*"} <= {
+        line.strip()
+        for line in github[0][1].get("with", {}).get("files", "").splitlines()
+    }:
+        failures.append("GitHub release must upload dist and provenance manifest")
+    return failures
 
 
 def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> None:
@@ -22,9 +105,8 @@ def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> Non
         "wheel==0.47.0",
     ]
 
-    workflow = (
-        ROOT / ".github" / "workflows" / "release.yml"
-    ).read_text(encoding="utf-8")
+    workflow = RELEASE.read_text(encoding="utf-8")
+    assert _release_safety_failures(workflow) == []
     build_name = "- name: Build distributions"
     publish_name = "- name: Generate release SBOM"
     build = workflow[workflow.index(build_name) : workflow.index(publish_name)]
@@ -42,3 +124,71 @@ def test_release_build_inputs_are_bounded_and_hash_manifest_is_uploaded() -> Non
     assert "pypa/gh-action-pypi-publish@" in release
     assert "softprops/action-gh-release@" in release
     assert "release-artifacts/*" in release
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected"),
+    (
+        (
+            lambda text: text.replace("needs: prepublish", "needs: []", 1),
+            "release must need prepublish",
+        ),
+        (
+            lambda text: text.replace(
+                "  release:\n    needs:",
+                "  release:\n    if: always()\n    needs:",
+                1,
+            ),
+            "release must not override dependency status",
+        ),
+        (
+            lambda text: text.replace(
+                "      - name: Build distributions",
+                "      - name: Build distributions\n        continue-on-error: true",
+                1,
+            ),
+            "release step must not continue on error",
+        ),
+        (
+            lambda text: _replace_last(
+                text,
+                "python scripts/check_public_hygiene.py",
+                "python -m pip --version",
+            ),
+            "build step must build, hash, and hygiene-check the same dist",
+        ),
+        (
+            lambda text: text.replace(
+                'Path("dist").iterdir()',
+                'Path("other-dist").iterdir()',
+                1,
+            ),
+            "build step must build, hash, and hygiene-check the same dist",
+        ),
+        (
+            lambda text: text.replace(
+                "            dist/*\n",
+                "            other-dist/*\n",
+                1,
+            ),
+            "GitHub release must upload dist and provenance manifest",
+        ),
+    ),
+    ids=(
+        "remove-needs",
+        "always-run-release",
+        "continue-on-error",
+        "remove-artifact-hygiene",
+        "hash-another-directory",
+        "upload-another-directory",
+    ),
+)
+def test_release_provenance_mutations_fail_closed(
+    mutate,
+    expected: str,
+) -> None:
+    workflow = RELEASE.read_text(encoding="utf-8")
+
+    failures = _release_safety_failures(mutate(workflow))
+
+    assert any(expected in failure for failure in failures)
