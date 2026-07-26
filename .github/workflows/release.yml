@@ -26,6 +26,7 @@ jobs:
           PHASE0_VENV="${RUNNER_TEMP}/hwpx-phase0-legacy"
           python -m venv "${PHASE0_VENV}"
           "${PHASE0_VENV}/bin/python" -m pip install --only-binary=:all: \
+            "packaging>=23" \
             "python-hwpx==4.2.0" \
             "hwpx-mcp-server==5.1.1"
           "${PHASE0_VENV}/bin/python" -m pip check

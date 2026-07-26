@@ -46,6 +46,7 @@ def test_phase0_legacy_cap_precedes_every_core_5_resolution() -> None:
     assert phase0 < dependencies < matrix
 
     phase0_run = str(steps[phase0]["run"])
+    assert '"packaging>=23"' in phase0_run
     assert '"python-hwpx==4.2.0"' in phase0_run
     assert '"hwpx-mcp-server==5.1.1"' in phase0_run
     assert 'expected_specifiers = {">=4.2.0", "<5"}' in phase0_run
