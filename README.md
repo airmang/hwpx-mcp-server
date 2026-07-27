@@ -34,6 +34,10 @@
 [모델 컨텍스트 프로토콜(MCP)](https://modelcontextprotocol.io)은 `[mcp]` extra로
 추가하는 선택 어댑터입니다.
 
+한컴오피스도 Windows도 필요하지 않으므로 **ChatGPT 채팅 환경에서도 HWPX
+문서를 다룰 수 있습니다.** 파이썬이 도는 곳이면 저작·양식 채움 워크플로가
+그대로 동작합니다.
+
 | 계층 | 저장소 | 정본 책임 |
 |---|---|---|
 | Core | [`python-hwpx`](https://github.com/airmang/python-hwpx) | HWPX package/object model·OPC/OXML·직렬화·재사용 primitive |
