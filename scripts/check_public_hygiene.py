@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import os
 import re
@@ -13,8 +14,13 @@ from collections.abc import Mapping
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PINNED_ROOT = ROOT
 INTERNAL_STAGE_CODE = re.compile(
     rb"(?<![A-Za-z0-9])(?:S-[0-9]{3}(?![0-9])|STG-[A-Za-z0-9]+)"
+)
+INTERNAL_STAGE_CODE_COUNT = 60
+INTERNAL_STAGE_CODE_SHA256 = (
+    "5fa4756713848bf51587afa0b345afc19e4ab24b33e771ebce3d8025487d3d08"
 )
 WORKSTATION_PATH = re.compile(
     ("/" + "Users" + r"/[^/\s]+/").encode()
@@ -371,6 +377,38 @@ def _shipped_source_stage_failures(
     return failures
 
 
+def _internal_stage_inventory_failures(
+    *snapshots: Mapping[str, bytes],
+) -> list[str]:
+    """Reject any identifier outside the frozen historical source inventory."""
+
+    if ROOT != PINNED_ROOT:
+        return []
+    records = sorted(
+        {
+            f"{rel}\0{match.decode('ascii')}"
+            for blobs in snapshots
+            for rel, raw_data in blobs.items()
+            if (data := _text_blob(raw_data)) is not None
+            for match in INTERNAL_STAGE_CODE.findall(data)
+        }
+    )
+    digest = hashlib.sha256(
+        ("\n".join(records) + "\n").encode("utf-8")
+    ).hexdigest()
+    if (
+        len(records) == INTERNAL_STAGE_CODE_COUNT
+        and digest == INTERNAL_STAGE_CODE_SHA256
+    ):
+        return []
+    return [
+        (
+            "internal Stage-code source inventory differs from frozen baseline: "
+            f"count={len(records)} sha256={digest}"
+        )
+    ]
+
+
 def _automation_runtime_failures(
     tracked: list[str],
     blobs: Mapping[str, bytes] | None = None,
@@ -506,6 +544,9 @@ def main() -> int:
             kind,
             private_markers,
         )
+    )
+    failures.extend(
+        _internal_stage_inventory_failures(indexed_blobs, worktree_blobs)
     )
     tracked_ignored = _git_paths("ls-files", "-ci", "--exclude-standard")
     failures.extend(
