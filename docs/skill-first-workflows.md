@@ -1,9 +1,11 @@
 # Skill-First Workflows on the Automation MCP Adapter
 
-This guide describes the unreleased 6.0 automation candidate's optional FastMCP
-adapter. The Python automation layer is the product surface and `python-hwpx`
-remains the upstream engine layer; the current public adapter is
-`hwpx-mcp-server` 5.1.0 until the new release is observed remotely.
+This guide describes the 6.0 automation train's optional FastMCP adapter,
+currently in the `release-approved` state: publication is approved and in
+progress, and remote truth has not been observed yet. The Python automation
+layer is the product surface and `python-hwpx` remains the upstream engine
+layer; the current public adapter is `hwpx-mcp-server` 5.1.0 until the new
+release is observed remotely.
 
 Scope for this pass:
 

@@ -12,16 +12,17 @@
   </p>
 </p>
 
-<!-- release-state: unreleased-candidate -->
+<!-- release-state: release-approved -->
 > [!WARNING]
-> **릴리스 상태 — 아직 공개되지 않은 6.0.0 후보입니다.** 이 checkout은
+> **릴리스 상태 — `release-approved`: 6.0.0 train 발행이 승인되어 진행
+> 중입니다(2026-07-28).** 이 checkout은
 > `python-hwpx 5.0.0 → python-hwpx-automation 6.0.0 → hwpx-plugin 1.0.0`
-> 후보와 계약 해시 `0ce938371f0b55a6`을 설명하지만, 아직 PyPI·GitHub
-> Release·marketplace에 발행되지 않았습니다. 마지막으로 plugin 설치까지
-> 함께 검증한 완전한 공개 트레인은
+> train과 계약 해시 `0ce938371f0b55a6`을 설명하지만, **원격 truth는 아직
+> 관찰 전**입니다. 마지막으로 plugin 설치까지 함께 검증한 완전한 공개
+> 트레인은 여전히
 > `python-hwpx 4.2.0 → hwpx-mcp-server 5.1.0 → hwpx-plugin 0.8.0`,
-> 계약 해시 `429cb6706323e762`입니다. 아래 canonical 설치 명령은 6.0
-> 발행 후의 목표 표면이며, 그 전에는 공개 설치로 간주하지 마세요.
+> 계약 해시 `429cb6706323e762`입니다. 아래 canonical 설치 명령은 발행
+> readback이 끝나기 전에는 공개 설치로 간주하지 마세요.
 > 상태 승격은 `unreleased-candidate → release-approved → released` 세 단계이며,
 > `released`와 current-public 좌표는 core·canonical·compatibility와 plugin GitHub
 > Release·marketplace·실제 marketplace 설치까지 3스택 전체 원격 정본을 관찰한 뒤

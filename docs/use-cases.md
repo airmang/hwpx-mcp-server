@@ -1,6 +1,9 @@
 # 🔧 python-hwpx-automation — 이런 것도 가능합니다
 
 > Python 자동화와 선택 MCP 어댑터로 여는 한글(HWPX) 문서 워크플로
+>
+> 릴리스 상태: `release-approved` — 6.0.0 train 발행이 승인되어 진행
+> 중이며, 원격 truth 관찰 전까지 공개 좌표는 4.2.0/5.1.0/0.8.0입니다.
 
 ---
 

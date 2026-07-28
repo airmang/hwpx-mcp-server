@@ -1,7 +1,8 @@
 # python-hwpx-automation 하드닝 가이드
 
-> 아래 5.0/6.0/1.0 좌표는 아직 공개되지 않은 source candidate입니다.
-> 마지막으로 plugin 설치까지 함께 검증한 완전한 공개 트레인은 core 4.2.0 /
+> 아래 5.0/6.0/1.0 좌표는 `release-approved` 상태의 train입니다 — 발행이
+> 승인되어 진행 중이며 원격 truth 관찰 전입니다. 마지막으로 plugin
+> 설치까지 함께 검증한 완전한 공개 트레인은 core 4.2.0 /
 > `hwpx-mcp-server` 5.1.0 / plugin 0.8.0, 계약 해시
 > `429cb6706323e762`입니다.
 
