@@ -26,7 +26,7 @@ EXPECTED_TRIGGER = {
 }
 EXPECTED_STEP_IDENTITY_SHA256 = {
     "prepublish": (
-        "8c8720c93f38f11e17da96b85e490c1b3bc40efb33860a5bd1f0c3cd0fccb700"
+        "c0a0f94f003cde7c6d730fbbd7d7ef072be4c0fe09ae66ea3862f438e5a4d474"
     ),
     "release": (
         "70f1a6828a7c6866764731eb837da0869769f00c83ec917793969cfd2138c618"
@@ -39,6 +39,9 @@ EXPECTED_RUN_SHA256 = {
         ),
         "Install test dependencies": (
             "4a69d4cc5c726554deda4bb96cc3cc622d03c8dfdee44480d74762c5d68c22fa"
+        ),
+        "Install uv for the clean installed-wheel gates": (
+            "a528bb5ef5a4d3201a325ff8ca5170f2e72d275a5fb8a31d95ccd0dd2cab5e6b"
         ),
         "Observe public core dependency remote truth": (
             "9d5f4fced2a765244ab2180097de55e4de0399431f20e43de8a2033e633dd517"

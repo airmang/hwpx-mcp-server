@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## [6.0.1]
+
+`v6.0.0` is a preserved failed tag: its release run stopped in prepublish
+(the parity suites need a `python-hwpx` repository checkout for fixtures,
+and the clean installed-wheel gates need `uv`; the workflow provided
+neither) and nothing was published. 6.0.1 is the same train content plus
+those workflow fixes and the core-5.0.1 observation pins. Never delete,
+move, or reuse `v6.0.0`.
+
 ## [6.0.0] - unreleased
 
 The core-5.0/automation-6.0 train. `python-hwpx` 5.0 removes the application

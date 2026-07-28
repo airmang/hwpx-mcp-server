@@ -17,6 +17,14 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           path: python-hwpx-automation
+      # The runtime-parity suites read fixtures from a python-hwpx REPO
+      # checkout (the installed wheel ships no tests/); pin the exact
+      # released core tag this train observes.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: airmang/python-hwpx
+          ref: v5.0.1
+          path: python-hwpx
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
@@ -60,6 +68,11 @@ jobs:
           # sibling checkout or an unpublished branch.
           python -m pip install "python-hwpx[visual,preview]==5.0.1"
           python -m pip install -e ".[mcp,oracle,test,typecheck]"
+      # The clean installed-wheel gates (docs example, compat matrix) fail
+      # closed without uv; runners do not ship it.
+      - name: Install uv for the clean installed-wheel gates
+        working-directory: python-hwpx-automation
+        run: python -m pip install "uv>=0.7"
       - name: Observe public core dependency remote truth
         working-directory: python-hwpx-automation
         env:
