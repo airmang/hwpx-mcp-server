@@ -12,21 +12,17 @@
   </p>
 </p>
 
-<!-- release-state: release-approved -->
-> [!WARNING]
-> **릴리스 상태 — `release-approved`: 6.0.4 train 발행이 승인되어 진행
-> 중입니다(2026-07-28).** 이 checkout은
-> `python-hwpx 5.0.1 → python-hwpx-automation 6.0.4 → hwpx-plugin 1.0.0`
-> train과 계약 해시 `0ce938371f0b55a6`을 설명하지만, **원격 truth는 아직
-> 관찰 전**입니다. 마지막으로 plugin 설치까지 함께 검증한 완전한 공개
-> 트레인은 여전히
-> `python-hwpx 4.2.0 → hwpx-mcp-server 5.1.0 → hwpx-plugin 0.8.0`,
-> 계약 해시 `429cb6706323e762`입니다. 아래 canonical 설치 명령은 발행
-> readback이 끝나기 전에는 공개 설치로 간주하지 마세요.
-> 상태 승격은 `unreleased-candidate → release-approved → released` 세 단계이며,
-> `released`와 current-public 좌표는 core·canonical·compatibility와 plugin GitHub
-> Release·marketplace·실제 marketplace 설치까지 3스택 전체 원격 정본을 관찰한 뒤
-> 후속 commit에서만 바꿉니다. 절차는
+<!-- release-state: released -->
+> [!NOTE]
+> **릴리스 상태 — `released` (2026-07-28).** 현재 공개 트레인은
+> `python-hwpx 5.0.1 → python-hwpx-automation 6.0.4 → hwpx-plugin 1.0.0`,
+> 계약 해시 `0ce938371f0b55a6`입니다. core PyPI/GitHub Release,
+> canonical·compatibility PyPI, plugin GitHub
+> Release·marketplace·실제 marketplace 설치까지 3스택 전체 원격 정본을
+> 관찰한 뒤 이 상태로 승격했습니다.
+> 직전 공개 트레인은 `python-hwpx 4.2.0 → hwpx-mcp-server 5.1.0 →
+> hwpx-plugin 0.8.0`(`429cb6706323e762`)이며, 기존 5.x 설치는 별도 발행된
+> `hwpx-mcp-server 5.1.1`의 `<5` cap으로 보호됩니다. 상태 머신과 절차는
 > [릴리스 상태 runbook](docs/release-runbook.md)에 있습니다.
 
 [python-hwpx](https://github.com/airmang/python-hwpx)의 format/object-model 위에서
