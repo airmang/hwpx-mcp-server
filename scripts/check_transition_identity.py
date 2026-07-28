@@ -435,14 +435,23 @@ def main() -> int:
     release_runbook = (ROOT / "docs" / "release-runbook.md").read_text(
         encoding="utf-8"
     )
+    compat_surface = (ROOT / "docs" / "compatibility-6x.md").read_text(
+        encoding="utf-8"
+    )
     _require(
-        all(name in readme for name in observed_preserved),
-        "README omits a preserved integration/capability environment key",
+        "docs/compatibility-6x.md" in readme,
+        "README does not link the 6.x compatibility surface document",
+        errors,
+    )
+    _require(
+        all(name in compat_surface for name in observed_preserved),
+        "compatibility surface doc omits a preserved integration/capability "
+        "environment key",
         errors,
     )
     _require(
         all(
-            name in readme
+            name in compat_surface
             for name in (
                 "versions.automation",
                 "versions.mcp",
@@ -455,7 +464,8 @@ def main() -> int:
                 "mcpRuntimeMembers",
             )
         ),
-        "README omits canonical or compatibility-preserved wire identifiers",
+        "compatibility surface doc omits canonical or compatibility-preserved "
+        "wire identifiers",
         errors,
     )
     _require(
