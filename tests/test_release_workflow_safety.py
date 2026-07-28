@@ -56,13 +56,13 @@ EXPECTED_RUN_SHA256 = {
             "03b2d5596d232a4210386ff5610b26c7bb59cd1aa14f9531d5121955881b3d13"
         ),
         "Run public 5.1.1 to 6.0 compatibility install matrix": (
-            "b4a89e586c14473d1828e4c5c3405f1b4a7f4783420e7275af205fb151716652"
+            "95434c986b9fd662df10f971eb6c00789df4f95e0a71ba3ac37ac76483ed5179"
         ),
         "Verify generated ToolSpec documentation": (
             "c7a25a48d6118f2932df62fe23211794b2729991ce6354671c8524f20e838254"
         ),
         "Gate minimum-Python clean wheel and optional boundaries": (
-            "68530502a229e11f821bd2968daba40404f360e1298b38d4a22ed33711535ca5"
+            "067f2c0d224574bdfae410cabb783652a2c4d8300dfefb6b9661959c6c81c8e0"
         ),
     },
     "release": {
