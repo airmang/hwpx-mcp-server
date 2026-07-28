@@ -123,9 +123,9 @@ def test_installed_identity_contract_is_machine_readable() -> None:
     assert release["candidate"] == {
         "pythonHwpx": "5.0.1",
         "canonicalDistribution": "python-hwpx-automation",
-        "canonicalAutomation": "6.0.1",
+        "canonicalAutomation": "6.0.2",
         "compatibilityDistribution": "hwpx-mcp-server",
-        "compatibility": "6.0.1",
+        "compatibility": "6.0.2",
         "plugin": "1.0.0",
         "contractHash": "0ce938371f0b55a6",
     }
@@ -155,7 +155,7 @@ def test_installed_identity_contract_is_machine_readable() -> None:
         assert release["currentPublic"] == {
             "pythonHwpx": "5.0.1",
             "primaryDistribution": "python-hwpx-automation",
-            "primaryApplication": "6.0.1",
+            "primaryApplication": "6.0.2",
             "plugin": "1.0.0",
             "contractHash": "0ce938371f0b55a6",
         }

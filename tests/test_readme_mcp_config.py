@@ -18,7 +18,7 @@ def test_readme_host_config_is_parseable_and_resolves_distribution_explicitly() 
     assert server["command"] == "uvx"
     assert server["args"] == [
         "--from",
-        "python-hwpx-automation[mcp]==6.0.1",
+        "python-hwpx-automation[mcp]==6.0.2",
         "hwpx-automation-mcp",
     ]
     assert "HWPX_AUTOMATION_WORKSPACE_ROOTS" in server["env"]

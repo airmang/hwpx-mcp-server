@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## [6.0.2]
+
+`v6.0.1` is a preserved failed tag: its prepublish stopped in the
+compatibility install matrix, whose embedded assertions still named
+6.0.0, and nothing was published. 6.0.2 is the same train content with
+every embedded coordinate audited repository-wide. Never delete, move,
+or reuse `v6.0.1`.
+
 ## [6.0.1]
 
 `v6.0.0` is a preserved failed tag: its release run stopped in prepublish

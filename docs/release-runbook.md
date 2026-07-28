@@ -34,8 +34,8 @@ promote the global state or `currentPublic`.
 Use only after every member of the coherent train has remote evidence:
 
 1. `python-hwpx 5.0.1` is observed on PyPI and as its GitHub Release;
-2. canonical `python-hwpx-automation 6.0.1` and compatibility
-   `hwpx-mcp-server 6.0.1` are observed on PyPI, and the automation GitHub
+2. canonical `python-hwpx-automation 6.0.2` and compatibility
+   `hwpx-mcp-server 6.0.2` are observed on PyPI, and the automation GitHub
    Release carries the handoff receipt;
 3. `hwpx-plugin 1.0.0` is observed in its GitHub Release and marketplace entry;
 4. a real marketplace install resolves the exact 5.0/6.0/1.0 stack and contract
@@ -44,7 +44,7 @@ Use only after every member of the coherent train has remote evidence:
 Only then, in a follow-up commit on the main branch:
 
 1. set `releaseState.status` to `released`;
-2. promote `currentPublic` to core 5.0.1, canonical automation 6.0.1, plugin
+2. promote `currentPublic` to core 5.0.1, canonical automation 6.0.2, plugin
    1.0.0, and contract hash `0ce938371f0b55a6`;
 3. change the README marker to `release-state: released`;
 4. remove candidate/pending wording from the four current-facing guides;
