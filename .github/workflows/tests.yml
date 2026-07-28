@@ -38,6 +38,10 @@ jobs:
           python -m pip install
           "packaging>=23.0"
           "tomli>=2.0; python_version < '3.11'"
+      # The suite's clean installed-wheel gate builds throwaway venvs with uv
+      # and fails closed when the binary is absent; runners do not ship it.
+      - name: Install uv for the clean installed-wheel gate
+        run: python -m pip install "uv>=0.7"
       - name: Pinned core satisfies the declared floor
         run: python scripts/check_pinned_core_satisfies_floor.py ../python-hwpx
         working-directory: python-hwpx-automation

@@ -43,7 +43,6 @@ import json
 from pathlib import Path
 
 from parity_fingerprint import fingerprint
-from PIL import Image, ImageDraw
 
 from hwpx_automation.office.rendering import fixture_corpus as mcp_fixture
 from hwpx_automation.office.rendering import oracle as mcp_oracle
@@ -77,15 +76,20 @@ def _scenario(identifier: str) -> dict[str, object]:
 
 
 def _clean_fixture(tmp_path: Path) -> Path:
+    # The page bytes are a checked-in fixture, not encoded at test time: the
+    # golden receipt freezes this file's sha256, and PNG encoder output varies
+    # across Pillow builds/platforms even for identical pixels. Regenerate via
+    # tests/visual_runtime_parity/fixtures/ (same 150-point pattern) only when
+    # deliberately refreezing the golden.
     page = tmp_path / "page.png"
-    image = Image.new("RGB", (400, 600), "white")
-    draw = ImageDraw.Draw(image)
-    for offset in range(150):
-        draw.point(
-            (80 + (offset * 17) % 240, 80 + (offset * 29) % 440),
-            fill="black",
-        )
-    image.save(page)
+    page.write_bytes(
+        (
+            Path(__file__).parent
+            / "visual_runtime_parity"
+            / "fixtures"
+            / "page_clean.png"
+        ).read_bytes()
+    )
     manifest = {
         "schema": "hwpx.visual-fixture-manifest/v1",
         "taxonomyVersion": "hwpx-visual-defects/1.0",
