@@ -58,7 +58,7 @@ jobs:
           # Release order is legacy cap -> core -> automation -> compatibility -> plugin.
           # A tag release must observe the exact public core rather than a
           # sibling checkout or an unpublished branch.
-          python -m pip install "python-hwpx[visual,preview]==5.0.0"
+          python -m pip install "python-hwpx[visual,preview]==5.0.1"
           python -m pip install -e ".[mcp,oracle,test,typecheck]"
       - name: Observe public core dependency remote truth
         working-directory: python-hwpx-automation
@@ -67,13 +67,13 @@ jobs:
         run: |
           python - <<'PY'
           from importlib.metadata import version
-          assert version("python-hwpx") == "5.0.0"
+          assert version("python-hwpx") == "5.0.1"
           PY
-          gh release view v5.0.0 \
+          gh release view v5.0.1 \
             --repo airmang/python-hwpx \
             --json tagName,isDraft,isPrerelease \
-            --jq 'select(.tagName == "v5.0.0" and (.isDraft | not) and (.isPrerelease | not)) | .tagName' \
-            | grep -Fx v5.0.0
+            --jq 'select(.tagName == "v5.0.1" and (.isDraft | not) and (.isPrerelease | not)) | .tagName' \
+            | grep -Fx v5.0.1
       - name: Check public repository hygiene
         working-directory: python-hwpx-automation
         run: |

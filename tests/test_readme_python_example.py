@@ -195,7 +195,7 @@ def test_readme_python_example_runs_saves_and_reopens_from_base_wheel(
             "--no-index",
             "--find-links",
             str(wheelhouse),
-            "python-hwpx==5.0.0",
+            "python-hwpx==5.0.1",
             "python-hwpx-automation==6.0.0",
         ],
         cwd=tmp_path,

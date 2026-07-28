@@ -16,7 +16,7 @@
 기존에는 한글 파일을 열어서 일일이 수작업으로 처리해야 했던 일을, 이제 자연어 요청으로 자동화할 수 있습니다.
 
 이 문서는 아직 공개되지 않은 6.0.0 source candidate를 기준으로 합니다.
-후보 좌표는 `python-hwpx 5.0.0 → python-hwpx-automation 6.0.0 →
+후보 좌표는 `python-hwpx 5.0.1 → python-hwpx-automation 6.0.0 →
 hwpx-plugin 1.0.0`, 계약 해시는 `0ce938371f0b55a6`입니다. 마지막으로
 plugin 설치까지 함께 검증한 완전한 공개 트레인은
 `python-hwpx 4.2.0 → hwpx-mcp-server 5.1.0 → hwpx-plugin 0.8.0`,

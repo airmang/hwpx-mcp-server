@@ -16,7 +16,7 @@
 > [!WARNING]
 > **릴리스 상태 — `release-approved`: 6.0.0 train 발행이 승인되어 진행
 > 중입니다(2026-07-28).** 이 checkout은
-> `python-hwpx 5.0.0 → python-hwpx-automation 6.0.0 → hwpx-plugin 1.0.0`
+> `python-hwpx 5.0.1 → python-hwpx-automation 6.0.0 → hwpx-plugin 1.0.0`
 > train과 계약 해시 `0ce938371f0b55a6`을 설명하지만, **원격 truth는 아직
 > 관찰 전**입니다. 마지막으로 plugin 설치까지 함께 검증한 완전한 공개
 > 트레인은 여전히
