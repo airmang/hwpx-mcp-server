@@ -9,7 +9,7 @@
 ## 공개 계약과 프로필
 
 - 도구 등록, 입력·출력 스키마, health/capability 표면과 생성 문서는 하나의
-  `ToolSpec` 레지스트리에서 만들어집니다. `python-hwpx-automation` 6.0.3는
+  `ToolSpec` 레지스트리에서 만들어집니다. `python-hwpx-automation` 6.0.4는
   기본 119개, 고급 모드 포함 127개 도구와 28개 skill-required 도구를 유지하며
   계약 해시는 `0ce938371f0b55a6`입니다. 최소 좌표는 core `5.0.0`,
   automation `6.0.0`, skill `1.0.0`입니다.
