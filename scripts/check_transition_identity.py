@@ -7,6 +7,8 @@ import ast
 import json
 import re
 import sys
+
+from packaging.version import Version
 from pathlib import Path
 
 try:
@@ -382,8 +384,33 @@ def main() -> int:
         errors,
     )
     candidate = release_state.get("candidate", {})
+    # The candidate names the exact train being shipped, not the contract
+    # floor. The two coincided until core recovered as 5.0.1 over a preserved
+    # v5.0.0 tag; the authoritative exact-core coordinate is the release
+    # workflow's remote-truth observation pin, which must itself satisfy the
+    # contract floor.
+    release_workflow_text = (
+        ROOT / ".github" / "workflows" / "release.yml"
+    ).read_text(encoding="utf-8")
+    observed_core = re.search(
+        r'python-hwpx\[visual,preview\]==([0-9][0-9a-z.]*)"',
+        release_workflow_text,
+    )
+    _require(
+        observed_core is not None,
+        "release workflow does not pin the observed core version",
+        errors,
+    )
+    observed_core_version = observed_core.group(1) if observed_core else ""
+    _require(
+        observed_core is not None
+        and Version(observed_core_version)
+        >= Version(contract["minPythonHwpx"]),
+        "observed core version does not satisfy the contract floor",
+        errors,
+    )
     expected_candidate = {
-        "pythonHwpx": contract["minPythonHwpx"],
+        "pythonHwpx": observed_core_version,
         "canonicalDistribution": metadata["name"],
         "canonicalAutomation": version,
         "compatibilityDistribution": compat["name"],
