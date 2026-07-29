@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+- Official Python 3.13/3.14 support: the CI matrix now runs the full suite on
+  CPython 3.10–3.14 (1,390 passed verified on both new versions before
+  widening), and the canonical/compat classifiers follow. The canonical
+  distribution also declares `Typing :: Typed` — it has shipped `py.typed`
+  all along. The compat README now states that the legacy import shell is a
+  runtime redirect: type-checked code should import `hwpx_automation`
+  directly.
+
 ## [6.0.4] - 2026-07-28
 
 `v6.0.3` published the canonical `python-hwpx-automation` 6.0.3 but the

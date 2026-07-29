@@ -20,6 +20,10 @@ pip install python-hwpx-automation   # 새 이름. MCP 없이 파이썬 API만
 `DeprecationWarning`을 냅니다. 새 이름은 `hwpx_automation`입니다. 제거는 7.0
 이전에는 하지 않으며 최소 90일 공개 관찰과 별도 오너 승인이 필요합니다.
 
+셸의 리다이렉트는 런타임 전용이라 mypy/pyright 같은 정적 타입 검사기는 옛
+경로를 해석하지 못합니다. 타입 검사가 필요한 코드는 `hwpx_automation`을 직접
+import하세요 — 그쪽이 `py.typed`를 배포합니다.
+
 `importlib.resources`의 package data는 복제하지 않습니다. 리소스 소비자는
 `importlib.resources.files("hwpx_automation")`을 사용해야 하며, 호환 셸에는
 shim 외의 구현·데이터 사본이 없습니다.
