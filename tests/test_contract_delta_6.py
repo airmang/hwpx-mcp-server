@@ -17,7 +17,7 @@ def _load(name: str) -> dict:
 
 
 def test_6_1_1_contract_delta_is_additive_and_matches_the_live_contract() -> None:
-    delta = _load("tool-contract-delta-6.1.1.json")
+    delta = _load("tool-contract-delta-6.1.2.json")
     contract = _load("tool-contract.generated.json")
 
     assert delta["target"]["contractHash"] == contract["contractHash"] == contract_hash()
@@ -52,7 +52,7 @@ def test_6_0_delta_receipt_chains_into_the_6_1_baseline() -> None:
     the 6.1.0 baseline so the release hash chain has no gap."""
 
     superseded = _load("tool-contract-delta-6.0.0.json")
-    delta = _load("tool-contract-delta-6.1.1.json")
+    delta = _load("tool-contract-delta-6.1.2.json")
     assert superseded["hash"] == delta["baseline"]["contractHash"]
     assert superseded["toolCounts"] == {
         "default": delta["baseline"]["defaultToolCount"],

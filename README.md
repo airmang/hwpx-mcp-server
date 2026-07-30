@@ -14,7 +14,7 @@
 
 <!-- release-state: release-approved -->
 > [!NOTE]
-> 이 소스 트리는 아직 공개되지 않은 6.1.1 후보입니다(누름틀 필드 저작
+> 이 소스 트리는 아직 공개되지 않은 6.1.2 후보입니다(누름틀 필드 저작
 > `add_form_field`, 계약 `ac1a422376b5ac84`, 128 도구). 현재 공개 트레인은
 > `python-hwpx 5.0.2 → python-hwpx-automation 6.0.4 → hwpx-plugin 1.0.1`
 > (계약 `0ce938371f0b55a6`)입니다. core·automation PyPI와 plugin GitHub

@@ -1,6 +1,6 @@
 # Skill-First Workflows on the Automation MCP Adapter
 
-> 릴리스 상태: release-approved — 6.1.1 후보, 원격 발행 진실 관찰 전.
+> 릴리스 상태: release-approved — 6.1.2 후보, 원격 발행 진실 관찰 전.
 
 This guide describes the released 6.0 automation train's optional FastMCP
 adapter (`released`, 2026-07-28: core 5.0.1 / automation 6.0.4 / plugin

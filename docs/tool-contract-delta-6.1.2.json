@@ -1,9 +1,9 @@
 {
   "schemaVersion": "hwpx.tool-contract-delta.v2",
-  "release": "6.1.1",
+  "release": "6.1.2",
   "changeKind": "additive-tool",
   "releaseStatus": "unreleased-candidate",
-  "note": "6.1.1 candidate receipt (v6.1.0 is a preserved failed tag; nothing was published). One new public default-profile tool, add_form_field, creates native click-here (누름틀) form fields with the exact real-Hancom CLICKHERE shape (fieldBegin attributes, Prop/Command/Direction/HelpState parameters, screen-only prompt run, paired fieldEnd), so the form lifecycle create→list→fill→verify is self-sufficient without preparing forms in Hancom by hand. Version floors move with the train (python-hwpx 5.1.0 / automation 6.1.0 / skill 1.1.0). The candidate contract hash is ac1a422376b5ac84.",
+  "note": "6.1.2 candidate receipt (v6.1.0 and v6.1.1 are preserved failed tags; nothing was published). One new public default-profile tool, add_form_field, creates native click-here (누름틀) form fields with the exact real-Hancom CLICKHERE shape (fieldBegin attributes, Prop/Command/Direction/HelpState parameters, screen-only prompt run, paired fieldEnd), so the form lifecycle create→list→fill→verify is self-sufficient without preparing forms in Hancom by hand. Version floors move with the train (python-hwpx 5.1.0 / automation 6.1.0 / skill 1.1.0). The candidate contract hash is ac1a422376b5ac84.",
   "baseline": {
     "versions": {
       "pythonHwpx": "5.0.2",
@@ -25,7 +25,7 @@
   "target": {
     "versions": {
       "pythonHwpx": "5.1.0",
-      "automation": "6.1.1",
+      "automation": "6.1.2",
       "skill": "1.1.0"
     },
     "defaultToolCount": 120,

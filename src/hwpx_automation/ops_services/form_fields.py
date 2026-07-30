@@ -95,7 +95,7 @@ class FormFieldService:
                 "paragraphIndex cannot be combined with a cell target",
             )
         paragraph = None
-        if use_cell:
+        if table_index is not None and row is not None and col is not None:
             tables = self._context._iter_tables(document)
             try:
                 table = tables[table_index]

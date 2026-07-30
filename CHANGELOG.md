@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-## [6.1.1] - 2026-07-31
+## [6.1.2] - 2026-07-31
+
+`v6.1.1`도 보존된 실패 태그입니다 — 아무것도 게시되지 않았습니다. 신규
+도구 테스트 파일의 미사용 import 하나가 prepublish Ruff 게이트에서
+적발됐습니다. 이번에는 release 정적 게이트 전부를 로컬에서 선실행한 뒤
+6.1.2로 복구합니다. `v6.1.1`은 삭제·이동·재사용하지 않습니다.
+
+## [6.1.1] - 2026-07-31 (미게시 후보)
 
 `v6.1.0`은 보존된 실패 태그입니다 — 아무것도 게시되지 않았습니다. 태그
 워크플로의 public core dependency 관측 스텝이 5.0.1로 동결돼 있어(5.0.2
@@ -21,7 +28,7 @@
   (`FORM_FIELD_TARGET_INVALID`/`TABLE_INDEX_OUT_OF_RANGE`/
   `PARAGRAPH_INDEX_OUT_OF_RANGE`)로 거부됩니다. 설치 계약은 기본 120 /
   고급 128 / 스킬 필수 28, 계약 해시 `ac1a422376b5ac84`
-  (델타 영수증 `docs/tool-contract-delta-6.1.1.json`).
+  (델타 영수증 `docs/tool-contract-delta-6.1.2.json`).
 - Official Python 3.13/3.14 support: the CI matrix now runs the full suite on
   CPython 3.10–3.14 (1,390 passed verified on both new versions before
   widening), and the canonical/compat classifiers follow. The canonical
