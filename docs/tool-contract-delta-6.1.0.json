@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "hwpx.tool-contract-delta.v2",
+  "release": "6.1.0",
+  "changeKind": "additive-tool",
+  "releaseStatus": "unreleased-candidate",
+  "note": "6.1.0 candidate receipt. One new public default-profile tool, add_form_field, creates native click-here (누름틀) form fields with the exact real-Hancom CLICKHERE shape (fieldBegin attributes, Prop/Command/Direction/HelpState parameters, screen-only prompt run, paired fieldEnd), so the form lifecycle create→list→fill→verify is self-sufficient without preparing forms in Hancom by hand. Version floors move with the train (python-hwpx 5.1.0 / automation 6.1.0 / skill 1.1.0). The candidate contract hash is ac1a422376b5ac84.",
+  "baseline": {
+    "versions": {
+      "pythonHwpx": "5.0.2",
+      "automation": "6.0.4",
+      "skill": "1.0.1"
+    },
+    "defaultToolCount": 119,
+    "advancedToolCount": 127,
+    "skillRequiredToolCount": 28,
+    "classificationCounts": {
+      "public": 110,
+      "compatibility": 6,
+      "advanced": 8,
+      "deprecated": 3,
+      "internal": 4
+    },
+    "contractHash": "0ce938371f0b55a6"
+  },
+  "target": {
+    "versions": {
+      "pythonHwpx": "5.1.0",
+      "automation": "6.1.0",
+      "skill": "1.1.0"
+    },
+    "defaultToolCount": 120,
+    "advancedToolCount": 128,
+    "skillRequiredToolCount": 28,
+    "classificationCounts": {
+      "public": 111,
+      "compatibility": 6,
+      "advanced": 8,
+      "deprecated": 3,
+      "internal": 4
+    },
+    "contractHash": "ac1a422376b5ac84"
+  },
+  "delta": {
+    "defaultToolCount": 1,
+    "advancedToolCount": 1,
+    "skillRequiredToolCount": 0,
+    "removedTools": [],
+    "addedTools": ["add_form_field"],
+    "promotedTools": [],
+    "profileMoves": []
+  },
+  "changedTools": [
+    {
+      "name": "add_form_field",
+      "domain": "form_fill",
+      "classification": "public",
+      "profile": "default",
+      "mutates": true,
+      "skillRequired": false,
+      "changedFields": ["added"],
+      "inputParameters": [
+        {"name": "filename", "type": "string", "required": true},
+        {"name": "name", "type": "string", "required": true, "description": "Field name consumed by list_form_fields/fill_form_field."},
+        {"name": "prompt", "type": "string", "required": false, "description": "안내문 shown while the field is empty; screen-only, Hancom does not print it."},
+        {"name": "memo", "type": "string", "required": false},
+        {"name": "paragraph_index", "type": "integer", "required": false},
+        {"name": "table_index", "type": "integer", "required": false},
+        {"name": "row", "type": "integer", "required": false},
+        {"name": "col", "type": "integer", "required": false},
+        {"name": "dry_run", "type": "boolean", "required": false},
+        {"name": "expected_revision", "type": "string", "required": false}
+      ]
+    }
+  ],
+  "coreDependency": {
+    "capability": "hwpx.HwpxDocument.add_form_field (experimental contract) + reader dirty/is_placeholder exposure + fill dirty=1/prompt-style swap",
+    "floorBumped": true,
+    "failClosed": "Blank names raise ValueError before any write; invalid paragraph/cell targets raise typed FORM_FIELD_TARGET_INVALID / TABLE_INDEX_OUT_OF_RANGE / PARAGRAPH_INDEX_OUT_OF_RANGE errors. The candidate distribution requires python-hwpx>=5.1.0, the first public core with the authoring primitive; resolver validation prevents the stale-core degradation path in a valid 6.1.0 install."
+  },
+  "proof": "Holding every existing tool fixed, the canonical payload delta is confined to the dependency/version floors and one added public default-profile mutating tool, add_form_field (form_fill domain). No tool is removed, renamed, reclassified, or moved between profiles; every existing input/output schema is unchanged. The added tool's engine emission was reverse-engineered from real Hancom-authored gold documents and its round-trip through the unchanged list_form_fields/fill_form_field consumers is regression-locked in both repositories."
+}

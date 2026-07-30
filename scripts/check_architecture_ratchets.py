@@ -35,7 +35,7 @@ EXPECTED_SERVICE_LINES = {
     "_border_fill.py": 283,
     "content_layout.py": 322,
     "context.py": 213,
-    "form_fields.py": 557,
+    "form_fields.py": 618,
     "media.py": 178,
     "memo_style.py": 477,
     "package_validation.py": 166,
@@ -49,9 +49,9 @@ EXPECTED_SERVICE_LINES = {
 }
 
 EXPECTED_FACADE_LINES = {
-    "hwpx_ops.py": 1439,
+    "hwpx_ops.py": 1464,
     # S-108: shared identity/config helpers replaced duplicated MCP-era parsing.
-    "server.py": 259,
+    "server.py": 260,
 }
 
 PRIVATE_ATTRIBUTES = ("_mcp_server", "_tool_manager", "_tools")

@@ -704,6 +704,31 @@ class HwpxOps:
     ) -> Dict[str, Any]:
         return self._services.form_fields.list_form_fields(path)
 
+    def add_form_field(
+        self,
+        path: str,
+        *,
+        name: str,
+        prompt: str = "",
+        memo: str = "",
+        paragraph_index: Optional[int] = None,
+        table_index: Optional[int] = None,
+        row: Optional[int] = None,
+        col: Optional[int] = None,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        return self._services.form_fields.add_form_field(
+            path,
+            name=name,
+            prompt=prompt,
+            memo=memo,
+            paragraph_index=paragraph_index,
+            table_index=table_index,
+            row=row,
+            col=col,
+            dry_run=dry_run,
+        )
+
     def fill_form_field(
         self,
         path: str,

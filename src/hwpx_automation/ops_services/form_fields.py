@@ -68,6 +68,67 @@ class FormFieldService:
             "fallback": "table-label" if not fields else None,
         }
 
+    def add_form_field(
+        self,
+        path: str,
+        *,
+        name: str,
+        prompt: str = "",
+        memo: str = "",
+        paragraph_index: int | None = None,
+        table_index: int | None = None,
+        row: int | None = None,
+        col: int | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        document, resolved = self._context._open_document(path)
+        cell_parts = (table_index, row, col)
+        use_cell = any(part is not None for part in cell_parts)
+        if use_cell and not all(part is not None for part in cell_parts):
+            raise self._context._new_error(
+                "FORM_FIELD_TARGET_INVALID",
+                "provide tableIndex, row, and col together for a cell target",
+            )
+        if use_cell and paragraph_index is not None:
+            raise self._context._new_error(
+                "FORM_FIELD_TARGET_INVALID",
+                "paragraphIndex cannot be combined with a cell target",
+            )
+        paragraph = None
+        if use_cell:
+            tables = self._context._iter_tables(document)
+            try:
+                table = tables[table_index]
+            except IndexError as exc:
+                raise self._context._new_error(
+                    "TABLE_INDEX_OUT_OF_RANGE",
+                    "tableIndex out of range",
+                    details={"tableIndex": table_index},
+                ) from exc
+            try:
+                paragraph = table.cell(row, col).paragraphs[-1]
+            except (IndexError, ValueError) as exc:
+                raise self._context._new_error(
+                    "TABLE_CELL_OPERATION_FAILED",
+                    f"failed to resolve table cell for the form field: {exc}",
+                ) from exc
+        elif paragraph_index is not None:
+            try:
+                paragraph = document.paragraphs[paragraph_index]
+            except IndexError as exc:
+                raise self._context._new_error(
+                    "PARAGRAPH_INDEX_OUT_OF_RANGE",
+                    "paragraphIndex out of range",
+                    details={"paragraphIndex": paragraph_index},
+                ) from exc
+        field = document.add_form_field(
+            name, prompt=prompt, memo=memo, paragraph=paragraph
+        )
+        result = {"ok": True, "filename": path, "field": field}
+        return self._transactions._with_transaction_verification(
+            result, document, resolved, dry_run=dry_run
+        )
+
     def fill_form_field(
         self,
         path: str,

@@ -66,10 +66,10 @@
     "removalGate": "public observation followed by separately approved core major"
   },
   "toolContract": {
-    "default": 119,
-    "advanced": 127,
+    "default": 120,
+    "advanced": 128,
     "skillRequired": 28,
-    "hash": "0ce938371f0b55a6",
+    "hash": "ac1a422376b5ac84",
     "composeExamToolSha256": "be9e32237e911ec03923048845932823b5e6cf31520822776bc2780a8cc49768"
   }
 }

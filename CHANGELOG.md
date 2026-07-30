@@ -2,7 +2,18 @@
 
 ## Unreleased
 
+## [6.1.0] - 2026-07-31
+
 ### Added
+- **`add_form_field` — 누름틀(click-here) 필드 저작 도구.** 실한컴이 만드는
+  CLICKHERE 형상 그대로 필드를 생성해 양식 수명주기(create→list→fill→verify)가
+  한컴 수동 준비 없이 자급됩니다. 배치는 문서 끝 새 문단(기본)·`paragraph_index`·
+  `tableIndex`+`row`+`col`(표 셀, 중첩 포함)을 지원하고, 안내문(`prompt`)은
+  화면 전용(미인쇄)입니다. 잘못된 타깃 조합은 typed 오류
+  (`FORM_FIELD_TARGET_INVALID`/`TABLE_INDEX_OUT_OF_RANGE`/
+  `PARAGRAPH_INDEX_OUT_OF_RANGE`)로 거부됩니다. 설치 계약은 기본 120 /
+  고급 128 / 스킬 필수 28, 계약 해시 `ac1a422376b5ac84`
+  (델타 영수증 `docs/tool-contract-delta-6.1.0.json`).
 - Official Python 3.13/3.14 support: the CI matrix now runs the full suite on
   CPython 3.10–3.14 (1,390 passed verified on both new versions before
   widening), and the canonical/compat classifiers follow. The canonical
@@ -10,6 +21,12 @@
   all along. The compat README now states that the legacy import shell is a
   runtime redirect: type-checked code should import `hwpx_automation`
   directly.
+
+### Changed
+- Version floors move with the train: `python-hwpx>=5.1.0,<6`
+  (`add_form_field` 프리미티브·리더 `dirty`/`is_placeholder` 노출·fill의
+  dirty=1/안내문 스타일 스왑을 포함하는 첫 공개 코어), automation floor
+  `6.1.0`, skill floor `1.1.0`.
 
 ## [6.0.4] - 2026-07-28
 

@@ -105,6 +105,7 @@ def _build_tool_bindings() -> Mapping[str, Callable[..., Any]]:
         "inspect_fill_residue": form_fill.inspect_fill_residue,
         "verify_form_fill": form_fill.verify_form_fill,
         "list_form_fields": form_fill.list_form_fields,
+        "add_form_field": form_fill.add_form_field,
         "fill_form_field": form_fill.fill_form_field,
         "find_cell_by_label": form_fill.find_cell_by_label,
         "fill_by_path": form_fill.fill_by_path,

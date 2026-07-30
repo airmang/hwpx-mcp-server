@@ -381,6 +381,39 @@ def list_form_fields(filename: str) -> dict:
     return _with_document_state(RUNTIME_SERVICES.ops.list_form_fields(path), path)
 
 
+def add_form_field(
+    filename: str,
+    name: str,
+    prompt: str = "",
+    memo: str = "",
+    paragraph_index: int = None,
+    table_index: int = None,
+    row: int = None,
+    col: int = None,
+    dry_run: bool = False,
+    expected_revision: str = None,
+) -> dict:
+    """누름틀(click-here) 필드를 생성합니다. 실한컴 CLICKHERE 형상 그대로 방출되어
+    기존 list/fill/한컴이 특수분기 없이 소비합니다. prompt(안내문)는 화면 전용(미인쇄).
+    배치: 기본=문서 끝 새 문단, paragraph_index=기존 문단, tableIndex+row+col=표 셀."""
+    path = resolve_path(filename)
+    guard = _revision_guard(path, expected_revision)
+    if guard is not None:
+        return guard
+    result = RUNTIME_SERVICES.ops.add_form_field(
+        path,
+        name=name,
+        prompt=prompt,
+        memo=memo,
+        paragraph_index=paragraph_index,
+        table_index=table_index,
+        row=row,
+        col=col,
+        dry_run=dry_run,
+    )
+    return _with_document_state(result, path)
+
+
 def fill_form_field(
     filename: str,
     value: str,
@@ -589,6 +622,7 @@ apply_form_fill.__hwpx_input_schema_extra__ = {  # type: ignore[attr-defined]
 
 
 __all__ = [
+    "add_form_field",
     "analyze_form_fill",
     "analyze_template_formfit",
     "apply_body_ops",

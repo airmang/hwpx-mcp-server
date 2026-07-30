@@ -66,7 +66,7 @@ jobs:
           # Release order is legacy cap -> core -> automation -> compatibility -> plugin.
           # A tag release must observe the exact public core rather than a
           # sibling checkout or an unpublished branch.
-          python -m pip install "python-hwpx[visual,preview]==5.0.1"
+          python -m pip install "python-hwpx[visual,preview]==5.1.0"
           python -m pip install -e ".[mcp,oracle,test,typecheck]"
       # The clean installed-wheel gates (docs example, compat matrix) fail
       # closed without uv; runners do not ship it.

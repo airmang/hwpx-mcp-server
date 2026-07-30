@@ -19,7 +19,7 @@ EXPECTED_CONTRACT_HASH = RELEASED_CONTRACT_HASH
 
 @pytest.mark.parametrize(
     ("advanced", "expected_count"),
-    ((False, 119), (True, 127)),
+    ((False, 120), (True, 128)),
 )
 def test_audited_patch_registration_error_and_protocol_contract(
     advanced: bool,

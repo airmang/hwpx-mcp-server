@@ -484,29 +484,29 @@ def main() -> int:
         _require(
             current_public
             == {
-                "pythonHwpx": "4.2.0",
-                "primaryDistribution": "hwpx-mcp-server",
-                "primaryApplication": "5.1.0",
-                "plugin": "0.8.0",
-                "contractHash": "429cb6706323e762",
+                "pythonHwpx": "5.0.2",
+                "primaryDistribution": "python-hwpx-automation",
+                "primaryApplication": "6.0.4",
+                "plugin": "1.0.1",
+                "contractHash": "0ce938371f0b55a6",
             },
-            "candidate manifest does not preserve the observed public 4.2/5.1/0.8 truth",
+            "candidate manifest does not preserve the observed public 5.0.2/6.0.4/1.0.1 truth",
             errors,
         )
     if status == "unreleased-candidate":
         _require(
             "<!-- release-state: unreleased-candidate -->" in readme
-            and "아직 공개되지 않은 6.0.0 후보" in readme
-            and "python-hwpx 4.2.0 → hwpx-mcp-server 5.1.0 → hwpx-plugin 0.8.0"
+            and "아직 공개되지 않은 6.1.0 후보" in readme
+            and "python-hwpx 5.0.2 → python-hwpx-automation 6.0.4 → hwpx-plugin 1.0.1"
             in readme,
             "README does not prominently distinguish candidate from public release",
             errors,
         )
         _require(
-            "아직 공개되지 않은 6.0.0 source candidate" in use_cases
-            and "`python-hwpx >= 5.0.0`" in use_cases
+            "아직 공개되지 않은 6.1.0 source candidate" in use_cases
+            and "`python-hwpx >= 5.1.0`" in use_cases
             and "`0ce938371f0b55a6`" in use_cases
-            and "`429cb6706323e762`" in use_cases,
+            and "`ac1a422376b5ac84`" in use_cases,
             "use-cases guide does not separate candidate and current-public coordinates",
             errors,
         )

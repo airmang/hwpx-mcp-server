@@ -130,7 +130,7 @@ def test_identity_requires_complete_three_stack_remote_truth() -> None:
         "released",
     }
     if release["status"] != "released":
-        assert release["currentPublic"]["plugin"] == "0.8.0"
+        assert release["currentPublic"]["plugin"] == "1.0.1"
     else:
         assert release["currentPublic"]["plugin"] == release["candidate"]["plugin"]
     gate = release["promotionGate"]

@@ -12,12 +12,13 @@
   </p>
 </p>
 
-<!-- release-state: released -->
+<!-- release-state: unreleased-candidate -->
 > [!NOTE]
-> 현재 공개 트레인은 `python-hwpx 5.0.1 → python-hwpx-automation 6.0.4 →
-> hwpx-plugin 1.0.0`(계약 `0ce938371f0b55a6`, 2026-07-28 released)입니다.
-> core·automation PyPI와 plugin GitHub
-> Release·marketplace·실제 marketplace 설치까지 확인한 뒤 승격했으며, 기존
+> 이 소스 트리는 아직 공개되지 않은 6.1.0 후보입니다(누름틀 필드 저작
+> `add_form_field`, 계약 `ac1a422376b5ac84`, 128 도구). 현재 공개 트레인은
+> `python-hwpx 5.0.2 → python-hwpx-automation 6.0.4 → hwpx-plugin 1.0.1`
+> (계약 `0ce938371f0b55a6`)입니다. core·automation PyPI와 plugin GitHub
+> Release·marketplace·실제 marketplace 설치까지 확인한 뒤 승격하며, 기존
 > 5.x 설치는 별도 발행된 `hwpx-mcp-server 5.1.1`이 보호합니다. 절차와 상태
 > 머신: [릴리스 runbook](docs/release-runbook.md)
 
