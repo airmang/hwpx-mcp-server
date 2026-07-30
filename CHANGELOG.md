@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-## [6.1.0] - 2026-07-31
+## [6.1.1] - 2026-07-31
+
+`v6.1.0`은 보존된 실패 태그입니다 — 아무것도 게시되지 않았습니다. 태그
+워크플로의 public core dependency 관측 스텝이 5.0.1로 동결돼 있어(5.0.2
+패치 트레인·5.1.1 코어 복구를 반영하지 못함) prepublish에서 중단했습니다.
+관측 좌표를 5.1.1로 갱신한 동일 내용이 6.1.1로 복구되었습니다. `v6.1.0`은
+삭제·이동·재사용하지 않습니다.
+
+## [6.1.0] - 2026-07-31 (미게시 후보)
 
 ### Added
 - **`add_form_field` — 누름틀(click-here) 필드 저작 도구.** 실한컴이 만드는
@@ -13,7 +21,7 @@
   (`FORM_FIELD_TARGET_INVALID`/`TABLE_INDEX_OUT_OF_RANGE`/
   `PARAGRAPH_INDEX_OUT_OF_RANGE`)로 거부됩니다. 설치 계약은 기본 120 /
   고급 128 / 스킬 필수 28, 계약 해시 `ac1a422376b5ac84`
-  (델타 영수증 `docs/tool-contract-delta-6.1.0.json`).
+  (델타 영수증 `docs/tool-contract-delta-6.1.1.json`).
 - Official Python 3.13/3.14 support: the CI matrix now runs the full suite on
   CPython 3.10–3.14 (1,390 passed verified on both new versions before
   widening), and the canonical/compat classifiers follow. The canonical

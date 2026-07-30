@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: airmang/python-hwpx
-          ref: v5.0.1
+          ref: v5.1.1
           path: python-hwpx
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -80,13 +80,13 @@ jobs:
         run: |
           python - <<'PY'
           from importlib.metadata import version
-          assert version("python-hwpx") == "5.0.1"
+          assert version("python-hwpx") == "5.1.1"
           PY
-          gh release view v5.0.1 \
+          gh release view v5.1.1 \
             --repo airmang/python-hwpx \
             --json tagName,isDraft,isPrerelease \
-            --jq 'select(.tagName == "v5.0.1" and (.isDraft | not) and (.isPrerelease | not)) | .tagName' \
-            | grep -Fx v5.0.1
+            --jq 'select(.tagName == "v5.1.1" and (.isDraft | not) and (.isPrerelease | not)) | .tagName' \
+            | grep -Fx v5.1.1
       - name: Check public repository hygiene
         working-directory: python-hwpx-automation
         run: |
@@ -109,7 +109,7 @@ jobs:
         run: |
           python -m pip install build
           python -m pip wheel --no-deps --wheel-dir .compat-core-wheel \
-            "python-hwpx==5.0.1"
+            "python-hwpx==5.1.1"
           CORE_WHEEL=$(find .compat-core-wheel -name 'python_hwpx-*.whl' -print -quit)
           python scripts/check_compat_install_matrix.py \
             --core-wheel "${CORE_WHEEL}" \
@@ -130,8 +130,8 @@ jobs:
           python -m pip install "build>=1.2"
           mkdir -p .minimum-core-wheel
           python -m pip wheel --no-deps --wheel-dir .minimum-core-wheel \
-            "python-hwpx==5.0.1"
-          CORE_WHEEL=$(find .minimum-core-wheel -name 'python_hwpx-5.0.1-*.whl' -print -quit)
+            "python-hwpx==5.1.1"
+          CORE_WHEEL=$(find .minimum-core-wheel -name 'python_hwpx-5.1.1-*.whl' -print -quit)
           test -n "${CORE_WHEEL}"
           python scripts/check_platform_optional_smoke.py \
             --core-wheel "${CORE_WHEEL}"

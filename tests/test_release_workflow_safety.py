@@ -26,7 +26,7 @@ EXPECTED_TRIGGER = {
 }
 EXPECTED_STEP_IDENTITY_SHA256 = {
     "prepublish": (
-        "c0a0f94f003cde7c6d730fbbd7d7ef072be4c0fe09ae66ea3862f438e5a4d474"
+        "b2654ddb0fb96e80ad9cc5dd0ddf7f1823cf0335c8a8d8e2aaee3dcee21ba151"
     ),
     "release": (
         "70f1a6828a7c6866764731eb837da0869769f00c83ec917793969cfd2138c618"
@@ -44,7 +44,7 @@ EXPECTED_RUN_SHA256 = {
             "a528bb5ef5a4d3201a325ff8ca5170f2e72d275a5fb8a31d95ccd0dd2cab5e6b"
         ),
         "Observe public core dependency remote truth": (
-            "9d5f4fced2a765244ab2180097de55e4de0399431f20e43de8a2033e633dd517"
+            "f2b8c0b046789bf76e246d1c38d1ea38aa4e907464adab49056f7c0fbe98c095"
         ),
         "Check public repository hygiene": (
             "d217752235a4a35f99b76ef367b28bc309a23efd6b9004666615f27291d8acc2"
@@ -59,13 +59,13 @@ EXPECTED_RUN_SHA256 = {
             "03b2d5596d232a4210386ff5610b26c7bb59cd1aa14f9531d5121955881b3d13"
         ),
         "Run public 5.1.1 to 6.0 compatibility install matrix": (
-            "95434c986b9fd662df10f971eb6c00789df4f95e0a71ba3ac37ac76483ed5179"
+            "6fdd5ec459e420ceb97d81d747dc1751cadd86ad3da382200162585ebd3287ff"
         ),
         "Verify generated ToolSpec documentation": (
             "c7a25a48d6118f2932df62fe23211794b2729991ce6354671c8524f20e838254"
         ),
         "Gate minimum-Python clean wheel and optional boundaries": (
-            "067f2c0d224574bdfae410cabb783652a2c4d8300dfefb6b9661959c6c81c8e0"
+            "9f3f84aeddacf186bc9e8085906168655a216a2b9436ac0fd8998fafadea0f91"
         ),
     },
     "release": {
