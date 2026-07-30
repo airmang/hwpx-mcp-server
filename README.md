@@ -12,13 +12,12 @@
   </p>
 </p>
 
-<!-- release-state: release-approved -->
+<!-- release-state: released -->
 > [!NOTE]
-> 이 소스 트리는 아직 공개되지 않은 6.1.3 후보입니다(누름틀 필드 저작
-> `add_form_field`, 계약 `ac1a422376b5ac84`, 128 도구). 현재 공개 트레인은
-> `python-hwpx 5.0.2 → python-hwpx-automation 6.0.4 → hwpx-plugin 1.0.1`
-> (계약 `0ce938371f0b55a6`)입니다. core·automation PyPI와 plugin GitHub
-> Release·marketplace·실제 marketplace 설치까지 확인한 뒤 승격하며, 기존
+> 현재 공개 트레인은 `python-hwpx 5.1.1 → python-hwpx-automation 6.1.3 →
+> hwpx-plugin 1.1.0`(계약 `ac1a422376b5ac84`, 2026-07-31 released — 누름틀
+> 필드 저작 `add_form_field`, 128 도구)입니다. core·automation PyPI와 plugin GitHub
+> Release·marketplace·실제 marketplace 설치까지 확인한 뒤 승격했으며, 기존
 > 5.x 설치는 별도 발행된 `hwpx-mcp-server 5.1.1`이 보호합니다. 절차와 상태
 > 머신: [릴리스 runbook](docs/release-runbook.md)
 
@@ -74,7 +73,7 @@ Gemini CLI는 `~/.gemini/settings.json`, Cursor·Windsurf는 각 에디터의 MC
       "command": "uvx",
       "args": [
         "--from",
-        "python-hwpx-automation[mcp]==6.0.4",
+        "python-hwpx-automation[mcp]==6.1.3",
         "hwpx-automation-mcp"
       ],
       "env": {
