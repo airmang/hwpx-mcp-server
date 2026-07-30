@@ -157,7 +157,7 @@ from pathlib import Path
 
 assert sys.version_info[:2] == (3, 10), sys.version
 assert version("python-hwpx") == "5.1.1"
-assert version("python-hwpx-automation") == "6.1.2"
+assert version("python-hwpx-automation") == "6.1.3"
 assert importlib.util.find_spec("mcp") is None
 assert importlib.util.find_spec("fitz") is not None
 assert importlib.util.find_spec("PIL") is not None

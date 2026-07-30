@@ -59,12 +59,12 @@ def test_phase0_legacy_cap_precedes_every_core_5_resolution() -> None:
     assert "--legacy-version 5.1.1" in matrix_run
     assert "--legacy-core-version 4.2.0" in matrix_run
 
-    # Phase-0 is a safety prerequisite, not a promotion of the last observed
-    # coherent plugin stack (whose 0.8.0 bundle still pins MCP 5.1.0).
+    # Phase-0 is a safety prerequisite, not a promotion: the tag gate keeps
+    # the last observed coherent public stack frozen in the workflow.
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
-    assert '"primaryApplication": "5.1.0"' in workflow
+    assert '"primaryApplication": "6.0.4"' in workflow
 
 
 def test_automation_release_hands_off_without_global_promotion() -> None:
@@ -93,7 +93,7 @@ def test_automation_release_hands_off_without_global_promotion() -> None:
     )
 
     handoff_run = str(steps[github_observed]["run"])
-    assert "release-approved and currentPublic remains 4.2/5.1/0.8" in handoff_run
+    assert "release-approved and currentPublic remains 5.0.2/6.0.4/1.0.1" in handoff_run
     assert "plugin GitHub Release, marketplace entry, and a real marketplace" in (
         handoff_run
     )

@@ -496,14 +496,14 @@ def main() -> int:
     if status == "unreleased-candidate":
         _require(
             "<!-- release-state: unreleased-candidate -->" in readme
-            and "아직 공개되지 않은 6.1.2 후보" in readme
+            and "아직 공개되지 않은 6.1.3 후보" in readme
             and "python-hwpx 5.0.2 → python-hwpx-automation 6.0.4 → hwpx-plugin 1.0.1"
             in readme,
             "README does not prominently distinguish candidate from public release",
             errors,
         )
         _require(
-            "아직 공개되지 않은 6.1.2 source candidate" in use_cases
+            "아직 공개되지 않은 6.1.3 source candidate" in use_cases
             and "`python-hwpx >= 5.1.0`" in use_cases
             and "`0ce938371f0b55a6`" in use_cases
             and "`ac1a422376b5ac84`" in use_cases,
@@ -683,7 +683,7 @@ def main() -> int:
         and "Observe automation GitHub Release and record plugin handoff"
         in release_workflow
         and "The global state remains" in release_workflow
-        and "release-approved and currentPublic remains 4.2/5.1/0.8"
+        and "release-approved and currentPublic remains 5.0.2/6.0.4/1.0.1"
         in release_workflow
         and "plugin GitHub Release, marketplace entry, and a real marketplace"
         in release_workflow,

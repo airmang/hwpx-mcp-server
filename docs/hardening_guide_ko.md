@@ -1,6 +1,6 @@
 # python-hwpx-automation 하드닝 가이드
 
-> 릴리스 상태: release-approved — 6.1.2 후보, 원격 발행 진실 관찰 전.
+> 릴리스 상태: release-approved — 6.1.3 후보, 원격 발행 진실 관찰 전.
 
 > 아래 5.0/6.0/1.0 좌표는 `released` 공개 트레인입니다(2026-07-28):
 > core 5.0.1 / `python-hwpx-automation` 6.0.4 / plugin 1.0.0. 직전 공개
