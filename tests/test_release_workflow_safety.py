@@ -38,7 +38,7 @@ EXPECTED_RUN_SHA256 = {
             "eeaa0090d37e4b8deb891f75111b21f16b632f9e8b47f72aaba89dbb6d568082"
         ),
         "Install test dependencies": (
-            "9222d7df0889c6a2d2dcb338de1073658fbd4b2ff6664d2112ca5fdd5bdd6007"
+            "a4d2bf0aa3dbc3de75c05d42b0d68f56007c24485525d788c6ab138d78b48845"
         ),
         "Install uv for the clean installed-wheel gates": (
             "a528bb5ef5a4d3201a325ff8ca5170f2e72d275a5fb8a31d95ccd0dd2cab5e6b"
