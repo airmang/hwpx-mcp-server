@@ -1,9 +1,9 @@
 {
  "schemaVersion": "hwpx.tool-contract-delta.v2",
- "release": "6.2.0",
+ "release": "6.2.1",
  "changeKind": "additive-tool",
  "releaseStatus": "unreleased-candidate",
- "note": "6.2.0 candidate receipt. One new public default-profile tool, add_equation, inserts native <hp:equation> objects: LaTeX input is converted to Hancom EqEdit script through a render-verified token set (anything outside it is refused with EQUATION_LATEX_UNSUPPORTED — no silent approximation), raw EqEdit script is accepted as the honest low level, placement targets an appended paragraph, an existing paragraph, or a table cell, and the response carries the reader-direction round-trip (readerLatex). Every emitted spelling was pixel-verified against a live Hancom render oracle (60-probe token battery); spellings the real build refuses (to, iint/iiint, vmatrix/Vmatrix, Bmatrix, widehat/widetilde, limsup/liminf) are replaced or typed-refused, and the render-verified Hancom vocabulary (dint, tint, FORALL, dmatrix) also joined the reader token maps.",
+ "note": "6.2.1 candidate receipt (v6.2.0 is a preserved failed tag — nothing was published; the prepublish architecture ratchet caught a one-line drift in content_layout.py after a local type-narrowing fix skipped the ratchet re-run; the bare tag 6.2.0 was pushed against naming convention and its run was cancelled before any gate completed, also with nothing published). One new public default-profile tool, add_equation, inserts native <hp:equation> objects: LaTeX input is converted to Hancom EqEdit script through a render-verified token set (anything outside it is refused with EQUATION_LATEX_UNSUPPORTED — no silent approximation), raw EqEdit script is accepted as the honest low level, placement targets an appended paragraph, an existing paragraph, or a table cell, and the response carries the reader-direction round-trip (readerLatex). Every emitted spelling was pixel-verified against a live Hancom render oracle (60-probe token battery); spellings the real build refuses (to, iint/iiint, vmatrix/Vmatrix, Bmatrix, widehat/widetilde, limsup/liminf) are replaced or typed-refused, and the render-verified Hancom vocabulary (dint, tint, FORALL, dmatrix) also joined the reader token maps.",
  "baseline": {
   "versions": {
    "pythonHwpx": "5.1.1",
@@ -25,7 +25,7 @@
  "target": {
   "versions": {
    "pythonHwpx": "5.2.0",
-   "automation": "6.2.0",
+   "automation": "6.2.1",
    "skill": "1.2.0"
   },
   "defaultToolCount": 121,

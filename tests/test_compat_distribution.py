@@ -82,14 +82,14 @@ def test_compat_metadata_exactly_delegates_to_canonical_distribution() -> None:
     project = data["project"]
     assert project["name"] == "hwpx-mcp-server"
     assert project["dependencies"] == [
-        "python-hwpx-automation[mcp]==6.2.0"
+        "python-hwpx-automation[mcp]==6.2.1"
     ]
     assert project["scripts"] == {
         "hwpx-mcp-server": "hwpx_automation.mcp_cli:main"
     }
     for extra in ("mcp", "hwp", "http", "ingest", "oracle", "vision"):
         assert project["optional-dependencies"][extra] == [
-            f"python-hwpx-automation[{extra}]==6.2.0"
+            f"python-hwpx-automation[{extra}]==6.2.1"
         ]
 
 

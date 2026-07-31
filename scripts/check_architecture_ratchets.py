@@ -33,7 +33,7 @@ EXPECTED_SDK_IMPORTERS = (
 
 EXPECTED_SERVICE_LINES = {
     "_border_fill.py": 283,
-    "content_layout.py": 449,
+    "content_layout.py": 450,
     "context.py": 213,
     "form_fields.py": 618,
     "media.py": 178,
