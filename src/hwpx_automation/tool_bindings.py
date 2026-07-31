@@ -65,6 +65,7 @@ def _build_tool_bindings() -> Mapping[str, Callable[..., Any]]:
         "add_heading": content_edit.add_heading,
         "add_paragraph": content_edit.add_paragraph,
         "add_equation": content_edit.add_equation,
+        "add_chart": content_edit.add_chart,
         "insert_paragraph": content_edit.insert_paragraph,
         "delete_paragraph": content_edit.delete_paragraph,
         "add_page_break": content_edit.add_page_break,

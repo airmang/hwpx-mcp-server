@@ -127,17 +127,18 @@ class ContentLayoutService:
         table_index: Optional[int],
         row: Optional[int],
         col: Optional[int],
+        target_error_code: str = "EQUATION_TARGET_INVALID",
     ) -> Any:
         cell_parts = (table_index, row, col)
         use_cell = any(part is not None for part in cell_parts)
         if use_cell and not all(part is not None for part in cell_parts):
             raise self._context._new_error(
-                "EQUATION_TARGET_INVALID",
+                target_error_code,
                 "provide tableIndex, row, and col together for a cell target",
             )
         if use_cell and paragraph_index is not None:
             raise self._context._new_error(
-                "EQUATION_TARGET_INVALID",
+                target_error_code,
                 "paragraphIndex cannot be combined with a cell target",
             )
         if use_cell:
@@ -168,6 +169,80 @@ class ContentLayoutService:
                     details={"paragraphIndex": paragraph_index},
                 ) from exc
         return None
+
+    def add_chart(
+        self,
+        path: str,
+        *,
+        chart_type: str,
+        categories: list[str],
+        series: list[dict],
+        title: Optional[str] = None,
+        paragraph_index: Optional[int] = None,
+        table_index: Optional[int] = None,
+        row: Optional[int] = None,
+        col: Optional[int] = None,
+        treat_as_char: bool = False,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        from ..office.charting import (
+            ChartSeries,
+            UnsupportedChartError,
+            build_chart_ml,
+        )
+
+        try:
+            parsed_series = [
+                ChartSeries(
+                    name=str(item.get("name", "")),
+                    values=tuple(float(v) for v in item.get("values", ())),
+                )
+                for item in series
+            ]
+        except (TypeError, ValueError) as exc:
+            raise self._context._new_error(
+                "CHART_INPUT_INVALID",
+                f"series values must be numbers: {exc}",
+            ) from exc
+        try:
+            chart_ml = build_chart_ml(
+                chart_type, categories, parsed_series, title=title
+            )
+        except UnsupportedChartError as exc:
+            raise self._context._new_error(
+                "CHART_UNSUPPORTED", str(exc)
+            ) from exc
+
+        document, resolved = self._context._open_document(path)
+        paragraph = self._resolve_equation_target(
+            document,
+            paragraph_index=paragraph_index,
+            table_index=table_index,
+            row=row,
+            col=col,
+            target_error_code="CHART_TARGET_INVALID",
+        )
+        try:
+            inline_object = document.add_chart(
+                chart_ml, paragraph=paragraph, treat_as_char=treat_as_char
+            )
+        except ValueError as exc:
+            raise self._context._new_error(
+                "CHART_INPUT_INVALID", str(exc)
+            ) from exc
+        result = {
+            "ok": True,
+            "filename": path,
+            "chart": {
+                "chartType": chart_type,
+                "chartIDRef": inline_object.element.get("chartIDRef"),
+                "seriesCount": len(parsed_series),
+                "categoryCount": len(categories),
+            },
+        }
+        return self._transactions._with_transaction_verification(
+            result, document, resolved, dry_run=dry_run
+        )
 
     def add_equation(
         self,

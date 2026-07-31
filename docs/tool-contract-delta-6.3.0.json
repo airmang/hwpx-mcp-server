@@ -1,0 +1,137 @@
+{
+ "schemaVersion": "hwpx.tool-contract-delta.v2",
+ "release": "6.3.0",
+ "changeKind": "additive-tool",
+ "releaseStatus": "unreleased-candidate",
+ "note": "6.3.0 candidate receipt. One new public default-profile tool, add_chart, inserts native charts: a data series set is compiled to ECMA-376 chartML (render-verified MVP types bar/line/pie; anything else is refused with CHART_UNSUPPORTED — no silent approximation), stored as a Chart/chartN.xml part registered in no manifest (the real-Hancom contract), and anchored with <hp:chart chartIDRef>. Real Hancom draws the chart from the chartML alone — the OLE fallback and pre-rendered images real Hancom also writes are deliberately not generated. Placement covers appended paragraphs, existing paragraphs, table cells, and inline (treat_as_char).",
+ "baseline": {
+  "versions": {
+   "pythonHwpx": "5.2.0",
+   "automation": "6.2.1",
+   "skill": "1.2.0"
+  },
+  "defaultToolCount": 121,
+  "advancedToolCount": 129,
+  "skillRequiredToolCount": 28,
+  "classificationCounts": {
+   "public": 112,
+   "compatibility": 6,
+   "advanced": 8,
+   "deprecated": 3,
+   "internal": 4
+  },
+  "contractHash": "342cf672f29cd183"
+ },
+ "target": {
+  "versions": {
+   "pythonHwpx": "5.3.0",
+   "automation": "6.3.0",
+   "skill": "1.3.0"
+  },
+  "defaultToolCount": 122,
+  "advancedToolCount": 130,
+  "skillRequiredToolCount": 28,
+  "classificationCounts": {
+   "public": 113,
+   "compatibility": 6,
+   "advanced": 8,
+   "deprecated": 3,
+   "internal": 4
+  },
+  "contractHash": "236f8ea855c875fe"
+ },
+ "delta": {
+  "defaultToolCount": 1,
+  "advancedToolCount": 1,
+  "skillRequiredToolCount": 0,
+  "removedTools": [],
+  "addedTools": [
+   "add_chart"
+  ],
+  "promotedTools": [],
+  "profileMoves": []
+ },
+ "changedTools": [
+  {
+   "name": "add_chart",
+   "domain": "edit",
+   "classification": "public",
+   "profile": "default",
+   "mutates": true,
+   "skillRequired": false,
+   "changedFields": [
+    "added"
+   ],
+   "inputParameters": [
+    {
+     "name": "filename",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "chart_type",
+     "type": "string",
+     "required": true,
+     "description": "bar | line | pie (render-verified MVP set)."
+    },
+    {
+     "name": "categories",
+     "type": "array",
+     "required": true
+    },
+    {
+     "name": "series",
+     "type": "array",
+     "required": true,
+     "description": "[{\"name\": str, \"values\": [number,...]}]; values length must match categories."
+    },
+    {
+     "name": "title",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "paragraph_index",
+     "type": "integer",
+     "required": false
+    },
+    {
+     "name": "table_index",
+     "type": "integer",
+     "required": false
+    },
+    {
+     "name": "row",
+     "type": "integer",
+     "required": false
+    },
+    {
+     "name": "col",
+     "type": "integer",
+     "required": false
+    },
+    {
+     "name": "treat_as_char",
+     "type": "boolean",
+     "required": false
+    },
+    {
+     "name": "dry_run",
+     "type": "boolean",
+     "required": false
+    },
+    {
+     "name": "expected_revision",
+     "type": "string",
+     "required": false
+    }
+   ]
+  }
+ ],
+ "coreDependency": {
+  "capability": "hwpx.HwpxDocument.add_chart (experimental contract) — chartML part storage behind the real-Hancom hp:chart anchor",
+  "floorBumped": true,
+  "failClosed": "Unsupported chart types/shapes raise typed CHART_UNSUPPORTED before any write; malformed data raises CHART_INPUT_INVALID; invalid targets raise CHART_TARGET_INVALID / TABLE_INDEX_OUT_OF_RANGE / PARAGRAPH_INDEX_OUT_OF_RANGE. The candidate distribution requires python-hwpx>=5.3.0, the first public core with the chart part/anchor primitive."
+ },
+ "proof": "Holding every existing tool fixed, the canonical payload delta is confined to the dependency/version floors and one added public default-profile mutating tool, add_chart (edit domain). No tool is removed, renamed, reclassified, or moved between profiles; every existing input/output schema is unchanged. The anchor/part emission follows the hp:chart contract reverse-engineered from a real Hancom-authored document, and every MVP chart type was verified by pixel against a live Hancom render oracle, including the OLE-free authored output."
+}

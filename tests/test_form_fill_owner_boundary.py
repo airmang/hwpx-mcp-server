@@ -66,10 +66,10 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
         for module, names in OWNER["retainedCoreSymbols"].items()
     } == RETAINED_CORE_SYMBOLS
     assert OWNER["toolContract"] == {
-        "default": 121,
-        "advanced": 129,
+        "default": 122,
+        "advanced": 130,
         "skillRequired": 28,
-        "hash": "342cf672f29cd183",
+        "hash": "236f8ea855c875fe",
     }
 
 

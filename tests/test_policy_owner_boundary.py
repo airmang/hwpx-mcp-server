@@ -36,10 +36,10 @@ def test_owner_ledger_matches_the_frozen_source_and_package_plan() -> None:
     }
     assert set(OWNER["canonicalOwners"]) == set(FROZEN_CORE_POLICY_IMPORTS)
     assert OWNER["toolContract"] == {
-        "default": 121,
-        "advanced": 129,
+        "default": 122,
+        "advanced": 130,
         "skillRequired": 28,
-        "hash": "342cf672f29cd183",
+        "hash": "236f8ea855c875fe",
     }
 
 

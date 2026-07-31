@@ -16,40 +16,57 @@ def _load(name: str) -> dict:
     return json.loads((ROOT / "docs" / name).read_text(encoding="utf-8"))
 
 
-def test_6_2_0_contract_delta_is_additive_and_matches_the_live_contract() -> None:
-    delta = _load("tool-contract-delta-6.2.1.json")
+def test_6_3_0_contract_delta_is_additive_and_matches_the_live_contract() -> None:
+    delta = _load("tool-contract-delta-6.3.0.json")
     contract = _load("tool-contract.generated.json")
 
     assert delta["target"]["contractHash"] == contract["contractHash"] == contract_hash()
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "342cf672f29cd183"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "236f8ea855c875fe"
 
-    assert delta["baseline"]["contractHash"] == "ac1a422376b5ac84"
-    assert delta["baseline"]["defaultToolCount"] == 120
-    assert delta["baseline"]["advancedToolCount"] == 128
-    assert delta["target"]["defaultToolCount"] == 121
-    assert delta["target"]["advancedToolCount"] == 129
+    assert delta["baseline"]["contractHash"] == "342cf672f29cd183"
+    assert delta["baseline"]["defaultToolCount"] == 121
+    assert delta["baseline"]["advancedToolCount"] == 129
+    assert delta["target"]["defaultToolCount"] == 122
+    assert delta["target"]["advancedToolCount"] == 130
     assert delta["target"]["skillRequiredToolCount"] == 28
 
-    assert delta["delta"]["addedTools"] == ["add_equation"]
+    assert delta["delta"]["addedTools"] == ["add_chart"]
     assert delta["delta"]["removedTools"] == []
     assert delta["delta"]["promotedTools"] == []
     assert delta["delta"]["profileMoves"] == []
 
     tools = {tool["name"]: tool for tool in contract["tools"]}
-    added = tools["add_equation"]
+    added = tools["add_chart"]
     assert added["profile"] == "default"
     assert added["classification"] == "public"
     assert added["mutates"] is True
     assert added["skillRequired"] is False
 
-    assert contract["minAutomationVersion"] == contract["minMcpVersion"] == "6.2.0"
-    assert contract["minPythonHwpx"] == "5.2.0"
-    assert contract["minSkillVersion"] == "1.2.0"
+    assert contract["minAutomationVersion"] == contract["minMcpVersion"] == "6.3.0"
+    assert contract["minPythonHwpx"] == "5.3.0"
+    assert contract["minSkillVersion"] == "1.3.0"
+
+
+def test_6_2_1_delta_receipt_is_frozen_and_chains_into_the_6_3_baseline() -> None:
+    """The historical 6.2.1 receipt stays frozen against its own hashes (not the
+    live contract) and its target must be exactly the 6.3.0 baseline."""
+
+    frozen = _load("tool-contract-delta-6.2.1.json")
+    delta = _load("tool-contract-delta-6.3.0.json")
+    assert frozen["target"]["contractHash"] == "342cf672f29cd183"
+    assert frozen["target"]["contractHash"] == delta["baseline"]["contractHash"]
+    assert frozen["target"]["defaultToolCount"] == delta["baseline"]["defaultToolCount"]
+    assert frozen["target"]["advancedToolCount"] == delta["baseline"]["advancedToolCount"]
+
+    assert frozen["baseline"]["contractHash"] == "ac1a422376b5ac84"
+    assert frozen["baseline"]["defaultToolCount"] == 120
+    assert frozen["baseline"]["advancedToolCount"] == 128
+    assert frozen["delta"]["addedTools"] == ["add_equation"]
 
 
 def test_6_1_3_delta_receipt_is_frozen_and_chains_into_the_6_2_baseline() -> None:
-    """The historical 6.1.3 receipt stays frozen against its own hashes (not the
-    live contract) and its target must be exactly the 6.2.0 baseline."""
+    """The historical 6.1.3 receipt stays frozen; its target must be exactly
+    the 6.2.1 baseline."""
 
     frozen = _load("tool-contract-delta-6.1.3.json")
     delta = _load("tool-contract-delta-6.2.1.json")

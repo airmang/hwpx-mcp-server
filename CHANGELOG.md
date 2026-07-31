@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## [6.3.0] - 2026-07-31
+
+차트 생성 트레인. 새 public 기본 도구 `add_chart`(edit 도메인) 1종 —
+데이터 시리즈를 ECMA-376 chartML로 컴파일해(렌더 검증 MVP: bar·line·pie,
+밖은 `CHART_UNSUPPORTED` typed 거부) `Chart/chartN.xml` 파트로 저장하고
+`<hp:chart chartIDRef>` 앵커를 방출합니다. 실한컴은 chartML만으로 차트를
+그립니다(OLE 폴백·사전렌더 이미지 미생성 — 실측 계약).
+
+- 계약: 기본 122 / 고급 130 / 스킬 필수 28 @ `236f8ea855c875fe`
+  (델타 영수증 `docs/tool-contract-delta-6.3.0.json`, additive-tool 증명).
+- 플로어 동반 이동: `python-hwpx>=5.3.0` · automation `6.3.0` · skill `1.3.0`.
+- 배치: 새 문단(float)·기존 문단·표 셀·인라인(treat_as_char).
+
 ## [6.2.1] - 2026-07-31
 
 `v6.2.0`은 보존된 실패 태그입니다 — 아무것도 게시되지 않았습니다. prepublish

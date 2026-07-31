@@ -552,7 +552,7 @@ assert scripts == {
 import os
 from importlib.metadata import distribution, version
 from pathlib import Path
-assert version("python-hwpx-automation") == "6.2.1"
+assert version("python-hwpx-automation") == "6.3.0"
 import hwpx_automation.server
 assert hwpx_automation.server.mcp.name == "python-hwpx-automation"
 assert not any(name in os.environ for name in (
@@ -588,17 +588,17 @@ import os
 import pickle
 from importlib.metadata import distribution, version
 from pathlib import Path
-assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "6.2.1"
+assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "6.3.0"
 import hwpx_automation
 import hwpx_mcp_server.office.exam as old
 import hwpx_automation.office.exam as new
 assert old is new
 assert old.ComposeResult is new.ComposeResult
 import hwpx_mcp_server
-assert hwpx_mcp_server.__version__ == version("hwpx-mcp-server") == "6.2.1"
+assert hwpx_mcp_server.__version__ == version("hwpx-mcp-server") == "6.3.0"
 namespace = {}
 exec("from hwpx_mcp_server import *", namespace)
-assert namespace["__version__"] == "6.2.1"
+assert namespace["__version__"] == "6.3.0"
 from importlib.metadata import entry_points
 owners = {
     item.name: item.dist.name
@@ -668,7 +668,7 @@ except PackageNotFoundError:
     pass
 else:
     raise AssertionError("compat metadata survived uninstall")
-assert version("python-hwpx-automation") == "6.2.1"
+assert version("python-hwpx-automation") == "6.3.0"
 import hwpx_automation
 from pathlib import Path
 import sys
@@ -702,7 +702,7 @@ assert not (scripts / f"hwpx-mcp-server{suffix}").exists()
             compat_python,
             """
 from importlib.metadata import version
-assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "6.2.1"
+assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "6.3.0"
 import hwpx_mcp_server.office.exam as old
 import hwpx_automation.office.exam as new
 assert old is new
@@ -777,7 +777,7 @@ import os
 from importlib.metadata import distribution, entry_points, version
 from pathlib import Path
 import hwpx_automation
-assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "6.2.1"
+assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "6.3.0"
 import hwpx_mcp_server.office.exam
 canonical = distribution("python-hwpx-automation")
 compat = distribution("hwpx-mcp-server")
@@ -816,10 +816,10 @@ for old_name in legacy_modules:
     new = importlib.import_module(new_name)
     assert old is new, (old_name, new_name)
 import hwpx_mcp_server
-assert hwpx_mcp_server.__version__ == version("hwpx-mcp-server") == "6.2.1"
+assert hwpx_mcp_server.__version__ == version("hwpx-mcp-server") == "6.3.0"
 namespace = {}
 exec("from hwpx_mcp_server import *", namespace)
-assert namespace["__version__"] == "6.2.1"
+assert namespace["__version__"] == "6.3.0"
 """.replace("__LEGACY_DEEP_MODULES__", repr(legacy_deep_modules)),
                 cwd=probe_cwd,
             )

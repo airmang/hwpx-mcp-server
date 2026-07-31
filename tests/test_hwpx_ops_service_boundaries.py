@@ -91,6 +91,7 @@ OWNER_METHODS = {
         "replace_text_in_runs",
         "add_paragraph",
         "add_equation",
+        "add_chart",
         "insert_paragraphs_bulk",
         "set_paragraph_format",
         "set_page_setup",
@@ -233,9 +234,9 @@ def test_facade_has_one_explicit_delegate_for_every_baselined_method() -> None:
     }
 
     assert len(OWNER_METHODS) == 12
-    assert len(owned) == 124
+    assert len(owned) == 125
     assert set(methods) == {"__init__", *owned}
-    assert sum(not name.startswith("_") for name in methods) == 83
+    assert sum(not name.startswith("_") for name in methods) == 84
 
     for method_name, owner in owned.items():
         expression = _single_return_expression(methods[method_name])

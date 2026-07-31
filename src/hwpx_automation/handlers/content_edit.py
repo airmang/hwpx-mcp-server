@@ -680,6 +680,46 @@ def add_page_break(
     return _with_save_verification({"success": True}, verification)
 
 
+def add_chart(
+    filename: str,
+    chart_type: str,
+    categories: list,
+    series: list,
+    title: str = None,
+    paragraph_index: int = None,
+    table_index: int = None,
+    row: int = None,
+    col: int = None,
+    treat_as_char: bool = False,
+    dry_run: bool = False,
+    expected_revision: str = None,
+) -> dict:
+    """네이티브 차트(<hp:chart>+ECMA-376 chartML part)를 삽입합니다. 렌더 검증된
+    MVP 3종(bar·line·pie)만 지원 — 밖이면 CHART_UNSUPPORTED로 typed 거부(무음
+    근사 없음). series=[{"name": str, "values": [number,...]}], values 길이는
+    categories와 일치해야 합니다. 실한컴은 chartML만으로 차트를 그립니다(OLE
+    폴백·사전렌더 이미지 불요). 배치: 기본=문서 끝 새 문단(float),
+    paragraph_index=기존 문단, tableIndex+row+col=표 셀, treat_as_char=인라인."""
+    path = resolve_path(filename)
+    guard = _revision_guard(path, expected_revision)
+    if guard is not None:
+        return guard
+    result = RUNTIME_SERVICES.ops.add_chart(
+        path,
+        chart_type=chart_type,
+        categories=categories,
+        series=series,
+        title=title,
+        paragraph_index=paragraph_index,
+        table_index=table_index,
+        row=row,
+        col=col,
+        treat_as_char=treat_as_char,
+        dry_run=dry_run,
+    )
+    return _with_document_state(result, path)
+
+
 def add_equation(
     filename: str,
     latex: str = None,
@@ -1097,6 +1137,7 @@ __all__ = [
     "delete_paragraph",
     "add_page_break",
     "add_equation",
+    "add_chart",
     "apply_edits",
     "undo_last_edit",
     "replace_by_anchor",

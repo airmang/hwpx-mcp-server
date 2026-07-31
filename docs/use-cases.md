@@ -2,7 +2,8 @@
 
 > Python 자동화와 선택 MCP 어댑터로 여는 한글(HWPX) 문서 워크플로
 >
-> 릴리스 상태: `released` (2026-07-31) — 현재 공개 트레인은
+> 릴리스 상태: `unreleased-candidate` — 이 문서의 main 기준은 아직 공개되지
+> 않은 6.3.0 source candidate입니다. 현재 공개 트레인은
 > `python-hwpx 5.2.0 → python-hwpx-automation 6.2.1 → hwpx-plugin 1.2.0`입니다. 현재 공개 트레인은
 > `python-hwpx 5.1.1 → python-hwpx-automation 6.1.3 → hwpx-plugin 1.1.0`입니다.
 
@@ -16,19 +17,21 @@
 
 기존에는 한글 파일을 열어서 일일이 수작업으로 처리해야 했던 일을, 이제 자연어 요청으로 자동화할 수 있습니다.
 
-이 문서는 공개 릴리스 `python-hwpx-automation 6.2.1` 기준입니다. 공개
-트레인은 `python-hwpx 5.2.0 → python-hwpx-automation 6.2.1 →
-hwpx-plugin 1.2.0`, 계약 해시는 `342cf672f29cd183`입니다.
+이 문서는 아직 공개되지 않은 6.3.0 source candidate 기준입니다(후보 계약
+해시 `236f8ea855c875fe`). 현재 공개 트레인은 `python-hwpx 5.2.0 →
+python-hwpx-automation 6.2.1 → hwpx-plugin 1.2.0`, 공개 계약 해시는
+`342cf672f29cd183`입니다.
 
-6.2.1 릴리스의 기본 모드 121개(고급 모드 포함 총 129개)의 도구로 문서 생성,
+6.3.0 후보의 기본 모드 122개(고급 모드 포함 총 130개)의 도구로 문서 생성,
 선언형 document-plan 생성, 누름틀 필드 저작(`add_form_field`), 네이티브 수식
-저작(`add_equation`, LaTeX→EqEdit), 운영 계획서 품질 프로필, 검색, 치환,
+저작(`add_equation`, LaTeX→EqEdit), 네이티브 차트 생성(`add_chart`,
+데이터→chartML, 막대·꺾은선·원), 운영 계획서 품질 프로필, 검색, 치환,
 표 편집, 서식 적용, HWPX repair/recover까지 처리할 수 있습니다.
 
-현재 MCP 표면, document-plan, form-fill, visual-review handoff 워크플로의
-문서화·테스트 기준 upstream 버전 바닥은 `python-hwpx >= 5.2.0`입니다.
-설치 계약은 기본 121개/고급 129개/스킬 필수 28개이며, automation
-바닥은 `6.2.0`, skill 바닥은 `1.2.0`입니다.
+후보 MCP 표면, document-plan, form-fill, visual-review handoff 워크플로의
+문서화·테스트 기준 upstream 버전 바닥은 `python-hwpx >= 5.3.0`입니다.
+설치 계약은 기본 122개/고급 130개/스킬 필수 28개이며, automation
+바닥은 `6.3.0`, skill 바닥은 `1.3.0`입니다.
 호환·deprecated 도구는
 2026-10-31까지 모두 유지하며, 신규 호출의 canonical 경로와 rollback은
 [compatibility observation](compatibility-observation.md)을 따릅니다.

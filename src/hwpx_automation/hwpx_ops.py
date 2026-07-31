@@ -517,6 +517,35 @@ class HwpxOps:
             path, text, section_index=section_index, run_style=run_style
         )
 
+    def add_chart(
+        self,
+        path: str,
+        *,
+        chart_type: str,
+        categories: list[str],
+        series: list[dict],
+        title: Optional[str] = None,
+        paragraph_index: Optional[int] = None,
+        table_index: Optional[int] = None,
+        row: Optional[int] = None,
+        col: Optional[int] = None,
+        treat_as_char: bool = False,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        return self._services.content_layout.add_chart(
+            path,
+            chart_type=chart_type,
+            categories=categories,
+            series=series,
+            title=title,
+            paragraph_index=paragraph_index,
+            table_index=table_index,
+            row=row,
+            col=col,
+            treat_as_char=treat_as_char,
+            dry_run=dry_run,
+        )
+
     def add_equation(
         self,
         path: str,

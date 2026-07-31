@@ -20,7 +20,7 @@ def test_representative_tools_are_exposed_only_through_the_canonical_registry():
 
 def test_canonical_registry_has_normalized_input_and_output_schema_for_all_127_tools():
     registry = bound_tool_registry()
-    assert len(registry.tools) == 129
+    assert len(registry.tools) == 130
     for item in registry.tools:
         assert item.input_schema["type"] == "object", item.spec.name
         assert item.input_schema["additionalProperties"] is False, item.spec.name
@@ -56,6 +56,6 @@ def test_contract_payload_is_deterministic_and_contains_bound_schemas():
     first = contract_payload()
     second = contract_payload()
     assert first == second
-    assert first["minAutomationVersion"] == first["minMcpVersion"] == "6.2.0"
-    assert len(first["tools"]) == 129
+    assert first["minAutomationVersion"] == first["minMcpVersion"] == "6.3.0"
+    assert len(first["tools"]) == 130
     assert all(tool["inputSchema"] and tool["outputSchema"] for tool in first["tools"])
