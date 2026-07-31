@@ -14,7 +14,7 @@
 
 <!-- release-state: release-approved -->
 > [!NOTE]
-> 이 저장소의 main은 아직 공개되지 않은 6.3.0 후보 — release-approved 상태(네이티브 차트 생성
+> 이 저장소의 main은 아직 공개되지 않은 6.3.1 후보 — release-approved 상태(네이티브 차트 생성
 > `add_chart`, 계약 `236f8ea855c875fe`, 130 도구)입니다. 현재 공개 트레인은
 > `python-hwpx 5.2.0 → python-hwpx-automation 6.2.1 → hwpx-plugin 1.2.0`
 > (계약 `342cf672f29cd183`, 2026-07-31 released)입니다. 공개 트레인은
