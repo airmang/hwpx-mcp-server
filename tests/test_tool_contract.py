@@ -127,7 +127,7 @@ def test_active_registry_exactly_matches_contract() -> None:
     assert REMOVED_TRANSITION_STUBS.isdisjoint(server._fastmcp_tool_names())
     assert REMOVED_TRANSITION_STUBS.isdisjoint(expected_tool_names(advanced=True))
     assert REMOVED_TRANSITION_STUBS.isdisjoint({spec.name for spec in BASELINE_TOOL_SPECS})
-    assert len(expected_tool_names(advanced=False)) == 120
+    assert len(expected_tool_names(advanced=False)) == 121
     workflow_domains = [domain for domain in DOMAIN_SPECS if domain.key == "workflow"]
     assert len(workflow_domains) == 1
     assert set(workflow_domains[0].tools) == WORKFLOW_TOOLS
@@ -162,24 +162,24 @@ def test_release_contract_versions_counts_and_hash_are_exact() -> None:
         MIN_MCP_VERSION,
         MIN_SKILL_VERSION,
     ) == (
-        "5.1.0",
-        "6.1.0",
-        "6.1.0",
-        "1.1.0",
+        "5.2.0",
+        "6.2.0",
+        "6.2.0",
+        "1.2.0",
     )
-    assert len(expected_tool_names(advanced=False)) == 120
-    assert len(expected_tool_names(advanced=True)) == 128
+    assert len(expected_tool_names(advanced=False)) == 121
+    assert len(expected_tool_names(advanced=True)) == 129
     assert len(skill_required_tool_names()) == 28
-    assert RELEASED_CONTRACT_HASH == "ac1a422376b5ac84"
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "ac1a422376b5ac84"
+    assert RELEASED_CONTRACT_HASH == "342cf672f29cd183"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "342cf672f29cd183"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 
 def test_baseline_classification_is_disjoint_exact_and_exhaustive() -> None:
-    assert len(BASELINE_TOOL_SPECS) == 132
-    assert len({spec.name for spec in BASELINE_TOOL_SPECS}) == 132
+    assert len(BASELINE_TOOL_SPECS) == 133
+    assert len({spec.name for spec in BASELINE_TOOL_SPECS}) == 133
     assert classification_counts() == {
-        "public": 111,
+        "public": 112,
         "compatibility": 6,
         "advanced": 8,
         "deprecated": 3,
@@ -431,7 +431,7 @@ print(json.dumps({
     )
     payload = json.loads(result.stdout)
     assert payload["actual"] == payload["expected"]
-    assert len(payload["actual"]) == 128
+    assert len(payload["actual"]) == 129
     assert payload["valid"] is True
 
 
@@ -552,7 +552,7 @@ def test_generated_mcp_contract_is_current() -> None:
     payload = json.loads(
         (ROOT / "docs" / "tool-contract.generated.json").read_text(encoding="utf-8")
     )
-    assert payload["baselineToolCount"] == 132
+    assert payload["baselineToolCount"] == 133
     assert payload["classificationCounts"] == classification_counts()
     assert payload["contractHash"] == contract_hash()
 

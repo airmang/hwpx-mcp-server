@@ -517,6 +517,31 @@ class HwpxOps:
             path, text, section_index=section_index, run_style=run_style
         )
 
+    def add_equation(
+        self,
+        path: str,
+        *,
+        latex: Optional[str] = None,
+        script: Optional[str] = None,
+        paragraph_index: Optional[int] = None,
+        table_index: Optional[int] = None,
+        row: Optional[int] = None,
+        col: Optional[int] = None,
+        base_unit: int = 1100,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        return self._services.content_layout.add_equation(
+            path,
+            latex=latex,
+            script=script,
+            paragraph_index=paragraph_index,
+            table_index=table_index,
+            row=row,
+            col=col,
+            base_unit=base_unit,
+            dry_run=dry_run,
+        )
+
     def insert_paragraphs_bulk(
         self,
         path: str,

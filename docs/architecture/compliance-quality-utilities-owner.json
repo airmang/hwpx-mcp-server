@@ -1,89 +1,89 @@
 {
-  "schemaVersion": "hwpx-mcp.compliance-quality-utilities-owner/v1",
-  "canonicalOwners": {
-    "hwpx.tools.official_lint": "hwpx_automation.office.compliance.official_lint",
-    "hwpx.tools.pii": "hwpx_automation.office.compliance.pii",
-    "hwpx.tools.page_guard": "hwpx_automation.office.quality.page_guard",
-    "hwpx.tools.table_compute": "hwpx_automation.office.utilities.table_compute"
+ "schemaVersion": "hwpx-mcp.compliance-quality-utilities-owner/v1",
+ "canonicalOwners": {
+  "hwpx.tools.official_lint": "hwpx_automation.office.compliance.official_lint",
+  "hwpx.tools.pii": "hwpx_automation.office.compliance.pii",
+  "hwpx.tools.page_guard": "hwpx_automation.office.quality.page_guard",
+  "hwpx.tools.table_compute": "hwpx_automation.office.utilities.table_compute"
+ },
+ "packageRoots": {
+  "compliance": "src/hwpx_automation/office/compliance",
+  "quality": "src/hwpx_automation/office/quality",
+  "utilities": "src/hwpx_automation/office/utilities"
+ },
+ "sourceCompatibilityOwner": "python-hwpx 4.x",
+ "source": {
+  "head": "ac88d5fb1a015de1217577090d62e92c36cf4d8a",
+  "pythonFiles": 4,
+  "loc": 1622,
+  "manifestSha256": "d97db5cac702059ce4297f10ca108c6e2a162ba84b93bd5fe1a914a27877ad1f"
+ },
+ "canonical": {
+  "pythonFiles": 7,
+  "loc": 1684,
+  "manifestSha256": "a395e5eef5c1c96d860e3787881644ea0ddf322adc969910322feb09fd35c5ec",
+  "packageFileCounts": {
+   "compliance": 3,
+   "quality": 2,
+   "utilities": 2
   },
-  "packageRoots": {
-    "compliance": "src/hwpx_automation/office/compliance",
-    "quality": "src/hwpx_automation/office/quality",
-    "utilities": "src/hwpx_automation/office/utilities"
-  },
-  "sourceCompatibilityOwner": "python-hwpx 4.x",
-  "source": {
-    "head": "ac88d5fb1a015de1217577090d62e92c36cf4d8a",
-    "pythonFiles": 4,
-    "loc": 1622,
-    "manifestSha256": "d97db5cac702059ce4297f10ca108c6e2a162ba84b93bd5fe1a914a27877ad1f"
-  },
-  "canonical": {
-    "pythonFiles": 7,
-    "loc": 1684,
-    "manifestSha256": "a395e5eef5c1c96d860e3787881644ea0ddf322adc969910322feb09fd35c5ec",
-    "packageFileCounts": {
-      "compliance": 3,
-      "quality": 2,
-      "utilities": 2
-    },
-    "refrozenFrom": {
-      "loc": 1684,
-      "manifestSha256": "74112864e78e032e39bf0859f24a77b9aa519756f6c5700c85dd08c26ebf67c6",
-      "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
-    }
-  },
-  "approvedCoreImports": {
-    "compliance": [
-      "hwpx.document"
-    ],
-    "quality": [
-      "hwpx"
-    ],
-    "utilities": []
-  },
-  "approvedCoreSymbols": {
-    "hwpx.document": [
-      "HwpxDocument"
-    ],
-    "hwpx": [
-      "HwpxPackage"
-    ]
-  },
-  "forbiddenCoreCompatibilityImports": [
-    "hwpx.tools.official_lint",
-    "hwpx.tools.pii",
-    "hwpx.tools.page_guard",
-    "hwpx.tools.table_compute"
-  ],
-  "productionConsumersToRoute": [
-    "hwpx_automation.handlers.quality_render",
-    "hwpx_automation.handlers.specialized",
-    "hwpx_automation.handlers.read_export",
-    "hwpx_automation.handlers.content_edit",
-    "hwpx_automation.form_fill",
-    "hwpx_automation.office.authoring",
-    "hwpx_automation.office.authoring.template_analyzer"
-  ],
-  "policyInjection": {
-    "formFill": "hwpx_automation.office.compliance.DEFAULT_POLICY",
-    "mailMerge": "pass masking_policy=hwpx_automation.office.compliance.DEFAULT_POLICY to the core merge primitive"
-  },
-  "coreRetainedPrimitives": [
-    "HwpxDocument",
-    "HwpxPackage",
-    "generic HWPX package, XML, traversal, serialization, and preservation behavior"
-  ],
-  "compatibilityPolicy": {
-    "coreLine": "4.x",
-    "featureWork": "automation canonical owner only",
-    "mirrors": "correctness-or-security-only with parity test and receipt",
-    "removalGate": "public observation followed by separately approved core major"
-  },
-  "toolContract": {
-    "default": 120,
-    "advanced": 128,
-    "skillRequired": 28,
-    "hash": "ac1a422376b5ac84"
+  "refrozenFrom": {
+   "loc": 1684,
+   "manifestSha256": "74112864e78e032e39bf0859f24a77b9aa519756f6c5700c85dd08c26ebf67c6",
+   "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
   }
+ },
+ "approvedCoreImports": {
+  "compliance": [
+   "hwpx.document"
+  ],
+  "quality": [
+   "hwpx"
+  ],
+  "utilities": []
+ },
+ "approvedCoreSymbols": {
+  "hwpx.document": [
+   "HwpxDocument"
+  ],
+  "hwpx": [
+   "HwpxPackage"
+  ]
+ },
+ "forbiddenCoreCompatibilityImports": [
+  "hwpx.tools.official_lint",
+  "hwpx.tools.pii",
+  "hwpx.tools.page_guard",
+  "hwpx.tools.table_compute"
+ ],
+ "productionConsumersToRoute": [
+  "hwpx_automation.handlers.quality_render",
+  "hwpx_automation.handlers.specialized",
+  "hwpx_automation.handlers.read_export",
+  "hwpx_automation.handlers.content_edit",
+  "hwpx_automation.form_fill",
+  "hwpx_automation.office.authoring",
+  "hwpx_automation.office.authoring.template_analyzer"
+ ],
+ "policyInjection": {
+  "formFill": "hwpx_automation.office.compliance.DEFAULT_POLICY",
+  "mailMerge": "pass masking_policy=hwpx_automation.office.compliance.DEFAULT_POLICY to the core merge primitive"
+ },
+ "coreRetainedPrimitives": [
+  "HwpxDocument",
+  "HwpxPackage",
+  "generic HWPX package, XML, traversal, serialization, and preservation behavior"
+ ],
+ "compatibilityPolicy": {
+  "coreLine": "4.x",
+  "featureWork": "automation canonical owner only",
+  "mirrors": "correctness-or-security-only with parity test and receipt",
+  "removalGate": "public observation followed by separately approved core major"
+ },
+ "toolContract": {
+  "default": 121,
+  "advanced": 129,
+  "skillRequired": 28,
+  "hash": "342cf672f29cd183"
+ }
 }

@@ -1,75 +1,75 @@
 {
-  "schemaVersion": "hwpx-mcp.exam-runtime-owner/v1",
-  "canonicalOwner": "hwpx_automation.office.exam",
-  "sourceCompatibilityOwner": "python-hwpx 4.x",
-  "source": {
-    "head": "d0aa3f124ab410686f48f99e299f45958afd1002",
-    "pythonFiles": 6,
-    "loc": 708,
-    "manifestSha256": "c5fd6734f36efb254eab5cba6f012cff3e1a2af7dbccf53e9053018296884563"
-  },
-  "canonical": {
-    "status": "canonical",
-    "pythonFiles": 6,
-    "loc": 806,
-    "manifestSha256": "7485965024224771d91ab6cc64bec34fd66e9488531e37b8fb910f879b646dda",
-    "refrozenNote": "2ffc011280ca599b…에서 재계산. measure.py가 block-split 계약을 core가 아니라 렌더 소유자에서 가져오도록 바뀌었다(5.0 경계 마감). 조판 로직은 그대로다."
-  },
-  "packageFiles": [
-    "__init__.py",
-    "compose.py",
-    "ir.py",
-    "measure.py",
-    "parser.py",
-    "profile.py"
+ "schemaVersion": "hwpx-mcp.exam-runtime-owner/v1",
+ "canonicalOwner": "hwpx_automation.office.exam",
+ "sourceCompatibilityOwner": "python-hwpx 4.x",
+ "source": {
+  "head": "d0aa3f124ab410686f48f99e299f45958afd1002",
+  "pythonFiles": 6,
+  "loc": 708,
+  "manifestSha256": "c5fd6734f36efb254eab5cba6f012cff3e1a2af7dbccf53e9053018296884563"
+ },
+ "canonical": {
+  "status": "canonical",
+  "pythonFiles": 6,
+  "loc": 806,
+  "manifestSha256": "7485965024224771d91ab6cc64bec34fd66e9488531e37b8fb910f879b646dda",
+  "refrozenNote": "2ffc011280ca599b…에서 재계산. measure.py가 block-split 계약을 core가 아니라 렌더 소유자에서 가져오도록 바뀌었다(5.0 경계 마감). 조판 로직은 그대로다."
+ },
+ "packageFiles": [
+  "__init__.py",
+  "compose.py",
+  "ir.py",
+  "measure.py",
+  "parser.py",
+  "profile.py"
+ ],
+ "moduleMap": {
+  "hwpx.exam": "hwpx_automation.office.exam"
+ },
+ "approvedCoreImports": [
+  "hwpx.document",
+  "hwpx.oxml",
+  "hwpx.tools.table_cleanup",
+  "hwpx.visual.block_splits"
+ ],
+ "approvedSiblingOwners": [
+  "hwpx_automation.office.form_fill.fit.wordbox",
+  "hwpx_automation.office.rendering"
+ ],
+ "forbiddenCoreCompatibilityImports": [
+  "hwpx.exam",
+  "hwpx.form_fit.seal",
+  "hwpx.form_fit.wordbox"
+ ],
+ "coreVisualContract": {
+  "module": "hwpx.visual.block_splits",
+  "members": [
+   "Block",
+   "detect_block_splits"
   ],
-  "moduleMap": {
-    "hwpx.exam": "hwpx_automation.office.exam"
-  },
-  "approvedCoreImports": [
-    "hwpx.document",
-    "hwpx.oxml",
-    "hwpx.tools.table_cleanup",
-    "hwpx.visual.block_splits"
-  ],
-  "approvedSiblingOwners": [
-    "hwpx_automation.office.form_fill.fit.wordbox",
-    "hwpx_automation.office.rendering"
-  ],
-  "forbiddenCoreCompatibilityImports": [
-    "hwpx.exam",
-    "hwpx.form_fit.seal",
-    "hwpx.form_fit.wordbox"
-  ],
-  "coreVisualContract": {
-    "module": "hwpx.visual.block_splits",
-    "members": [
-      "Block",
-      "detect_block_splits"
-    ],
-    "status": "renderer-neutral core owner"
-  },
-  "retainedCorePrimitives": [
-    "HwpxDocument object model and package serialization",
-    "OXML style and paragraph-format mutation",
-    "generic table text normalization",
-    "renderer-neutral block-split geometry contracts",
-    "tables, equations, mutation, preservation and open-safety"
-  ],
-  "productionConsumers": [
-    "hwpx_automation.handlers.specialized"
-  ],
-  "compatibilityPolicy": {
-    "coreLine": "4.x",
-    "featureWork": "automation canonical owner only",
-    "mirrors": "correctness-or-security-only with parity test and receipt",
-    "removalGate": "public observation followed by separately approved core major"
-  },
-  "toolContract": {
-    "default": 120,
-    "advanced": 128,
-    "skillRequired": 28,
-    "hash": "ac1a422376b5ac84",
-    "composeExamToolSha256": "be9e32237e911ec03923048845932823b5e6cf31520822776bc2780a8cc49768"
-  }
+  "status": "renderer-neutral core owner"
+ },
+ "retainedCorePrimitives": [
+  "HwpxDocument object model and package serialization",
+  "OXML style and paragraph-format mutation",
+  "generic table text normalization",
+  "renderer-neutral block-split geometry contracts",
+  "tables, equations, mutation, preservation and open-safety"
+ ],
+ "productionConsumers": [
+  "hwpx_automation.handlers.specialized"
+ ],
+ "compatibilityPolicy": {
+  "coreLine": "4.x",
+  "featureWork": "automation canonical owner only",
+  "mirrors": "correctness-or-security-only with parity test and receipt",
+  "removalGate": "public observation followed by separately approved core major"
+ },
+ "toolContract": {
+  "default": 121,
+  "advanced": 129,
+  "skillRequired": 28,
+  "hash": "342cf672f29cd183",
+  "composeExamToolSha256": "be9e32237e911ec03923048845932823b5e6cf31520822776bc2780a8cc49768"
+ }
 }

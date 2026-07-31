@@ -42,7 +42,7 @@ def test_phase0_legacy_cap_precedes_every_core_5_resolution() -> None:
     names = [str(step.get("name", "")) for step in steps]
     phase0 = names.index("Observe Phase-0 legacy cap before resolving core 5")
     dependencies = names.index("Install test dependencies")
-    matrix = names.index("Run public 5.1.1 to 6.0 compatibility install matrix")
+    matrix = names.index("Run public 5.2.0 compatibility install matrix")
     assert phase0 < dependencies < matrix
 
     phase0_run = str(steps[phase0]["run"])
@@ -64,7 +64,7 @@ def test_phase0_legacy_cap_precedes_every_core_5_resolution() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
-    assert '"primaryApplication": "6.0.4"' in workflow
+    assert '"primaryApplication": "6.1.3"' in workflow
 
 
 def test_automation_release_hands_off_without_global_promotion() -> None:
@@ -93,7 +93,7 @@ def test_automation_release_hands_off_without_global_promotion() -> None:
     )
 
     handoff_run = str(steps[github_observed]["run"])
-    assert "release-approved and currentPublic remains 5.0.2/6.0.4/1.0.1" in handoff_run
+    assert "release-approved and currentPublic remains 5.1.1/6.1.3/1.1.0" in handoff_run
     assert "plugin GitHub Release, marketplace entry, and a real marketplace" in (
         handoff_run
     )
@@ -130,7 +130,7 @@ def test_identity_requires_complete_three_stack_remote_truth() -> None:
         "released",
     }
     if release["status"] != "released":
-        assert release["currentPublic"]["plugin"] == "1.0.1"
+        assert release["currentPublic"]["plugin"] == "1.1.0"
     else:
         assert release["currentPublic"]["plugin"] == release["candidate"]["plugin"]
     gate = release["promotionGate"]

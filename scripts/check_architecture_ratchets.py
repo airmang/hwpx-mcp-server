@@ -33,7 +33,7 @@ EXPECTED_SDK_IMPORTERS = (
 
 EXPECTED_SERVICE_LINES = {
     "_border_fill.py": 283,
-    "content_layout.py": 322,
+    "content_layout.py": 449,
     "context.py": 213,
     "form_fields.py": 618,
     "media.py": 178,
@@ -49,9 +49,9 @@ EXPECTED_SERVICE_LINES = {
 }
 
 EXPECTED_FACADE_LINES = {
-    "hwpx_ops.py": 1464,
+    "hwpx_ops.py": 1489,
     # S-108: shared identity/config helpers replaced duplicated MCP-era parsing.
-    "server.py": 260,
+    "server.py": 261,
 }
 
 PRIVATE_ATTRIBUTES = ("_mcp_server", "_tool_manager", "_tools")

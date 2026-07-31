@@ -42,6 +42,7 @@ from ._shared import (
     _normalize_fill_mappings,
     _revision_guard,
     _save_doc_verification,
+    _with_document_state,
     _with_dry_run_verification,
     _with_save_verification,
 )
@@ -679,6 +680,41 @@ def add_page_break(
     return _with_save_verification({"success": True}, verification)
 
 
+def add_equation(
+    filename: str,
+    latex: str = None,
+    script: str = None,
+    paragraph_index: int = None,
+    table_index: int = None,
+    row: int = None,
+    col: int = None,
+    base_unit: int = 1100,
+    dry_run: bool = False,
+    expected_revision: str = None,
+) -> dict:
+    """네이티브 수식(<hp:equation>)을 삽입합니다. latex(권장) 또는 EqEdit script 중
+    하나만 지정 — LaTeX는 렌더 검증된 토큰셋만 EqEdit로 변환하고, 밖이면
+    EQUATION_LATEX_UNSUPPORTED로 거부합니다(무음 근사 없음). 산출 수식은 실한컴이
+    조판하고 기존 리더(eqedit_to_latex)가 되읽습니다(응답 readerLatex).
+    배치: 기본=문서 끝 새 문단, paragraph_index=기존 문단, tableIndex+row+col=표 셀."""
+    path = resolve_path(filename)
+    guard = _revision_guard(path, expected_revision)
+    if guard is not None:
+        return guard
+    result = RUNTIME_SERVICES.ops.add_equation(
+        path,
+        latex=latex,
+        script=script,
+        paragraph_index=paragraph_index,
+        table_index=table_index,
+        row=row,
+        col=col,
+        base_unit=base_unit,
+        dry_run=dry_run,
+    )
+    return _with_document_state(result, path)
+
+
 def insert_picture(
     filename: str,
     image_base64: str,
@@ -1060,6 +1096,7 @@ __all__ = [
     "insert_paragraph",
     "delete_paragraph",
     "add_page_break",
+    "add_equation",
     "apply_edits",
     "undo_last_edit",
     "replace_by_anchor",

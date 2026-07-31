@@ -1,69 +1,69 @@
 {
-  "schemaVersion": "hwpx-mcp.evalplan-runtime-owner/v1",
-  "canonicalOwner": "hwpx_automation.office.evalplan",
-  "sourceCompatibilityOwner": "python-hwpx 4.x",
-  "source": {
-    "head": "98a6282bcf486859c9c3b9786d9744a1ff3bd362",
-    "pythonFiles": 1,
-    "loc": 2727,
-    "sha256": "35aaf4ab6964a028cd5470da05e80ccb0a7537532b48644c31dd142604a9eb52",
-    "manifestSha256": "3769acd8a4d599f20fe3658f212c83b384096bdf64014c8ca1892e52b6115089"
+ "schemaVersion": "hwpx-mcp.evalplan-runtime-owner/v1",
+ "canonicalOwner": "hwpx_automation.office.evalplan",
+ "sourceCompatibilityOwner": "python-hwpx 4.x",
+ "source": {
+  "head": "98a6282bcf486859c9c3b9786d9744a1ff3bd362",
+  "pythonFiles": 1,
+  "loc": 2727,
+  "sha256": "35aaf4ab6964a028cd5470da05e80ccb0a7537532b48644c31dd142604a9eb52",
+  "manifestSha256": "3769acd8a4d599f20fe3658f212c83b384096bdf64014c8ca1892e52b6115089"
+ },
+ "canonical": {
+  "pythonFiles": 2,
+  "loc": 2798,
+  "manifestSha256": "8db0d06b5035723d391a1a3589e7c8d2ca09945b3ad9734af60b12df2c8d252a",
+  "nomenclatureRefrozenFrom": {
+   "loc": 2798,
+   "manifestSha256": "ba65da4b137cc6b9737b3a44f9a84fbdd04787454f47fa7d8ab3a86533f75e3a",
+   "reason": "Canonical product ownership wording changed from MCP to automation; behavior is unchanged."
   },
-  "canonical": {
-    "pythonFiles": 2,
-    "loc": 2798,
-    "manifestSha256": "8db0d06b5035723d391a1a3589e7c8d2ca09945b3ad9734af60b12df2c8d252a",
-    "nomenclatureRefrozenFrom": {
-      "loc": 2798,
-      "manifestSha256": "ba65da4b137cc6b9737b3a44f9a84fbdd04787454f47fa7d8ab3a86533f75e3a",
-      "reason": "Canonical product ownership wording changed from MCP to automation; behavior is unchanged."
-    },
-    "refrozenFrom": {
-      "loc": 2798,
-      "manifestSha256": "f27c9d25e2dfd08545a00c530c034335dac8c3628896d38549d4bc38554824d5",
-      "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
-    }
-  },
-  "packageFiles": [
-    "__init__.py",
-    "runtime.py"
-  ],
-  "moduleMap": {
-    "hwpx.evalplan_fill": "hwpx_automation.office.evalplan"
-  },
-  "approvedCoreImports": [
-    "hwpx.body_patch",
-    "hwpx.patch",
-    "hwpx.table_patch"
-  ],
-  "forbiddenCoreCompatibilityImports": [
-    "hwpx.evalplan_fill"
-  ],
-  "siblingApplicationOwners": [
-    "hwpx_automation.office.form_fill"
-  ],
-  "retainedCorePrimitives": [
-    "balanced table and paragraph byte spans",
-    "logical table-cell address/span records",
-    "table/body/paragraph mutation operations",
-    "package section reads and explicit part rewrites",
-    "byte-preserving mutation and open-safety reports"
-  ],
-  "productionConsumers": [
-    "hwpx_automation.office.form_fill.quality",
-    "hwpx_automation.ops_services.form_fields"
-  ],
-  "compatibilityPolicy": {
-    "coreLine": "4.x",
-    "featureWork": "automation canonical owner only",
-    "mirrors": "correctness-or-security-only with parity test and receipt",
-    "removalGate": "public observation followed by separately approved core major"
-  },
-  "toolContract": {
-    "default": 120,
-    "advanced": 128,
-    "skillRequired": 28,
-    "hash": "ac1a422376b5ac84",
-    "applyEvalplanToolSha256": "5f3a93c2a698d2e715e82b8ada2101c622452c17e84ac3a26aeb78db4034cef9"
+  "refrozenFrom": {
+   "loc": 2798,
+   "manifestSha256": "f27c9d25e2dfd08545a00c530c034335dac8c3628896d38549d4bc38554824d5",
+   "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
   }
+ },
+ "packageFiles": [
+  "__init__.py",
+  "runtime.py"
+ ],
+ "moduleMap": {
+  "hwpx.evalplan_fill": "hwpx_automation.office.evalplan"
+ },
+ "approvedCoreImports": [
+  "hwpx.body_patch",
+  "hwpx.patch",
+  "hwpx.table_patch"
+ ],
+ "forbiddenCoreCompatibilityImports": [
+  "hwpx.evalplan_fill"
+ ],
+ "siblingApplicationOwners": [
+  "hwpx_automation.office.form_fill"
+ ],
+ "retainedCorePrimitives": [
+  "balanced table and paragraph byte spans",
+  "logical table-cell address/span records",
+  "table/body/paragraph mutation operations",
+  "package section reads and explicit part rewrites",
+  "byte-preserving mutation and open-safety reports"
+ ],
+ "productionConsumers": [
+  "hwpx_automation.office.form_fill.quality",
+  "hwpx_automation.ops_services.form_fields"
+ ],
+ "compatibilityPolicy": {
+  "coreLine": "4.x",
+  "featureWork": "automation canonical owner only",
+  "mirrors": "correctness-or-security-only with parity test and receipt",
+  "removalGate": "public observation followed by separately approved core major"
+ },
+ "toolContract": {
+  "default": 121,
+  "advanced": 129,
+  "skillRequired": 28,
+  "hash": "342cf672f29cd183",
+  "applyEvalplanToolSha256": "5f3a93c2a698d2e715e82b8ada2101c622452c17e84ac3a26aeb78db4034cef9"
+ }
 }

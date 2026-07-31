@@ -26,7 +26,7 @@ EXPECTED_TRIGGER = {
 }
 EXPECTED_STEP_IDENTITY_SHA256 = {
     "prepublish": (
-        "b2654ddb0fb96e80ad9cc5dd0ddf7f1823cf0335c8a8d8e2aaee3dcee21ba151"
+        "438ecf2028bb55155d94d6dc5a619a7f2d6267ab2816d5ad6e699d5b3c040c96"
     ),
     "release": (
         "70f1a6828a7c6866764731eb837da0869769f00c83ec917793969cfd2138c618"
@@ -38,13 +38,13 @@ EXPECTED_RUN_SHA256 = {
             "eeaa0090d37e4b8deb891f75111b21f16b632f9e8b47f72aaba89dbb6d568082"
         ),
         "Install test dependencies": (
-            "a4d2bf0aa3dbc3de75c05d42b0d68f56007c24485525d788c6ab138d78b48845"
+            "b4901ef0e1bf16d22f7d5f3ea0e40a085699f034dba3ca3c4463e37f09f33072"
         ),
         "Install uv for the clean installed-wheel gates": (
             "a528bb5ef5a4d3201a325ff8ca5170f2e72d275a5fb8a31d95ccd0dd2cab5e6b"
         ),
         "Observe public core dependency remote truth": (
-            "f2b8c0b046789bf76e246d1c38d1ea38aa4e907464adab49056f7c0fbe98c095"
+            "379899905512a7a153c58f772e36f48392908a484c206bdb9378aab42c6456c6"
         ),
         "Check public repository hygiene": (
             "d217752235a4a35f99b76ef367b28bc309a23efd6b9004666615f27291d8acc2"
@@ -58,19 +58,19 @@ EXPECTED_RUN_SHA256 = {
         "Run release-facing tests": (
             "03b2d5596d232a4210386ff5610b26c7bb59cd1aa14f9531d5121955881b3d13"
         ),
-        "Run public 5.1.1 to 6.0 compatibility install matrix": (
-            "6fdd5ec459e420ceb97d81d747dc1751cadd86ad3da382200162585ebd3287ff"
+        "Run public 5.2.0 compatibility install matrix": (
+            "d670d870d5adb9eb13ecf410ff889ab57fc13b908a427516ca3e7dd0c5abfd84"
         ),
         "Verify generated ToolSpec documentation": (
             "c7a25a48d6118f2932df62fe23211794b2729991ce6354671c8524f20e838254"
         ),
         "Gate minimum-Python clean wheel and optional boundaries": (
-            "9f3f84aeddacf186bc9e8085906168655a216a2b9436ac0fd8998fafadea0f91"
+            "ec750ff077de2adf34f26d646652be3aadfeb32369f80d5dedf73152a66a2288"
         ),
     },
     "release": {
         "Validate tag/version consistency": (
-            "518ac15cae5082b985c09efacbade7b31e1b111507adea34c154946a550a6629"
+            "06d5f1e7b390fa58ac4621149c7e09a0aa69e66540aa8923892017dbb874a362"
         ),
         "Extract latest changelog section for release notes": (
             "13596e1604f36a15a740b8f64332da6aab4e032740bf33a890aae4befadb5314"
@@ -100,7 +100,7 @@ EXPECTED_RUN_SHA256 = {
             "c758216698c1c22d1a9706eca43e21d12825dcc61f24b6a6a7776b3c6cffbdaa"
         ),
         "Observe automation GitHub Release and record plugin handoff": (
-            "5ab7671dbf564b5f0692e8dc5ca98d443aa5db3a3cb40258293c4ed23bf752d5"
+            "b4710d92cd214f69ab60a060dd778f2bb78c04bc12660b2675d6c1cfadb6d519"
         ),
     },
 }

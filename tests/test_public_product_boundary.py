@@ -55,8 +55,8 @@ def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
     dependencies = project["project"]["dependencies"]
     optional_dependencies = project["project"]["optional-dependencies"]
 
-    assert project["project"]["version"] == "6.1.3"
-    assert "python-hwpx>=5.1.0,<6" in dependencies
+    assert project["project"]["version"] == "6.2.0"
+    assert "python-hwpx>=5.2.0,<6" in dependencies
     # The imaging stack is declared here since the 5.0 boundary closed: core
     # stopped reading PDFs and images, so its `visual` extra is empty and
     # deferring to it would have installed nothing.
@@ -105,8 +105,8 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
     advanced = expected_tool_names(advanced=True)
     live = set(server._fastmcp_tool_names())
 
-    assert len(default) == 120
-    assert len(advanced) == 128
+    assert len(default) == 121
+    assert len(advanced) == 129
     assert len(skill_required_tool_names()) == 28
     assert (
         MIN_PYTHON_HWPX,
@@ -114,10 +114,10 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
         MIN_MCP_VERSION,
         MIN_SKILL_VERSION,
     ) == (
-        "5.1.0",
-        "6.1.0",
-        "6.1.0",
-        "1.1.0",
+        "5.2.0",
+        "6.2.0",
+        "6.2.0",
+        "1.2.0",
     )
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(default)
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(advanced)
@@ -134,8 +134,8 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
 
     health = server.mcp_server_health()
     assert health["toolSurface"]["status"] == "ok"
-    assert health["toolSurface"]["expectedFastMcpToolCount"] == 120
-    assert health["toolSurface"]["actualFastMcpToolCount"] == 120
+    assert health["toolSurface"]["expectedFastMcpToolCount"] == 121
+    assert health["toolSurface"]["actualFastMcpToolCount"] == 121
     assert health["toolSurface"]["contractHash"] == contract_hash()
     assert health["toolSurface"]["missingExpectedTools"] == []
     assert health["toolSurface"]["unexpectedRegisteredTools"] == []

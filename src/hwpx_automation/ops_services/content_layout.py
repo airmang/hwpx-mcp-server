@@ -88,6 +88,134 @@ class ContentLayoutService:
         self._save._save_document(document, resolved)
         return {"paragraphIndex": index}
 
+    def _equation_script_from_input(
+        self, latex: Optional[str], script: Optional[str]
+    ) -> str:
+        from hwpx.equation import (
+            EquationConversionError,
+            UnsupportedLatexError,
+            latex_to_eqedit,
+        )
+
+        if (latex is None) == (script is None):
+            raise self._context._new_error(
+                "EQUATION_INPUT_INVALID",
+                "provide exactly one of latex or script",
+            )
+        if latex is None:
+            assert script is not None
+            return script
+        try:
+            return latex_to_eqedit(latex)
+        except UnsupportedLatexError as exc:
+            raise self._context._new_error(
+                "EQUATION_LATEX_UNSUPPORTED",
+                f"LaTeX outside the render-verified token set: {exc}",
+                details={"latex": latex},
+            ) from exc
+        except EquationConversionError as exc:
+            raise self._context._new_error(
+                "EQUATION_INPUT_INVALID",
+                f"LaTeX input rejected: {exc}",
+            ) from exc
+
+    def _resolve_equation_target(
+        self,
+        document: Any,
+        *,
+        paragraph_index: Optional[int],
+        table_index: Optional[int],
+        row: Optional[int],
+        col: Optional[int],
+    ) -> Any:
+        cell_parts = (table_index, row, col)
+        use_cell = any(part is not None for part in cell_parts)
+        if use_cell and not all(part is not None for part in cell_parts):
+            raise self._context._new_error(
+                "EQUATION_TARGET_INVALID",
+                "provide tableIndex, row, and col together for a cell target",
+            )
+        if use_cell and paragraph_index is not None:
+            raise self._context._new_error(
+                "EQUATION_TARGET_INVALID",
+                "paragraphIndex cannot be combined with a cell target",
+            )
+        if use_cell:
+            assert table_index is not None and row is not None and col is not None
+            tables = self._context._iter_tables(document)
+            try:
+                table = tables[table_index]
+            except IndexError as exc:
+                raise self._context._new_error(
+                    "TABLE_INDEX_OUT_OF_RANGE",
+                    "tableIndex out of range",
+                    details={"tableIndex": table_index},
+                ) from exc
+            try:
+                return table.cell(row, col).paragraphs[-1]
+            except (IndexError, ValueError) as exc:
+                raise self._context._new_error(
+                    "TABLE_CELL_OPERATION_FAILED",
+                    f"failed to resolve table cell for the equation: {exc}",
+                ) from exc
+        if paragraph_index is not None:
+            try:
+                return self._context._iter_paragraphs(document)[paragraph_index]
+            except IndexError as exc:
+                raise self._context._new_error(
+                    "PARAGRAPH_INDEX_OUT_OF_RANGE",
+                    "paragraphIndex out of range",
+                    details={"paragraphIndex": paragraph_index},
+                ) from exc
+        return None
+
+    def add_equation(
+        self,
+        path: str,
+        *,
+        latex: Optional[str] = None,
+        script: Optional[str] = None,
+        paragraph_index: Optional[int] = None,
+        table_index: Optional[int] = None,
+        row: Optional[int] = None,
+        col: Optional[int] = None,
+        base_unit: int = 1100,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        from hwpx.equation import EquationConversionError, eqedit_to_latex
+
+        script = self._equation_script_from_input(latex, script)
+        document, resolved = self._context._open_document(path)
+        paragraph = self._resolve_equation_target(
+            document,
+            paragraph_index=paragraph_index,
+            table_index=table_index,
+            row=row,
+            col=col,
+        )
+        try:
+            document.add_equation(script, paragraph=paragraph, base_unit=base_unit)
+        except ValueError as exc:
+            raise self._context._new_error(
+                "EQUATION_INPUT_INVALID", str(exc)
+            ) from exc
+        try:
+            reader_latex = eqedit_to_latex(script)
+        except EquationConversionError:
+            reader_latex = None
+        result = {
+            "ok": True,
+            "filename": path,
+            "equation": {
+                "script": script,
+                "readerLatex": reader_latex,
+                "baseUnit": base_unit,
+            },
+        }
+        return self._transactions._with_transaction_verification(
+            result, document, resolved, dry_run=dry_run
+        )
+
     def insert_paragraphs_bulk(
         self,
         path: str,

@@ -1,93 +1,93 @@
 {
-  "schemaVersion": "hwpx-mcp.document-operations-owner/v1",
-  "canonicalOwner": "hwpx_automation.office.document_ops",
-  "sourceCompatibilityOwner": "python-hwpx 4.x",
-  "source": {
-    "head": "86e26314540a82c5a772a05012be5fb2f14f9ed4",
-    "pythonFiles": 3,
-    "loc": 1020,
-    "manifestSha256": "630469fdb286eb383262afae1a6e8e28f76d1774b86712b097b62bfd79370649",
-    "qualifiedExportCount": 13,
-    "qualifiedSnapshotSha256": "a1b77d246543217e33df910b6ef2c021f93120c8b75975cde279f5fb695f9a0e"
+ "schemaVersion": "hwpx-mcp.document-operations-owner/v1",
+ "canonicalOwner": "hwpx_automation.office.document_ops",
+ "sourceCompatibilityOwner": "python-hwpx 4.x",
+ "source": {
+  "head": "86e26314540a82c5a772a05012be5fb2f14f9ed4",
+  "pythonFiles": 3,
+  "loc": 1020,
+  "manifestSha256": "630469fdb286eb383262afae1a6e8e28f76d1774b86712b097b62bfd79370649",
+  "qualifiedExportCount": 13,
+  "qualifiedSnapshotSha256": "a1b77d246543217e33df910b6ef2c021f93120c8b75975cde279f5fb695f9a0e"
+ },
+ "canonical": {
+  "status": "canonical",
+  "pythonFiles": 4,
+  "loc": 183,
+  "manifestSha256": "0211ca145d4d0c83dbbdb36f26e29009ec158ce29c6110d26b5d8bfa1ecb0da2",
+  "nomenclatureRefrozenFrom": {
+   "loc": 183,
+   "manifestSha256": "504480de77ec0053f713725629ff675b46b4c35257ceb7644ee002e6d9743548",
+   "reason": "Canonical product ownership wording changed from MCP to automation; behavior is unchanged."
   },
-  "canonical": {
-    "status": "canonical",
-    "pythonFiles": 4,
-    "loc": 183,
-    "manifestSha256": "0211ca145d4d0c83dbbdb36f26e29009ec158ce29c6110d26b5d8bfa1ecb0da2",
-    "nomenclatureRefrozenFrom": {
-      "loc": 183,
-      "manifestSha256": "504480de77ec0053f713725629ff675b46b4c35257ceb7644ee002e6d9743548",
-      "reason": "Canonical product ownership wording changed from MCP to automation; behavior is unchanged."
-    },
-    "refrozenFrom": {
-      "loc": 183,
-      "manifestSha256": "16fdc78fc1e13462809125a21bfbb54477d90ca84bd608361842926a0c99b62f",
-      "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
-    }
-  },
-  "memberOwners": {
-    "core": [
-      "hwpx.tools.doc_diff.diff_paragraphs",
-      "hwpx.tools.doc_diff.doc_diff",
-      "hwpx.tools.doc_diff.inspect_reference_consistency",
-      "hwpx.tools.mail_merge.inspect_mail_merge_placeholders",
-      "hwpx.tools.mail_merge.load_mail_merge_rows",
-      "hwpx.tools.mail_merge.merge_template_rows",
-      "hwpx.tools.redline.author_demo_redline",
-      "hwpx.tools.redline.inspect_redline_structure",
-      "hwpx.tools.redline.verify_redline"
-    ],
-    "automationCanonical": [
-      "office.document_ops.comparison.build_comparison_table_plan",
-      "office.document_ops.mail_merge.build_mail_merge",
-      "office.document_ops.redline.verify_redline"
-    ],
-    "coreCompatibility": [
-      "hwpx.tools.doc_diff.build_comparison_table_plan",
-      "hwpx.tools.mail_merge.mail_merge"
-    ]
-  },
-  "approvedCoreImports": [
-    "hwpx.document",
-    "hwpx.quality.rendering",
-    "hwpx.tools.doc_diff",
-    "hwpx.tools.mail_merge",
-    "hwpx.tools.redline"
-  ],
-  "forbiddenCoreCompatibilityCallables": {
-    "hwpx": [
-      "build_comparison_table_plan",
-      "mail_merge"
-    ],
-    "hwpx.tools.doc_diff": [
-      "build_comparison_table_plan"
-    ],
-    "hwpx.tools.mail_merge": [
-      "mail_merge"
-    ]
-  },
-  "siblingOwners": [
-    "hwpx_automation.office.compliance",
-    "hwpx_automation.office.form_fill.fit",
-    "hwpx_automation.office.rendering"
-  ],
-  "productionConsumers": [
-    "hwpx_automation.handlers.authoring",
-    "hwpx_automation.handlers.specialized",
-    "hwpx_automation.handlers.tracked_changes",
-    "hwpx_automation.office.authoring.style_profile"
-  ],
-  "compatibilityPolicy": {
-    "coreLine": "4.x",
-    "featureWork": "automation canonical owner or generic core seam only",
-    "mirrors": "correctness-or-security-only with parity test and receipt",
-    "removalGate": "public observation followed by a separately approved core major"
-  },
-  "toolContract": {
-    "default": 120,
-    "advanced": 128,
-    "skillRequired": 28,
-    "hash": "ac1a422376b5ac84"
+  "refrozenFrom": {
+   "loc": 183,
+   "manifestSha256": "16fdc78fc1e13462809125a21bfbb54477d90ca84bd608361842926a0c99b62f",
+   "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
   }
+ },
+ "memberOwners": {
+  "core": [
+   "hwpx.tools.doc_diff.diff_paragraphs",
+   "hwpx.tools.doc_diff.doc_diff",
+   "hwpx.tools.doc_diff.inspect_reference_consistency",
+   "hwpx.tools.mail_merge.inspect_mail_merge_placeholders",
+   "hwpx.tools.mail_merge.load_mail_merge_rows",
+   "hwpx.tools.mail_merge.merge_template_rows",
+   "hwpx.tools.redline.author_demo_redline",
+   "hwpx.tools.redline.inspect_redline_structure",
+   "hwpx.tools.redline.verify_redline"
+  ],
+  "automationCanonical": [
+   "office.document_ops.comparison.build_comparison_table_plan",
+   "office.document_ops.mail_merge.build_mail_merge",
+   "office.document_ops.redline.verify_redline"
+  ],
+  "coreCompatibility": [
+   "hwpx.tools.doc_diff.build_comparison_table_plan",
+   "hwpx.tools.mail_merge.mail_merge"
+  ]
+ },
+ "approvedCoreImports": [
+  "hwpx.document",
+  "hwpx.quality.rendering",
+  "hwpx.tools.doc_diff",
+  "hwpx.tools.mail_merge",
+  "hwpx.tools.redline"
+ ],
+ "forbiddenCoreCompatibilityCallables": {
+  "hwpx": [
+   "build_comparison_table_plan",
+   "mail_merge"
+  ],
+  "hwpx.tools.doc_diff": [
+   "build_comparison_table_plan"
+  ],
+  "hwpx.tools.mail_merge": [
+   "mail_merge"
+  ]
+ },
+ "siblingOwners": [
+  "hwpx_automation.office.compliance",
+  "hwpx_automation.office.form_fill.fit",
+  "hwpx_automation.office.rendering"
+ ],
+ "productionConsumers": [
+  "hwpx_automation.handlers.authoring",
+  "hwpx_automation.handlers.specialized",
+  "hwpx_automation.handlers.tracked_changes",
+  "hwpx_automation.office.authoring.style_profile"
+ ],
+ "compatibilityPolicy": {
+  "coreLine": "4.x",
+  "featureWork": "automation canonical owner or generic core seam only",
+  "mirrors": "correctness-or-security-only with parity test and receipt",
+  "removalGate": "public observation followed by a separately approved core major"
+ },
+ "toolContract": {
+  "default": 121,
+  "advanced": 129,
+  "skillRequired": 28,
+  "hash": "342cf672f29cd183"
+ }
 }

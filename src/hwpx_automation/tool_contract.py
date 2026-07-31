@@ -20,20 +20,20 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Mapping
 
-MIN_PYTHON_HWPX = "5.1.0"
+MIN_PYTHON_HWPX = "5.2.0"
 # The 5.0 train: core drops the workflow surfaces and the `hwpx` console name,
 # this package picks the name up, and the plugin pins both. The three move
 # together — a mixed set is what "no valid install has two declarers" rules out.
-MIN_AUTOMATION_VERSION = "6.1.0"
+MIN_AUTOMATION_VERSION = "6.2.0"
 # Compatibility alias retained in the 6.x contract payload for existing health
 # and plugin consumers. New code and documentation use the automation name.
 MIN_MCP_VERSION = MIN_AUTOMATION_VERSION
-MIN_SKILL_VERSION = "1.1.0"
+MIN_SKILL_VERSION = "1.2.0"
 # Frozen release receipt for non-runtime services. Runtime construction still
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "ac1a422376b5ac84"
+RELEASED_CONTRACT_HASH = "342cf672f29cd183"
 
 
 def describe_callables(entries: Any) -> Any:
@@ -309,7 +309,7 @@ _MUTATING_TOOLS = {
     "create_government_report_document", "create_proposal_document",
     "create_comparison_table_document", "register_template",
     "add_heading", "add_paragraph", "insert_paragraph", "delete_paragraph",
-    "add_page_break", "apply_edits", "undo_last_edit",
+    "add_page_break", "add_equation", "apply_edits", "undo_last_edit",
     "replace_by_anchor", "replace_in_paragraph", "search_and_replace", "batch_replace",
     "byte_preserving_patch", "insert_picture", "replace_picture",
     "add_table", "set_table_cell_text", "merge_table_cells", "split_table_cell",
@@ -424,7 +424,7 @@ BASELINE_DOMAIN_SPECS: tuple[DomainSpec, ...] = (
             "add_heading", "add_paragraph", "insert_paragraph", "delete_paragraph", "add_page_break",
             "apply_edits", "undo_last_edit",
             "replace_by_anchor", "replace_in_paragraph", "search_and_replace", "batch_replace",
-            "byte_preserving_patch", "insert_picture", "replace_picture",
+            "byte_preserving_patch", "insert_picture", "replace_picture", "add_equation",
         ),
     ),
     DomainSpec(
@@ -589,18 +589,18 @@ TOOL_SPECS = tuple(spec for spec in BASELINE_TOOL_SPECS if spec.installed)
 def _validate_classification() -> None:
     counts = classification_counts()
     expected = {
-        ToolClassification.PUBLIC.value: 111,
+        ToolClassification.PUBLIC.value: 112,
         ToolClassification.COMPATIBILITY.value: 6,
         ToolClassification.ADVANCED.value: 8,
         ToolClassification.DEPRECATED.value: 3,
         ToolClassification.INTERNAL.value: 4,
     }
-    if len(BASELINE_TOOL_SPECS) != 132 or counts != expected:
+    if len(BASELINE_TOOL_SPECS) != 133 or counts != expected:
         raise RuntimeError(
-            f"132-tool classification must be disjoint and exhaustive: {counts!r} != {expected!r}"
+            f"133-tool classification must be disjoint and exhaustive: {counts!r} != {expected!r}"
         )
-    if len(TOOL_SPECS) != 128:
-        raise RuntimeError(f"installed advanced surface must contain 128 tools, got {len(TOOL_SPECS)}")
+    if len(TOOL_SPECS) != 129:
+        raise RuntimeError(f"installed advanced surface must contain 129 tools, got {len(TOOL_SPECS)}")
     if sum(spec.skill_required for spec in TOOL_SPECS) != 28:
         raise RuntimeError(
             "installed surface must contain exactly 28 skill-required tools"

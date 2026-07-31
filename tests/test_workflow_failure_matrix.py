@@ -382,5 +382,5 @@ def test_default_toolspec_regression_remains_exactly_119():
     from hwpx_automation import server
 
     expected = expected_tool_names(advanced=False)
-    assert len(expected) == 120
+    assert len(expected) == 121
     assert set(server._fastmcp_tool_names()) == expected

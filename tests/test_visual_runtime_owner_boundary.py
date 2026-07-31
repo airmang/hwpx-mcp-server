@@ -42,10 +42,10 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
         BOUNDARY["FROZEN_CORE_VISUAL_RUNTIME_IMPORTS"]
     )
     assert OWNER["toolContract"] == {
-        "default": 120,
-        "advanced": 128,
+        "default": 121,
+        "advanced": 129,
         "skillRequired": 28,
-        "hash": "ac1a422376b5ac84",
+        "hash": "342cf672f29cd183",
     }
 
 
@@ -96,10 +96,10 @@ def test_canonical_package_inventory_and_runtime_identities_are_exact() -> None:
 
 
 def test_tool_surface_remains_exactly_frozen() -> None:
-    assert len(expected_tool_names(advanced=False)) == 120
-    assert len(expected_tool_names(advanced=True)) == 128
+    assert len(expected_tool_names(advanced=False)) == 121
+    assert len(expected_tool_names(advanced=True)) == 129
     assert len(skill_required_tool_names()) == 28
-    assert contract_hash() == "ac1a422376b5ac84"
+    assert contract_hash() == "342cf672f29cd183"
 
 
 def test_real_product_tree_passes_rendering_owner_gate() -> None:
