@@ -1,5 +1,7 @@
 # python-hwpx-automation 하드닝 가이드
 
+> 릴리스 상태: `release-approved` — 6.2.0 후보 기준 문서이며, 원격 3스택 관찰 전까지 공개 트레인은 바뀌지 않습니다.
+
 > 아래 5.0/6.0/1.0 좌표는 `released` 공개 트레인입니다(2026-07-28):
 > core 5.0.1 / `python-hwpx-automation` 6.0.4 / plugin 1.0.0. 직전 공개
 > 트레인은 core 4.2.0 / `hwpx-mcp-server` 5.1.0 / plugin 0.8.0, 계약 해시

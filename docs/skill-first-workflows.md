@@ -1,5 +1,7 @@
 # Skill-First Workflows on the Automation MCP Adapter
 
+> 릴리스 상태: `release-approved` — 6.2.0 후보 기준 문서이며, 원격 3스택 관찰 전까지 공개 트레인은 바뀌지 않습니다.
+
 This guide describes the released 6.0 automation train's optional FastMCP
 adapter (`released`, 2026-07-28: core 5.0.1 / automation 6.0.4 / plugin
 1.0.0). The Python automation layer is the product surface and `python-hwpx`
