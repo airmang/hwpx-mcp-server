@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## [6.2.0] - 2026-07-31
+
+수식 저작 트레인. 새 public 기본 도구 `add_equation`(edit 도메인) 1종 —
+LaTeX(렌더 검증 토큰셋, 밖은 `EQUATION_LATEX_UNSUPPORTED` typed 거부) 또는
+EqEdit script를 받아 네이티브 `<hp:equation>`을 삽입하고, 응답에 리더 왕복
+`readerLatex`를 담습니다. 배치는 새 문단·기존 문단·표 셀 3형.
+
+- 계약: 기본 121 / 고급 129 / 스킬 필수 28 @ `342cf672f29cd183`
+  (델타 영수증 `docs/tool-contract-delta-6.2.0.json`, additive-tool 증명).
+- 플로어 동반 이동: `python-hwpx>=5.2.0` · automation `6.2.0` · skill `1.2.0`.
+- 저작 어휘는 실한컴 렌더 오라클 픽셀 실측으로 확정 — 실한컴이 거부하는
+  철자는 대체(`->`·`FORALL`·`dint`/`tint`·`dmatrix`) 또는 typed 거부.
+
 ## [6.1.3] - 2026-07-31
 
 `v6.1.2`도 보존된 실패 태그입니다 — 아무것도 게시되지 않았습니다. release
