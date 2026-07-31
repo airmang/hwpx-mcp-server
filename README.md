@@ -12,12 +12,11 @@
   </p>
 </p>
 
-<!-- release-state: release-approved -->
+<!-- release-state: released -->
 > [!NOTE]
-> 이 저장소의 main은 아직 공개되지 않은 6.3.1 후보 — release-approved 상태(네이티브 차트 생성
-> `add_chart`, 계약 `236f8ea855c875fe`, 130 도구)입니다. 현재 공개 트레인은
-> `python-hwpx 5.2.0 → python-hwpx-automation 6.2.1 → hwpx-plugin 1.2.0`
-> (계약 `342cf672f29cd183`, 2026-07-31 released)입니다. 공개 트레인은
+> 현재 공개 트레인은 `python-hwpx 5.3.0 → python-hwpx-automation 6.3.1 →
+> hwpx-plugin 1.3.0`(계약 `236f8ea855c875fe`, 2026-07-31 released — 네이티브
+> 차트 생성 `add_chart`, 130 도구)입니다. 공개 트레인은
 > core·automation PyPI와 plugin GitHub
 > Release·marketplace·실제 marketplace 설치까지 확인한 뒤 승격했으며, 기존
 > 5.x 설치는 별도 발행된 `hwpx-mcp-server 5.1.1`이 보호합니다. 절차와 상태
