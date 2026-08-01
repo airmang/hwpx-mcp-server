@@ -123,9 +123,9 @@ def test_installed_identity_contract_is_machine_readable() -> None:
     assert release["candidate"] == {
         "pythonHwpx": "5.4.0",
         "canonicalDistribution": "python-hwpx-automation",
-        "canonicalAutomation": "6.4.1",
+        "canonicalAutomation": "6.4.2",
         "compatibilityDistribution": "hwpx-mcp-server",
-        "compatibility": "6.4.1",
+        "compatibility": "6.4.2",
         "plugin": "1.4.0",
         "contractHash": "dbdbdfaac26148b7",
     }

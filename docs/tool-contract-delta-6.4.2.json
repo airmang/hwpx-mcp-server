@@ -1,9 +1,9 @@
 {
  "schemaVersion": "hwpx.tool-contract-delta.v2",
- "release": "6.4.1",
+ "release": "6.4.2",
  "changeKind": "additive-parameters",
  "releaseStatus": "unreleased-candidate",
- "note": "6.4.1 candidate receipt (v6.4.0 is a preserved failed tag — nothing was published; the tag was pushed while the identity state machine still said unreleased-candidate, and the tag gate correctly requires release-approved). over the repaired 5.4.0 core (the fidelity-audit repair train). No tools added or removed: format_table gains additive border/shading parameters — border_type (OWPML line vocabulary, typed refusal outside it), border_color, border_width, fill_color, and optional row/col to target one cell (both-or-neither, typed refusal) — implemented on the new core 5.4.0 surfaces ensure_border_fill(border_type=…) and set_cell_border_fill. The core floor moves to 5.4.0: authored tables now carry the real-Hancom defaults (cell inner margins 510/141, body-width default, nested tables sized to the parent cell), list paraPr no longer leaks into appended paragraphs, hyperlinks follow the corpus-dominant blue-underline convention on the display run only, script sup/sub offset signs are render-corrected, and ensure_run_style adds seven render-verified parameters.",
+ "note": "6.4.2 candidate receipt (v6.4.0 and v6.4.1 are preserved failed tags — nothing was published. v6.4.0: tagged while the identity state machine still said unreleased-candidate. v6.4.1: the workflow's own currentPublic freeze still named the 6.2-era public stack and rejected the truthful 6.3.1 coordinates). over the repaired 5.4.0 core (the fidelity-audit repair train). No tools added or removed: format_table gains additive border/shading parameters — border_type (OWPML line vocabulary, typed refusal outside it), border_color, border_width, fill_color, and optional row/col to target one cell (both-or-neither, typed refusal) — implemented on the new core 5.4.0 surfaces ensure_border_fill(border_type=…) and set_cell_border_fill. The core floor moves to 5.4.0: authored tables now carry the real-Hancom defaults (cell inner margins 510/141, body-width default, nested tables sized to the parent cell), list paraPr no longer leaks into appended paragraphs, hyperlinks follow the corpus-dominant blue-underline convention on the display run only, script sup/sub offset signs are render-corrected, and ensure_run_style adds seven render-verified parameters.",
  "baseline": {
   "versions": {
    "pythonHwpx": "5.3.0",
@@ -25,7 +25,7 @@
  "target": {
   "versions": {
    "pythonHwpx": "5.4.0",
-   "automation": "6.4.1",
+   "automation": "6.4.2",
    "skill": "1.4.0"
   },
   "defaultToolCount": 122,

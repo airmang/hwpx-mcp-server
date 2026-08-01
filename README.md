@@ -14,7 +14,7 @@
 
 <!-- release-state: release-approved -->
 > [!NOTE]
-> 이 저장소의 main은 아직 공개되지 않은 6.4.1 후보 — release-approved 상태(표 테두리·음영
+> 이 저장소의 main은 아직 공개되지 않은 6.4.2 후보 — release-approved 상태(표 테두리·음영
 > `format_table` 확장, 수리된 core 5.4.0 기본값, 계약 `dbdbdfaac26148b7`,
 > 130 도구)입니다. 현재 공개 트레인은
 > `python-hwpx 5.3.0 → python-hwpx-automation 6.3.1 → hwpx-plugin 1.3.0`

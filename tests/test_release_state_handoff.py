@@ -64,7 +64,7 @@ def test_phase0_legacy_cap_precedes_every_core_5_resolution() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
-    assert '"primaryApplication": "6.2.1"' in workflow
+    assert '"primaryApplication": "6.3.1"' in workflow
 
 
 def test_automation_release_hands_off_without_global_promotion() -> None:

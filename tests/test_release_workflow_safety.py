@@ -70,7 +70,7 @@ EXPECTED_RUN_SHA256 = {
     },
     "release": {
         "Validate tag/version consistency": (
-            "2749450d3b7b12ac17739c8de0056af466033f4f384ddce08ea970e64433899c"
+            "ac469a5272f223d8584f73df4c50018d453f7eee6db3ca6a679edb75dbc1be95"
         ),
         "Extract latest changelog section for release notes": (
             "13596e1604f36a15a740b8f64332da6aab4e032740bf33a890aae4befadb5314"
