@@ -1,0 +1,100 @@
+{
+ "schemaVersion": "hwpx.tool-contract-delta.v2",
+ "release": "6.4.0",
+ "changeKind": "additive-parameters",
+ "releaseStatus": "unreleased-candidate",
+ "note": "6.4.0 candidate receipt over the repaired 5.4.0 core (the fidelity-audit repair train). No tools added or removed: format_table gains additive border/shading parameters — border_type (OWPML line vocabulary, typed refusal outside it), border_color, border_width, fill_color, and optional row/col to target one cell (both-or-neither, typed refusal) — implemented on the new core 5.4.0 surfaces ensure_border_fill(border_type=…) and set_cell_border_fill. The core floor moves to 5.4.0: authored tables now carry the real-Hancom defaults (cell inner margins 510/141, body-width default, nested tables sized to the parent cell), list paraPr no longer leaks into appended paragraphs, hyperlinks follow the corpus-dominant blue-underline convention on the display run only, script sup/sub offset signs are render-corrected, and ensure_run_style adds seven render-verified parameters.",
+ "baseline": {
+  "versions": {
+   "pythonHwpx": "5.3.0",
+   "automation": "6.3.1",
+   "skill": "1.3.0"
+  },
+  "defaultToolCount": 122,
+  "advancedToolCount": 130,
+  "skillRequiredToolCount": 28,
+  "classificationCounts": {
+   "public": 113,
+   "compatibility": 6,
+   "advanced": 8,
+   "deprecated": 3,
+   "internal": 4
+  },
+  "contractHash": "236f8ea855c875fe"
+ },
+ "target": {
+  "versions": {
+   "pythonHwpx": "5.4.0",
+   "automation": "6.4.0",
+   "skill": "1.4.0"
+  },
+  "defaultToolCount": 122,
+  "advancedToolCount": 130,
+  "skillRequiredToolCount": 28,
+  "classificationCounts": {
+   "public": 113,
+   "compatibility": 6,
+   "advanced": 8,
+   "deprecated": 3,
+   "internal": 4
+  },
+  "contractHash": "dbdbdfaac26148b7"
+ },
+ "delta": {
+  "defaultToolCount": 0,
+  "advancedToolCount": 0,
+  "skillRequiredToolCount": 0,
+  "removedTools": [],
+  "addedTools": [],
+  "promotedTools": [],
+  "profileMoves": []
+ },
+ "changedTools": [
+  {
+   "name": "format_table",
+   "domain": "tables",
+   "classification": "public",
+   "profile": "default",
+   "mutates": true,
+   "skillRequired": false,
+   "changedFields": [
+    "inputParameters"
+   ],
+   "addedParameters": [
+    {
+     "name": "border_type",
+     "type": "string",
+     "required": false,
+     "description": "OWPML 선 종류 어휘(SOLID/DASH/DOT/DOUBLE_SLIM/WAVE …); 어휘 밖은 typed 거부."
+    },
+    {
+     "name": "border_color",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "border_width",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "fill_color",
+     "type": "string",
+     "required": false,
+     "description": "셀 음영(배경)색."
+    },
+    {
+     "name": "row",
+     "type": "integer",
+     "required": false,
+     "description": "col과 함께 지정 시 그 셀에만 적용."
+    },
+    {
+     "name": "col",
+     "type": "integer",
+     "required": false
+    }
+   ]
+  }
+ ]
+}

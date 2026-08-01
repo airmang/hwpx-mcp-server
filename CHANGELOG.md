@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## [6.4.0] - 2026-08-01
+
+### 추가
+- **`format_table` 테두리·음영 확장(additive)**: `border_type`(OWPML 선
+  종류 어휘 — SOLID/DASH/DOT/DOUBLE_SLIM/WAVE 등, 어휘 밖은 typed 거부),
+  `border_color`, `border_width`, `fill_color`(셀 음영)와 선택 `row`/`col`
+  (함께 지정 시 그 셀에만 적용 — 홀로 지정은 typed 거부). 수리된 core
+  5.4.0의 `ensure_border_fill(border_type=…)`·`set_cell_border_fill` 표면
+  위에 구현. 도구 수 불변(122/130), 계약 해시 `dbdbdfaac26148b7`.
+
+### 변경
+- **core 바닥 5.4.0**: 저작 충실도 감사 수리 트레인 편입 — 표
+  기본값(셀 안여백 510/141·본문폭·중첩=부모 셀 폭), 목록 paraPr 비상속,
+  하이퍼링크 파랑/밑줄 관례(표시 런 한정), 첨자 offset 부호 정정,
+  `ensure_run_style` 확장 7종. mail-merge fit 판정은 이제 실한컴 셀
+  안여백을 반영해 가용폭을 계산합니다.
+
 ## [6.3.1] - 2026-07-31
 
 `v6.3.0`은 보존된 실패 태그입니다 — 아무것도 게시되지 않았습니다. 호환

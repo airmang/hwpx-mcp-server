@@ -16,7 +16,9 @@ def _narrow_cell_template(path: Path) -> None:
     table = doc.add_paragraph("").add_table(1, 2)
     table.cell(0, 0).set_text("이름")
     cell = table.cell(0, 1)
-    cell.set_size(width=3500)
+    # 5.4.0부터 add_table 셀이 실한컴 기본 안여백(좌우 510)을 갖는다 —
+    # 가용폭이 그만큼 줄므로 "깨끗한 행"이 실제로 들어갈 폭을 준다.
+    cell.set_size(width=4600)
     cell.set_text("{{name}}")
     doc.save_to_path(str(path))
 

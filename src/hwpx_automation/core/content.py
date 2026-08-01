@@ -418,20 +418,77 @@ def split_cell_in_table(doc: HwpxDocument, table_index: int, row: int, col: int)
     return original
 
 
-def format_table_in_doc(doc: HwpxDocument, table_index: int, has_header_row: bool = None) -> None:
-    """표 서식을 변경한다. 헤더 행 강조 등."""
-    if has_header_row is None:
-        return
+def _apply_table_border_fill(
+    doc: HwpxDocument,
+    table,
+    border_type: str = None,
+    border_color: str = None,
+    border_width: str = None,
+    fill_color: str = None,
+    row: int = None,
+    col: int = None,
+) -> str:
+    """테두리/음영 borderFill을 만들어 표 전체 또는 한 셀에 적용한다."""
+    border_fill_id = doc.ensure_border_fill(
+        border_type=border_type or "SOLID",
+        border_color=border_color or "#000000",
+        border_width=border_width or "0.12 mm",
+        fill_color=fill_color,
+    )
+    if row is not None:
+        table.set_cell_border_fill(row, col, border_fill_id)
+        return border_fill_id
+    table.element.set("borderFillIDRef", str(border_fill_id))
+    for table_row in table.rows:
+        for cell in table_row.cells:
+            cell.element.set("borderFillIDRef", str(border_fill_id))
+    table.mark_dirty()
+    return border_fill_id
+
+
+def format_table_in_doc(
+    doc: HwpxDocument,
+    table_index: int,
+    has_header_row: bool = None,
+    border_type: str = None,
+    border_color: str = None,
+    border_width: str = None,
+    fill_color: str = None,
+    row: int = None,
+    col: int = None,
+) -> dict:
+    """표 서식을 변경한다. 헤더 행 강조·테두리(선 종류/색/굵기)·셀 음영."""
+    if (row is None) != (col is None):
+        raise ValueError("row와 col은 함께 지정해야 합니다 (셀 단위 테두리 적용)")
+    wants_border = any(
+        value is not None for value in (border_type, border_color, border_width, fill_color)
+    )
+    if row is not None and not wants_border:
+        raise ValueError("row/col 지정은 테두리·음영 파라미터와 함께 사용합니다")
+    if has_header_row is None and not wants_border:
+        return {}
     tables = list(_iter_tables(doc))
     if table_index < 0 or table_index >= len(tables):
         raise ValueError(f"유효하지 않은 table_index: {table_index}")
     table = tables[table_index]
-    if not table.rows:
-        return
-    for cell in table.rows[0].cells:
-        for paragraph in getattr(cell, "paragraphs", []):
-            for run in paragraph.runs:
-                run.bold = bool(has_header_row)
+    applied: dict = {}
+    if wants_border:
+        applied["border_fill_id"] = _apply_table_border_fill(
+            doc,
+            table,
+            border_type=border_type,
+            border_color=border_color,
+            border_width=border_width,
+            fill_color=fill_color,
+            row=row,
+            col=col,
+        )
+    if has_header_row is not None and table.rows:
+        for cell in table.rows[0].cells:
+            for paragraph in getattr(cell, "paragraphs", []):
+                for run in paragraph.runs:
+                    run.bold = bool(has_header_row)
+    return applied
 
 
 def copy_document_file(source: str, destination: str = None) -> str:

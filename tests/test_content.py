@@ -23,6 +23,7 @@ from hwpx_automation.server import (
     fill_by_path,
     find_cell_by_label,
     find_text,
+    format_table,
     get_document_outline,
     get_document_text,
     get_paragraph_text,
@@ -1596,6 +1597,44 @@ def test_add_and_remove_memo(tmp_path: Path):
 
     assert added["memo_added"] is True
     assert removed["memo_removed"] is True
+
+
+def test_format_table_border_and_shading(tmp_path: Path):
+    target = tmp_path / "table_fmt.hwpx"
+    create_document(str(target))
+    add_table(str(target), 2, 2, [["h1", "h2"], ["a", "b"]])
+
+    whole = format_table(
+        str(target), 0,
+        border_type="DASH", border_color="#0000FF", border_width="0.4 mm",
+    )
+    assert whole["formatted"] is True
+    assert whole["border_fill_id"]
+
+    one_cell = format_table(str(target), 0, fill_color="#FFFF00", row=1, col=1)
+    assert one_cell["border_fill_id"] != whole["border_fill_id"]
+
+    doc = open_doc(str(target))
+    HP = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
+    HH = "{http://www.hancom.co.kr/hwpml/2011/head}"
+    cells = list(doc.sections[0].element.iter(f"{HP}tc"))
+    ids = [c.get("borderFillIDRef") for c in cells]
+    assert ids[:3] == [whole["border_fill_id"]] * 3
+    assert ids[3] == one_cell["border_fill_id"]
+    fills = {bf.get("id"): bf for header in doc.headers for bf in header.element.iter(f"{HH}borderFill")}
+    dash = fills[whole["border_fill_id"]]
+    assert any(child.get("type") == "DASH" for child in dash)
+
+
+def test_format_table_typed_refusals(tmp_path: Path):
+    target = tmp_path / "table_fmt2.hwpx"
+    create_document(str(target))
+    add_table(str(target), 1, 1, [["x"]])
+
+    with pytest.raises(ValueError):
+        format_table(str(target), 0, border_type="ZIGZAG")
+    with pytest.raises(ValueError):
+        format_table(str(target), 0, border_type="DASH", row=0)
 
 
 def test_add_page_break(tmp_path: Path):

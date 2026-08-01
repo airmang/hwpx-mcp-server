@@ -55,8 +55,8 @@ def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
     dependencies = project["project"]["dependencies"]
     optional_dependencies = project["project"]["optional-dependencies"]
 
-    assert project["project"]["version"] == "6.3.1"
-    assert "python-hwpx>=5.3.0,<6" in dependencies
+    assert project["project"]["version"] == "6.4.0"
+    assert "python-hwpx>=5.4.0,<6" in dependencies
     # The imaging stack is declared here since the 5.0 boundary closed: core
     # stopped reading PDFs and images, so its `visual` extra is empty and
     # deferring to it would have installed nothing.
@@ -114,10 +114,10 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
         MIN_MCP_VERSION,
         MIN_SKILL_VERSION,
     ) == (
-        "5.3.0",
-        "6.3.0",
-        "6.3.0",
-        "1.3.0",
+        "5.4.0",
+        "6.4.0",
+        "6.4.0",
+        "1.4.0",
     )
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(default)
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(advanced)

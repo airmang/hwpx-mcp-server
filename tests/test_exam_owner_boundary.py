@@ -30,7 +30,7 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
         tuple(OWNER["forbiddenCoreCompatibilityImports"])
         == BOUNDARY["FROZEN_CORE_EXAM_IMPORTS"]
     )
-    assert OWNER["toolContract"]["hash"] == "236f8ea855c875fe"
+    assert OWNER["toolContract"]["hash"] == "dbdbdfaac26148b7"
 
 
 def test_canonical_owner_rejects_frozen_and_unapproved_core_seams() -> None:

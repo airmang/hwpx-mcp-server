@@ -1110,24 +1110,40 @@ def format_table(
     filename: str,
     table_index: int,
     has_header_row: bool = None,
+    border_type: str = None,
+    border_color: str = None,
+    border_width: str = None,
+    fill_color: str = None,
+    row: int = None,
+    col: int = None,
     dry_run: bool = False,
     expected_revision: str = None,
 ) -> dict:
-    """표 서식을 적용합니다. dry_run=True이면 원본을 저장하지 않습니다."""
+    """표 서식을 적용합니다. 헤더 행 강조 외에 테두리 선 종류(OWPML 어휘:
+    SOLID/DASH/DOT/DOUBLE_SLIM/WAVE 등)·색·굵기와 셀 음영(fill_color)을
+    표 전체 또는 (row, col) 한 셀에 적용합니다. dry_run=True이면 원본을
+    저장하지 않습니다."""
     path = resolve_path(filename)
     guard = _revision_guard(path, expected_revision)
     if guard is not None:
         return guard
     doc = open_doc(path)
-    format_table_in_doc(doc, table_index, has_header_row=has_header_row)
-    if dry_run:
-        return _with_dry_run_verification(
-            {"formatted": True, "table_index": table_index}, doc, path
-        )
-    verification = _save_doc_verification(doc, path)
-    return _with_save_verification(
-        {"formatted": True, "table_index": table_index}, verification
+    applied = format_table_in_doc(
+        doc,
+        table_index,
+        has_header_row=has_header_row,
+        border_type=border_type,
+        border_color=border_color,
+        border_width=border_width,
+        fill_color=fill_color,
+        row=row,
+        col=col,
     )
+    result = {"formatted": True, "table_index": table_index, **applied}
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
 
 
 __all__ = [

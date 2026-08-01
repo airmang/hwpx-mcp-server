@@ -26,7 +26,7 @@ EXPECTED_TRIGGER = {
 }
 EXPECTED_STEP_IDENTITY_SHA256 = {
     "prepublish": (
-        "acaff21a247f4466c9b744a5257c58304f71d2aa27b19b51dbe752c38545f521"
+        "75fb8361f7d5042c5a089f811a3869fb504f797167241426d971637e97dd5006"
     ),
     "release": (
         "70f1a6828a7c6866764731eb837da0869769f00c83ec917793969cfd2138c618"
@@ -38,13 +38,13 @@ EXPECTED_RUN_SHA256 = {
             "eeaa0090d37e4b8deb891f75111b21f16b632f9e8b47f72aaba89dbb6d568082"
         ),
         "Install test dependencies": (
-            "84986e601ad2070b451fedfe1aff906f11b90a06a46ec4755d4bb2cdff012fbd"
+            "ceed33dab84c434b130072055c0041a4be9a6cf2bb740577a2954e151808a64e"
         ),
         "Install uv for the clean installed-wheel gates": (
             "a528bb5ef5a4d3201a325ff8ca5170f2e72d275a5fb8a31d95ccd0dd2cab5e6b"
         ),
         "Observe public core dependency remote truth": (
-            "6f6ec96a0d485b388bd1977bddb35ea037143b488fc6df903c0b8d876f2bee92"
+            "ab8e34e0ca9ac189d33fdc85f38a31031b637f7b6cb4dc683524b06cf5071766"
         ),
         "Check public repository hygiene": (
             "d217752235a4a35f99b76ef367b28bc309a23efd6b9004666615f27291d8acc2"
@@ -58,14 +58,14 @@ EXPECTED_RUN_SHA256 = {
         "Run release-facing tests": (
             "03b2d5596d232a4210386ff5610b26c7bb59cd1aa14f9531d5121955881b3d13"
         ),
-        "Run public 5.3.0 compatibility install matrix": (
-            "4ab55ada9a5fa9951fd79cdd20f2ef55831e0b08803c8530d28d0d98b19a4a1c"
+        "Run public 5.4.0 compatibility install matrix": (
+            "fa50d8c1167d9c6d22974681abab74add44f66b652cca3d14170622b641de16c"
         ),
         "Verify generated ToolSpec documentation": (
             "c7a25a48d6118f2932df62fe23211794b2729991ce6354671c8524f20e838254"
         ),
         "Gate minimum-Python clean wheel and optional boundaries": (
-            "e1e0bd65686b98c86ff313f58cf2e5d3d808ca5312cf37993ad2d06dad66be55"
+            "2ec2a503df574e5785db5892a005dcf2330b24d1fe5a177bbb3ba6c445bb67f0"
         ),
     },
     "release": {
@@ -100,7 +100,7 @@ EXPECTED_RUN_SHA256 = {
             "c758216698c1c22d1a9706eca43e21d12825dcc61f24b6a6a7776b3c6cffbdaa"
         ),
         "Observe automation GitHub Release and record plugin handoff": (
-            "e648df41778bef22db7952b5e23312b6d0a95de106f052d1703df4ebca5729c2"
+            "372c671dd926d5aedb7d0ef2e07f1024160f50504e85782280569a9c35050488"
         ),
     },
 }
