@@ -1,9 +1,9 @@
 {
  "schemaVersion": "hwpx.tool-contract-delta.v2",
- "release": "6.5.0",
+ "release": "6.5.1",
  "changeKind": "additive-tool",
  "releaseStatus": "unreleased-candidate",
- "note": "6.5.0 candidate receipt — zero-base operating-plan genre authoring. Three new public tools: add_boxed_org_chart draws the real-Hancom boxed organization chart (borderless table canvas + merged label boxes + cell-border connectors — measured from real operating-plan documents; depth ≤4, ≤40 boxes, typed refusal beyond) directly into a document; compose_section_chip lowers the genre's section divider to generic document-plan blocks (box/inline, accent colour) without writing files; get_genre_grammar is a read-only lookup of the house-style genre grammar and inherited bank profile so the skill instantiates per-document choices without hardcoding. Genre data and composition are owned by the automation layer; the core floor moves to 5.5.0 (footnote contract repair train).",
+ "note": "6.5.1 candidate receipt (v6.5.0 is a preserved failed tag — nothing was published; the compatibility matrix's embedded exact-version probe still pinned 6.4.2 and the full matrix had not been rerun locally for this train). zero-base operating-plan genre authoring. Three new public tools: add_boxed_org_chart draws the real-Hancom boxed organization chart (borderless table canvas + merged label boxes + cell-border connectors — measured from real operating-plan documents; depth ≤4, ≤40 boxes, typed refusal beyond) directly into a document; compose_section_chip lowers the genre's section divider to generic document-plan blocks (box/inline, accent colour) without writing files; get_genre_grammar is a read-only lookup of the house-style genre grammar and inherited bank profile so the skill instantiates per-document choices without hardcoding. Genre data and composition are owned by the automation layer; the core floor moves to 5.5.0 (footnote contract repair train).",
  "baseline": {
   "versions": {
    "pythonHwpx": "5.4.0",
@@ -25,7 +25,7 @@
  "target": {
   "versions": {
    "pythonHwpx": "5.5.0",
-   "automation": "6.5.0",
+   "automation": "6.5.1",
    "skill": "1.5.0"
   },
   "defaultToolCount": 125,

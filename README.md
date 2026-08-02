@@ -14,7 +14,7 @@
 
 <!-- release-state: release-approved -->
 > [!NOTE]
-> 이 저장소의 main은 아직 공개되지 않은 6.5.0 후보 — release-approved 상태(운영계획 장르 저작 —
+> 이 저장소의 main은 아직 공개되지 않은 6.5.1 후보 — release-approved 상태(운영계획 장르 저작 —
 > 표-기반 박스 조직도 `add_boxed_org_chart`·섹션칩 `compose_section_chip`·
 > 장르 문법 `get_genre_grammar`, 계약 `f61d2c60c0aa0413`, 133 도구)입니다.
 > 현재 공개 트레인은

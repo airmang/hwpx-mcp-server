@@ -156,8 +156,8 @@ from importlib.metadata import distribution, version
 from pathlib import Path
 
 assert sys.version_info[:2] == (3, 10), sys.version
-assert version("python-hwpx") == "5.4.0"
-assert version("python-hwpx-automation") == "6.4.2"
+assert version("python-hwpx") == "5.5.0"
+assert version("python-hwpx-automation") == "6.5.1"
 assert importlib.util.find_spec("mcp") is None
 assert importlib.util.find_spec("fitz") is not None
 assert importlib.util.find_spec("PIL") is not None
@@ -309,14 +309,14 @@ def main(argv: list[str] | None = None) -> int:
             core_wheel = _build_wheel(
                 clean_core,
                 wheelhouse / "core",
-                "python_hwpx-5.4.0-*.whl",
+                "python_hwpx-5.5.0-*.whl",
             )
         else:
             assert args.core_wheel is not None
             core_wheel = args.core_wheel.expanduser().resolve()
             if (
                 not core_wheel.is_file()
-                or not core_wheel.name.startswith("python_hwpx-5.4.0-")
+                or not core_wheel.name.startswith("python_hwpx-5.5.0-")
                 or core_wheel.suffix != ".whl"
             ):
                 raise SystemExit(f"invalid python-hwpx 5.0 wheel: {core_wheel}")
