@@ -30,7 +30,7 @@
     },
     "defaultToolCount": 126,
     "advancedToolCount": 134,
-    "skillRequiredToolCount": 28,
+    "skillRequiredToolCount": 29,
     "classificationCounts": {
       "public": 117,
       "compatibility": 6,
@@ -38,12 +38,12 @@
       "deprecated": 3,
       "internal": 4
     },
-    "contractHash": "420c194e4ae17b85"
+    "contractHash": "19898dba41495c47"
   },
   "delta": {
     "defaultToolCount": 1,
     "advancedToolCount": 1,
-    "skillRequiredToolCount": 0,
+    "skillRequiredToolCount": 1,
     "removedTools": [],
     "addedTools": [
       "run_edit_plan"
@@ -58,7 +58,7 @@
       "classification": "public",
       "profile": "default",
       "mutates": true,
-      "skillRequired": false,
+      "skillRequired": true,
       "changedFields": [
         "added"
       ]

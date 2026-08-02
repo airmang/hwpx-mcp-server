@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+## [6.6.0] - 2026-08-03
+
+에이전트 계약 표면 트레인입니다. core 바닥이 5.6.0(`hwpx.plan`/`hwpx.capabilities`)
+으로 올라갑니다.
+
+### 추가
+- **`run_edit_plan`** (public·mutating·skill-required): 선언적 편집 계획
+  (`hwpx.edit-plan/v1`)을 core `hwpx.plan` 실행기로 위임합니다 — 정적 선검증 →
+  전 체인 인메모리 실행 → 최종 open-safety 검증 → 단 1회 원자 쓰기. 중간 step
+  실패 시 output·source가 바이트 불변이고 `ok=false` `hwpx.plan-report/v1`
+  (failedStepId·step error·step별+원본→최종 실측 mutation-report 사영)이
+  돌아옵니다. `dry_run=true`는 동일 체인을 전부 실행하되 쓰기만 생략합니다.
+- **첫 MCP resources 표면 9종**: core 동봉 계약 문서 4종(support-matrix·
+  recipes-traversal·mutation-semantics·known-traps)·라이브 빌드 JSON Schema
+  4종(edit-plan·plan-report·mutation-report·capabilities)·automation 도구 계약
+  payload. 등록은 `fastmcp_adapter.register_canonical_resource` seam으로만
+  합니다(어댑터 유일 SDK 접점 규율 유지).
+- **`describe_capabilities` additive 확장**: core 자기서술 블록
+  (`hwpx.capabilities/v1`)·무실행(render 발사 없음) 오라클 가용성 프로브·리소스
+  카탈로그를 기존 도구에 합성합니다 — 자기서술 도구를 둘로 쪼개지 않습니다.
+
+### 변경
+- 계약 126 default / 134 advanced / 29 skill-required @ `19898dba41495c47`
+  (`docs/tool-contract-delta-6.6.0.json`, additive — removed/promoted/
+  profileMoves 전부 없음). `run_edit_plan`은 `apply_table_ops`/`apply_body_ops`
+  와 같은 skill-required 등급입니다.
+- 버전 바닥: `MIN_PYTHON_HWPX` 5.6.0 · `MIN_SKILL_VERSION` 1.6.0.
+
 ## [6.5.1] - 2026-08-02
 
 `v6.5.0`은 보존된 실패 태그입니다 — 아무것도 게시되지 않았습니다. 호환

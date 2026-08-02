@@ -18,7 +18,7 @@
 이 문서는 **아직 공개되지 않은 6.6.0 source candidate** 기준입니다. 현재
 공개 트레인은 여전히 `python-hwpx 5.5.0 → python-hwpx-automation 6.5.1 →
 hwpx-plugin 1.5.0`(계약 해시 `f61d2c60c0aa0413`)이고, 이 후보의 계약 해시는
-`420c194e4ae17b85`입니다.
+`19898dba41495c47`입니다.
 
 6.6.0 후보의 기본 모드 126개(고급 모드 포함 총 134개)의 도구로 문서 생성,
 선언형 document-plan 생성, 선언적 편집 계획 실행(`run_edit_plan` —
@@ -351,3 +351,6 @@ python3 ../hwpx-skill/scripts/visual_review.py work/output.hwpx --evidence work/
 `observed_pass` with `--screenshot` evidence is the only status that permits a submission-ready visual claim.
 `needs_review` and `blocked` preserve residual risk and should not be described
 as final visual clearance.
+
+
+> 릴리스 상태 참고: 이 소스 트리는 release-approved 단계에서도 원격 진실 관찰 전까지 공개 좌표를 승격하지 않습니다.

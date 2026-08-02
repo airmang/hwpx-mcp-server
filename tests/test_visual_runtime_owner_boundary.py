@@ -44,8 +44,8 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
     assert OWNER["toolContract"] == {
         "default": 122,
         "advanced": 130,
-        "skillRequired": 28,
-        "hash": "420c194e4ae17b85",
+        "skillRequired": 29,
+        "hash": "19898dba41495c47",
     }
 
 
@@ -98,8 +98,8 @@ def test_canonical_package_inventory_and_runtime_identities_are_exact() -> None:
 def test_tool_surface_remains_exactly_frozen() -> None:
     assert len(expected_tool_names(advanced=False)) == 126
     assert len(expected_tool_names(advanced=True)) == 134
-    assert len(skill_required_tool_names()) == 28
-    assert contract_hash() == "420c194e4ae17b85"
+    assert len(skill_required_tool_names()) == 29
+    assert contract_hash() == "19898dba41495c47"
 
 
 def test_real_product_tree_passes_rendering_owner_gate() -> None:

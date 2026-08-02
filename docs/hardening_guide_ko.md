@@ -94,3 +94,6 @@
   --check tests/conformance/golden/structural.json`를 모두 통과해야 합니다. 공개 합성
   코퍼스의 생성기는 `python scripts/conformance_corpus_build.py`이며 출력은
   `scripts/conformance/corpus`입니다.
+
+
+> 릴리스 상태 참고: 이 소스 트리는 release-approved 단계에서도 원격 진실 관찰 전까지 공개 좌표를 승격하지 않습니다.

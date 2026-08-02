@@ -506,7 +506,7 @@ def main() -> int:
             "아직 공개되지 않은 6.6.0 source candidate" in use_cases
             and "`python-hwpx >= 5.6.0`" in use_cases
             and "`f61d2c60c0aa0413`" in use_cases
-            and "`420c194e4ae17b85`" in use_cases,
+            and "`19898dba41495c47`" in use_cases,
             "use-cases guide does not separate candidate and current-public coordinates",
             errors,
         )

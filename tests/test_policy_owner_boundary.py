@@ -38,8 +38,8 @@ def test_owner_ledger_matches_the_frozen_source_and_package_plan() -> None:
     assert OWNER["toolContract"] == {
         "default": 122,
         "advanced": 130,
-        "skillRequired": 28,
-        "hash": "420c194e4ae17b85",
+        "skillRequired": 29,
+        "hash": "19898dba41495c47",
     }
 
 

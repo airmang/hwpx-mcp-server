@@ -95,8 +95,8 @@ def test_owner_ledger_matches_source_inventory_and_contract() -> None:
     assert OWNER["toolContract"] == {
         "default": 122,
         "advanced": 130,
-        "skillRequired": 28,
-        "hash": "420c194e4ae17b85",
+        "skillRequired": 29,
+        "hash": "19898dba41495c47",
     }
 
 
@@ -162,5 +162,5 @@ def test_real_product_tree_and_tool_surface_are_exact() -> None:
     assert report["canonicalDocumentOpsPythonFiles"] == 4
     assert len(expected_tool_names(advanced=False)) == 126
     assert len(expected_tool_names(advanced=True)) == 134
-    assert len(skill_required_tool_names()) == 28
-    assert contract_hash() == "420c194e4ae17b85"
+    assert len(skill_required_tool_names()) == 29
+    assert contract_hash() == "19898dba41495c47"

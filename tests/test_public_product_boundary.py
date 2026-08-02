@@ -107,7 +107,7 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
 
     assert len(default) == 126
     assert len(advanced) == 134
-    assert len(skill_required_tool_names()) == 28
+    assert len(skill_required_tool_names()) == 29
     assert (
         MIN_PYTHON_HWPX,
         MIN_AUTOMATION_VERSION,

@@ -21,14 +21,14 @@ def test_6_6_0_contract_delta_is_additive_and_matches_the_live_contract() -> Non
     contract = _load("tool-contract.generated.json")
 
     assert delta["target"]["contractHash"] == contract["contractHash"] == contract_hash()
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "420c194e4ae17b85"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "19898dba41495c47"
 
     assert delta["baseline"]["contractHash"] == "f61d2c60c0aa0413"
     assert delta["baseline"]["defaultToolCount"] == 125
     assert delta["baseline"]["advancedToolCount"] == 133
     assert delta["target"]["defaultToolCount"] == 126
     assert delta["target"]["advancedToolCount"] == 134
-    assert delta["target"]["skillRequiredToolCount"] == 28
+    assert delta["target"]["skillRequiredToolCount"] == 29
 
     assert delta["delta"]["addedTools"] == ["run_edit_plan"]
     assert delta["delta"]["removedTools"] == []

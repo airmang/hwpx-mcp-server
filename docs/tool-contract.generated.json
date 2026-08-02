@@ -4760,14 +4760,15 @@
       "availabilityReason": null,
       "decisionReason": "canonical installed product capability",
       "replacementTools": [],
-      "skillRequired": false,
+      "skillRequired": true,
       "callableName": "run_edit_plan",
       "schemaBinding": "python-signature",
       "mutates": true,
       "tags": [
         "form_fill",
         "public",
-        "mutation"
+        "mutation",
+        "skill-required"
       ],
       "description": "선언적 편집 계획(hwpx.edit-plan/v1)을 all-or-nothing으로 실행합니다.\n\nplan.steps는 기존 바이트-스플라이스 op 이름 그대로(fill_cells·\napply_table_ops·apply_body_ops·paragraph_patch·recolor_runs_by_color·\nstrip_runs_by_color·strip_trailing_table_captions)를 지시합니다. 실행은\n정적 선검증→전 체인 인메모리→최종 open-safety 검증→단 1회 원자 쓰기 —\n중간 step 실패 시 output·source는 바이트 불변이고 ok=false 리포트\n(failedStepId·step error)가 돌아옵니다. dry_run=true는 동일 체인을 전부\n실행하되 쓰기만 생략합니다(미리보기=실행 정의상 동일). 반환은\nhwpx.plan-report/v1(step별+원본→최종 mutation-report/v1 실측 사영 포함).\n스키마는 hwpx://schemas/edit-plan-v1 리소스로 구독 가능합니다.",
       "signature": "(plan: 'dict', dry_run: 'bool' = False) -> 'dict'",
@@ -19476,14 +19477,15 @@
         "availabilityReason": null,
         "decisionReason": "canonical installed product capability",
         "replacementTools": [],
-        "skillRequired": false,
+        "skillRequired": true,
         "callableName": "run_edit_plan",
         "schemaBinding": "python-signature",
         "mutates": true,
         "tags": [
           "form_fill",
           "public",
-          "mutation"
+          "mutation",
+          "skill-required"
         ]
       },
       {
@@ -22197,7 +22199,7 @@
       }
     ]
   },
-  "contractHash": "420c194e4ae17b85",
+  "contractHash": "19898dba41495c47",
   "defaultToolCount": 126,
   "advancedToolCount": 134,
   "baselineToolCount": 138,
@@ -22232,6 +22234,7 @@
     "repair_hwpx",
     "replace_by_anchor",
     "replay_document_blueprint",
+    "run_edit_plan",
     "scan_form_guidance",
     "score_form_fill",
     "table_compute",

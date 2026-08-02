@@ -33,7 +33,7 @@ MIN_SKILL_VERSION = "1.6.0"
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "420c194e4ae17b85"
+RELEASED_CONTRACT_HASH = "19898dba41495c47"
 
 
 def describe_callables(entries: Any) -> Any:
@@ -264,6 +264,7 @@ _INTERNAL_QA_TOOLS = {
 
 _SKILL_REQUIRED_TOOLS = {
     "get_document_node",
+    "run_edit_plan",
     "query_document_nodes",
     "apply_document_commands",
     "dump_document_blueprint",
@@ -605,9 +606,9 @@ def _validate_classification() -> None:
         )
     if len(TOOL_SPECS) != 134:
         raise RuntimeError(f"installed advanced surface must contain 134 tools, got {len(TOOL_SPECS)}")
-    if sum(spec.skill_required for spec in TOOL_SPECS) != 28:
+    if sum(spec.skill_required for spec in TOOL_SPECS) != 29:
         raise RuntimeError(
-            "installed surface must contain exactly 28 skill-required tools"
+            "installed surface must contain exactly 29 skill-required tools"
         )
 
 

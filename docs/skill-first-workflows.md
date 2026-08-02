@@ -168,3 +168,6 @@ Reason:
 - legacy prompt/resource code exists elsewhere in the repo, but enabling or expanding it here would broaden scope without proving a product need
 
 If future workflow prompting becomes important, keep the contract narrow and register it against the active FastMCP surface instead of reviving legacy behavior by default.
+
+
+> 릴리스 상태 참고: 이 소스 트리는 release-approved 단계에서도 원격 진실 관찰 전까지 공개 좌표를 승격하지 않습니다.
