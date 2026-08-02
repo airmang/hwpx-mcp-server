@@ -50,3 +50,5 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+.compat-core-wheel/
+.minimum-core-wheel/

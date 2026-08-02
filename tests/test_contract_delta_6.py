@@ -16,8 +16,8 @@ def _load(name: str) -> dict:
     return json.loads((ROOT / "docs" / name).read_text(encoding="utf-8"))
 
 
-def test_6_6_1_contract_delta_is_additive_and_matches_the_live_contract() -> None:
-    delta = _load("tool-contract-delta-6.6.1.json")
+def test_6_6_2_contract_delta_is_additive_and_matches_the_live_contract() -> None:
+    delta = _load("tool-contract-delta-6.6.2.json")
     contract = _load("tool-contract.generated.json")
 
     assert delta["target"]["contractHash"] == contract["contractHash"] == contract_hash()
@@ -46,12 +46,12 @@ def test_6_6_1_contract_delta_is_additive_and_matches_the_live_contract() -> Non
     assert contract["minSkillVersion"] == "1.6.0"
 
 
-def test_6_5_1_delta_receipt_is_frozen_and_chains_into_the_6_6_1_baseline() -> None:
+def test_6_5_1_delta_receipt_is_frozen_and_chains_into_the_6_6_2_baseline() -> None:
     """The historical 6.5.1 receipt stays frozen against its own hashes (not the
-    live contract) and its target must be exactly the 6.6.1 baseline."""
+    live contract) and its target must be exactly the 6.6.2 baseline."""
 
     frozen = _load("tool-contract-delta-6.5.1.json")
-    delta = _load("tool-contract-delta-6.6.1.json")
+    delta = _load("tool-contract-delta-6.6.2.json")
     assert frozen["target"]["contractHash"] == "f61d2c60c0aa0413"
     assert frozen["target"]["contractHash"] == delta["baseline"]["contractHash"]
     assert frozen["target"]["defaultToolCount"] == delta["baseline"]["defaultToolCount"]
