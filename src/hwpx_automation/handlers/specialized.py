@@ -7,7 +7,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 from ..core.content import (
     collect_full_text,
@@ -23,6 +23,11 @@ from ..office.authoring.advanced_generators import (
     build_organization_chart as build_hwpx_organization_chart,
 )
 from ..office.compliance import DEFAULT_POLICY, detect_pii, mask_value
+from ..office.house_style import load_bank, load_genres
+from ..office.house_style.composition import (
+    compose_section_chip as compose_house_section_chip,
+)
+from ..office.house_style.org_chart import lower_boxed_org_chart
 from ..office.document_ops import (
     build_mail_merge as build_hwpx_mail_merge,
 )
@@ -214,6 +219,81 @@ def build_organization_chart(
         "block": block,
         "document_plan": _single_block_plan(block, title=title),
         "next_tool": "create_document_from_plan",
+    }
+
+
+def add_boxed_org_chart(
+    filename: str,
+    hierarchy: dict,
+    accent_color: str = None,
+    dry_run: bool = False,
+    expected_revision: str = None,
+) -> dict:
+    """계층 트리를 실물 관례의 박스 조직도(표 캔버스+병합 박스+셀 테두리
+    커넥터)로 문서 끝에 그립니다. 각 노드는 {"label", "sublabel"?,
+    "children"?[]} 매핑이며 깊이 4·박스 40 초과는 typed 거부.
+    accent_color는 루트 박스 배경색. dry_run=True이면 저장하지 않습니다."""
+    path = resolve_path(filename)
+    guard = _revision_guard(path, expected_revision)
+    if guard is not None:
+        return guard
+    doc = open_doc(path)
+    summary = lower_boxed_org_chart(doc, hierarchy or {}, accent_color=accent_color)
+    result = {"orgChart": summary}
+    if dry_run:
+        return _with_dry_run_verification(result, doc, path)
+    verification = _save_doc_verification(doc, path)
+    return _with_save_verification(result, verification)
+
+
+def compose_section_chip(
+    number: str,
+    title: str,
+    style: str = "box",
+    accent_color: str = None,
+) -> dict:
+    """운영계획 장르의 섹션 구분자(섹션칩)를 범용 document_plan block으로
+    합성합니다. style="box"(1×3 accent 칩) 또는 "inline"(번호 제목 헤딩).
+    파일은 쓰지 않습니다 — 반환 block을 document_plan에 끼워 넣으십시오."""
+    if style not in ("box", "inline"):
+        raise ValueError('style must be "box" or "inline"')
+    chip_style = cast('Literal["box", "inline"]', style)
+    block = compose_house_section_chip(
+        number, title, style=chip_style, accent_color=accent_color
+    )
+    return {"block": block, "next_tool": "validate_document_plan"}
+
+
+def get_genre_grammar(genre: str) -> dict:
+    """장르 구조 문법·타이포 역할(하우스 스타일 뱅크)을 반환하는 read-only
+    조회입니다. 스킬이 per-문서 인스턴스화(번호 체계·칩 렌더·블록 선택·색)
+    판단에 사용합니다. 미보유 장르는 사용 가능 목록과 함께 typed 거부."""
+    catalog = load_genres()
+    genres = catalog.genres if hasattr(catalog, "genres") else {}
+    if genre not in genres:
+        raise ValueError(
+            f"unknown genre {genre!r}; available: {sorted(genres)}"
+        )
+    bank = load_bank()
+    entry = genres[genre]
+    payload = entry if isinstance(entry, dict) else entry.model_dump()
+    inherits = None
+    typography = payload.get("typography") if isinstance(payload, dict) else None
+    if isinstance(typography, dict):
+        inherits = typography.get("inherits")
+    profiles = bank.profiles if hasattr(bank, "profiles") else {}
+    inherited_profile = None
+    if inherits and inherits in profiles:
+        base = profiles[inherits]
+        inherited_profile = base if isinstance(base, dict) else base.model_dump()
+    return {
+        "genre": genre,
+        "grammar": payload,
+        "inheritedProfile": {"name": inherits, "profile": inherited_profile}
+        if inherited_profile
+        else None,
+        "sectionChipTool": "compose_section_chip",
+        "orgChartTool": "add_boxed_org_chart",
     }
 
 

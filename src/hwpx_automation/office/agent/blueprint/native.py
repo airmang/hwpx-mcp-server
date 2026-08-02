@@ -115,15 +115,30 @@ def create_numbering(document: HwpxDocument, properties: dict[str, Any]) -> str:
 def _move_to_host_run(paragraph: Any, native: Any, host_run: Any) -> None:
     element = getattr(native, "element", native)
     temporary_run = None
+    movable = element
     for run in list(paragraph.element):
-        if _local_name(run) == "run" and any(child is element for child in run):
-            temporary_run = run
+        if _local_name(run) != "run":
+            continue
+        for child in run:
+            if child is element:
+                temporary_run = run
+                movable = element
+                break
+            # core 5.5.0+: notes are ctrl-wrapped inside the run (the
+            # real-Hancom contract) — relocate the wrapper, not the note.
+            if _local_name(child) == "ctrl" and any(
+                grandchild is element for grandchild in child
+            ):
+                temporary_run = run
+                movable = child
+                break
+        if temporary_run is not None:
             break
     if temporary_run is not None and temporary_run is not host_run.element:
-        temporary_run.remove(element)
+        temporary_run.remove(movable)
         if len(temporary_run) == 0:
             paragraph.element.remove(temporary_run)
-        host_run.element.append(element)
+        host_run.element.append(movable)
         paragraph.section.mark_dirty()
     _remove_empty_text_placeholders(host_run)
 

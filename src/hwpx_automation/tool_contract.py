@@ -20,20 +20,20 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Mapping
 
-MIN_PYTHON_HWPX = "5.4.0"
+MIN_PYTHON_HWPX = "5.5.0"
 # The 5.0 train: core drops the workflow surfaces and the `hwpx` console name,
 # this package picks the name up, and the plugin pins both. The three move
 # together — a mixed set is what "no valid install has two declarers" rules out.
-MIN_AUTOMATION_VERSION = "6.4.0"
+MIN_AUTOMATION_VERSION = "6.5.0"
 # Compatibility alias retained in the 6.x contract payload for existing health
 # and plugin consumers. New code and documentation use the automation name.
 MIN_MCP_VERSION = MIN_AUTOMATION_VERSION
-MIN_SKILL_VERSION = "1.4.0"
+MIN_SKILL_VERSION = "1.5.0"
 # Frozen release receipt for non-runtime services. Runtime construction still
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "dbdbdfaac26148b7"
+RELEASED_CONTRACT_HASH = "f61d2c60c0aa0413"
 
 
 def describe_callables(entries: Any) -> Any:
@@ -320,6 +320,7 @@ _MUTATING_TOOLS = {
     "compose_exam", "place_seal", "mail_merge", "build_image_grid",
     "build_meeting_nameplates", "build_organization_chart", "add_memo",
     "add_memo_by_anchor", "remove_memo", "repair_hwpx",
+    "add_boxed_org_chart",
 }
 
 
@@ -436,6 +437,7 @@ BASELINE_DOMAIN_SPECS: tuple[DomainSpec, ...] = (
         (
             "list_styles", "create_custom_style", "set_paragraph_format", "set_list_format",
             "format_text", "extract_style_profile", "apply_style_profile_to_plan", "compare_style_profiles",
+            "get_genre_grammar",
         ),
     ),
     DomainSpec(
@@ -453,7 +455,7 @@ BASELINE_DOMAIN_SPECS: tuple[DomainSpec, ...] = (
     DomainSpec(
         "generators", "대량생산·특수 산출", "메일머지·사진대지·명패·조직도를 생성.",
         "반복 문서나 특수 레이아웃을 만들 때.",
-        ("mail_merge", "inspect_mail_merge_placeholders", "build_image_grid", "build_meeting_nameplates", "build_organization_chart"),
+        ("mail_merge", "inspect_mail_merge_placeholders", "build_image_grid", "build_meeting_nameplates", "build_organization_chart", "add_boxed_org_chart", "compose_section_chip"),
     ),
     DomainSpec("memo", "메모·주석", "검토 메모를 추가·삭제.", "문서에 코멘트를 달 때.", ("add_memo", "add_memo_by_anchor", "remove_memo")),
     DomainSpec(
@@ -589,18 +591,18 @@ TOOL_SPECS = tuple(spec for spec in BASELINE_TOOL_SPECS if spec.installed)
 def _validate_classification() -> None:
     counts = classification_counts()
     expected = {
-        ToolClassification.PUBLIC.value: 113,
+        ToolClassification.PUBLIC.value: 116,
         ToolClassification.COMPATIBILITY.value: 6,
         ToolClassification.ADVANCED.value: 8,
         ToolClassification.DEPRECATED.value: 3,
         ToolClassification.INTERNAL.value: 4,
     }
-    if len(BASELINE_TOOL_SPECS) != 134 or counts != expected:
+    if len(BASELINE_TOOL_SPECS) != 137 or counts != expected:
         raise RuntimeError(
-            f"134-tool classification must be disjoint and exhaustive: {counts!r} != {expected!r}"
+            f"137-tool classification must be disjoint and exhaustive: {counts!r} != {expected!r}"
         )
-    if len(TOOL_SPECS) != 130:
-        raise RuntimeError(f"installed advanced surface must contain 130 tools, got {len(TOOL_SPECS)}")
+    if len(TOOL_SPECS) != 133:
+        raise RuntimeError(f"installed advanced surface must contain 133 tools, got {len(TOOL_SPECS)}")
     if sum(spec.skill_required for spec in TOOL_SPECS) != 28:
         raise RuntimeError(
             "installed surface must contain exactly 28 skill-required tools"

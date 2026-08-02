@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "python-hwpx-automation"
-version = "6.4.2"
+version = "6.5.0"
 description = "Task-oriented HWPX document automation for Python, with an optional MCP adapter."
 readme = "README.md"
 authors = [{ name = "Kohkyuhyun" }]
@@ -29,7 +29,7 @@ dependencies = [
     # the bounded major here is what makes "no valid install has two declarers"
     # true rather than hopeful, and prevents the next core major from silently
     # breaking an already-published automation line.
-    "python-hwpx>=5.4.0,<6", # HWPX object model, OXML/OPC, format-native primitives
+    "python-hwpx>=5.5.0,<6", # HWPX object model, OXML/OPC, format-native primitives
 
     "pydantic>=2.11,<3",
     "cryptography>=42.0",

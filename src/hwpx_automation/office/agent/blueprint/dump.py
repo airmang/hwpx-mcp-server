@@ -276,6 +276,13 @@ def _host_run_path(record: NodeRecord, selected: Mapping[str, NodeRecord]) -> st
         run_element = candidate.native.element
         if parent is run_element or (element is not None and any(child is element for child in run_element)):
             return candidate.path
+        # core 5.5.0+: notes are ctrl-wrapped inside the run (the real-Hancom
+        # contract) — the run hosts the wrapper, one hop above the note.
+        if element is not None and any(
+            child.tag.endswith("}ctrl") and any(grand is element for grand in child)
+            for child in run_element
+        ):
+            return candidate.path
     return None
 
 

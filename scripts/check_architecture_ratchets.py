@@ -51,7 +51,7 @@ EXPECTED_SERVICE_LINES = {
 EXPECTED_FACADE_LINES = {
     "hwpx_ops.py": 1518,
     # S-108: shared identity/config helpers replaced duplicated MCP-era parsing.
-    "server.py": 262,
+    "server.py": 265,
 }
 
 PRIVATE_ATTRIBUTES = ("_mcp_server", "_tool_manager", "_tools")
@@ -133,9 +133,9 @@ EXPECTED_C901 = (
     ("src/hwpx_automation/office/agent/cli.py", "main", 14),
     ("src/hwpx_automation/office/agent/commands.py", "_add", 16),
     ("src/hwpx_automation/office/agent/commands.py", "_move", 15),
-    ("src/hwpx_automation/office/agent/commands.py", "_refresh_copy_identities", 18),
+    ("src/hwpx_automation/office/agent/commands.py", "_refresh_copy_identities", 13),
     ("src/hwpx_automation/office/agent/commands.py", "_remove", 12),
-    ("src/hwpx_automation/office/agent/document.py", "_project_paragraph", 16),
+    ("src/hwpx_automation/office/agent/document.py", "_project_paragraph", 13),
     ("src/hwpx_automation/office/agent/form_plan.py", "_validate_plan_target", 11),
     ("src/hwpx_automation/office/agent/form_plan.py", "_validate_public_plan_request", 11),
     ("src/hwpx_automation/office/agent/form_plan.py", "validate_mixed_form_request", 13),

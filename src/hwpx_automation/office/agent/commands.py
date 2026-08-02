@@ -1020,6 +1020,57 @@ def _identity_kind(local: str) -> str:
     }.get(local, "shape" if local in _SHAPE_KINDS else local)
 
 
+def _identity_attribute_names(local: str, node: Any) -> tuple[str, ...]:
+    if local in {"p", "tbl", "pic", "memo", "fieldBegin", *_SHAPE_KINDS}:
+        return tuple(name for name in ("id", "instid", "instId") if node.get(name) is not None)
+    if local in {"footNote", "endNote"}:
+        return tuple(name for name in ("instId", "id") if node.get(name) is not None)
+    return ()
+
+
+def _refresh_one_identity(
+    node: Any,
+    local: str,
+    allocate: Any,
+    identity_map: list[dict[str, str]],
+    field_ids: dict[str, str],
+) -> None:
+    names = _identity_attribute_names(local, node)
+    paired_identity = allocate() if len(names) > 1 and local in {"pic", *_SHAPE_KINDS} else None
+    for name in names:
+        old = str(node.get(name))
+        new = paired_identity or allocate()
+        node.set(name, new)
+        identity_map.append(
+            {"kind": _identity_kind(local), "attribute": name, "old": old, "new": new}
+        )
+        if local == "fieldBegin" and name == "id":
+            field_ids[old] = new
+
+
+def _walk_refresh_identities(
+    node: Any,
+    inside_note: bool,
+    allocate: Any,
+    identity_map: list[dict[str, str]],
+    field_ids: dict[str, str],
+) -> None:
+    """Refresh copyable identities in document order.
+
+    Real-Hancom note bodies keep paragraph id="0" inside their subList (the
+    gold contract) — those are not document-order identities, so nothing
+    inside a note is refreshed. Single-pass recursion keeps this correct on
+    both element backends (lxml proxies break id()-sets).
+    """
+
+    local = _local_name(node)
+    if not inside_note:
+        _refresh_one_identity(node, local, allocate, identity_map, field_ids)
+    child_inside = inside_note or local in {"footNote", "endNote"}
+    for child in node:
+        _walk_refresh_identities(child, child_inside, allocate, identity_map, field_ids)
+
+
 def _refresh_copy_identities(document: HwpxDocument, clone: Any) -> list[dict[str, str]]:
     used: set[str] = set()
     max_numeric = 0
@@ -1043,23 +1094,7 @@ def _refresh_copy_identities(document: HwpxDocument, clone: Any) -> list[dict[st
 
     identity_map: list[dict[str, str]] = []
     field_ids: dict[str, str] = {}
-    for node in clone.iter():
-        local = _local_name(node)
-        names: tuple[str, ...] = ()
-        if local in {"p", "tbl", "pic", "memo", "fieldBegin", *_SHAPE_KINDS}:
-            names = tuple(name for name in ("id", "instid", "instId") if node.get(name) is not None)
-        elif local in {"footNote", "endNote"}:
-            names = tuple(name for name in ("instId", "id") if node.get(name) is not None)
-        paired_identity = allocate() if len(names) > 1 and local in {"pic", *_SHAPE_KINDS} else None
-        for name in names:
-            old = str(node.get(name))
-            new = paired_identity or allocate()
-            node.set(name, new)
-            identity_map.append(
-                {"kind": _identity_kind(local), "attribute": name, "old": old, "new": new}
-            )
-            if local == "fieldBegin" and name == "id":
-                field_ids[old] = new
+    _walk_refresh_identities(clone, False, allocate, identity_map, field_ids)
     if field_ids:
         for node in clone.iter():
             if _local_name(node) != "fieldEnd":

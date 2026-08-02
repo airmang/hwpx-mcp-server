@@ -1,10 +1,10 @@
 {
  "schemaVersion": "python-hwpx-automation.public-modules/v1",
  "scope": "All Python modules shipped by the canonical 6.x distribution. Base-public modules must import without the optional MCP SDK; the five adapter modules require the mcp extra by design.",
- "moduleCount": 178,
- "moduleSha256": "bde514982198eb1db9e125c7f3cc46f29e39d3a3db57f973d0d3c7524081c1e8",
- "basePublicModuleCount": 173,
- "basePublicModuleSha256": "4417935156927a59f424fb767eebea4dd6ec2f2ade0266ad137af37e79fa57a0",
+ "moduleCount": 179,
+ "moduleSha256": "8704da9bdf1b43f3e82eb2c069ab3ca3756595b6c673107cd379c4d6754ae340",
+ "basePublicModuleCount": 174,
+ "basePublicModuleSha256": "bbadfb6a59bd069ff721b441f2482b0fe44e72be3b08bbc445b5f78928cd5f15",
  "basePublicModules": [
   "hwpx_automation",
   "hwpx_automation.__main__",
@@ -125,6 +125,7 @@
   "hwpx_automation.office.form_fill.template_formfit",
   "hwpx_automation.office.house_style",
   "hwpx_automation.office.house_style.composition",
+  "hwpx_automation.office.house_style.org_chart",
   "hwpx_automation.office.quality",
   "hwpx_automation.office.quality.page_guard",
   "hwpx_automation.office.rendering",

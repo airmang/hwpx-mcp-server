@@ -419,23 +419,65 @@ class HwpxAgentDocument:
                     note = next(candidate for candidate in notes if candidate.element is child)
                     self._project_note(note, path, kind, object_indexes[kind])
                 elif local == "ctrl":
-                    matches = fields_by_position.get((run_index - 1, child_index), [])
-                    if matches:
-                        for match in matches:
-                            object_indexes["form-field"] += 1
-                            self._project_form_field(match, path, object_indexes["form-field"])
-                    elif len(child) > 0 and all(
-                        _local_name(control_child) in {"fieldEnd", "colPr", "secPr"}
-                        for control_child in child
-                    ):
-                        # A matched FORM field is projected from its fieldBegin. Its paired
-                        # fieldEnd and section/column controls carry no additional subtree
-                        # semantics and must not make an otherwise complete block unsupported.
-                        continue
-                    else:
-                        record.mark_unsupported("ctrl")
+                    self._project_ctrl_child(
+                        child, paragraph, path, object_indexes,
+                        fields_by_position, run_index, child_index, record,
+                    )
                 elif local not in _IGNORED_INLINE_KINDS:
                     record.mark_unsupported(local)
+
+    def _project_ctrl_child(
+        self,
+        child: Any,
+        paragraph: Any,
+        path: SemanticPath,
+        object_indexes: Any,
+        fields_by_position: Any,
+        run_index: int,
+        child_index: int,
+        record: Any,
+    ) -> None:
+        if self._project_wrapped_notes(child, paragraph, path, object_indexes):
+            return
+        matches = fields_by_position.get((run_index - 1, child_index), [])
+        if matches:
+            for match in matches:
+                object_indexes["form-field"] += 1
+                self._project_form_field(match, path, object_indexes["form-field"])
+        elif len(child) > 0 and all(
+            _local_name(control_child) in {"fieldEnd", "colPr", "secPr"}
+            for control_child in child
+        ):
+            # A matched FORM field is projected from its fieldBegin. Its paired
+            # fieldEnd and section/column controls carry no additional subtree
+            # semantics and must not make an otherwise complete block unsupported.
+            return
+        else:
+            record.mark_unsupported("ctrl")
+
+    def _project_wrapped_notes(
+        self, ctrl: Any, paragraph: Any, path: SemanticPath, object_indexes: Any
+    ) -> bool:
+        """Project ctrl-wrapped footnotes/endnotes (the real-Hancom contract).
+
+        Returns True when the ctrl hosted at least one note — core 5.5.0+
+        wraps notes in ``<hp:ctrl>`` inside the run.
+        """
+
+        projected = False
+        for control_child in ctrl:
+            note_local = _local_name(control_child)
+            if note_local not in {"footNote", "endNote"}:
+                continue
+            kind = "footnote" if note_local == "footNote" else "endnote"
+            object_indexes[kind] += 1
+            notes = paragraph.footnotes if kind == "footnote" else paragraph.endnotes
+            note = next(
+                candidate for candidate in notes if candidate.element is control_child
+            )
+            self._project_note(note, path, kind, object_indexes[kind])
+            projected = True
+        return projected
 
     def _project_table(self, paragraph: Any, element: Any, parent: SemanticPath, index: int) -> None:
         table = next(candidate for candidate in paragraph.tables if candidate.element is element)

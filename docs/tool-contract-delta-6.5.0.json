@@ -1,0 +1,91 @@
+{
+ "schemaVersion": "hwpx.tool-contract-delta.v2",
+ "release": "6.5.0",
+ "changeKind": "additive-tool",
+ "releaseStatus": "unreleased-candidate",
+ "note": "6.5.0 candidate receipt — zero-base operating-plan genre authoring. Three new public tools: add_boxed_org_chart draws the real-Hancom boxed organization chart (borderless table canvas + merged label boxes + cell-border connectors — measured from real operating-plan documents; depth ≤4, ≤40 boxes, typed refusal beyond) directly into a document; compose_section_chip lowers the genre's section divider to generic document-plan blocks (box/inline, accent colour) without writing files; get_genre_grammar is a read-only lookup of the house-style genre grammar and inherited bank profile so the skill instantiates per-document choices without hardcoding. Genre data and composition are owned by the automation layer; the core floor moves to 5.5.0 (footnote contract repair train).",
+ "baseline": {
+  "versions": {
+   "pythonHwpx": "5.4.0",
+   "automation": "6.4.2",
+   "skill": "1.4.0"
+  },
+  "defaultToolCount": 122,
+  "advancedToolCount": 130,
+  "skillRequiredToolCount": 28,
+  "classificationCounts": {
+   "public": 113,
+   "compatibility": 6,
+   "advanced": 8,
+   "deprecated": 3,
+   "internal": 4
+  },
+  "contractHash": "dbdbdfaac26148b7"
+ },
+ "target": {
+  "versions": {
+   "pythonHwpx": "5.5.0",
+   "automation": "6.5.0",
+   "skill": "1.5.0"
+  },
+  "defaultToolCount": 125,
+  "advancedToolCount": 133,
+  "skillRequiredToolCount": 28,
+  "classificationCounts": {
+   "public": 116,
+   "compatibility": 6,
+   "advanced": 8,
+   "deprecated": 3,
+   "internal": 4
+  },
+  "contractHash": "f61d2c60c0aa0413"
+ },
+ "delta": {
+  "defaultToolCount": 3,
+  "advancedToolCount": 3,
+  "skillRequiredToolCount": 0,
+  "removedTools": [],
+  "addedTools": [
+   "add_boxed_org_chart",
+   "compose_section_chip",
+   "get_genre_grammar"
+  ],
+  "promotedTools": [],
+  "profileMoves": []
+ },
+ "changedTools": [
+  {
+   "name": "add_boxed_org_chart",
+   "domain": "generators",
+   "classification": "public",
+   "profile": "default",
+   "mutates": true,
+   "skillRequired": false,
+   "changedFields": [
+    "added"
+   ]
+  },
+  {
+   "name": "compose_section_chip",
+   "domain": "generators",
+   "classification": "public",
+   "profile": "default",
+   "mutates": false,
+   "skillRequired": false,
+   "changedFields": [
+    "added"
+   ]
+  },
+  {
+   "name": "get_genre_grammar",
+   "domain": "styles",
+   "classification": "public",
+   "profile": "default",
+   "mutates": false,
+   "skillRequired": false,
+   "changedFields": [
+    "added"
+   ]
+  }
+ ]
+}
