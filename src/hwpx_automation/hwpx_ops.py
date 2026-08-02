@@ -939,6 +939,14 @@ class HwpxOps:
             publication_sink=publication_sink,
         )
 
+    def run_edit_plan(
+        self,
+        plan: Dict[str, Any],
+        *,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        return self._services.form_fields.run_edit_plan(plan, dry_run=dry_run)
+
     def apply_table_ops(
         self,
         path: str,

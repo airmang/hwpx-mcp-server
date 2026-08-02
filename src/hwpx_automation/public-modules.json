@@ -1,10 +1,10 @@
 {
  "schemaVersion": "python-hwpx-automation.public-modules/v1",
  "scope": "All Python modules shipped by the canonical 6.x distribution. Base-public modules must import without the optional MCP SDK; the five adapter modules require the mcp extra by design.",
- "moduleCount": 179,
- "moduleSha256": "8704da9bdf1b43f3e82eb2c069ab3ca3756595b6c673107cd379c4d6754ae340",
- "basePublicModuleCount": 174,
- "basePublicModuleSha256": "bbadfb6a59bd069ff721b441f2482b0fe44e72be3b08bbc445b5f78928cd5f15",
+ "moduleCount": 180,
+ "moduleSha256": "4000174b39f93c6f8fd8e03420e58f1552ae2a37dd7b3d2b4716e654e66eac38",
+ "basePublicModuleCount": 175,
+ "basePublicModuleSha256": "6ebeb5b691f132b21a544122df3b825f4b708251fe8d3c22f2cc7c9947a84635",
  "basePublicModules": [
   "hwpx_automation",
   "hwpx_automation.__main__",
@@ -158,6 +158,7 @@
   "hwpx_automation.preview_output_models",
   "hwpx_automation.quality",
   "hwpx_automation.quality_generation",
+  "hwpx_automation.resources",
   "hwpx_automation.runtime_services",
   "hwpx_automation.storage",
   "hwpx_automation.tool_contract",

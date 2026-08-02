@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: airmang/python-hwpx
-          ref: v5.5.0
+          ref: v5.6.0
           path: python-hwpx
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -66,7 +66,7 @@ jobs:
           # Release order is legacy cap -> core -> automation -> compatibility -> plugin.
           # A tag release must observe the exact public core rather than a
           # sibling checkout or an unpublished branch.
-          python -m pip install "python-hwpx[visual,preview]==5.5.0"
+          python -m pip install "python-hwpx[visual,preview]==5.6.0"
           python -m pip install -e ".[mcp,oracle,test,typecheck]"
       # The clean installed-wheel gates (docs example, compat matrix) fail
       # closed without uv; runners do not ship it.
@@ -104,12 +104,12 @@ jobs:
       - name: Run release-facing tests
         working-directory: python-hwpx-automation
         run: python -m pytest -q
-      - name: Run public 5.5.0 compatibility install matrix
+      - name: Run public 5.6.0 compatibility install matrix
         working-directory: python-hwpx-automation
         run: |
           python -m pip install build
           python -m pip wheel --no-deps --wheel-dir .compat-core-wheel \
-            "python-hwpx==5.5.0"
+            "python-hwpx==5.6.0"
           CORE_WHEEL=$(find .compat-core-wheel -name 'python_hwpx-*.whl' -print -quit)
           python scripts/check_compat_install_matrix.py \
             --core-wheel "${CORE_WHEEL}" \
@@ -130,7 +130,7 @@ jobs:
           python -m pip install "build>=1.2"
           mkdir -p .minimum-core-wheel
           python -m pip wheel --no-deps --wheel-dir .minimum-core-wheel \
-            "python-hwpx==5.5.0"
+            "python-hwpx==5.6.0"
           CORE_WHEEL=$(find .minimum-core-wheel -name 'python_hwpx-5.5.0-*.whl' -print -quit)
           test -n "${CORE_WHEEL}"
           python scripts/check_platform_optional_smoke.py \
@@ -246,9 +246,9 @@ jobs:
           if current != {
               "pythonHwpx": "5.5.0",
               "primaryDistribution": "python-hwpx-automation",
-              "primaryApplication": "6.4.2",
-              "plugin": "1.4.1",
-              "contractHash": "dbdbdfaac26148b7",
+              "primaryApplication": "6.5.1",
+              "plugin": "1.5.0",
+              "contractHash": "f61d2c60c0aa0413",
           }:
               raise SystemExit(
                   "전체 3스택 원격 관찰 전 currentPublic를 candidate로 미리 "
@@ -524,7 +524,7 @@ jobs:
             echo
             echo "Core, canonical automation, compatibility, and this GitHub"
             echo "Release have remote evidence. The global state remains"
-            echo "release-approved and currentPublic remains 5.5.0/6.4.2/1.4.1."
+            echo "release-approved and currentPublic remains 5.5.0/6.5.1/1.5.0."
             echo "Pass ${RECEIPT_NAME} to plugin publication. Only after the"
             echo "plugin GitHub Release, marketplace entry, and a real marketplace"
             echo "install are observed may a follow-up commit promote the coherent"

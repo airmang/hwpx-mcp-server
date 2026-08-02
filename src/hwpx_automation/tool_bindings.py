@@ -103,6 +103,7 @@ def _build_tool_bindings() -> Mapping[str, Callable[..., Any]]:
         "remove_memo": layout_style.remove_memo,
         "scan_form_guidance": form_fill.scan_form_guidance,
         "apply_table_ops": form_fill.apply_table_ops,
+        "run_edit_plan": form_fill.run_edit_plan,
         "apply_body_ops": form_fill.apply_body_ops,
         "inspect_fill_residue": form_fill.inspect_fill_residue,
         "verify_form_fill": form_fill.verify_form_fill,

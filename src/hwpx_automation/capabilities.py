@@ -107,4 +107,59 @@ def tool_domain(name: str) -> str | None:
     return None
 
 
-__all__ = ["DOMAINS", "build_capability_report", "coverage_against", "tool_domain"]
+def core_self_description() -> dict[str, Any]:
+    """설치된 core의 `hwpx.capabilities/v1` 자기서술 — 없으면 정직 degrade.
+
+    core 5.6+가 제공한다. 구버전 core 위에서는 없다는 사실 자체를 보고하지,
+    자기서술을 지어내지 않는다.
+    """
+
+    try:
+        from hwpx.experimental import describe_capabilities as core_caps
+    except ImportError:
+        return {
+            "available": False,
+            "reason": (
+                "installed python-hwpx does not expose hwpx.capabilities "
+                "(needs >= 5.6.0)"
+            ),
+        }
+    report = dict(core_caps())
+    report["available"] = True
+    return report
+
+
+def render_oracle_availability() -> dict[str, Any]:
+    """실한컴 렌더 오라클 가용성 — **무실행 프로브만**(세션·렌더 발사 없음).
+
+    resolve_oracle 캐스케이드(Windows COM → Mac GUI → Null; STRUCTURAL_ONLY는
+    Null 단락)와 imaging/pymupdf 프로브를 그대로 보고한다. available=False는
+    결함이 아니라 이 환경의 사실이며, 그때 render 게이트는 renderChecked=false
+    로 정직하게 degrade한다.
+    """
+
+    from .office.rendering import detectors, diff
+    from .office.rendering.oracle import resolve_oracle
+
+    oracle = resolve_oracle()
+    try:
+        available = bool(oracle.available())
+    except Exception:
+        available = False
+    return {
+        "oracle": type(oracle).__name__,
+        "available": available,
+        "imaging": bool(detectors.imaging_available()),
+        "pymupdf": bool(diff.pymupdf_available()),
+        "note": "probe-only — 어떤 렌더 세션도 시작하지 않는다",
+    }
+
+
+__all__ = [
+    "DOMAINS",
+    "build_capability_report",
+    "core_self_description",
+    "coverage_against",
+    "render_oracle_availability",
+    "tool_domain",
+]

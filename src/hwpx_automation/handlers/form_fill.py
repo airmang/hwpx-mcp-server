@@ -136,6 +136,32 @@ def apply_template_formfit(
     )
 
 
+def run_edit_plan(
+    plan: dict,
+    dry_run: bool = False,
+) -> dict:
+    """선언적 편집 계획(hwpx.edit-plan/v1)을 all-or-nothing으로 실행합니다.
+
+    plan.steps는 기존 바이트-스플라이스 op 이름 그대로(fill_cells·
+    apply_table_ops·apply_body_ops·paragraph_patch·recolor_runs_by_color·
+    strip_runs_by_color·strip_trailing_table_captions)를 지시합니다. 실행은
+    정적 선검증→전 체인 인메모리→최종 open-safety 검증→단 1회 원자 쓰기 —
+    중간 step 실패 시 output·source는 바이트 불변이고 ok=false 리포트
+    (failedStepId·step error)가 돌아옵니다. dry_run=true는 동일 체인을 전부
+    실행하되 쓰기만 생략합니다(미리보기=실행 정의상 동일). 반환은
+    hwpx.plan-report/v1(step별+원본→최종 mutation-report/v1 실측 사영 포함).
+    스키마는 hwpx://schemas/edit-plan-v1 리소스로 구독 가능합니다."""
+
+    resolved = dict(plan) if plan else {}
+    for key in ("source", "output", "journalPath"):
+        value = resolved.get(key)
+        if isinstance(value, str) and value:
+            resolved[key] = resolve_path(value)
+    if not dry_run:
+        quality_contract.assert_write_capability()
+    return RUNTIME_SERVICES.ops.run_edit_plan(resolved, dry_run=dry_run)
+
+
 def apply_table_ops(
     filename: str,
     ops: list[TableOperation],

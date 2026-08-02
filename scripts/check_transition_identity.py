@@ -486,27 +486,27 @@ def main() -> int:
             == {
                 "pythonHwpx": "5.5.0",
                 "primaryDistribution": "python-hwpx-automation",
-                "primaryApplication": "6.4.2",
-                "plugin": "1.4.1",
-                "contractHash": "dbdbdfaac26148b7",
+                "primaryApplication": "6.5.1",
+                "plugin": "1.5.0",
+                "contractHash": "f61d2c60c0aa0413",
             },
-            "candidate manifest does not preserve the observed public 5.5.0/6.4.2/1.4.1 truth",
+            "candidate manifest does not preserve the observed public 5.5.0/6.5.1/1.5.0 truth",
             errors,
         )
     if status == "unreleased-candidate":
         _require(
             "<!-- release-state: unreleased-candidate -->" in readme
-            and "아직 공개되지 않은 6.5.1 후보" in readme
-            and "python-hwpx 5.5.0 → python-hwpx-automation 6.4.2 → hwpx-plugin 1.4.1"
+            and "아직 공개되지 않은 6.6.0 후보" in readme
+            and "python-hwpx 5.5.0 → python-hwpx-automation 6.5.1 → hwpx-plugin 1.5.0"
             in readme,
             "README does not prominently distinguish candidate from public release",
             errors,
         )
         _require(
-            "아직 공개되지 않은 6.5.1 source candidate" in use_cases
-            and "`python-hwpx >= 5.5.0`" in use_cases
-            and "`dbdbdfaac26148b7`" in use_cases
-            and "`f61d2c60c0aa0413`" in use_cases,
+            "아직 공개되지 않은 6.6.0 source candidate" in use_cases
+            and "`python-hwpx >= 5.6.0`" in use_cases
+            and "`f61d2c60c0aa0413`" in use_cases
+            and "`420c194e4ae17b85`" in use_cases,
             "use-cases guide does not separate candidate and current-public coordinates",
             errors,
         )
@@ -683,7 +683,7 @@ def main() -> int:
         and "Observe automation GitHub Release and record plugin handoff"
         in release_workflow
         and "The global state remains" in release_workflow
-        and "release-approved and currentPublic remains 5.5.0/6.4.2/1.4.1"
+        and "release-approved and currentPublic remains 5.5.0/6.5.1/1.5.0"
         in release_workflow
         and "plugin GitHub Release, marketplace entry, and a real marketplace"
         in release_workflow,

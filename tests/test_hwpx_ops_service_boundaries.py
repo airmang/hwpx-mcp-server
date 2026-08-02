@@ -116,6 +116,7 @@ OWNER_METHODS = {
         "add_form_field",
         "fill_form_field",
         "apply_table_ops",
+        "run_edit_plan",
         "verify_form_fill",
         "score_form_fill",
         "apply_body_ops",
@@ -234,9 +235,9 @@ def test_facade_has_one_explicit_delegate_for_every_baselined_method() -> None:
     }
 
     assert len(OWNER_METHODS) == 12
-    assert len(owned) == 125
+    assert len(owned) == 126
     assert set(methods) == {"__init__", *owned}
-    assert sum(not name.startswith("_") for name in methods) == 84
+    assert sum(not name.startswith("_") for name in methods) == 85
 
     for method_name, owner in owned.items():
         expression = _single_return_expression(methods[method_name])

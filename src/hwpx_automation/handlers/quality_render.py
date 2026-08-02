@@ -258,6 +258,17 @@ def describe_capabilities(domain: str | None = None) -> dict:
         advanced=advanced,
         registry_validation=validation,
     )
+    # additive(6.6): core 자기서술·오라클 가용성·리소스 카탈로그를 합성한다 —
+    # 자기서술 도구를 둘로 쪼개지 않는다(진실 이원화 방지).
+    from ..capabilities import core_self_description, render_oracle_availability
+    from ..resources import CANONICAL_RESOURCES
+
+    report["core"] = core_self_description()
+    report["renderOracle"] = render_oracle_availability()
+    report["resources"] = [
+        {"uri": spec.uri, "name": spec.name, "mimeType": spec.mime_type}
+        for spec in CANONICAL_RESOURCES
+    ]
     return report
 
 

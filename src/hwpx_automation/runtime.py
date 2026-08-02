@@ -290,6 +290,9 @@ def _compose_runtime(*, advanced: bool, replace: bool) -> tuple[FastMCP, Any]:
         )
     configure_runtime(composed, __version__, _strict_call_tool_handler)
     registry = register_fastmcp_tools(composed, TOOL_BINDINGS, advanced=advanced)
+    from .resources import register_canonical_resources
+
+    register_canonical_resources(composed)
     RUNTIME_SERVICES.install_registry(registry)
     return composed, registry
 

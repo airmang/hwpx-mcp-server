@@ -616,6 +616,32 @@ def register_canonical_tool(
     return _register(mcp, name=name, func=func, description=description, meta=meta)
 
 
+def register_canonical_resource(
+    mcp: Any,
+    *,
+    uri: str,
+    name: str,
+    description: str,
+    mime_type: str,
+    func: Callable[[], str],
+) -> None:
+    """Register one canonical read-only resource through the public SDK hook.
+
+    이 어댑터가 유일한 FastMCP 호환 seam이라는 계약(모듈 docstring)은 리소스
+    표면에도 그대로 적용된다 — 다른 모듈은 이 함수를 부르지, SDK의
+    ``resource`` 데코레이터를 직접 만지지 않는다.
+    """
+
+    try:
+        mcp.resource(uri, name=name, description=description, mime_type=mime_type)(
+            func
+        )
+    except Exception as exc:  # pragma: no cover - SDK 계약 위반은 등록 시점 하드 실패
+        raise FastMcpAdapterError(
+            f"failed to register canonical resource {uri!r}: {exc}"
+        ) from exc
+
+
 def snapshot_runtime_tools(mcp: Any) -> Mapping[str, FastMcpToolSnapshot]:
     """Return an insertion-ordered, read-only snapshot of the live registry."""
 

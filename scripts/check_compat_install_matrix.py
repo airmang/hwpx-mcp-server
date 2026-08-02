@@ -479,7 +479,7 @@ public_modules = json.loads(
     )
 )
 base_modules = public_modules["basePublicModules"]
-assert len(base_modules) == public_modules["basePublicModuleCount"] == 174
+assert len(base_modules) == public_modules["basePublicModuleCount"] == 175
 assert hashlib.sha256(
     ("\\n".join(sorted(base_modules)) + "\\n").encode()
 ).hexdigest() == public_modules["basePublicModuleSha256"]

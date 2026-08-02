@@ -151,6 +151,32 @@ class FormFieldService:
             result, document, resolved, dry_run=dry_run
         )
 
+    def run_edit_plan(
+        self,
+        plan: dict[str, Any],
+        *,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """선언적 편집 계획(hwpx.edit-plan/v1)을 core 실행기로 위임한다.
+
+        원자성(전 step 성공+최종 검증 후 단 1회 쓰기, 실패 시 무접촉)은 core
+        `hwpx.plan`이 소유한다 — 여기서는 typed 오류 어휘로만 감싼다. 실행
+        실패는 예외가 아니라 ok=False 리포트로 돌아온다(failedStepId 참조).
+        """
+
+        from hwpx.plan import PlanValidationError, apply_edit_plan
+
+        try:
+            report = apply_edit_plan(plan, dry_run=dry_run)
+        except PlanValidationError as exc:
+            raise self._context._new_error(
+                "EDIT_PLAN_INVALID",
+                exc.message,
+                details=exc.to_dict(),
+                hint=exc.suggestion,
+            ) from exc
+        return report.to_dict()
+
     def apply_table_ops(
         self,
         path: str,
