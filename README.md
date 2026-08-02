@@ -14,7 +14,7 @@
 
 <!-- release-state: release-approved -->
 > [!NOTE]
-> 이 소스 트리는 **아직 공개되지 않은 6.6.3 후보**입니다(에이전트 계약 표면:
+> 이 소스 트리는 **아직 공개되지 않은 6.6.4 후보**입니다(에이전트 계약 표면:
 > `run_edit_plan` 선언적 편집 계획 실행기 + MCP resources +
 > `describe_capabilities` 확장, 134 도구, core 바닥 5.6.0). 현재 공개
 > 트레인은 여전히 `python-hwpx 5.5.0 → python-hwpx-automation 6.5.1 → hwpx-plugin 1.5.0`

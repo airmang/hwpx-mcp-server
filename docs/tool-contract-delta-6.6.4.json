@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "hwpx.tool-contract-delta.v2",
+  "release": "6.6.4",
+  "changeKind": "additive-tool",
+  "releaseStatus": "unreleased-candidate",
+  "note": "6.6.4 candidate receipt (v6.6.3 is also a preserved failed tag — the minimum-Python clean-wheel gate still pinned the python_hwpx-5.5.0 wheel filename; every scripts/ train literal is now audited in one sweep and both gate scripts run locally before tagging.) 6.6.3 candidate receipt (v6.6.2 is also a preserved failed tag — the compat matrix's embedded exact-version probes still asserted 6.5.1; they are advanced and the full matrix now runs locally before tagging.) 6.6.2 candidate receipt (v6.6.1 is also a preserved failed tag — nothing was published; a locally generated .compat-core-wheel/python_hwpx-5.5.0 wheel had been committed by mistake, so the CI checkout's wheel directory shadowed the freshly wheeled 5.6.0 core; the artifact is removed and the directory is now ignored.) 6.6.1 candidate receipt (v6.6.0 is a preserved failed tag — nothing was published; the release workflow's frozen public-core observation step still asserted python-hwpx 5.5.0 while this train's observed public core is 5.6.0). Agent contract surface train. One new public tool: run_edit_plan executes a declarative multi-op edit plan (hwpx.edit-plan/v1) through the new core hwpx.plan engine — static pre-validation, whole-chain in-memory execution over the existing byte-splice op vocabulary, final open-safety verification, then exactly one atomic write; any mid-step failure leaves output and source byte-identical and returns an ok=false hwpx.plan-report/v1 with per-step and source-to-final measured mutation-report/v1 projections. The same train adds the first MCP resources surface (contract documents bundled by core: support-matrix, recipes-traversal, mutation-semantics, known-traps; live-built JSON Schemas: edit-plan, plan-report, mutation-report, capabilities; and the automation tool-contract payload) registered through the fastmcp adapter seam, and extends describe_capabilities additively with the core self-description block (hwpx.capabilities/v1), a probe-only render-oracle availability block and the resource catalogue. The core floor moves to 5.6.0 (hwpx.plan / hwpx.capabilities train).",
+  "baseline": {
+    "versions": {
+      "pythonHwpx": "5.5.0",
+      "automation": "6.5.1",
+      "skill": "1.5.0"
+    },
+    "defaultToolCount": 125,
+    "advancedToolCount": 133,
+    "skillRequiredToolCount": 28,
+    "classificationCounts": {
+      "public": 116,
+      "compatibility": 6,
+      "advanced": 8,
+      "deprecated": 3,
+      "internal": 4
+    },
+    "contractHash": "f61d2c60c0aa0413"
+  },
+  "target": {
+    "versions": {
+      "pythonHwpx": "5.6.0",
+      "automation": "6.6.4",
+      "skill": "1.6.0"
+    },
+    "defaultToolCount": 126,
+    "advancedToolCount": 134,
+    "skillRequiredToolCount": 29,
+    "classificationCounts": {
+      "public": 117,
+      "compatibility": 6,
+      "advanced": 8,
+      "deprecated": 3,
+      "internal": 4
+    },
+    "contractHash": "19898dba41495c47"
+  },
+  "delta": {
+    "defaultToolCount": 1,
+    "advancedToolCount": 1,
+    "skillRequiredToolCount": 1,
+    "removedTools": [],
+    "addedTools": [
+      "run_edit_plan"
+    ],
+    "promotedTools": [],
+    "profileMoves": []
+  },
+  "changedTools": [
+    {
+      "name": "run_edit_plan",
+      "domain": "form_fill",
+      "classification": "public",
+      "profile": "default",
+      "mutates": true,
+      "skillRequired": true,
+      "changedFields": [
+        "added"
+      ]
+    }
+  ]
+}

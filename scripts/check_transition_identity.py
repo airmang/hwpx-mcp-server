@@ -496,14 +496,14 @@ def main() -> int:
     if status == "unreleased-candidate":
         _require(
             "<!-- release-state: unreleased-candidate -->" in readme
-            and "아직 공개되지 않은 6.6.3 후보" in readme
+            and "아직 공개되지 않은 6.6.4 후보" in readme
             and "python-hwpx 5.5.0 → python-hwpx-automation 6.5.1 → hwpx-plugin 1.5.0"
             in readme,
             "README does not prominently distinguish candidate from public release",
             errors,
         )
         _require(
-            "아직 공개되지 않은 6.6.3 source candidate" in use_cases
+            "아직 공개되지 않은 6.6.4 source candidate" in use_cases
             and "`python-hwpx >= 5.6.0`" in use_cases
             and "`f61d2c60c0aa0413`" in use_cases
             and "`19898dba41495c47`" in use_cases,
