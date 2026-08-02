@@ -1894,6 +1894,7 @@ def _normalize_block(raw_block: Any, *, index: int) -> DocumentBlock:
             "caption": caption,
             "columns": columns,
             "rows": rows,
+            **_plan_table_header_extras(raw_block),
         }
         if unit:
             table_data["unit"] = unit
@@ -2268,9 +2269,14 @@ def _block_to_builder_nodes(block: DocumentBlock) -> tuple[Any, ...]:
         caption = str(block.data.get("caption") or "").strip()
         if caption:
             nodes.append(BuilderParagraph(text=caption, style="heading"))
+        show_header = block.data.get("showHeader") is not False
         nodes.append(
             BuilderTable(
-                header=tuple(str(column["label"]) for column in columns),
+                header=(
+                    tuple(str(column["label"]) for column in columns)
+                    if show_header
+                    else ()
+                ),
                 rows=tuple(
                     tuple(str(row.get(column["key"], "")) for column in columns)
                     for row in rows
@@ -2308,6 +2314,14 @@ def _plan_table_column_widths(columns: list[dict[str, Any]]) -> list[int]:
     if widths:
         widths[-1] += _DEFAULT_TABLE_WIDTH - sum(widths)
     return widths
+
+
+def _plan_table_header_extras(raw_block: Mapping[str, Any]) -> dict[str, Any]:
+    """Carry the additive header-suppression flag (section chips, title bands)."""
+
+    if raw_block.get("showHeader") is False:
+        return {"showHeader": False}
+    return {}
 
 
 def _normalize_columns(value: Any, *, index: int) -> list[dict[str, Any]]:
@@ -2578,7 +2592,9 @@ def _add_builder_table(
     table_node: BuilderTable,
     tokens: Mapping[str, str],
 ) -> None:
-    rows = [list(table_node.header), *(list(row) for row in table_node.rows)]
+    rows = (
+        [list(table_node.header)] if table_node.header else []
+    ) + [list(row) for row in table_node.rows]
     if not rows:
         raise ValueError("table must contain a header or at least one row")
     column_count = max(len(row) for row in rows)

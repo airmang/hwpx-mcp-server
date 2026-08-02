@@ -165,11 +165,18 @@ def _place_subtree(
     leaves = _leaf_count(node)
     box_row = level * 3
     center = _center_edge(leaf_offset, leaves)
+    subtree_first = leaf_offset * 3
+    subtree_last = (leaf_offset + leaves - 1) * 3 + 1
+    if node.children and leaves > 1:
+        col_start = max(center - 1, subtree_first)
+        col_end = min(center + 2, subtree_last)
+    else:
+        col_start, col_end = center, center + 1
     spec.boxes.append(
         _Box(
             row=box_row,
-            col_start=center,
-            col_end=center + 1,
+            col_start=col_start,
+            col_end=col_end,
             text=_box_text(node),
             fill_color=accent_color if level == 0 else None,
         )

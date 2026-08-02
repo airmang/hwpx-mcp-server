@@ -116,9 +116,10 @@ class TestGenreGrammarAndChip:
         result = server.compose_section_chip("Ⅰ", "추진 배경", accent_color="#1F4E79")
         block = result["block"]
         assert block["type"] == "table"
-        assert block["rows"] == [["Ⅰ", "", "추진 배경"]]
-        assert block["metadata"]["generator"] == "section_chip"
-        assert block["metadata"]["accentColor"] == "#1F4E79"
+        assert block["showHeader"] is False
+        assert [column["key"] for column in block["columns"]] == ["number", "gap", "title"]
+        assert block["rows"] == [{"number": "Ⅰ", "gap": "", "title": "추진 배경"}]
+        assert result["styling"]["accentColor"] == "#1F4E79"
 
     def test_section_chip_inline_and_style_refusal(self) -> None:
         inline = server.compose_section_chip("1", "현황", style="inline")

@@ -70,8 +70,10 @@ def test_font_resolution_is_data_only() -> None:
 def test_section_chip_composes_generic_blocks() -> None:
     boxed = house_style.compose_section_chip("Ⅰ", "근거", accent_color="#3366CC")
     assert boxed["type"] == "table"
-    assert boxed["rows"] == [["Ⅰ", "", "근거"]]
-    assert boxed["metadata"]["accentColor"] == "#3366CC"
+    # 실제 document_plan v1 표 어휘(columns 객체 + rows 매핑, 헤더 억제)로 lower된다.
+    assert boxed["showHeader"] is False
+    assert [column["key"] for column in boxed["columns"]] == ["number", "gap", "title"]
+    assert boxed["rows"] == [{"number": "Ⅰ", "gap": "", "title": "근거"}]
 
     inline = house_style.compose_section_chip("1", "추진 목적", style="inline")
     assert inline["type"] == "heading"

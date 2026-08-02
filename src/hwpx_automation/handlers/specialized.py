@@ -261,7 +261,16 @@ def compose_section_chip(
     block = compose_house_section_chip(
         number, title, style=chip_style, accent_color=accent_color
     )
-    return {"block": block, "next_tool": "validate_document_plan"}
+    result: dict = {"block": block, "next_tool": "validate_document_plan"}
+    if style == "box" and accent_color:
+        result["styling"] = {
+            "accentColor": accent_color,
+            "how": (
+                "문서 생성 후 이 칩 표의 번호 셀에 "
+                "format_table(fill_color=accentColor, row=0, col=0)을 적용"
+            ),
+        }
+    return result
 
 
 def get_genre_grammar(genre: str) -> dict:

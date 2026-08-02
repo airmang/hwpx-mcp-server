@@ -126,8 +126,64 @@ class _BuilderPreset:
         return default_chars[level % len(default_chars)]
 
 
+def _genre_preset(genre: str) -> "_BuilderPreset":
+    """Preset driven by the house-style bank — no literal typography here."""
+
+    from ...house_style import load_bank, load_genres
+
+    catalog = load_genres()
+    genres = catalog.genres if hasattr(catalog, "genres") else {}
+    if genre not in genres:
+        raise ValueError(f"unknown genre preset: {genre!r}")
+    entry = genres[genre]
+    payload = entry if isinstance(entry, dict) else entry.model_dump()
+    typography = payload.get("typography") or {}
+    inherits = str(typography.get("inherits") or "")
+    bank = load_bank()
+    profiles = bank.profiles if hasattr(bank, "profiles") else {}
+    base = profiles.get(inherits) if inherits else None
+    base_payload = base if isinstance(base, dict) or base is None else base.model_dump()
+    return _GenreBankPreset(
+        name=f"genre:{genre}",
+        roles={**((base_payload or {}).get("roles") or {}), **(typography.get("roles") or {})},
+    )
+
+
+@dataclass(frozen=True)
+class _GenreBankPreset(_BuilderPreset):
+    """Typography sourced from the packaged bank/genre data."""
+
+    roles: Mapping[str, Any] = field(default_factory=dict)
+
+    def _role(self, *names: str) -> Mapping[str, Any]:
+        for name in names:
+            value = self.roles.get(name)
+            if isinstance(value, Mapping):
+                return value
+        return {}
+
+    def heading_style(self, level: int) -> dict[str, Any]:
+        role = self._role("section_header", "section_chip_title", "title")
+        return {
+            "bold": True,
+            "size": int(role.get("sizePt") or (16 - (level - 1) * 2)),
+            "font": str(role.get("font") or "함초롬바탕"),
+        }
+
+    def run_style(self, run: "Run") -> dict[str, Any]:
+        styles = super().run_style(run)
+        body = self._role("body")
+        if styles.get("font") is None and body.get("font"):
+            styles["font"] = str(body["font"])
+        if styles.get("size") is None and body.get("sizePt"):
+            styles["size"] = int(body["sizePt"])
+        return styles
+
+
 def _builder_preset(value: str | None) -> _BuilderPreset:
     normalized = (value or "default").strip().lower().replace("-", "_")
+    if normalized.startswith("genre:"):
+        return _genre_preset(normalized.split(":", 1)[1])
     if normalized in {"", "default", "standard", "standard_korean_business"}:
         return _BuilderPreset()
     if normalized in {"government_report", "gov_report", "공문보고서"}:

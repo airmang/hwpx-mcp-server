@@ -26,25 +26,23 @@ class SectionChipPlan(BaseModel):
         return normalized
 
     def to_document_plan_block(self) -> dict[str, Any]:
-        metadata: dict[str, Any] = {
-            "generator": "section_chip",
-            "style": self.style,
-            "number": self.number,
-        }
-        if self.accent_color:
-            metadata["accentColor"] = self.accent_color
         if self.style == "inline":
             return {
                 "type": "heading",
                 "level": 1,
                 "text": f"{self.number} {self.title}",
-                "metadata": metadata,
             }
         return {
             "type": "table",
-            "rows": [[self.number, "", self.title]],
-            "columnWidths": [1, 0.4, 11],
-            "metadata": metadata,
+            "showHeader": False,
+            "columns": [
+                {"key": "number", "label": "번호", "widthWeight": 2},
+                {"key": "gap", "label": "여백", "widthWeight": 1},
+                {"key": "title", "label": "제목", "widthWeight": 15},
+            ],
+            "rows": [
+                {"number": self.number, "gap": "", "title": self.title}
+            ],
         }
 
 
