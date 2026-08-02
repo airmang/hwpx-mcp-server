@@ -80,13 +80,13 @@ jobs:
         run: |
           python - <<'PY'
           from importlib.metadata import version
-          assert version("python-hwpx") == "5.5.0"
+          assert version("python-hwpx") == "5.6.0"
           PY
-          gh release view v5.5.0 \
+          gh release view v5.6.0 \
             --repo airmang/python-hwpx \
             --json tagName,isDraft,isPrerelease \
-            --jq 'select(.tagName == "v5.5.0" and (.isDraft | not) and (.isPrerelease | not)) | .tagName' \
-            | grep -Fx v5.5.0
+            --jq 'select(.tagName == "v5.6.0" and (.isDraft | not) and (.isPrerelease | not)) | .tagName' \
+            | grep -Fx v5.6.0
       - name: Check public repository hygiene
         working-directory: python-hwpx-automation
         run: |
@@ -131,7 +131,7 @@ jobs:
           mkdir -p .minimum-core-wheel
           python -m pip wheel --no-deps --wheel-dir .minimum-core-wheel \
             "python-hwpx==5.6.0"
-          CORE_WHEEL=$(find .minimum-core-wheel -name 'python_hwpx-5.5.0-*.whl' -print -quit)
+          CORE_WHEEL=$(find .minimum-core-wheel -name 'python_hwpx-5.6.0-*.whl' -print -quit)
           test -n "${CORE_WHEEL}"
           python scripts/check_platform_optional_smoke.py \
             --core-wheel "${CORE_WHEEL}"
