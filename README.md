@@ -12,15 +12,12 @@
   </p>
 </p>
 
-<!-- release-state: release-approved -->
+<!-- release-state: released -->
 > [!NOTE]
-> 이 저장소의 main은 아직 공개되지 않은 6.5.1 후보 — release-approved 상태(운영계획 장르 저작 —
-> 표-기반 박스 조직도 `add_boxed_org_chart`·섹션칩 `compose_section_chip`·
-> 장르 문법 `get_genre_grammar`, 계약 `f61d2c60c0aa0413`, 133 도구)입니다.
-> 현재 공개 트레인은
-> `python-hwpx 5.5.0 → python-hwpx-automation 6.4.2 → hwpx-plugin 1.4.1`
-> (계약 `dbdbdfaac26148b7`, 2026-08-02 released)입니다. 공개 트레인은
-> core·automation PyPI와 plugin GitHub
+> 현재 공개 트레인은 `python-hwpx 5.5.0 → python-hwpx-automation 6.5.1 →
+> hwpx-plugin 1.5.0`(계약 `f61d2c60c0aa0413`, 2026-08-02 released —
+> 운영계획 장르 저작: 박스 조직도·섹션칩·장르 문법, 133 도구)입니다.
+> 공개 트레인은 core·automation PyPI와 plugin GitHub
 > Release·marketplace·실제 marketplace 설치까지 확인한 뒤 승격했으며, 기존
 > 5.x 설치는 별도 발행된 `hwpx-mcp-server 5.1.1`이 보호합니다. 절차와 상태
 > 머신: [릴리스 runbook](docs/release-runbook.md)

@@ -155,7 +155,7 @@ def test_installed_identity_contract_is_machine_readable() -> None:
         assert release["currentPublic"] == {
             "pythonHwpx": "5.5.0",
             "primaryDistribution": "python-hwpx-automation",
-            "primaryApplication": "6.5.0",
+            "primaryApplication": "6.5.1",
             "plugin": "1.5.0",
             "contractHash": "f61d2c60c0aa0413",
         }
