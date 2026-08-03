@@ -29,7 +29,7 @@ def test_packaged_bank_loads_as_typed_deterministic_data() -> None:
 def test_packaged_genre_inherits_profile_roles() -> None:
     catalog = house_style.load_genres()
     assert catalog.schema_version == house_style.GENRES_SCHEMA_VERSION
-    assert house_style.list_genres() == ["operating_plan"]
+    assert house_style.list_genres() == ["official_draft", "operating_plan", "simple_draft"]
     grammar = house_style.get_genre("operating_plan").grammar
     assert grammar["blockTypes"]["section_chip"]["required"] is True
     assert grammar["blockTypes"]["org_chart"]["required"] is False

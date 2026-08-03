@@ -65,7 +65,7 @@ def test_production_handler_is_bound_to_automation_owner() -> None:
 
 
 def test_tool_contract_is_exactly_unchanged() -> None:
-    assert len(expected_tool_names(advanced=False)) == 126
-    assert len(expected_tool_names(advanced=True)) == 134
+    assert len(expected_tool_names(advanced=False)) == 128
+    assert len(expected_tool_names(advanced=True)) == 136
     assert len(skill_required_tool_names()) == 29
-    assert contract_hash() == "19898dba41495c47"
+    assert contract_hash() == "98510af22d13899c"

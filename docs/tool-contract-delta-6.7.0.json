@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "hwpx.tool-contract-delta.v2",
+  "release": "6.7.0",
+  "changeKind": "additive-tool",
+  "releaseStatus": "unreleased-candidate",
+  "note": "6.7.0 candidate receipt. Form-object and official-draft genre train. Two new public tools compose the Korean government draft forms (별지 제1호서식 일반기안문 / 제2호서식 간이기안문) into generic document-plan blocks from the regulation's public structure (clean-room): compose_official_draft and compose_simple_draft. Three regulation-derived contracts are enforced by the composition itself — the approval table has exactly as many cells as signing approvers (시행규칙 제7조제4항), the 결문 label vocabulary is not printed (별지 제1호서식 비고), and selection items use the [ ] + check convention rather than a check-box form object (별표 4 제10호). The core floor moves to 5.7.0 for the new check-box authoring primitives (add_check_box / list_check_boxes / set_check_box), whose emission shape was measured against real Hancom.",
+  "baseline": {
+    "versions": {
+      "pythonHwpx": "5.6.0",
+      "automation": "6.6.4",
+      "skill": "1.6.0"
+    },
+    "defaultToolCount": 126,
+    "advancedToolCount": 134,
+    "skillRequiredToolCount": 29,
+    "classificationCounts": {
+      "public": 117,
+      "compatibility": 6,
+      "advanced": 8,
+      "deprecated": 3,
+      "internal": 4
+    },
+    "contractHash": "19898dba41495c47"
+  },
+  "target": {
+    "versions": {
+      "pythonHwpx": "5.7.0",
+      "automation": "6.7.0",
+      "skill": "1.7.0"
+    },
+    "defaultToolCount": 128,
+    "advancedToolCount": 136,
+    "skillRequiredToolCount": 29,
+    "classificationCounts": {
+      "public": 119,
+      "compatibility": 6,
+      "advanced": 8,
+      "deprecated": 3,
+      "internal": 4
+    },
+    "contractHash": "98510af22d13899c"
+  },
+  "delta": {
+    "defaultToolCount": 2,
+    "advancedToolCount": 2,
+    "skillRequiredToolCount": 0,
+    "removedTools": [],
+    "addedTools": [
+      "compose_official_draft",
+      "compose_simple_draft"
+    ],
+    "promotedTools": [],
+    "profileMoves": []
+  },
+  "changedTools": [
+    {
+      "name": "compose_official_draft",
+      "domain": "generators",
+      "classification": "public",
+      "profile": "default",
+      "mutates": false,
+      "skillRequired": false,
+      "changedFields": [
+        "added"
+      ]
+    },
+    {
+      "name": "compose_simple_draft",
+      "domain": "generators",
+      "classification": "public",
+      "profile": "default",
+      "mutates": false,
+      "skillRequired": false,
+      "changedFields": [
+        "added"
+      ]
+    }
+  ]
+}

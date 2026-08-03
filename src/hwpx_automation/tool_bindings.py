@@ -127,6 +127,8 @@ def _build_tool_bindings() -> Mapping[str, Callable[..., Any]]:
         "mail_merge": specialized.mail_merge,
         "add_boxed_org_chart": specialized.add_boxed_org_chart,
         "compose_section_chip": specialized.compose_section_chip,
+        "compose_official_draft": specialized.compose_official_draft,
+        "compose_simple_draft": specialized.compose_simple_draft,
         "get_genre_grammar": specialized.get_genre_grammar,
         "inspect_mail_merge_placeholders": specialized.inspect_mail_merge_placeholders,
         "build_image_grid": specialized.build_image_grid,

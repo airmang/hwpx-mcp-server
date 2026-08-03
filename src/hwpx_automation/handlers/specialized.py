@@ -27,6 +27,12 @@ from ..office.house_style import load_bank, load_genres
 from ..office.house_style.composition import (
     compose_section_chip as compose_house_section_chip,
 )
+from ..office.house_style.gianmun import (
+    HIDDEN_LABELS as HOUSE_HIDDEN_LABELS,
+    SHOWN_LABELS as HOUSE_SHOWN_LABELS,
+    compose_official_draft as compose_house_official_draft,
+    compose_simple_draft as compose_house_simple_draft,
+)
 from ..office.house_style.org_chart import lower_boxed_org_chart
 from ..office.document_ops import (
     build_mail_merge as build_hwpx_mail_merge,
@@ -244,6 +250,48 @@ def add_boxed_org_chart(
         return _with_dry_run_verification(result, doc, path)
     verification = _save_doc_verification(doc, path)
     return _with_save_verification(result, verification)
+
+
+def compose_official_draft(plan: dict) -> dict:
+    """일반기안문(별지 제1호서식)을 범용 document_plan block으로 합성합니다.
+
+    「행정업무의 운영 및 혁신에 관한 규정 시행규칙」 별지 제1호서식의 공개
+    구조를 두문/본문/결문 순서로 낮춥니다. 파일은 쓰지 않습니다 — 반환 blocks를
+    document_plan에 넣어 create_document_from_plan으로 생성하십시오.
+
+    규정에서 오는 계약 3가지: ①결재란 칸 수는 approvers 목록 길이입니다
+    (규칙 제7조제4항 — 서명·전결 표시를 하지 않는 사람의 서명란은 만들지
+    않습니다). ②행정기관명·발신명·기안자/검토자/결재권자·직위(직급) 서명·
+    주소·공개 구분 등의 용어(라벨)는 인쇄하지 않고 값만 적습니다(서식 비고).
+    ③선택 항목에 체크박스 개체를 쓰지 않습니다 — 별표 4 제10호가 `[  ]`+√
+    텍스트를 규정합니다. 내부결재문서는 internal_only=true로 발신명의를
+    생략합니다."""
+    blocks = compose_house_official_draft(plan)
+    return {
+        "blocks": blocks,
+        "genre": "official_draft",
+        "next_tool": "validate_document_plan",
+        "labelPolicy": {
+            "hidden": list(HOUSE_HIDDEN_LABELS),
+            "shown": list(HOUSE_SHOWN_LABELS),
+        },
+    }
+
+
+def compose_simple_draft(plan: dict) -> dict:
+    """간이기안문(별지 제2호서식)을 범용 document_plan block으로 합성합니다.
+
+    보고서·계획서·검토서 등 발신할 필요가 없는 **내부결재문서 전용**입니다
+    (규칙 제3조제3항 — 시행문으로 변환할 수 없습니다). 일반기안문과 달리
+    두문·발신명의·시행/접수·주소가 없고, 문서등록 블록과 결재란이 상단에,
+    제목·(선택)요약설명문·작성일·작성기관이 그 아래 중앙에 옵니다. 결재란 칸
+    수는 approvers 목록 길이입니다(규칙 제7조제4항)."""
+    blocks = compose_house_simple_draft(plan)
+    return {
+        "blocks": blocks,
+        "genre": "simple_draft",
+        "next_tool": "validate_document_plan",
+    }
 
 
 def compose_section_chip(

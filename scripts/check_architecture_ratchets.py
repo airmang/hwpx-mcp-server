@@ -51,7 +51,7 @@ EXPECTED_SERVICE_LINES = {
 EXPECTED_FACADE_LINES = {
     "hwpx_ops.py": 1526,
     # S-108: shared identity/config helpers replaced duplicated MCP-era parsing.
-    "server.py": 266,
+    "server.py": 268,
 }
 
 PRIVATE_ATTRIBUTES = ("_mcp_server", "_tool_manager", "_tools")

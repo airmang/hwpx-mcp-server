@@ -121,13 +121,13 @@ def test_installed_identity_contract_is_machine_readable() -> None:
         "released",
     }
     assert release["candidate"] == {
-        "pythonHwpx": "5.6.0",
+        "pythonHwpx": "5.7.0",
         "canonicalDistribution": "python-hwpx-automation",
-        "canonicalAutomation": "6.6.4",
+        "canonicalAutomation": "6.7.0",
         "compatibilityDistribution": "hwpx-mcp-server",
-        "compatibility": "6.6.4",
-        "plugin": "1.6.0",
-        "contractHash": "19898dba41495c47",
+        "compatibility": "6.7.0",
+        "plugin": "1.7.0",
+        "contractHash": "98510af22d13899c",
     }
     promotion_gate = release["promotionGate"]
     assert all(
@@ -145,19 +145,19 @@ def test_installed_identity_contract_is_machine_readable() -> None:
     )
     if release["status"] != "released":
         assert release["currentPublic"] == {
-            "pythonHwpx": "5.5.0",
-            "primaryDistribution": "python-hwpx-automation",
-            "primaryApplication": "6.5.1",
-            "plugin": "1.5.0",
-            "contractHash": "f61d2c60c0aa0413",
-        }
-    else:
-        assert release["currentPublic"] == {
             "pythonHwpx": "5.6.0",
             "primaryDistribution": "python-hwpx-automation",
             "primaryApplication": "6.6.4",
             "plugin": "1.6.0",
             "contractHash": "19898dba41495c47",
+        }
+    else:
+        assert release["currentPublic"] == {
+            "pythonHwpx": "5.7.0",
+            "primaryDistribution": "python-hwpx-automation",
+            "primaryApplication": "6.7.0",
+            "plugin": "1.7.0",
+            "contractHash": "98510af22d13899c",
         }
 
 

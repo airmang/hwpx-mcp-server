@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Mapping
 
-MIN_PYTHON_HWPX = "5.6.0"
+MIN_PYTHON_HWPX = "5.7.0"
 # The 5.0 train: core drops the workflow surfaces and the `hwpx` console name,
 # this package picks the name up, and the plugin pins both. The three move
 # together — a mixed set is what "no valid install has two declarers" rules out.
@@ -28,12 +28,12 @@ MIN_AUTOMATION_VERSION = "6.5.0"
 # Compatibility alias retained in the 6.x contract payload for existing health
 # and plugin consumers. New code and documentation use the automation name.
 MIN_MCP_VERSION = MIN_AUTOMATION_VERSION
-MIN_SKILL_VERSION = "1.6.0"
+MIN_SKILL_VERSION = "1.7.0"
 # Frozen release receipt for non-runtime services. Runtime construction still
 # recomputes and verifies the bound callable/schema contract through
 # ``contract_hash()``; this constant prevents those services from importing the
 # runtime composer merely to stamp the approved release receipt.
-RELEASED_CONTRACT_HASH = "19898dba41495c47"
+RELEASED_CONTRACT_HASH = "98510af22d13899c"
 
 
 def describe_callables(entries: Any) -> Any:
@@ -457,7 +457,7 @@ BASELINE_DOMAIN_SPECS: tuple[DomainSpec, ...] = (
     DomainSpec(
         "generators", "대량생산·특수 산출", "메일머지·사진대지·명패·조직도를 생성.",
         "반복 문서나 특수 레이아웃을 만들 때.",
-        ("mail_merge", "inspect_mail_merge_placeholders", "build_image_grid", "build_meeting_nameplates", "build_organization_chart", "add_boxed_org_chart", "compose_section_chip"),
+        ("mail_merge", "inspect_mail_merge_placeholders", "build_image_grid", "build_meeting_nameplates", "build_organization_chart", "add_boxed_org_chart", "compose_section_chip", "compose_official_draft", "compose_simple_draft"),
     ),
     DomainSpec("memo", "메모·주석", "검토 메모를 추가·삭제.", "문서에 코멘트를 달 때.", ("add_memo", "add_memo_by_anchor", "remove_memo")),
     DomainSpec(
@@ -594,18 +594,18 @@ def _validate_classification() -> None:
     counts = classification_counts()
     expected = {
         # 6.6: +1 public — run_edit_plan — 선언적 편집 계획 실행기.
-        ToolClassification.PUBLIC.value: 117,
+        ToolClassification.PUBLIC.value: 119,
         ToolClassification.COMPATIBILITY.value: 6,
         ToolClassification.ADVANCED.value: 8,
         ToolClassification.DEPRECATED.value: 3,
         ToolClassification.INTERNAL.value: 4,
     }
-    if len(BASELINE_TOOL_SPECS) != 138 or counts != expected:
+    if len(BASELINE_TOOL_SPECS) != 140 or counts != expected:
         raise RuntimeError(
-            f"138-tool classification must be disjoint and exhaustive: {counts!r} != {expected!r}"
+            f"140-tool classification must be disjoint and exhaustive: {counts!r} != {expected!r}"
         )
-    if len(TOOL_SPECS) != 134:
-        raise RuntimeError(f"installed advanced surface must contain 134 tools, got {len(TOOL_SPECS)}")
+    if len(TOOL_SPECS) != 136:
+        raise RuntimeError(f"installed advanced surface must contain 136 tools, got {len(TOOL_SPECS)}")
     if sum(spec.skill_required for spec in TOOL_SPECS) != 29:
         raise RuntimeError(
             "installed surface must contain exactly 29 skill-required tools"
