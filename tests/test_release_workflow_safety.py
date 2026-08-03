@@ -70,7 +70,7 @@ EXPECTED_RUN_SHA256 = {
     },
     "release": {
         "Validate tag/version consistency": (
-            "795158672de638d77c5dc30d56e48d03f25995c7a6cb4cb66aff21392b4c5e08"
+            "ddf61e73d9a81ff5d3b544934e90ff4bbdd05adc58b3ebd3c3f638b9fc410f81"
         ),
         "Extract latest changelog section for release notes": (
             "13596e1604f36a15a740b8f64332da6aab4e032740bf33a890aae4befadb5314"
@@ -447,3 +447,41 @@ def test_release_workflow_mutations_are_rejected(
     failures = _workflow_safety_failures(mutated)
 
     assert any(expected in failure for failure in failures), failures
+
+
+def test_frozen_current_public_gate_matches_identity_exactly() -> None:
+    """The release job's frozen currentPublic dict must equal identity's, field
+    for field.
+
+    This gate exists because a *partial* literal advance is silent until tag
+    time: three of the four version fields were updated for one train and
+    ``pythonHwpx`` was left pointing at the train before last, so the tag job
+    refused to publish after every earlier check had passed. Comparing the two
+    sources here moves that failure from "after the tag is pushed" to "in the
+    ordinary test run".
+    """
+
+    import json
+    import re
+
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+    identity = json.loads(
+        (ROOT / "src" / "hwpx_automation" / "identity.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    current_public = identity["releaseState"]["currentPublic"]
+
+    match = re.search(
+        r"if current != \{(?P<body>.*?)\n          \}:", workflow, re.DOTALL
+    )
+    assert match, "release.yml no longer pins a frozen currentPublic dict"
+    frozen = dict(
+        re.findall(r'"([A-Za-z]+)":\s*"([^"]+)"', match.group("body"))
+    )
+    assert frozen == current_public, (
+        "release.yml's frozen currentPublic gate drifted from identity.json — "
+        f"workflow={frozen} identity={current_public}"
+    )

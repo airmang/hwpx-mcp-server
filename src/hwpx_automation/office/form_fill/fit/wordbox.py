@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Word/glyph-box geometry oracle for form-fill verification (M2 / rhwp ⑨).
+"""Word/glyph-box geometry oracle for form-fill verification.
 
 The faithful renderer for HWPX is Hancom (Constitution IV); there is no free
 headless one. Rather than drive the Hancom GUI on every check, this module makes

@@ -14,7 +14,7 @@
 
 <!-- release-state: release-approved -->
 > [!NOTE]
-> 이 소스 트리는 **아직 공개되지 않은 6.7.0 후보**입니다(양식개체·기안문 장르:
+> 이 소스 트리는 **아직 공개되지 않은 6.7.1 후보**입니다(양식개체·기안문 장르:
 > 체크박스 저작 프리미티브와 `compose_official_draft`/`compose_simple_draft`,
 > 136 도구, core 바닥 5.7.0). 현재 공개 트레인은 여전히
 > `python-hwpx 5.6.0 → python-hwpx-automation 6.6.4 → hwpx-plugin 1.6.0`

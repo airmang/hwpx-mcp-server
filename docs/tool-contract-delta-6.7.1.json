@@ -1,9 +1,9 @@
 {
   "schemaVersion": "hwpx.tool-contract-delta.v2",
-  "release": "6.7.0",
+  "release": "6.7.1",
   "changeKind": "additive-tool",
   "releaseStatus": "unreleased-candidate",
-  "note": "6.7.0 candidate receipt. Form-object and official-draft genre train. Two new public tools compose the Korean government draft forms (별지 제1호서식 일반기안문 / 제2호서식 간이기안문) into generic document-plan blocks from the regulation's public structure (clean-room): compose_official_draft and compose_simple_draft. Three regulation-derived contracts are enforced by the composition itself — the approval table has exactly as many cells as signing approvers (시행규칙 제7조제4항), the 결문 label vocabulary is not printed (별지 제1호서식 비고), and selection items use the [ ] + check convention rather than a check-box form object (별표 4 제10호). The core floor moves to 5.7.0 for the new check-box authoring primitives (add_check_box / list_check_boxes / set_check_box), whose emission shape was measured against real Hancom.",
+  "note": "6.7.1 candidate receipt (v6.7.0 is a preserved failed tag — nothing was published; the release job's frozen currentPublic gate had only three of its four version literals advanced, leaving pythonHwpx at the train before last). 6.7.0 candidate receipt. Form-object and official-draft genre train. Two new public tools compose the Korean government draft forms (별지 제1호서식 일반기안문 / 제2호서식 간이기안문) into generic document-plan blocks from the regulation's public structure (clean-room): compose_official_draft and compose_simple_draft. Three regulation-derived contracts are enforced by the composition itself — the approval table has exactly as many cells as signing approvers (시행규칙 제7조제4항), the 결문 label vocabulary is not printed (별지 제1호서식 비고), and selection items use the [ ] + check convention rather than a check-box form object (별표 4 제10호). The core floor moves to 5.7.0 for the new check-box authoring primitives (add_check_box / list_check_boxes / set_check_box), whose emission shape was measured against real Hancom.",
   "baseline": {
     "versions": {
       "pythonHwpx": "5.6.0",
@@ -25,7 +25,7 @@
   "target": {
     "versions": {
       "pythonHwpx": "5.7.0",
-      "automation": "6.7.0",
+      "automation": "6.7.1",
       "skill": "1.7.0"
     },
     "defaultToolCount": 128,
