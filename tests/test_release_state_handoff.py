@@ -64,7 +64,7 @@ def test_phase0_legacy_cap_precedes_every_core_5_resolution() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
-    assert '"primaryApplication": "6.6.4"' in workflow
+    assert '"primaryApplication": "6.7.1"' in workflow
 
 
 def test_automation_release_hands_off_without_global_promotion() -> None:
@@ -93,7 +93,7 @@ def test_automation_release_hands_off_without_global_promotion() -> None:
     )
 
     handoff_run = str(steps[github_observed]["run"])
-    assert "release-approved and currentPublic remains 5.6.0/6.6.4/1.6.0" in handoff_run
+    assert "release-approved and currentPublic remains 5.7.0/6.7.1/1.7.0" in handoff_run
     assert "plugin GitHub Release, marketplace entry, and a real marketplace" in (
         handoff_run
     )
@@ -130,7 +130,7 @@ def test_identity_requires_complete_three_stack_remote_truth() -> None:
         "released",
     }
     if release["status"] != "released":
-        assert release["currentPublic"]["plugin"] == "1.6.0"
+        assert release["currentPublic"]["plugin"] == "1.7.0"
     else:
         assert release["currentPublic"]["plugin"] == release["candidate"]["plugin"]
     gate = release["promotionGate"]

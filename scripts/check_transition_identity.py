@@ -484,13 +484,13 @@ def main() -> int:
         _require(
             current_public
             == {
-                "pythonHwpx": "5.6.0",
+                "pythonHwpx": "5.7.0",
                 "primaryDistribution": "python-hwpx-automation",
-                "primaryApplication": "6.6.4",
-                "plugin": "1.6.0",
-                "contractHash": "19898dba41495c47",
+                "primaryApplication": "6.7.1",
+                "plugin": "1.7.0",
+                "contractHash": "98510af22d13899c",
             },
-            "candidate manifest does not preserve the observed public 5.6.0/6.6.4/1.6.0 truth",
+            "candidate manifest does not preserve the observed public 5.7.0/6.7.1/1.7.0 truth",
             errors,
         )
     if status == "unreleased-candidate":
@@ -683,7 +683,7 @@ def main() -> int:
         and "Observe automation GitHub Release and record plugin handoff"
         in release_workflow
         and "The global state remains" in release_workflow
-        and "release-approved and currentPublic remains 5.6.0/6.6.4/1.6.0"
+        and "release-approved and currentPublic remains 5.7.0/6.7.1/1.7.0"
         in release_workflow
         and "plugin GitHub Release, marketplace entry, and a real marketplace"
         in release_workflow,

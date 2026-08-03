@@ -70,7 +70,7 @@ EXPECTED_RUN_SHA256 = {
     },
     "release": {
         "Validate tag/version consistency": (
-            "ddf61e73d9a81ff5d3b544934e90ff4bbdd05adc58b3ebd3c3f638b9fc410f81"
+            "4296b167a4ba6ec16aeeff983a9426d628049ab4bcfcda245edf2643a70d9dae"
         ),
         "Extract latest changelog section for release notes": (
             "13596e1604f36a15a740b8f64332da6aab4e032740bf33a890aae4befadb5314"
@@ -100,7 +100,7 @@ EXPECTED_RUN_SHA256 = {
             "c758216698c1c22d1a9706eca43e21d12825dcc61f24b6a6a7776b3c6cffbdaa"
         ),
         "Observe automation GitHub Release and record plugin handoff": (
-            "7dce6c581469e279e0044463c11b52b63d96512ee3ec3737a51a589000afbf2a"
+            "a0025d784d9fc68fd5dc8ab5ee343823a6ccb317b11f47fce74e19ffdf9ecf7a"
         ),
     },
 }

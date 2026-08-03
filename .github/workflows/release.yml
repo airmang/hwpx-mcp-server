@@ -244,11 +244,11 @@ jobs:
                   "release-approved candidate 버전이 tag와 일치하지 않습니다."
               )
           if current != {
-              "pythonHwpx": "5.6.0",
+              "pythonHwpx": "5.7.0",
               "primaryDistribution": "python-hwpx-automation",
-              "primaryApplication": "6.6.4",
-              "plugin": "1.6.0",
-              "contractHash": "19898dba41495c47",
+              "primaryApplication": "6.7.1",
+              "plugin": "1.7.0",
+              "contractHash": "98510af22d13899c",
           }:
               raise SystemExit(
                   "전체 3스택 원격 관찰 전 currentPublic를 candidate로 미리 "
@@ -524,7 +524,7 @@ jobs:
             echo
             echo "Core, canonical automation, compatibility, and this GitHub"
             echo "Release have remote evidence. The global state remains"
-            echo "release-approved and currentPublic remains 5.6.0/6.6.4/1.6.0."
+            echo "release-approved and currentPublic remains 5.7.0/6.7.1/1.7.0."
             echo "Pass ${RECEIPT_NAME} to plugin publication. Only after the"
             echo "plugin GitHub Release, marketplace entry, and a real marketplace"
             echo "install are observed may a follow-up commit promote the coherent"
