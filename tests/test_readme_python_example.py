@@ -147,6 +147,8 @@ def test_readme_python_example_runs_saves_and_reopens_from_base_wheel(
     bootstrap_python = bootstrap / (
         "Scripts/python.exe" if os.name == "nt" else "bin/python"
     )
+    core_version = core_wheel.name.split("-")[1]
+    automation_version = automation_wheel.name.split("-")[1]
     wheelhouse = tmp_path / "wheelhouse"
     subprocess.run(
         [
@@ -156,6 +158,11 @@ def test_readme_python_example_runs_saves_and_reopens_from_base_wheel(
             "download",
             "--dest",
             str(wheelhouse),
+            # The candidate wheels are not on any index; without this,
+            # automation's python-hwpx dependency resolves against PyPI and the
+            # gate only passes while the pinned floor happens to be published.
+            "--find-links",
+            str(dist),
             str(core_wheel),
             str(automation_wheel),
         ],
@@ -195,8 +202,11 @@ def test_readme_python_example_runs_saves_and_reopens_from_base_wheel(
             "--no-index",
             "--find-links",
             str(wheelhouse),
-            "python-hwpx==5.8.0",
-            "python-hwpx-automation==6.8.1",
+            # Derived from the wheels this test just built - a literal
+            # coordinate here is exactly the stale-pin lie the release train
+            # exists to prevent.
+            f"python-hwpx=={core_version}",
+            f"python-hwpx-automation=={automation_version}",
         ],
         cwd=tmp_path,
         check=True,

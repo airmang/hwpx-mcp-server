@@ -80,16 +80,22 @@ def _compat_module(
 def test_compat_metadata_exactly_delegates_to_canonical_distribution() -> None:
     data = tomllib.loads((COMPAT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = data["project"]
+    # The delegation target is whatever version the canonical package IS - a
+    # literal here would freeze the shell one train behind the canonical
+    # pyproject, which is the exact skew this test exists to rule out.
+    canonical = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    canonical_version = canonical["project"]["version"]
+    assert project["version"] == canonical_version
     assert project["name"] == "hwpx-mcp-server"
     assert project["dependencies"] == [
-        "python-hwpx-automation[mcp]==6.8.1"
+        f"python-hwpx-automation[mcp]=={canonical_version}"
     ]
     assert project["scripts"] == {
         "hwpx-mcp-server": "hwpx_automation.mcp_cli:main"
     }
     for extra in ("mcp", "hwp", "http", "ingest", "oracle", "vision"):
         assert project["optional-dependencies"][extra] == [
-            f"python-hwpx-automation[{extra}]==6.8.1"
+            f"python-hwpx-automation[{extra}]=={canonical_version}"
         ]
 
 
