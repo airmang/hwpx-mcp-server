@@ -386,24 +386,27 @@ def main() -> int:
     candidate = release_state.get("candidate", {})
     # The candidate names the exact train being shipped, not the contract
     # floor. The two coincided until core recovered as 5.0.1 over a preserved
-    # v5.0.0 tag; the authoritative exact-core coordinate is the release
-    # workflow's remote-truth observation pin, which must itself satisfy the
-    # contract floor.
+    # v5.0.0 tag.
+    #
+    # This used to regex the exact core version out of a literal in
+    # release.yml, which made the workflow the authority and required the
+    # literal to be hand advanced every train. Leaving it behind produced the
+    # preserved failure tags v6.6.0 and v6.6.3. The authority is now
+    # identity.json, and the workflow is required to *derive* from it.
     release_workflow_text = (
         ROOT / ".github" / "workflows" / "release.yml"
     ).read_text(encoding="utf-8")
-    observed_core = re.search(
-        r'python-hwpx\[visual,preview\]==([0-9][0-9a-z.]*)"',
-        release_workflow_text,
-    )
     _require(
-        observed_core is not None,
-        "release workflow does not pin the observed core version",
+        'python-hwpx[visual,preview]==${CANDIDATE_CORE}' in release_workflow_text
+        and "release_coordinates.py --verify --github-output"
+        in release_workflow_text
+        and "steps.coords.outputs.candidate_core" in release_workflow_text,
+        "release workflow does not derive the observed core version from identity",
         errors,
     )
-    observed_core_version = observed_core.group(1) if observed_core else ""
+    observed_core_version = candidate.get("pythonHwpx", "")
     _require(
-        observed_core is not None
+        bool(observed_core_version)
         and Version(observed_core_version)
         >= Version(contract["minPythonHwpx"]),
         "observed core version does not satisfy the contract floor",
@@ -662,15 +665,26 @@ def main() -> int:
         "release contains a broad one-shot dist publish",
         errors,
     )
+    # The tag gate moved out of this workflow into scripts/check_tag_release_gate.py
+    # so a dry run can execute it without pushing a tag. Assert that the
+    # workflow delegates and that the script still enforces both rules.
+    tag_gate = (ROOT / "scripts" / "check_tag_release_gate.py").read_text(
+        encoding="utf-8"
+    )
     _require(
-        'release_state["status"] != "release-approved"' in release_workflow
-        and "release-state: release-approved" in release_workflow,
+        "scripts/check_tag_release_gate.py" in release_workflow,
+        "tag release does not run the extracted release gate",
+        errors,
+    )
+    _require(
+        "PUBLISHABLE_STATUS" in tag_gate
+        and "release-state: release-approved" in tag_gate,
         "tag release does not require the truthful intermediate approved state",
         errors,
     )
     _require(
-        "'## [x.y.z] - YYYY-MM-DD'" in release_workflow
-        and r"(\d{{4}}-\d{{2}}-\d{{2}})" in release_workflow,
+        "'## [x.y.z] - YYYY-MM-DD'" in tag_gate
+        and r"\d{{4}}-\d{{2}}-\d{{2}}" in tag_gate,
         "tag release does not reject an unreleased changelog heading",
         errors,
     )
@@ -683,11 +697,21 @@ def main() -> int:
         and "Observe automation GitHub Release and record plugin handoff"
         in release_workflow
         and "The global state remains" in release_workflow
-        and "release-approved and currentPublic remains 5.7.0/6.7.1/1.7.0"
-        in release_workflow
+        # The handoff line used to be a verbatim version string repeated here,
+        # in the workflow, and in tests/test_release_state_handoff.py. Three
+        # copies of one coordinate is how v6.7.0 happened. Assert that the
+        # workflow *derives* the line instead of stating it.
+        and "release_coordinates.py --handoff-summary" in release_workflow
+        and "release_coordinates.py --candidate-triple" in release_workflow
         and "plugin GitHub Release, marketplace entry, and a real marketplace"
         in release_workflow,
         "automation release does not leave a truthful plugin handoff receipt",
+        errors,
+    )
+    _require(
+        "scripts/release_coordinates.py --verify" in release_workflow
+        and "check_current_public_remote.py --require-network" in release_workflow,
+        "release path no longer derives and externally witnesses currentPublic",
         errors,
     )
     _require(

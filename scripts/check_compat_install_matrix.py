@@ -25,8 +25,46 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 ROOT = Path(__file__).resolve().parents[1]
-PHASE0_LEGACY_VERSION = "5.1.1"
-PHASE0_CORE_VERSION = "4.2.0"
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from release_coordinates import coordinates
+
+_COORDINATES = coordinates()
+
+# Phase-0 floors are frozen history, not train coordinates. They live in
+# identity.json so this script states no version of its own.
+PHASE0_LEGACY_VERSION = _COORDINATES.legacy_compatibility_version
+PHASE0_CORE_VERSION = _COORDINATES.legacy_core_version
+
+#: Token the embedded probe sources use in place of this train's version.
+#:
+#: The probes are Python source carried as strings, so before this token
+#: existed each one restated the train version as a literal. Nine of them did,
+#: and a probe left on the previous train produced the preserved failure tags
+#: v6.3.0, v6.5.0, and v6.6.2. :func:`_probe` now substitutes the token from
+#: identity.json, so a probe cannot fall behind the train.
+TRAIN_VERSION_TOKEN = "@@TRAIN_VERSION@@"
+TRAIN_VERSION = _COORDINATES.candidate.automation
+
+#: Token for the base public module count the installed wheel must declare.
+#:
+#: The probe used to assert a literal ``176``. Adding one module moved it to
+#: 177 and produced the preserved failure tag v6.3.0. The count is derived from
+#: this repository's own manifest, so the probe still compares the *installed*
+#: wheel against a source outside itself while nobody has to edit a number.
+BASE_MODULE_COUNT_TOKEN = "@@BASE_PUBLIC_MODULE_COUNT@@"
+BASE_PUBLIC_MODULE_COUNT = str(
+    json.loads(
+        (ROOT / "src" / "hwpx_automation" / "public-modules.json").read_text(
+            encoding="utf-8"
+        )
+    )["basePublicModuleCount"]
+)
+
+_PROBE_SUBSTITUTIONS = {
+    TRAIN_VERSION_TOKEN: TRAIN_VERSION,
+    BASE_MODULE_COUNT_TOKEN: BASE_PUBLIC_MODULE_COUNT,
+}
 _SOURCE_AFFECTING_ENV = (
     "PYTHONPATH",
     "PYTHONHOME",
@@ -139,8 +177,22 @@ def _install_phase0_legacy(
     _pip(python, "check")
 
 
+def _resolve_probe(script: str) -> str:
+    """Substitute every declared token, failing closed on an unknown one."""
+
+    resolved = script
+    for token, value in _PROBE_SUBSTITUTIONS.items():
+        resolved = resolved.replace(token, value)
+    if "@@" in resolved:
+        raise RuntimeError(
+            "probe source carries an unsubstituted @@token@@; every derived "
+            "value must be declared in _PROBE_SUBSTITUTIONS"
+        )
+    return resolved
+
+
 def _probe(python: Path, script: str, *, cwd: Path) -> None:
-    _run([str(python), "-c", script], cwd=cwd)
+    _run([str(python), "-c", _resolve_probe(script)], cwd=cwd)
 
 
 def _console_path(python: Path, name: str) -> Path:
@@ -243,7 +295,7 @@ def _validate_phase0_legacy_wheel(
         raise RuntimeError(
             "public legacy wheel must declare one unconditional python-hwpx bound"
         )
-    expected_core_specifiers = frozenset({">=4.2.0", "<5"})
+    expected_core_specifiers = frozenset(_COORDINATES.legacy_core_specifiers)
     unsafe_core_requirements = [
         item
         for item in core_requirements
@@ -251,9 +303,12 @@ def _validate_phase0_legacy_wheel(
         != expected_core_specifiers
     ]
     if unsafe_core_requirements:
+        # Declared order, not sorted: the message reads as the requirement is
+        # written in identity.json.
+        rendered = ",".join(_COORDINATES.legacy_core_specifiers)
         raise RuntimeError(
             "every public legacy python-hwpx requirement, including extras, "
-            "must require python-hwpx>=4.2.0,<5"
+            f"must require python-hwpx{rendered}"
         )
 
     modules = _wheel_python_modules(path)
@@ -359,7 +414,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--skip-public-upgrade",
         action="store_true",
-        help="Skip the public 5.1.1 -> 6.0 and full-stack rollback probes.",
+        help=(
+            "Skip the public legacy-to-current upgrade and full-stack "
+            "rollback probes."
+        ),
     )
     args = parser.parse_args(argv)
     core_wheel = args.core_wheel.expanduser().resolve()
@@ -479,7 +537,7 @@ public_modules = json.loads(
     )
 )
 base_modules = public_modules["basePublicModules"]
-assert len(base_modules) == public_modules["basePublicModuleCount"] == 176
+assert len(base_modules) == public_modules["basePublicModuleCount"] == @@BASE_PUBLIC_MODULE_COUNT@@
 assert hashlib.sha256(
     ("\\n".join(sorted(base_modules)) + "\\n").encode()
 ).hexdigest() == public_modules["basePublicModuleSha256"]
@@ -552,7 +610,7 @@ assert scripts == {
 import os
 from importlib.metadata import distribution, version
 from pathlib import Path
-assert version("python-hwpx-automation") == "6.7.1"
+assert version("python-hwpx-automation") == "@@TRAIN_VERSION@@"
 import hwpx_automation.server
 assert hwpx_automation.server.mcp.name == "python-hwpx-automation"
 assert not any(name in os.environ for name in (
@@ -588,17 +646,17 @@ import os
 import pickle
 from importlib.metadata import distribution, version
 from pathlib import Path
-assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "6.7.1"
+assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "@@TRAIN_VERSION@@"
 import hwpx_automation
 import hwpx_mcp_server.office.exam as old
 import hwpx_automation.office.exam as new
 assert old is new
 assert old.ComposeResult is new.ComposeResult
 import hwpx_mcp_server
-assert hwpx_mcp_server.__version__ == version("hwpx-mcp-server") == "6.7.1"
+assert hwpx_mcp_server.__version__ == version("hwpx-mcp-server") == "@@TRAIN_VERSION@@"
 namespace = {}
 exec("from hwpx_mcp_server import *", namespace)
-assert namespace["__version__"] == "6.7.1"
+assert namespace["__version__"] == "@@TRAIN_VERSION@@"
 from importlib.metadata import entry_points
 owners = {
     item.name: item.dist.name
@@ -668,7 +726,7 @@ except PackageNotFoundError:
     pass
 else:
     raise AssertionError("compat metadata survived uninstall")
-assert version("python-hwpx-automation") == "6.7.1"
+assert version("python-hwpx-automation") == "@@TRAIN_VERSION@@"
 import hwpx_automation
 from pathlib import Path
 import sys
@@ -702,7 +760,7 @@ assert not (scripts / f"hwpx-mcp-server{suffix}").exists()
             compat_python,
             """
 from importlib.metadata import version
-assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "6.7.1"
+assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "@@TRAIN_VERSION@@"
 import hwpx_mcp_server.office.exam as old
 import hwpx_automation.office.exam as new
 assert old is new
@@ -777,7 +835,7 @@ import os
 from importlib.metadata import distribution, entry_points, version
 from pathlib import Path
 import hwpx_automation
-assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "6.7.1"
+assert version("hwpx-mcp-server") == version("python-hwpx-automation") == "@@TRAIN_VERSION@@"
 import hwpx_mcp_server.office.exam
 canonical = distribution("python-hwpx-automation")
 compat = distribution("hwpx-mcp-server")
@@ -816,10 +874,10 @@ for old_name in legacy_modules:
     new = importlib.import_module(new_name)
     assert old is new, (old_name, new_name)
 import hwpx_mcp_server
-assert hwpx_mcp_server.__version__ == version("hwpx-mcp-server") == "6.7.1"
+assert hwpx_mcp_server.__version__ == version("hwpx-mcp-server") == "@@TRAIN_VERSION@@"
 namespace = {}
 exec("from hwpx_mcp_server import *", namespace)
-assert namespace["__version__"] == "6.7.1"
+assert namespace["__version__"] == "@@TRAIN_VERSION@@"
 """.replace("__LEGACY_DEEP_MODULES__", repr(legacy_deep_modules)),
                 cwd=probe_cwd,
             )

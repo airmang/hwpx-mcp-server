@@ -17,42 +17,71 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           path: python-hwpx-automation
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      # Every version this job uses comes from identity.json through this one
+      # step. Before it existed the workflow restated the train coordinates as
+      # literals, and a literal left on the previous train produced the
+      # preserved failure tags v6.6.0 and v6.6.3. Do not add a version literal
+      # below; tests/test_release_coordinate_derivation.py fails the build.
+      - name: Derive release coordinates from identity.json
+        id: coords
+        working-directory: python-hwpx-automation
+        run: python scripts/release_coordinates.py --verify --github-output
       # The runtime-parity suites read fixtures from a python-hwpx REPO
       # checkout (the installed wheel ships no tests/); pin the exact
       # released core tag this train observes.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: airmang/python-hwpx
-          ref: v5.7.0
+          ref: ${{ steps.coords.outputs.candidate_core_tag }}
           path: python-hwpx
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
       - name: Observe Phase-0 legacy cap before resolving core 5
         working-directory: python-hwpx-automation
+        env:
+          LEGACY_CORE: ${{ steps.coords.outputs.legacy_core_version }}
+          LEGACY_COMPAT: ${{ steps.coords.outputs.legacy_compatibility_version }}
+          LEGACY_DIST: >-
+            ${{ steps.coords.outputs.legacy_compatibility_distribution }}
+          LEGACY_REQ_COUNT: >-
+            ${{ steps.coords.outputs.legacy_core_requirement_count }}
         run: |
           PHASE0_VENV="${RUNNER_TEMP}/hwpx-phase0-legacy"
           python -m venv "${PHASE0_VENV}"
           "${PHASE0_VENV}/bin/python" -m pip install --only-binary=:all: \
             "packaging>=23" \
-            "python-hwpx==4.2.0" \
-            "hwpx-mcp-server==5.1.1"
+            "python-hwpx==${LEGACY_CORE}" \
+            "${LEGACY_DIST}==${LEGACY_COMPAT}"
           "${PHASE0_VENV}/bin/python" -m pip check
           "${PHASE0_VENV}/bin/python" - <<'PY'
+          import json
+          import os
           from importlib.metadata import metadata, version
+          from pathlib import Path
           from packaging.requirements import Requirement
 
-          assert version("python-hwpx") == "4.2.0"
-          assert version("hwpx-mcp-server") == "5.1.1"
+          legacy_core = os.environ["LEGACY_CORE"]
+          legacy_compat = os.environ["LEGACY_COMPAT"]
+          legacy_dist = os.environ["LEGACY_DIST"]
+          expected_count = int(os.environ["LEGACY_REQ_COUNT"])
+          floors = json.loads(
+              Path("src/hwpx_automation/identity.json").read_text(
+                  encoding="utf-8"
+              )
+          )["releaseFloors"]
+
+          assert version("python-hwpx") == legacy_core
+          assert version(legacy_dist) == legacy_compat
           requirements = [
               Requirement(item)
-              for item in metadata("hwpx-mcp-server").get_all("Requires-Dist") or []
+              for item in metadata(legacy_dist).get_all("Requires-Dist") or []
           ]
           core = [item for item in requirements if item.name == "python-hwpx"]
           base = [item for item in core if item.marker is None]
           assert len(base) == 1, core
-          assert len(core) == 3, core
-          expected_specifiers = {">=4.2.0", "<5"}
+          assert len(core) == expected_count, core
+          expected_specifiers = set(floors["legacyCoreSpecifiers"])
           assert all(
               {str(specifier) for specifier in item.specifier}
               == expected_specifiers
@@ -62,11 +91,13 @@ jobs:
           PY
       - name: Install test dependencies
         working-directory: python-hwpx-automation
+        env:
+          CANDIDATE_CORE: ${{ steps.coords.outputs.candidate_core }}
         run: |
           # Release order is legacy cap -> core -> automation -> compatibility -> plugin.
           # A tag release must observe the exact public core rather than a
           # sibling checkout or an unpublished branch.
-          python -m pip install "python-hwpx[visual,preview]==5.7.0"
+          python -m pip install "python-hwpx[visual,preview]==${CANDIDATE_CORE}"
           python -m pip install -e ".[mcp,oracle,test,typecheck]"
       # The clean installed-wheel gates (docs example, compat matrix) fail
       # closed without uv; runners do not ship it.
@@ -77,16 +108,30 @@ jobs:
         working-directory: python-hwpx-automation
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_CORE: ${{ steps.coords.outputs.candidate_core }}
+          CANDIDATE_CORE_TAG: ${{ steps.coords.outputs.candidate_core_tag }}
         run: |
           python - <<'PY'
+          import os
           from importlib.metadata import version
-          assert version("python-hwpx") == "5.7.0"
+          assert version("python-hwpx") == os.environ["CANDIDATE_CORE"]
           PY
-          gh release view v5.7.0 \
+          gh release view "${CANDIDATE_CORE_TAG}" \
             --repo airmang/python-hwpx \
             --json tagName,isDraft,isPrerelease \
-            --jq 'select(.tagName == "v5.7.0" and (.isDraft | not) and (.isPrerelease | not)) | .tagName' \
-            | grep -Fx v5.7.0
+            --jq "select(.tagName == \"${CANDIDATE_CORE_TAG}\" and (.isDraft | not) and (.isPrerelease | not)) | .tagName" \
+            | grep -Fx "${CANDIDATE_CORE_TAG}"
+      # currentPublic is a claim that a stack is already installable. Verify it
+      # against services we do not control instead of against a dictionary
+      # someone has to remember to edit. The frozen dictionary this replaces
+      # produced the preserved failure tags v6.1.2, v6.4.1, and v6.7.0 and
+      # caught no real defect; in v6.1.2 and v6.4.1 the CHANGELOG records that
+      # a correct identity was rejected by a stale expectation.
+      - name: Observe that currentPublic is really published
+        working-directory: python-hwpx-automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_current_public_remote.py --require-network
       - name: Check public repository hygiene
         working-directory: python-hwpx-automation
         run: |
@@ -104,17 +149,21 @@ jobs:
       - name: Run release-facing tests
         working-directory: python-hwpx-automation
         run: python -m pytest -q
-      - name: Run public 5.7.0 compatibility install matrix
+      - name: Run public core compatibility install matrix
         working-directory: python-hwpx-automation
+        env:
+          CANDIDATE_CORE: ${{ steps.coords.outputs.candidate_core }}
+          LEGACY_CORE: ${{ steps.coords.outputs.legacy_core_version }}
+          LEGACY_COMPAT: ${{ steps.coords.outputs.legacy_compatibility_version }}
         run: |
           python -m pip install build
           python -m pip wheel --no-deps --wheel-dir .compat-core-wheel \
-            "python-hwpx==5.7.0"
+            "python-hwpx==${CANDIDATE_CORE}"
           CORE_WHEEL=$(find .compat-core-wheel -name 'python_hwpx-*.whl' -print -quit)
           python scripts/check_compat_install_matrix.py \
             --core-wheel "${CORE_WHEEL}" \
-            --legacy-version 5.1.1 \
-            --legacy-core-version 4.2.0
+            --legacy-version "${LEGACY_COMPAT}" \
+            --legacy-core-version "${LEGACY_CORE}"
       - name: Verify generated ToolSpec documentation
         working-directory: python-hwpx-automation
         run: |
@@ -126,12 +175,15 @@ jobs:
           python-version: "3.10"
       - name: Gate minimum-Python clean wheel and optional boundaries
         working-directory: python-hwpx-automation
+        env:
+          CANDIDATE_CORE: ${{ steps.coords.outputs.candidate_core }}
         run: |
           python -m pip install "build>=1.2"
           mkdir -p .minimum-core-wheel
           python -m pip wheel --no-deps --wheel-dir .minimum-core-wheel \
-            "python-hwpx==5.7.0"
-          CORE_WHEEL=$(find .minimum-core-wheel -name 'python_hwpx-5.7.0-*.whl' -print -quit)
+            "python-hwpx==${CANDIDATE_CORE}"
+          CORE_WHEEL=$(find .minimum-core-wheel \
+            -name "python_hwpx-${CANDIDATE_CORE}-*.whl" -print -quit)
           test -n "${CORE_WHEEL}"
           python scripts/check_platform_optional_smoke.py \
             --core-wheel "${CORE_WHEEL}"
@@ -153,123 +205,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          TAG_NAME="${GITHUB_REF_NAME}"
-          TAG_VERSION="${TAG_NAME#v}"
-
-          PYPROJECT_VERSION=$(python - <<'PY'
-          import tomllib
-          from pathlib import Path
-
-          data = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))
-          print(data['project']['version'])
-          PY
-          )
-
-          COMPAT_VERSION=$(python - <<'PY'
-          import tomllib
-          from pathlib import Path
-
-          data = tomllib.loads(
-              Path('compat/hwpx-mcp-server/pyproject.toml').read_text(encoding='utf-8')
-          )
-          print(data['project']['version'])
-          PY
-          )
-
-          CHANGELOG_VERSION=$(python - <<'PY'
-          import re
-          from pathlib import Path
-
-          changelog = Path('CHANGELOG.md').read_text(encoding='utf-8')
-          # Skip the conventional [Unreleased] heading so keep-a-changelog
-          # workflow (pre-collecting notes above the released version) is
-          # preserved alongside tag-based release automation.
-          matches = re.findall(r'^## \[([^\]]+)\]', changelog, re.MULTILINE)
-          version = next(
-              (m.strip() for m in matches if m.strip().lower() != 'unreleased'),
-              None,
-          )
-          if version is None:
-              raise SystemExit('CHANGELOG.md에서 버전 섹션(## [x.y.z])을 찾지 못했습니다.')
-          print(version)
-          PY
-          )
-
-          echo "Tag version: ${TAG_VERSION}"
-          echo "pyproject version: ${PYPROJECT_VERSION}"
-          echo "compat pyproject version: ${COMPAT_VERSION}"
-          echo "changelog version: ${CHANGELOG_VERSION}"
-
-          if [[ "${TAG_VERSION}" != "${PYPROJECT_VERSION}" ]]; then
-            echo "태그 버전(${TAG_VERSION})과 pyproject 버전(${PYPROJECT_VERSION})이 일치하지 않습니다." >&2
-            exit 1
-          fi
-
-          if [[ "${TAG_VERSION}" != "${COMPAT_VERSION}" ]]; then
-            echo "태그 버전(${TAG_VERSION})과 compat 버전(${COMPAT_VERSION})이 일치하지 않습니다." >&2
-            exit 1
-          fi
-
-          if [[ "${TAG_VERSION}" != "${CHANGELOG_VERSION}" ]]; then
-            echo "태그 버전(${TAG_VERSION})과 changelog 최신 버전(${CHANGELOG_VERSION})이 일치하지 않습니다." >&2
-            exit 1
-          fi
-
-          python - <<'PY'
-          import json
-          import re
-          import tomllib
-          from pathlib import Path
-
-          identity = json.loads(
-              Path("src/hwpx_automation/identity.json").read_text(encoding="utf-8")
-          )
-          release_state = identity["releaseState"]
-          if release_state["status"] != "release-approved":
-              raise SystemExit(
-                  "tag publish에는 별도 오너 승인 뒤의 release-approved 상태가 "
-                  "필요합니다. released는 plugin/marketplace/실제 설치까지 "
-                  "전체 3스택 원격 정본을 관찰한 뒤의 상태이므로 tag 전에 "
-                  "사용하면 안 됩니다."
-              )
-
-          version = tomllib.loads(
-              Path("pyproject.toml").read_text(encoding="utf-8")
-          )["project"]["version"]
-          candidate = release_state["candidate"]
-          current = release_state["currentPublic"]
-          if version != candidate["canonicalAutomation"]:
-              raise SystemExit(
-                  "release-approved candidate 버전이 tag와 일치하지 않습니다."
-              )
-          if current != {
-              "pythonHwpx": "5.7.0",
-              "primaryDistribution": "python-hwpx-automation",
-              "primaryApplication": "6.7.1",
-              "plugin": "1.7.0",
-              "contractHash": "98510af22d13899c",
-          }:
-              raise SystemExit(
-                  "전체 3스택 원격 관찰 전 currentPublic를 candidate로 미리 "
-                  "승격하면 안 됩니다."
-              )
-          readme = Path("README.md").read_text(encoding="utf-8")
-          if "<!-- release-state: release-approved -->" not in readme:
-              raise SystemExit("README release-state: release-approved 표시가 없습니다.")
-          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
-          heading = re.search(
-              rf"^## \[{re.escape(version)}\] - (\d{{4}}-\d{{2}}-\d{{2}})$",
-              changelog,
-              re.MULTILINE,
-          )
-          if heading is None:
-              raise SystemExit(
-                  "tag release 전 CHANGELOG의 해당 버전 heading을 "
-                  "'## [x.y.z] - YYYY-MM-DD'로 확정해야 합니다."
-              )
-          PY
-
+          # The whole gate lives in scripts/check_tag_release_gate.py so it can
+          # be dry-run without pushing a tag. Logic embedded in this workflow
+          # could only ever be exercised by tagging, which is why its mistakes
+          # became preserved failure tags instead of red tests.
+          python scripts/check_tag_release_gate.py
       - name: Extract latest changelog section for release notes
         run: |
           python - <<'PY'
@@ -519,14 +459,16 @@ jobs:
           gh release view "${GITHUB_REF_NAME}" \
             --json assets --jq '.assets[].name' \
             | grep -Fx "${RECEIPT_NAME}"
+          HANDOFF_LINE=$(python scripts/release_coordinates.py --handoff-summary)
+          CANDIDATE_TRIPLE=$(python scripts/release_coordinates.py --candidate-triple)
           {
             echo "### Automation publication observed; plugin handoff ready"
             echo
             echo "Core, canonical automation, compatibility, and this GitHub"
             echo "Release have remote evidence. The global state remains"
-            echo "release-approved and currentPublic remains 5.7.0/6.7.1/1.7.0."
+            echo "${HANDOFF_LINE}"
             echo "Pass ${RECEIPT_NAME} to plugin publication. Only after the"
             echo "plugin GitHub Release, marketplace entry, and a real marketplace"
             echo "install are observed may a follow-up commit promote the coherent"
-            echo "5.0/6.0/1.0 stack to released."
+            echo "${CANDIDATE_TRIPLE} stack to released."
           } >> "${GITHUB_STEP_SUMMARY}"

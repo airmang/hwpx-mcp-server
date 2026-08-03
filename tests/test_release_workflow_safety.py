@@ -26,7 +26,7 @@ EXPECTED_TRIGGER = {
 }
 EXPECTED_STEP_IDENTITY_SHA256 = {
     "prepublish": (
-        "67f4a0a84d0ba7de02ae765d248015ceaeb5d94e202e188588a4bd62cb160851"
+        "3e4693823bc8299f93ad3179ce19b1d3b856a16030013cc123db69586c78446b"
     ),
     "release": (
         "70f1a6828a7c6866764731eb837da0869769f00c83ec917793969cfd2138c618"
@@ -34,17 +34,23 @@ EXPECTED_STEP_IDENTITY_SHA256 = {
 }
 EXPECTED_RUN_SHA256 = {
     "prepublish": {
+        "Derive release coordinates from identity.json": (
+            "50085ecd291300fb35250bc0864e677a3cd490319a24b10f91db57eba2b22c94"
+        ),
         "Observe Phase-0 legacy cap before resolving core 5": (
-            "eeaa0090d37e4b8deb891f75111b21f16b632f9e8b47f72aaba89dbb6d568082"
+            "7ad165d0c72a811f97cd98e212828fdda92c035868375b2f7bdf57a411c793e1"
         ),
         "Install test dependencies": (
-            "0374f1cc988b0709609426efb43a9519d3ac57c5d050a2d5d4e4281a751d29b6"
+            "c5cd411583416ba003e518fd07f9eced969676fbb6ef6da3faed75ffa9067b18"
         ),
         "Install uv for the clean installed-wheel gates": (
             "a528bb5ef5a4d3201a325ff8ca5170f2e72d275a5fb8a31d95ccd0dd2cab5e6b"
         ),
         "Observe public core dependency remote truth": (
-            "32d158431cdb5a3218a8d2ed651ca072e72d9aa8263d91396a14d13eed33c618"
+            "ee604eb1e59b180da61549fda1f268d2281ad7fe0ae11749c7667388f921b6f7"
+        ),
+        "Observe that currentPublic is really published": (
+            "a0cb50fd095a3d6af880a055fbe889fc8892258335b6196191e380e5bbcafd28"
         ),
         "Check public repository hygiene": (
             "d217752235a4a35f99b76ef367b28bc309a23efd6b9004666615f27291d8acc2"
@@ -58,19 +64,19 @@ EXPECTED_RUN_SHA256 = {
         "Run release-facing tests": (
             "03b2d5596d232a4210386ff5610b26c7bb59cd1aa14f9531d5121955881b3d13"
         ),
-        "Run public 5.7.0 compatibility install matrix": (
-            "40ea19978e9a3cacfa81121977a24aacafe62c37eda9d67deb6c3f16a62befb5"
+        "Run public core compatibility install matrix": (
+            "fbbc9587334d36cffc5420e8700e01501e935a0cce3acbba1ba77b98fb6fb1d6"
         ),
         "Verify generated ToolSpec documentation": (
             "c7a25a48d6118f2932df62fe23211794b2729991ce6354671c8524f20e838254"
         ),
         "Gate minimum-Python clean wheel and optional boundaries": (
-            "3b986644e8cd0f328ce52933cc12c561126f84881285ccb7529fb88190102c4e"
+            "3e32643c5fb646515b0386d07cfb8243bd263f2b3fbad34127975c3929526177"
         ),
     },
     "release": {
         "Validate tag/version consistency": (
-            "4296b167a4ba6ec16aeeff983a9426d628049ab4bcfcda245edf2643a70d9dae"
+            "d18f3068b0268bc69fc0910f20913a774bfacbc709af4746360e2cd97165c24b"
         ),
         "Extract latest changelog section for release notes": (
             "13596e1604f36a15a740b8f64332da6aab4e032740bf33a890aae4befadb5314"
@@ -100,7 +106,7 @@ EXPECTED_RUN_SHA256 = {
             "c758216698c1c22d1a9706eca43e21d12825dcc61f24b6a6a7776b3c6cffbdaa"
         ),
         "Observe automation GitHub Release and record plugin handoff": (
-            "a0025d784d9fc68fd5dc8ab5ee343823a6ccb317b11f47fce74e19ffdf9ecf7a"
+            "3ccad3fefe97275d3dafabf985616e596843efcf98017a2ee1655bb3586449c3"
         ),
     },
 }
@@ -449,39 +455,42 @@ def test_release_workflow_mutations_are_rejected(
     assert any(expected in failure for failure in failures), failures
 
 
-def test_frozen_current_public_gate_matches_identity_exactly() -> None:
-    """The release job's frozen currentPublic dict must equal identity's, field
-    for field.
+def test_release_workflow_holds_no_frozen_current_public_dict() -> None:
+    """``currentPublic`` must be derived and externally witnessed, not frozen.
 
-    This gate exists because a *partial* literal advance is silent until tag
-    time: three of the four version fields were updated for one train and
-    ``pythonHwpx`` was left pointing at the train before last, so the tag job
-    refused to publish after every earlier check had passed. Comparing the two
-    sources here moves that failure from "after the tag is pushed" to "in the
-    ordinary test run".
+    The predecessor of this test compared a literal dictionary in
+    ``release.yml`` against ``identity.json`` field for field, to catch a
+    partial advance before tag time. That was a mirror check on a duplicate
+    that should not have existed.
+
+    The duplicate's record, from ``CHANGELOG.md``: it produced the preserved
+    failure tags ``v6.1.2``, ``v6.4.1``, and ``v6.7.0``, and caught no real
+    defect. For ``v6.1.2`` and ``v6.4.1`` the changelog states outright that an
+    identity correctly recording the then-current public stack was rejected by
+    the stale expectation.
+
+    So the dictionary is gone. The property it was meant to protect -- that a
+    tag never publishes after ``currentPublic`` was promoted early -- is now
+    held two ways that need no hand editing: a structural invariant
+    (``currentPublic`` differs from the candidate while the state is
+    ``release-approved``) and an external observation (every coordinate
+    ``currentPublic`` names is really published).
     """
 
-    import json
     import re
 
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
-    identity = json.loads(
-        (ROOT / "src" / "hwpx_automation" / "identity.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    current_public = identity["releaseState"]["currentPublic"]
 
-    match = re.search(
-        r"if current != \{(?P<body>.*?)\n          \}:", workflow, re.DOTALL
+    assert not re.search(r"if current != \{", workflow), (
+        "release.yml reintroduced a frozen currentPublic dictionary; derive it "
+        "through scripts/release_coordinates.py instead"
     )
-    assert match, "release.yml no longer pins a frozen currentPublic dict"
-    frozen = dict(
-        re.findall(r'"([A-Za-z]+)":\s*"([^"]+)"', match.group("body"))
+    assert "scripts/release_coordinates.py --verify" in workflow
+    assert "check_current_public_remote.py --require-network" in workflow
+
+    gate = (ROOT / "scripts" / "release_coordinates.py").read_text(
+        encoding="utf-8"
     )
-    assert frozen == current_public, (
-        "release.yml's frozen currentPublic gate drifted from identity.json — "
-        f"workflow={frozen} identity={current_public}"
-    )
+    assert "def check_promotion_not_premature" in gate

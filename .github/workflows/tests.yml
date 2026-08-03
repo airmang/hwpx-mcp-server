@@ -10,6 +10,33 @@ permissions:
   contents: read
 
 jobs:
+  # The tag-time release gate, exercised on every push instead of only when a
+  # tag is created. Thirteen preserved failure tags exist because this logic
+  # could previously be executed only by pushing a tag; nine of them were a
+  # stale coordinate that this job now surfaces days earlier, on a branch.
+  release-gate-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Bootstrap the gate's own dependencies
+        run: >-
+          python -m pip install
+          "packaging>=23.0"
+          "tomli>=2.0; python_version < '3.11'"
+      - name: Derive release coordinates
+        run: python scripts/release_coordinates.py --verify --json
+      - name: Dry-run the tag release gate without a tag
+        run: python scripts/check_tag_release_gate.py --dry-run
+      # Network-dependent, so it degrades instead of failing the branch build.
+      # The release workflow runs the same script with --require-network.
+      - name: Observe that currentPublic is really published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_current_public_remote.py
+
   test:
     runs-on: ubuntu-latest
     strategy:
