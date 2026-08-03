@@ -117,6 +117,16 @@ jobs:
         working-directory: python-hwpx-automation
       - run: python -m pytest -q
         working-directory: python-hwpx-automation
+      # The core fuzz harness builds documents through this package's builder,
+      # so core's own CI can only skip it — and importorskip meant it silently
+      # ran nowhere from the 5.0 split until this step existed. It runs here,
+      # where both sides are installed, as a fixed-seed regression asset.
+      - name: Run the core fuzz regression harness
+        working-directory: python-hwpx-automation
+        run: >-
+          python -m pytest -q
+          ../python-hwpx/tests/test_fuzz_loop.py
+          ../python-hwpx/tests/test_fuzz_regressions.py
       - run: |
           python scripts/render_tool_contract.py --check --skip-skill
           python scripts/render_contract_delta.py --check

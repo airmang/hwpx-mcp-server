@@ -1,0 +1,30 @@
+{
+ "schemaVersion": "hwpx.tool-contract-delta/v1",
+ "release": "6.8.0",
+ "baseline": {
+  "release": "6.7.1",
+  "contractHash": "98510af22d13899c",
+  "defaultToolCount": 128,
+  "advancedToolCount": 136
+ },
+ "target": {
+  "release": "6.8.0",
+  "contractHash": "6ba7bc0ca7226f2f",
+  "defaultToolCount": 128,
+  "advancedToolCount": 136,
+  "skillRequiredToolCount": 29
+ },
+ "note": "6.8.0 candidate receipt. Honesty train: no tool is added, removed, promoted, or moved — the hash advances only because the contract floors move with the observed stack (minPythonHwpx 5.7.0→5.8.0, minSkillVersion 1.7.0→1.8.0). The train's substance is repair: receipts can no longer report work that did not happen (evalplan in-place no-op, discarded-as-applied, fail-open layout gate), the capability self-description is guarded against the live code and ships a user-runnable verifier, corpus v3 measures the current stack's authoring surfaces on real Hancom with per-row bucketed receipts, and every release-path version coordinate derives from identity.json. Additive receipt keys on the byte-splice projection: discarded, outputIsSourceCopy.",
+ "delta": {
+  "addedTools": [],
+  "removedTools": [],
+  "promotedTools": [],
+  "profileMoves": []
+ },
+ "floors": {
+  "minPythonHwpx": "5.8.0",
+  "minAutomationVersion": "6.5.0",
+  "minSkillVersion": "1.8.0",
+  "automation": "6.8.0"
+ }
+}

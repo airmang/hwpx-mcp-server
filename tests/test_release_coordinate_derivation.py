@@ -48,6 +48,11 @@ RELEASE_PATH_FILES = (
     Path("scripts/check_compat_install_matrix.py"),
     Path("scripts/release_coordinates.py"),
     Path("scripts/check_current_public_remote.py"),
+    # v6.6.3 came from a stale wheel-filename pin in this file; it was not on
+    # this watch list when the derivation landed, and its probe pins went one
+    # train stale before being caught during the very next release prep.
+    Path("scripts/check_platform_optional_smoke.py"),
+    Path("scripts/check_tag_release_gate.py"),
 )
 
 #: Version-shaped strings that are not train coordinates.

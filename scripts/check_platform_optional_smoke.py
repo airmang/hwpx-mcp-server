@@ -28,6 +28,19 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 MINIMUM_PYTHON = (3, 10)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from release_coordinates import coordinates as _release_coordinates  # noqa: E402
+
+# Train coordinates are derived from identity.json, never restated here. A
+# stale wheel-filename pin in this very file produced the preserved failure
+# tag v6.6.3; the probe version pins were the same disease one train wide.
+_COORDINATES = _release_coordinates()
+_CORE_VERSION = _COORDINATES.candidate.core
+_PROBE_SUBSTITUTIONS = {
+    "@@CANDIDATE_CORE@@": _CORE_VERSION,
+    "@@TRAIN_VERSION@@": _COORDINATES.candidate.automation,
+}
 _SOURCE_AFFECTING_ENV = (
     "PYTHONPATH",
     "PYTHONHOME",
@@ -144,6 +157,20 @@ def _venv_python(path: Path, *, cwd: Path) -> Path:
     return path / suffix
 
 
+def _resolve_probe(script: str) -> str:
+    """Substitute every declared token, failing closed on an unknown one."""
+
+    resolved = script
+    for token, value in _PROBE_SUBSTITUTIONS.items():
+        resolved = resolved.replace(token, value)
+    if "@@" in resolved:
+        raise SystemExit(
+            "probe source carries an unsubstituted @@token@@; declare it in "
+            "_PROBE_SUBSTITUTIONS"
+        )
+    return resolved
+
+
 def _probe_script() -> str:
     return r"""
 import importlib.util
@@ -156,8 +183,8 @@ from importlib.metadata import distribution, version
 from pathlib import Path
 
 assert sys.version_info[:2] == (3, 10), sys.version
-assert version("python-hwpx") == "5.7.0"
-assert version("python-hwpx-automation") == "6.7.1"
+assert version("python-hwpx") == "@@CANDIDATE_CORE@@"
+assert version("python-hwpx-automation") == "@@TRAIN_VERSION@@"
 assert importlib.util.find_spec("mcp") is None
 assert importlib.util.find_spec("fitz") is not None
 assert importlib.util.find_spec("PIL") is not None
@@ -309,17 +336,17 @@ def main(argv: list[str] | None = None) -> int:
             core_wheel = _build_wheel(
                 clean_core,
                 wheelhouse / "core",
-                "python_hwpx-5.7.0-*.whl",
+                f"python_hwpx-{_CORE_VERSION}-*.whl",
             )
         else:
             assert args.core_wheel is not None
             core_wheel = args.core_wheel.expanduser().resolve()
             if (
                 not core_wheel.is_file()
-                or not core_wheel.name.startswith("python_hwpx-5.7.0-")
+                or not core_wheel.name.startswith(f"python_hwpx-{_CORE_VERSION}-")
                 or core_wheel.suffix != ".whl"
             ):
-                raise SystemExit(f"invalid python-hwpx 5.0 wheel: {core_wheel}")
+                raise SystemExit(f"invalid python-hwpx {_CORE_VERSION} wheel: {core_wheel}")
 
         venv_python = _venv_python(work / "venv", cwd=work)
         _run(
@@ -343,7 +370,7 @@ def main(argv: list[str] | None = None) -> int:
         probe_cwd.mkdir()
         probe_env = {"HWPX_ORACLE_STRUCTURAL_ONLY": "1"}
         probe = _run(
-            [str(venv_python), "-c", _probe_script()],
+            [str(venv_python), "-c", _resolve_probe(_probe_script())],
             cwd=probe_cwd,
             env=probe_env,
         )

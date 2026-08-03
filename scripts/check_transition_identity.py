@@ -484,32 +484,60 @@ def main() -> int:
         errors,
     )
     if status in {"unreleased-candidate", "release-approved"}:
+        # This used to freeze the expected currentPublic as a hand-advanced
+        # literal dictionary — the exact device whose stale copies produced the
+        # preserved failure tags v6.1.2, v6.4.1, and v6.7.0 in the workflow,
+        # and which would have fired here on the first train after this one.
+        # The structural half of the guarantee (a complete five-field public
+        # stack that still differs from the candidate) is checked here; whether
+        # that stack is REALLY public is the external observation's job
+        # (scripts/check_current_public_remote.py, run by both CI paths).
         _require(
-            current_public
-            == {
-                "pythonHwpx": "5.7.0",
-                "primaryDistribution": "python-hwpx-automation",
-                "primaryApplication": "6.7.1",
-                "plugin": "1.7.0",
-                "contractHash": "98510af22d13899c",
-            },
-            "candidate manifest does not preserve the observed public 5.7.0/6.7.1/1.7.0 truth",
+            all(
+                current_public.get(field)
+                for field in (
+                    "pythonHwpx",
+                    "primaryDistribution",
+                    "primaryApplication",
+                    "plugin",
+                    "contractHash",
+                )
+            ),
+            "currentPublic does not name a complete five-field public stack",
+            errors,
+        )
+        _require(
+            current_public.get("contractHash") != candidate.get("contractHash")
+            or current_public.get("pythonHwpx") != candidate.get("pythonHwpx")
+            or current_public.get("primaryApplication")
+            != candidate.get("canonicalAutomation"),
+            "currentPublic was promoted to the candidate before the full "
+            "three-stack remote truth was observed",
             errors,
         )
     if status == "unreleased-candidate":
+        # Derived from identity, not restated: the previous literals here named
+        # one specific train and would have failed the first commit of every
+        # following train — the same hand-advanced-coordinate disease this
+        # script exists to catch in others.
+        candidate_automation = str(candidate.get("canonicalAutomation", ""))
+        public_train = (
+            f"python-hwpx {current_public.get('pythonHwpx')} → "
+            f"python-hwpx-automation {current_public.get('primaryApplication')} → "
+            f"hwpx-plugin {current_public.get('plugin')}"
+        )
         _require(
             "<!-- release-state: unreleased-candidate -->" in readme
-            and "아직 공개되지 않은 6.7.1 후보" in readme
-            and "python-hwpx 5.6.0 → python-hwpx-automation 6.6.4 → hwpx-plugin 1.6.0"
-            in readme,
+            and f"아직 공개되지 않은 {candidate_automation} 후보" in readme
+            and public_train in readme,
             "README does not prominently distinguish candidate from public release",
             errors,
         )
         _require(
-            "아직 공개되지 않은 6.7.1 source candidate" in use_cases
-            and "`python-hwpx >= 5.7.0`" in use_cases
-            and "`19898dba41495c47`" in use_cases
-            and "`98510af22d13899c`" in use_cases,
+            f"아직 공개되지 않은 {candidate_automation} source candidate" in use_cases
+            and f"`python-hwpx >= {candidate.get('pythonHwpx')}`" in use_cases
+            and f"`{current_public.get('contractHash')}`" in use_cases
+            and f"`{candidate.get('contractHash')}`" in use_cases,
             "use-cases guide does not separate candidate and current-public coordinates",
             errors,
         )

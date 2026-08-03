@@ -3,15 +3,15 @@
   "product": "python-hwpx-automation",
   "releaseMajor": 6,
   "releaseState": {
-    "status": "released",
+    "status": "release-approved",
     "candidate": {
-      "pythonHwpx": "5.7.0",
+      "pythonHwpx": "5.8.0",
       "canonicalDistribution": "python-hwpx-automation",
-      "canonicalAutomation": "6.7.1",
+      "canonicalAutomation": "6.8.0",
       "compatibilityDistribution": "hwpx-mcp-server",
-      "compatibility": "6.7.1",
-      "plugin": "1.7.0",
-      "contractHash": "98510af22d13899c"
+      "compatibility": "6.8.0",
+      "plugin": "1.8.0",
+      "contractHash": "6ba7bc0ca7226f2f"
     },
     "currentPublic": {
       "pythonHwpx": "5.7.0",
@@ -27,7 +27,10 @@
     "legacyCompatibilityDistribution": "hwpx-mcp-server",
     "legacyCompatibilityVersion": "5.1.1",
     "legacyCoreVersion": "4.2.0",
-    "legacyCoreSpecifiers": [">=4.2.0", "<5"],
+    "legacyCoreSpecifiers": [
+      ">=4.2.0",
+      "<5"
+    ],
     "legacyCoreRequirementCount": 3
   },
   "identifiers": [

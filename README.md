@@ -12,14 +12,16 @@
   </p>
 </p>
 
-<!-- release-state: released -->
+<!-- release-state: release-approved -->
 > [!NOTE]
 > 현재 공개 트레인은 `python-hwpx 5.7.0 → python-hwpx-automation 6.7.1 →
-> hwpx-plugin 1.7.0`(계약 `98510af22d13899c`, 2026-08-03 released — 양식개체·
-> 기안문 장르: 체크박스 저작 프리미티브와 `compose_official_draft`/
-> `compose_simple_draft`, 136 도구)입니다.
-> 공개 트레인은 core·automation PyPI와 plugin GitHub
-> Release·marketplace·실제 marketplace 설치까지 확인한 뒤 승격했으며, 기존
+> hwpx-plugin 1.7.0`(계약 `98510af22d13899c`)입니다. 이 소스 트리는
+> **release-approved 상태의 6.8.0 후보**입니다 — 정직성 트레인(영수증
+> 무결성·자기서술 검증기·코퍼스 v3 재측정·릴리스 좌표 identity 유도,
+> 계약 `6ba7bc0ca7226f2f`). 발행 승인은 있으나
+> 원격 진실 — core·automation PyPI와 plugin GitHub
+> Release·marketplace·실제 marketplace 설치 — 관찰 전이므로
+> 공개 좌표는 승격하지 않았습니다. 기존
 > 5.x 설치는 별도 발행된 `hwpx-mcp-server 5.1.1`이 보호합니다. 절차와 상태
 > 머신: [릴리스 runbook](docs/release-runbook.md)
 
