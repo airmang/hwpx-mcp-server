@@ -11,8 +11,8 @@ from hwpx_automation.fastmcp_adapter import snapshot_runtime_tools
 
 def _reference_doc(path: Path) -> None:
     document = HwpxDocument.new()
-    document.set_page_size(width=72000, height=36000, orientation="LANDSCAPE")
-    document.set_page_margins(left=7000, right=5000, top=3000, bottom=3000, header=1500, footer=1600, gutter=1000)
+    document.page.set_size(width=72000, height=36000, orientation="LANDSCAPE")
+    document.page.set_margins(left=7000, right=5000, top=3000, bottom=3000, header=1500, footer=1600, gutter=1000)
     document.add_paragraph("{{student}} 안내")
     table = document.add_table(2, 3, width=30000)
     table.set_column_widths([2, 1, 1])

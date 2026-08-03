@@ -100,12 +100,12 @@ class PackageValidationService:
     def list_master_pages_histories_versions(self, path: str) -> Dict[str, Any]:
         document, _ = self._context._open_document(path)
         master_pages = [
-            getattr(page, "part_name", None) for page in document.master_pages
+            getattr(page, "part_name", None) for page in document.parts.master_pages
         ]
         histories = [
-            getattr(history, "part_name", None) for history in document.histories
+            getattr(history, "part_name", None) for history in document.parts.histories
         ]
-        version = document.version
+        version = document.parts.version
         version_info = (
             asdict(cast(Any, version)) if version and dataclasses.is_dataclass(version) else None
         )

@@ -231,7 +231,7 @@ def test_find_text_returns_table_cell_location_and_anchor(sample_file: Path):
     assert match["anchor"]["anchor_id"] == "table:0:0:0:0@7"
     assert memo_result["location"] == match["location"]
     assert text_result["text"] == "표 안 코드 TARGET"
-    assert len(open_doc(str(sample_file)).memos) == 1
+    assert len(open_doc(str(sample_file)).notes.memos) == 1
 
 
 def test_search_and_replace_rejects_empty_find(sample_file: Path):

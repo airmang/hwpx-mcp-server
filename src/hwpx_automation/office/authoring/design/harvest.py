@@ -39,7 +39,7 @@ _PLACEHOLDER = {
 
 
 def _font_height(doc, ref) -> int:
-    style = doc.char_property(ref)
+    style = doc.styles.char_property(ref)
     if style is None:
         return 0
     try:
@@ -189,7 +189,7 @@ def _build_skeleton(source: Path, out_path: Path) -> dict:
         page = {}
 
     report = doc.save_report(out_path)
-    style_count = len(doc.char_properties)
+    style_count = len(doc.styles.char_properties)
     doc.close()
     return {
         "page": page,

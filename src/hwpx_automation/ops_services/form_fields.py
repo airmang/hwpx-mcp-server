@@ -30,6 +30,43 @@ from .transactions import TransactionService
 logger = logging.getLogger("hwpx_automation.hwpx_ops")
 
 
+def _form_field_to_legacy_dict(field: Any, *, index: int | None = None) -> dict[str, Any]:
+    """Rebuild the 5.x form-field dict shape from a 6.0 ``FormField``.
+
+    ``FormField`` (design §2.3) is a living view with no ``to_dict()`` — it
+    consolidated the 5.x dict's three id aliases / two prompt aliases / two
+    type aliases / five index keys into single attributes. This
+    automation-owned reconstruction restores the old dict shape (aliases
+    included) that existing callers/tests still depend on. ``dirty`` comes
+    straight off the wrapped element (the escape hatch), since it has no
+    dedicated attribute on FormField.
+    """
+
+    location = field.location
+    return {
+        "index": index,
+        "field_id": field.field_id,
+        "id": field.field_id,
+        "fieldid": field.field_id,
+        "name": field.name,
+        "prompt": field.prompt,
+        "instruction": field.prompt,
+        "memo": field.memo,
+        "dirty": field.element.get("dirty", ""),
+        "is_placeholder": field.is_placeholder,
+        "current_value": field.value,
+        "field_type": field.field_type,
+        "control_type": field.field_type,
+        "section_index": location.section_index,
+        "paragraph_index": location.paragraph_index,
+        "paragraph_index_in_section": location.paragraph_index_in_section,
+        "run_index": location.run_index,
+        "child_index": location.child_index,
+        "has_end": field.has_end,
+        "parameters": [parameter.to_dict() for parameter in field.parameters],
+    }
+
+
 def _note_preservation_contradiction(
     payload: dict[str, Any],
     domain_result: Mapping[str, Any],
@@ -89,7 +126,13 @@ class FormFieldService:
         path: str,
     ) -> dict[str, Any]:
         document, _resolved = self._context._open_document(path)
-        fields = document.list_form_fields()
+        # fields.all now returns tuple[FormField, ...] rather than
+        # list[dict] (design §2.3/§2.5) — reconstruct this op's established
+        # dict shape since FormField has no to_dict() of its own.
+        fields = [
+            _form_field_to_legacy_dict(field, index=index)
+            for index, field in enumerate(document.fields.all)
+        ]
         return {
             "fieldCount": len(fields),
             "fields": fields,
@@ -149,10 +192,16 @@ class FormFieldService:
                     "paragraphIndex out of range",
                     details={"paragraphIndex": paragraph_index},
                 ) from exc
-        field = document.add_form_field(
+        # fields.add now returns a FormField living view rather than a dict
+        # (design §2.3) — reconstruct the established response shape.
+        field = document.fields.add(
             name, prompt=prompt, memo=memo, paragraph=paragraph
         )
-        result = {"ok": True, "filename": path, "field": field}
+        result = {
+            "ok": True,
+            "filename": path,
+            "field": _form_field_to_legacy_dict(field),
+        }
         return self._transactions._with_transaction_verification(
             result, document, resolved, dry_run=dry_run
         )
@@ -168,13 +217,26 @@ class FormFieldService:
         dry_run: bool = False,
     ) -> dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        result = document.fill_form_field(
+        # fields.fill now returns a frozen FieldFillResult rather than a
+        # dict (design §2.3) — its own to_dict() uses camelCase keys and a
+        # bare field_id string for "field", which does not match this op's
+        # established snake_case/nested-dict contract, so rebuild it here.
+        fill_result = document.fields.fill(
             value,
             field_index=field_index,
             field_id=field_id,
             name=name,
         )
-        result.update({"ok": True, "filename": path})
+        result: dict[str, Any] = {
+            "ok": True,
+            "filename": path,
+            "field": _form_field_to_legacy_dict(fill_result.field),
+            "before_value": fill_result.before,
+            "after_value": fill_result.after,
+            "style_preserved": fill_result.style_preserved,
+            "style_before": list(fill_result.style_before),
+            "style_after": list(fill_result.style_after),
+        }
         return self._transactions._with_transaction_verification(
             result, document, resolved, dry_run=dry_run
         )

@@ -107,12 +107,12 @@ def test_create_custom_style_creates_distinct_style_and_name_resolves_on_insert(
     paragraph = doc.paragraphs[-1]
     assert paragraph.style_id_ref == created["style_id"]
 
-    style = doc.style(paragraph.style_id_ref)
+    style = doc.styles.get(paragraph.style_id_ref)
     assert style is not None
     assert style.name == "AccentStyle"
     assert str(style.char_pr_id_ref) == created["char_pr_id_ref"]
 
-    char_style = doc.char_property(style.char_pr_id_ref)
+    char_style = doc.styles.char_property(style.char_pr_id_ref)
     assert char_style is not None
     assert char_style.text_color() == "#FF0000"
     assert "bold" in char_style.child_attributes

@@ -70,7 +70,7 @@ def test_seal_pos_offsets_clamps_negative_to_zero():
 def test_add_picture_floating_emits_paper_relative_pos():
     document = HwpxDocument.new()
     paragraph = document.paragraphs[0]
-    ref = document.add_image(PNG_1X1, "png")
+    ref = document.media.add_image(PNG_1X1, "png")
     paragraph.add_picture(
         ref,
         width=7200,
@@ -106,7 +106,7 @@ def test_add_picture_pos_overrides_requires_floating():
     # pos_overrides (PAPER relTo/offset) on an INLINE pic is a contradictory
     # inline/floating mix — reject it rather than emit a confusing element.
     document = HwpxDocument.new()
-    ref = document.add_image(PNG_1X1, "png")
+    ref = document.media.add_image(PNG_1X1, "png")
     with pytest.raises(ValueError):
         document.paragraphs[0].add_picture(
             ref, treat_as_char=True, pos_overrides={"horzRelTo": "PAPER", "horzOffset": 100}
@@ -264,7 +264,7 @@ def test_add_picture_pos_overrides_clamps_negative_and_float_offsets():
     # the low-level floating primitive must never emit a schema-invalid offset
     # (xs:nonNegativeInteger) even if a caller passes a negative or fractional value.
     document = HwpxDocument.new()
-    ref = document.add_image(PNG_1X1, "png")
+    ref = document.media.add_image(PNG_1X1, "png")
     document.paragraphs[0].add_picture(
         ref,
         width=7200,

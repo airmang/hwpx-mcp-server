@@ -268,7 +268,7 @@ def test_ensure_char_style_applies_shared_color_style_logic(ops_with_sample):
     )
 
     assert char_id is not None
-    style = document.char_property(char_id)
+    style = document.styles.char_property(char_id)
     assert style is not None
     assert style.text_color() == "#FF0000"
     assert "bold" in style.child_attributes
@@ -414,7 +414,7 @@ def test_add_table_custom_border_fill_reuses_definition(ops_with_sample):
     assert border_id not in (None, "", "0")
     assert first_table.cell(0, 0).element.get("borderFillIDRef") == border_id
 
-    header = document.headers[0]
+    header = document.parts.headers[0]
     ref_list = header.element.find(f"{HH_NS}refList")
     assert ref_list is not None
     border_fills = ref_list.find(f"{HH_NS}borderFills")
@@ -739,7 +739,7 @@ def test_set_table_border_fill_updates_anchor_cells(ops_with_sample):
             )
 
     assert len(anchor_elements) == result["anchorCells"]
-    header = document.headers[0]
+    header = document.parts.headers[0]
     ref_list = header.element.find(f"{HH_NS}refList")
     assert ref_list is not None
     border_fills = ref_list.find(f"{HH_NS}borderFills")

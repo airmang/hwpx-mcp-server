@@ -236,7 +236,7 @@ def test_readme_python_example_runs_saves_and_reopens_from_base_wheel(
             "_output = Path('meeting-result.hwpx')",
             "assert _output.is_file()",
             "with HwpxDocument.open(_output) as _reopened:",
-            "    assert '결정 사항' in _reopened.export_text()",
+            "    assert '결정 사항' in _reopened.text.plain()",
             "assert 'mcp' not in sys.modules",
         )
     )

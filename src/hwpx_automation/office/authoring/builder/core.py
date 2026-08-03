@@ -271,12 +271,12 @@ class Paragraph:
 
         if not self.align:
             return None
-        if not document.headers:  # pragma: no cover - defensive
+        if not document.parts.headers:  # pragma: no cover - defensive
             raise ValueError(
                 "paragraph alignment requires a header part to hold the "
                 "paragraph properties"
             )
-        return document.headers[0].ensure_paragraph_alignment(self.align)
+        return document.parts.headers[0].ensure_paragraph_alignment(self.align)
 
     def lower(self, document: HwpxDocument, *, preset: _BuilderPreset | None = None) -> None:
         style_preset = preset or _BuilderPreset()
@@ -305,7 +305,7 @@ class Paragraph:
                 para_pr_id_ref=align_para_pr,
             )
             return
-        char_pr_id = document.ensure_run_style(**style_kwargs)
+        char_pr_id = document.styles.ensure_run(**style_kwargs)
         document.add_paragraph(
             _computed_text(self.text),
             char_pr_id_ref=char_pr_id,
@@ -334,11 +334,11 @@ class Toc:
     ) -> None:
         style_preset = preset or _BuilderPreset()
         title_style = (
-            document.ensure_run_style(**style_preset.heading_style(2))
+            document.styles.ensure_run(**style_preset.heading_style(2))
             if style_preset.is_government_report
-            else document.ensure_run_style(bold=True, size=14)
+            else document.styles.ensure_run(bold=True, size=14)
         )
-        entry_style = document.ensure_run_style()
+        entry_style = document.styles.ensure_run()
         document.add_paragraph(
             _computed_text(self.title),
             section_index=section_index,
@@ -430,7 +430,7 @@ class Heading:
         if self.level < 1 or self.level > 3:
             raise ValueError("heading level must be between 1 and 3")
         style_preset = preset or _BuilderPreset()
-        char_pr_id = document.ensure_run_style(**style_preset.heading_style(self.level))
+        char_pr_id = document.styles.ensure_run(**style_preset.heading_style(self.level))
         document.add_paragraph(
             _computed_text(self.text),
             section_index=section_index,
@@ -464,7 +464,7 @@ class Bullet:
             }
             for index in range(level_count)
         ]
-        refs = document.ensure_numbering(
+        refs = document.styles.ensure_numbering(
             kind="bullet",
             levels=levels,
         )
@@ -485,7 +485,7 @@ class NumberedList:
 
     def lower(self, document: HwpxDocument, *, section_index: int = 0) -> None:
         level_count = max(self.level + 1, 1)
-        refs = document.ensure_numbering(kind="number", levels=[{} for _ in range(level_count)])
+        refs = document.styles.ensure_numbering(kind="number", levels=[{} for _ in range(level_count)])
         para_pr_id = refs[self.level]
         for item in self.items:
             document.add_paragraph(
@@ -628,8 +628,8 @@ class Header:
         section_index: int = 0,
         preset: _BuilderPreset | None = None,
     ) -> None:
-        document.set_header_content(
-            _header_footer_content_specs(self.children, preset=preset),
+        document.page.set_header(
+            content=_header_footer_content_specs(self.children, preset=preset),
             section_index=section_index,
         )
 
@@ -645,8 +645,8 @@ class Footer:
         section_index: int = 0,
         preset: _BuilderPreset | None = None,
     ) -> None:
-        document.set_footer_content(
-            _header_footer_content_specs(self.children, preset=preset),
+        document.page.set_footer(
+            content=_header_footer_content_specs(self.children, preset=preset),
             section_index=section_index,
         )
 
@@ -840,14 +840,14 @@ class Section:
             else:
                 width = _mm_to_hwp_units(self.page.width_mm)
                 height = _mm_to_hwp_units(self.page.height_mm)
-            document.set_page_size(
+            document.page.set_size(
                 width=width,
                 height=height,
                 orientation=self.page.orientation,
                 section_index=section_index,
             )
         if self.margins is not None:
-            document.set_page_margins(
+            document.page.set_margins(
                 left=_mm_to_hwp_units(self.margins.left_mm),
                 right=_mm_to_hwp_units(self.margins.right_mm),
                 top=_mm_to_hwp_units(self.margins.top_mm),

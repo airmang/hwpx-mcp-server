@@ -226,7 +226,7 @@ def test_document_plan_creation_save_reopen_and_open_safety_match_frozen_core(
     mcp_path = tmp_path / "mcp-plan.hwpx"
     mcp_document = mcp_authoring.create_document_from_plan(_plan())
     try:
-        assert mcp_document.export_text() == GOLDEN["planDocument"]["exportText"]
+        assert mcp_document.text.plain() == GOLDEN["planDocument"]["exportText"]
         mcp_document.save_to_path(mcp_path)
     finally:
         mcp_document.close()
@@ -255,7 +255,7 @@ def test_builder_lowering_and_computed_fields_match_frozen_core(
     )
     mcp_document = mcp_plan.lower()
     try:
-        assert mcp_document.export_text() == GOLDEN["builderDocument"]["exportText"]
+        assert mcp_document.text.plain() == GOLDEN["builderDocument"]["exportText"]
         mcp_document.save_to_path(mcp_path)
     finally:
         mcp_document.close()

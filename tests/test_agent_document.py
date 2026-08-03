@@ -40,8 +40,8 @@ def _multi_story_fixture(path: Path) -> tuple[str, str]:
         table_paragraph = document.add_paragraph("표 문단")
         table = table_paragraph.add_table(1, 1)
         table.rows[0].cells[0].text = "S-080 MCP 셀 원본"
-        document.set_header_text(
-            "S-080 MCP 머리글 원본",
+        document.page.set_header(
+            text="S-080 MCP 머리글 원본",
             section=section,
             page_type="BOTH",
         )

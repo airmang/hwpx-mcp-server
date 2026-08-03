@@ -35,7 +35,7 @@ def _write_fixture(path: Path, *, merged: bool = False) -> None:
             Path(__file__).parent
             / "fixtures/fuzz_regressions/visual_review_seed_000000_000999_screenshots/seed-000003-710dbd610d8d.png"
         ).read_bytes()
-        image_ref = document.add_image(image_data, "png")
+        image_ref = document.media.add_image(image_data, "png")
         picture = second.add_picture(image_ref, width=7200, height=3600)
         picture.element.set("id", "402")
         picture.element.set("instid", "402")

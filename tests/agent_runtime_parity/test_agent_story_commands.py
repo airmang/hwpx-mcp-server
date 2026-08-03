@@ -566,10 +566,10 @@ def test_multisection_header_edit_preserves_other_section_and_story(
     with HwpxDocument.new() as document:
         first = document.sections[0]
         first.paragraphs[0].text = "첫 섹션 본문"
-        document.set_header_text("첫 섹션 머리글", section=first, page_type="BOTH")
+        document.page.set_header(text="첫 섹션 머리글", section=first, page_type="BOTH")
         second = document.add_section()
         second.paragraphs[0].text = "둘째 섹션 본문"
-        document.set_header_text("둘째 섹션 머리글", section=second, page_type="BOTH")
+        document.page.set_header(text="둘째 섹션 머리글", section=second, page_type="BOTH")
         source.write_bytes(document.to_bytes())
     before_members = _members(source.read_bytes())
 

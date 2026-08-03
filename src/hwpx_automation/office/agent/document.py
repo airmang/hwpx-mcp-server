@@ -314,9 +314,9 @@ class HwpxAgentDocument:
 
     def _paragraph_summary(self, paragraph: Any) -> tuple[dict[str, Any], dict[str, str]]:
         style_ref = paragraph.element.get("styleIDRef")
-        style = self.document.style(style_ref)
+        style = self.document.styles.get(style_ref)
         style_name = style.name if style is not None and style.name else style_ref
-        para_pr = self.document.paragraph_property(paragraph.element.get("paraPrIDRef"))
+        para_pr = self.document.styles.paragraph_property(paragraph.element.get("paraPrIDRef"))
         summary: dict[str, Any] = {"text": _bounded_text(paragraph.text), "style": style_name}
         if para_pr is not None:
             summary["alignment"] = para_pr.align.horizontal if para_pr.align is not None else None

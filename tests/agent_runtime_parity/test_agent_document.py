@@ -113,12 +113,12 @@ def test_projection_and_form_api_cover_fields_nested_in_table_cells() -> None:
         paragraph.element.append(end_run)
         paragraph.section.mark_dirty()
 
-        fields = document.list_form_fields()
+        fields = document.fields.all
         agent = HwpxAgentDocument.from_document(document, revision=REVISION)
         projected = [record for record in agent.records if record.kind == "form-field"]
 
-    assert [field["name"] for field in fields] == ["표셀담당"]
-    assert fields[0]["current_value"] == "교육과정부장"
+    assert [field.name for field in fields] == ["표셀담당"]
+    assert fields[0].value == "교육과정부장"
     assert len(projected) == 1
     assert projected[0].summary["name"] == "표셀담당"
     assert "/table" in projected[0].path and "/cell[1]/" in projected[0].path

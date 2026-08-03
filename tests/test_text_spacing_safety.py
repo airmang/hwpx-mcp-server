@@ -19,7 +19,7 @@ _SPACING_KEYS = ("hangul", "latin", "hanja", "japanese", "other", "symbol", "use
 
 def _char_pr_element(doc: Any, char_pr_id_ref: str | int):
     target = str(char_pr_id_ref)
-    ref_list = doc.headers[0].element.find(f"{HH_NS}refList")
+    ref_list = doc.parts.headers[0].element.find(f"{HH_NS}refList")
     assert ref_list is not None
     char_properties = ref_list.find(f"{HH_NS}charProperties")
     assert char_properties is not None
@@ -44,7 +44,7 @@ def _add_char_pr(doc: Any, *, spacing_value: int, preferred_id: str) -> str:
         for key in _SPACING_KEYS:
             spacing.set(key, str(spacing_value))
 
-    element = doc.headers[0].ensure_char_property(
+    element = doc.parts.headers[0].ensure_char_property(
         predicate=lambda _element: False,
         modifier=modifier,
         base_char_pr_id="0",

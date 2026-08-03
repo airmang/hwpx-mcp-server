@@ -406,13 +406,19 @@ def _table_summaries(doc: Any) -> list[dict[str, Any]]:
 
 def _style_summary(doc: Any) -> dict[str, Any]:
     used_ids: set[str] = set()
-    for run in getattr(doc, "iter_runs", lambda: [])():
+    # iter_runs/char_properties moved under doc.text/doc.styles (design
+    # §2.4/§2.6) — drill through the namespace defensively, same as the
+    # surrounding getattr(doc, ...) calls in this module, in case doc is a
+    # duck-typed stand-in without the full namespace surface.
+    text_ns = getattr(doc, "text", None)
+    for run in getattr(text_ns, "runs", lambda: [])():
         style_id = getattr(getattr(run, "element", None), "get", lambda _key: None)("charPrIDRef")
         if style_id:
             used_ids.add(str(style_id))
+    styles_ns = getattr(doc, "styles", {})
     return {
-        "available_char_style_count": len(getattr(doc, "char_properties", {})),
-        "available_paragraph_style_count": len(getattr(doc, "styles", {})),
+        "available_char_style_count": len(getattr(styles_ns, "char_properties", {})),
+        "available_paragraph_style_count": len(styles_ns),
         "used_run_style_ids": sorted(used_ids),
         "used_run_style_count": len(used_ids),
     }
@@ -504,11 +510,11 @@ def _create_quality_document_fallback(content_spec: Mapping[str, Any]) -> Any:
     """Create a presentable document when proposal presets are unavailable."""
 
     doc = new_document()
-    title_style = doc.ensure_run_style(bold=True)
-    heading_style = doc.ensure_run_style(bold=True, underline=True)
-    body_style = doc.ensure_run_style()
-    table_header_style = doc.ensure_run_style(bold=True)
-    callout_style = doc.ensure_run_style(bold=True)
+    title_style = doc.styles.ensure_run(bold=True)
+    heading_style = doc.styles.ensure_run(bold=True, underline=True)
+    body_style = doc.styles.ensure_run()
+    table_header_style = doc.styles.ensure_run(bold=True)
+    callout_style = doc.styles.ensure_run(bold=True)
 
     doc.add_paragraph(str(content_spec.get("title") or "운영계획서"), char_pr_id_ref=title_style)
     subtitle = str(content_spec.get("subtitle") or "")

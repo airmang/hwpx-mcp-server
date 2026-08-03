@@ -115,7 +115,7 @@ class ReadQueryService:
         sections = document.sections
         section_count = len(sections)
         paragraph_count = sum(len(section.paragraphs) for section in sections)
-        header_count = len(document.headers)
+        header_count = len(document.parts.headers)
         stat = resolved.stat()
         meta = {
             "path": self._context._relative_path(resolved),
@@ -146,8 +146,8 @@ class ReadQueryService:
     def list_headers(self, path: str) -> Dict[str, Any]:
         document, _ = self._context._open_document(path)
         headers: List[Dict[str, Any]] = []
-        has_master_page = bool(document.master_pages)
-        for index, header in enumerate(document.headers):
+        has_master_page = bool(document.parts.master_pages)
+        for index, header in enumerate(document.parts.headers):
             headers.append(
                 {
                     "index": index,

@@ -299,8 +299,11 @@ def materialize_dependencies(
             elif family == "resource":
                 asset_path = str(properties["assetPath"])
                 suffix = asset_path.rsplit(".", 1)[-1]
+                # media.add_image now returns a BinaryItem rather than a bare
+                # str (design §2.6) — str(...) is the documented migration
+                # buffer (item_id), keeping this identity payload a plain string.
                 item["identity"] = {
-                    "binaryItemIDRef": document.add_image(assets[asset_path], suffix),
+                    "binaryItemIDRef": str(document.media.add_image(assets[asset_path], suffix)),
                     "mediaType": properties["mediaType"],
                 }
             else:  # pragma: no cover - validated dependency family exhaustiveness

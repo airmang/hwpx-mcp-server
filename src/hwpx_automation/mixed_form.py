@@ -2393,7 +2393,7 @@ def _specialized_allowed_members(source_bytes: bytes) -> set[str]:
         members = {str(section.part_name) for section in document.document.sections}
         members.update(
             str(header.part_name)
-            for header in getattr(document.document, "headers", ())
+            for header in getattr(document.document.parts, "headers", ())
         )
     if not members:
         raise ValueError("specialized form operation has no editable document members")

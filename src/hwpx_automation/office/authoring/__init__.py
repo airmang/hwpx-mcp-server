@@ -225,38 +225,38 @@ class DocumentStylePreset:
         """Create/reuse run styles and return semantic token IDs."""
 
         return {
-            "title": document.ensure_run_style(
+            "title": document.styles.ensure_run(
                 bold=self.title_bold,
                 size=self.title_size,
                 font=self.font,
                 color=self.title_color,
             ),
-            "subtitle": document.ensure_run_style(
+            "subtitle": document.styles.ensure_run(
                 italic=self.subtitle_italic,
                 size=self.subtitle_size,
                 font=self.font,
                 color=self.subtitle_color,
             ),
-            "heading": document.ensure_run_style(
+            "heading": document.styles.ensure_run(
                 bold=self.heading_bold,
                 underline=self.heading_underline,
                 size=self.heading_size,
                 font=self.font,
                 color=self.heading_color,
             ),
-            "body": document.ensure_run_style(size=self.body_size, font=self.font),
-            "bullet": document.ensure_run_style(size=self.body_size, font=self.font),
-            "meta": document.ensure_run_style(
+            "body": document.styles.ensure_run(size=self.body_size, font=self.font),
+            "bullet": document.styles.ensure_run(size=self.body_size, font=self.font),
+            "meta": document.styles.ensure_run(
                 size=self.meta_size,
                 font=self.font,
                 color=self.meta_color,
             ),
-            "table_header": document.ensure_run_style(
+            "table_header": document.styles.ensure_run(
                 bold=self.table_header_bold,
                 size=self.body_size,
                 font=self.font,
             ),
-            "table_cell": document.ensure_run_style(
+            "table_cell": document.styles.ensure_run(
                 size=self.body_size,
                 font=self.font,
             ),
@@ -1178,7 +1178,7 @@ def create_document_from_plan(
         else DocumentStylePreset(name=str(preset or normalized.style_preset or DEFAULT_STYLE_PRESET))
     )
     document = HwpxDocument.new()
-    document.set_page_setup(
+    document.page.setup(
         margins_mm={
             "left": _DEFAULT_PAGE_MARGIN_MM,
             "right": _DEFAULT_PAGE_MARGIN_MM,
@@ -1311,7 +1311,7 @@ def inspect_document_authoring_quality(
             for paragraph in document.paragraphs
             if (paragraph.text or "").strip()
         ]
-        full_text = document.export_text()
+        full_text = document.text.plain()
         table_count = len(_iter_tables(document))
         page_break_count = sum(
             1
@@ -2438,7 +2438,7 @@ def _format_para(
         return
     try:
         index = document.paragraphs.index(paragraph)
-        document.set_paragraph_format(paragraph_index=index, **kwargs)
+        document.styles.apply_paragraph_format(paragraph_index=index, **kwargs)
     except (ValueError, KeyError):
         return
 
@@ -2453,7 +2453,7 @@ def _add_rich_runs(
     for run in runs:
         if not isinstance(run, BuilderRun):
             raise ValueError(f"unsupported paragraph child: {type(run).__name__}")
-        char_pr_id = document.ensure_run_style(
+        char_pr_id = document.styles.ensure_run(
             bold=bool(run.bold),
             italic=bool(run.italic),
             underline=bool(run.underline),
@@ -2542,7 +2542,7 @@ def _render_block(
             char_pr_id_ref=tokens["body"],
             inherit_style=False,
         )
-        document.add_memo_with_anchor(str(block.data["memo"]), paragraph=paragraph)
+        document.notes.add_memo(str(block.data["memo"]), anchor=paragraph)
         return
     if isinstance(block, BuilderPageBreak):
         document.add_paragraph("", pageBreak="1", inherit_style=False)
@@ -2684,8 +2684,8 @@ def _style_plan_table(
     header_fill: str,
     header_rows: int = 1,
 ) -> None:
-    border_fill_id = document.ensure_border_fill(border_color=_TABLE_BORDER_COLOR)
-    header_fill_id = document.ensure_border_fill(
+    border_fill_id = document.styles.ensure_border_fill(border_color=_TABLE_BORDER_COLOR)
+    header_fill_id = document.styles.ensure_border_fill(
         border_color=_TABLE_BORDER_COLOR,
         fill_color=header_fill,
     )
@@ -2788,7 +2788,7 @@ def _style_usage(document: HwpxDocument) -> dict[str, Any]:
     return {
         "used_run_style_ids": sorted(used_ids),
         "used_run_style_count": len(used_ids),
-        "available_char_style_count": len(document.char_properties),
+        "available_char_style_count": len(document.styles.char_properties),
     }
 
 
@@ -2860,7 +2860,7 @@ def _inspect_operating_plan_quality(
     profile: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     options = _operating_plan_profile(profile)
-    full_text = document.export_text()
+    full_text = document.text.plain()
     table_text = _table_text(document)
     plan_text = _plan_text(normalized_plan)
     all_text = "\n".join(text for text in (full_text, table_text, plan_text) if text)
@@ -2982,7 +2982,7 @@ def _inspect_operating_plan_quality(
 
 
 def _document_text_lines(document: HwpxDocument) -> list[str]:
-    full_text = document.export_text()
+    full_text = document.text.plain()
     table_text = _table_text(document)
     lines: list[str] = []
     for chunk in (full_text, table_text):
@@ -3342,7 +3342,7 @@ def _camel_to_snake(value: str) -> str:
 
 
 def _iter_runs_deep(document: HwpxDocument) -> list[Any]:
-    runs = list(document.iter_runs())
+    runs = list(document.text.runs())
     for table in _iter_tables(document):
         for row in table.rows:
             for cell in row.cells:

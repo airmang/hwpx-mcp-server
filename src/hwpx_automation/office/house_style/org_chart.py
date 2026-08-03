@@ -223,14 +223,14 @@ def lower_boxed_org_chart(
     spec = compose_boxed_org_chart(hierarchy, accent_color=accent_color)
     table = document.add_table(spec.rows, spec.cols, section_index=section_index)
 
-    invisible = document.ensure_border_fill(active_borders=[])
+    invisible = document.styles.ensure_border_fill(active_borders=[])
     table.element.set("borderFillIDRef", str(invisible))
     for row in range(spec.rows):
         for col in range(spec.cols):
             table.set_cell_border_fill(row, col, invisible)
 
     for (row, col), sides in sorted(spec.cell_sides.items()):
-        fill = document.ensure_border_fill(
+        fill = document.styles.ensure_border_fill(
             border_color=_BORDER_COLOR,
             border_width=_BORDER_WIDTH,
             active_borders=sorted(sides),
@@ -239,7 +239,7 @@ def lower_boxed_org_chart(
 
     for box in spec.boxes:
         merged = table.merge_cells(box.row, box.col_start, box.row, box.col_end)
-        box_fill = document.ensure_border_fill(
+        box_fill = document.styles.ensure_border_fill(
             border_color=_BORDER_COLOR,
             border_width=_BORDER_WIDTH,
             fill_color=box.fill_color,

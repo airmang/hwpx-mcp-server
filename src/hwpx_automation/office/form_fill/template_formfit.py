@@ -584,7 +584,7 @@ def _residual_markers(path: Path, policy: Mapping[str, Any]) -> dict[str, Any]:
     ]
     doc = HwpxDocument.open(path)
     try:
-        full_text = doc.export_text()
+        full_text = doc.text.plain()
     finally:
         doc.close()
     blocking = [

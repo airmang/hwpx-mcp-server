@@ -131,7 +131,7 @@ def test_add_tracked_edit_writes_structural_redline_receipt(
 
     reopened = open_doc(str(destination))
     try:
-        assert len(reopened.track_changes) >= 4
+        assert len(reopened.tracking.changes) >= 4
         assert " ".join(
             _project_tracked_text(
                 reopened,

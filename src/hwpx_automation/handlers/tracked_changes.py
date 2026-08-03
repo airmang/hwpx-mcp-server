@@ -483,30 +483,36 @@ def add_tracked_edit(
             paragraph = doc.paragraphs[paragraph_index]
             before_text = _tracked_paragraph_text(paragraph)
             if edit_type == "insert":
-                change_id = doc.add_tracked_insert(
+                # tracking.insert/delete/replace now return TrackedChange /
+                # TrackedReplacement objects rather than bare int/tuple
+                # (design §2.6) — .change_id (and .delete/.insert for the
+                # replace case, in the same delete-then-insert order 5.x
+                # returned) keeps this handler's own int-list response shape
+                # unchanged.
+                change = doc.tracking.insert(
                     paragraph,
                     edit["text"],
                     author=author,
                     date=normalized_date,
                 )
-                change_ids = [change_id]
+                change_ids = [change.change_id]
             elif edit_type == "delete":
-                change_id = doc.add_tracked_delete(
+                change = doc.tracking.delete(
                     paragraph,
                     match=edit.get("match"),
                     author=author,
                     date=normalized_date,
                 )
-                change_ids = [change_id]
+                change_ids = [change.change_id]
             elif edit_type == "replace":
-                replace_ids = doc.add_tracked_replace(
+                replacement = doc.tracking.replace(
                     paragraph,
                     edit["old"],
                     edit["new"],
                     author=author,
                     date=normalized_date,
                 )
-                change_ids = list(replace_ids)
+                change_ids = [replacement.delete.change_id, replacement.insert.change_id]
             else:  # pragma: no cover - validation prevents this branch
                 raise ValueError(f"unsupported tracked edit type: {edit_type}")
             edit_results.append(

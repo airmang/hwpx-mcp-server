@@ -406,10 +406,10 @@ def create_style_in_doc(
     name = (style_name or "").strip()
     if not name:
         raise ValueError("style_name cannot be empty")
-    if not doc.headers:
+    if not doc.parts.headers:
         raise RuntimeError("document does not contain any headers to host styles")
 
-    header = doc.headers[0]
+    header = doc.parts.headers[0]
     styles_element = document_styles_element(doc)
 
     for style in _iter_unique_styles(doc):
@@ -427,7 +427,7 @@ def create_style_in_doc(
         }
 
     base_style_id = _default_base_style_id(doc)
-    base_style = doc.style(base_style_id)
+    base_style = doc.styles.get(base_style_id)
     if base_style is None:
         raise RuntimeError(f"failed to resolve base style id: {base_style_id}")
 

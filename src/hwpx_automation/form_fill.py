@@ -311,7 +311,10 @@ def apply_form_fill_workflow(
             if mapping.get("kind") == "form-field":
                 before_fields = _document_form_fields(doc)
                 before_field = _find_form_field_by_mapping(before_fields, mapping)
-                fill_result = doc.fill_form_field(
+                # fields.fill now returns a frozen FieldFillResult rather
+                # than a dict (design §2.3) — read its attributes directly
+                # instead of the old after_value/style_before/... dict keys.
+                fill_result = doc.fields.fill(
                     str(mapping.get("value", "")),
                     field_index=int(mapping["field_index"]),
                 )
@@ -320,10 +323,10 @@ def apply_form_fill_workflow(
                     {
                         **mapping,
                         "before_text": mask_pii(_before_ff, DEFAULT_POLICY) if mask else _before_ff,
-                        "after_text": fill_result["after_value"],
-                        "style_before": fill_result.get("style_before"),
-                        "style_after": fill_result.get("style_after"),
-                        "style_preserved": bool(fill_result.get("style_preserved", False)),
+                        "after_text": fill_result.after,
+                        "style_before": list(fill_result.style_before),
+                        "style_after": list(fill_result.style_after),
+                        "style_preserved": bool(fill_result.style_preserved),
                     }
                 )
             elif mapping.get("kind") == "cell":
@@ -589,7 +592,7 @@ def _build_mapping_analysis(doc: Any, canonical_input: dict[str, Any]) -> dict[s
             if native_mapping is not None:
                 resolved.append(native_mapping)
                 continue
-            matches = doc.find_cell_by_label(label, direction=direction).get("matches", [])
+            matches = doc.tables.find_cell_by_label(label, direction=direction).get("matches", [])
             if len(matches) == 1:
                 match = matches[0]
                 cell = match["target_cell"]
@@ -681,14 +684,50 @@ def _build_mapping_analysis(doc: Any, canonical_input: dict[str, Any]) -> dict[s
     return {"resolved": resolved, "unresolved": unresolved, "formFields": form_field_strategy}
 
 
+def _form_field_to_legacy_dict(field: Any, *, index: int) -> dict[str, Any]:
+    """Rebuild the 5.x form-field dict shape from a 6.0 ``FormField`` view.
+
+    Mirrors ``ops_services.form_fields._form_field_to_legacy_dict`` — kept
+    local (not imported) since this lower-level workflow module sits below
+    the service layer and importing from it would invert that dependency
+    direction. ``index`` is load-bearing here: downstream mapping resolution
+    (``_resolved_explicit_form_field_mapping``/``_find_form_field_by_mapping``)
+    matches on ``field["index"]`` to build ``field_index=`` fill targets.
+    """
+
+    location = field.location
+    return {
+        "index": index,
+        "field_id": field.field_id,
+        "id": field.field_id,
+        "fieldid": field.field_id,
+        "name": field.name,
+        "prompt": field.prompt,
+        "instruction": field.prompt,
+        "memo": field.memo,
+        "dirty": field.element.get("dirty", ""),
+        "is_placeholder": field.is_placeholder,
+        "current_value": field.value,
+        "field_type": field.field_type,
+        "control_type": field.field_type,
+        "section_index": location.section_index,
+        "paragraph_index": location.paragraph_index,
+        "paragraph_index_in_section": location.paragraph_index_in_section,
+        "run_index": location.run_index,
+        "child_index": location.child_index,
+        "has_end": field.has_end,
+        "parameters": [parameter.to_dict() for parameter in field.parameters],
+    }
+
+
 def _document_form_fields(doc: Any) -> list[dict[str, Any]]:
-    list_fields = getattr(doc, "list_form_fields", None)
-    if not callable(list_fields):
-        return []
-    fields = list_fields()
-    if not isinstance(fields, list):
-        return []
-    return [copy.deepcopy(field) for field in fields if isinstance(field, dict)]
+    # fields.all now returns tuple[FormField, ...] rather than list[dict]
+    # (design §2.3/§2.5) — reconstruct the established dict shape since
+    # FormField has no to_dict() of its own.
+    return [
+        _form_field_to_legacy_dict(field, index=index)
+        for index, field in enumerate(doc.fields.all)
+    ]
 
 
 def _normalize_match_text(value: Any) -> str:

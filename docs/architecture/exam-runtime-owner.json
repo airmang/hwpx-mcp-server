@@ -12,8 +12,13 @@
   "status": "canonical",
   "pythonFiles": 6,
   "loc": 806,
-  "manifestSha256": "7485965024224771d91ab6cc64bec34fd66e9488531e37b8fb910f879b646dda",
-  "refrozenNote": "2ffc011280ca599b…에서 재계산. measure.py가 block-split 계약을 core가 아니라 렌더 소유자에서 가져오도록 바뀌었다(5.0 경계 마감). 조판 로직은 그대로다."
+  "manifestSha256": "8b1c5e859b6e466409692fe2a4e6b7e28c95670d64ee5860a00eb45a93cdef21",
+  "refrozenNote": "WP-F (core 6.0 namespace adaptation): profile.py's doc.style(sid) call moved to doc.styles.get(sid) (design §2.4, id·이름 겸용 조회로 승격). Same line count, no behavior change.",
+  "refrozenFrom": {
+   "loc": 806,
+   "manifestSha256": "7485965024224771d91ab6cc64bec34fd66e9488531e37b8fb910f879b646dda",
+   "reason": "measure.py block-split contract sourced from the render owner instead of core (5.0 boundary close)"
+  }
  },
  "packageFiles": [
   "__init__.py",

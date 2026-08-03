@@ -787,7 +787,10 @@ def insert_picture(
         section_index=section_index,
         align=align,
     )
-    picture_refs = doc.picture_references()
+    # media.picture_references now returns tuple[PictureRef, ...] rather
+    # than list[dict] (design §2.5) — .to_dict() per entry keeps this
+    # handler's own dict-shaped response unchanged.
+    picture_refs = [ref.to_dict() for ref in doc.media.picture_references()]
     result = {
         "ok": True,
         "filename": filename,
@@ -821,19 +824,40 @@ def replace_picture(
     target_path = resolve_path(output) if output else path
     doc = open_doc(path)
     image_data = _decode_image_base64(image_base64)
-    replacement = doc.replace_picture(
+    # media.replace_picture now returns a frozen PictureReplacement (design
+    # §2.4) whose own .to_dict() uses different field names than this op's
+    # established response contract (old_binaryItemIDRef/new_binaryItemIDRef/
+    # removedOldImage/geometryPreserved/picture_index/section_index), which
+    # existing callers/tests depend on — rebuild that exact shape instead.
+    replacement = doc.media.replace_picture(
         image_data,
         image_format,
         picture_index=picture_index,
         binary_item_id_ref=binary_item_id_ref,
         remove_orphaned=remove_orphaned,
     )
+    replaced_section_index = next(
+        (
+            index
+            for index, section in enumerate(doc.sections)
+            if section.element is replacement.picture.paragraph.section.element
+        ),
+        None,
+    )
+    replacement_payload = {
+        "picture_index": picture_index,
+        "section_index": replaced_section_index,
+        "old_binaryItemIDRef": replacement.previous_item_id,
+        "new_binaryItemIDRef": replacement.item_id,
+        "removedOldImage": bool(replacement.removed_orphans),
+        "geometryPreserved": True,
+    }
     result = {
         "ok": True,
         "filename": filename,
         "outputPath": target_path,
-        "replacement": replacement,
-        "pictureReferences": doc.picture_references(),
+        "replacement": replacement_payload,
+        "pictureReferences": [ref.to_dict() for ref in doc.media.picture_references()],
         "idIntegrity": _id_integrity_payload(doc),
     }
     if dry_run:

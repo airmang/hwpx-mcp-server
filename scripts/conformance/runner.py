@@ -95,13 +95,15 @@ def _eval_form_safe(data: bytes, case: ConformanceCase) -> TierVerdict:
     document = HwpxDocument.open(io.BytesIO(data))
     try:
         if case.required_fields:
+            # fields.all now returns tuple[FormField, ...] rather than
+            # list[dict] (design §2.3/§2.5) — read the living view's own
+            # attributes instead of the old dict keys.
             by_name = {
-                str(f.get("name") or f.get("field_id") or ""): f
-                for f in document.list_form_fields()
+                str(f.name or f.field_id or ""): f for f in document.fields.all
             }
             for name in case.required_fields:
                 field = by_name.get(name)
-                if field is None or not str(field.get("current_value", "")).strip():
+                if field is None or not str(field.value or "").strip():
                     missing_required.append(name)
 
         if case.form_slots:

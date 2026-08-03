@@ -132,8 +132,8 @@ def test_mail_merge_policy_and_receipts_match_frozen_core(tmp_path: Path) -> Non
     assert _mail_merge_projection(canonical) == DOCUMENT_OPS_GOLDEN["mailMerge"]["projection"]
     canonical_doc = HwpxDocument.open(canonical["rows"][0]["filename"])
     try:
-        assert canonical_doc.export_text() == DOCUMENT_OPS_GOLDEN["mailMerge"]["exportText"]
-        assert "010-****-****" in canonical_doc.export_text()
+        assert canonical_doc.text.plain() == DOCUMENT_OPS_GOLDEN["mailMerge"]["exportText"]
+        assert "010-****-****" in canonical_doc.text.plain()
     finally:
         canonical_doc.close()
 

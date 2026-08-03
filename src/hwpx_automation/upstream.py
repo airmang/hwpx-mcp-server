@@ -85,11 +85,11 @@ def validate_document_path(path: str | PathLike[str]) -> ValidationReport:
 
 def export_document(document: HwpxDocument, output_format: Literal["text", "html", "markdown"]) -> str:
     if output_format == "text":
-        return document.export_text()
+        return document.text.plain()
     if output_format == "html":
-        return document.export_html()
+        return document.text.html()
     if output_format == "markdown":
-        return document.export_markdown()
+        return document.text.markdown()
     raise ValueError(f"unsupported export format: {output_format}")
 
 
@@ -123,9 +123,9 @@ def append_xml_child(parent: ET.Element, tag: str, attrs: dict[str, str] | None 
 
 
 def primary_header(document: HwpxDocument) -> Any:
-    if not document.headers:
+    if not document.parts.headers:
         raise RuntimeError("document does not contain any headers to host styles")
-    return document.headers[0]
+    return document.parts.headers[0]
 
 
 def style_identifier(style: Any) -> str | None:
@@ -155,7 +155,7 @@ def resolve_style_id(document: HwpxDocument, style: str | None) -> str | None:
     if not value:
         return None
 
-    resolved = document.style(value)
+    resolved = document.styles.get(value)
     if resolved is not None:
         style_id = style_identifier(resolved)
         if style_id is not None:
@@ -349,14 +349,14 @@ def ensure_char_style(
 ) -> str:
     """Return a ``charPr`` id matching the requested formatting.
 
-    This prefers the public-ish upstream helper ``document.ensure_run_style()``
+    This prefers the public-ish upstream helper ``document.styles.ensure_run()``
     when only bold/italic/underline flags are involved. When color, font size,
     or font family overrides are requested, we fall back to the header-level
     ``ensure_char_property()`` hook so downstream behavior stays aligned with the
     current upstream document engine.
     """
 
-    base_style = document.char_property(base_char_pr_id)
+    base_style = document.styles.char_property(base_char_pr_id)
     base_flags = run_style_flags(base_style)
     target_flags = (
         base_flags[0] if bold is None else bool(bold),
@@ -365,7 +365,7 @@ def ensure_char_style(
     )
 
     if font_size is None and font_name is None and color is None:
-        return document.ensure_run_style(
+        return document.styles.ensure_run(
             bold=target_flags[0],
             italic=target_flags[1],
             underline=target_flags[2],
@@ -467,7 +467,7 @@ def _char_property_element(
     if not target:
         return None
 
-    for header in document.headers:
+    for header in document.parts.headers:
         ref_list = header.element.find(f"{HH_NS}refList")
         if ref_list is None:
             continue
@@ -515,7 +515,7 @@ def _safe_spacing_fallback_refs(
 
     append(explicit_ref)
     if paragraph is not None:
-        style = document.style(getattr(paragraph, "style_id_ref", None))
+        style = document.styles.get(getattr(paragraph, "style_id_ref", None))
         append(getattr(style, "char_pr_id_ref", None))
         append(getattr(paragraph, "char_pr_id_ref", None))
 

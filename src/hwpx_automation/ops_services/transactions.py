@@ -199,7 +199,7 @@ class TransactionService:
             mappings = self._operation_value(operation, "mappings")
             if not isinstance(mappings, dict):
                 raise ValueError("fill_by_path requires mappings")
-            result = document.fill_by_path(mappings)
+            result = document.tables.fill_by_path(mappings)
             return {"type": op_type, **result}
 
         if op_type == "add_page_break":

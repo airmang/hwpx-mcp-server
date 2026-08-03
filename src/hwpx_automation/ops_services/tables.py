@@ -170,13 +170,13 @@ class TableService:
         if shortcut is not None:
             return shortcut
 
-        if not document.headers:
+        if not document.parts.headers:
             raise self._context._new_error(
                 "STYLE_BORDER_FILL_HEADER_MISSING",
                 "document does not contain any headers to host border fills",
             )
 
-        header = document.headers[0]
+        header = document.parts.headers[0]
         spec = _resolve_border_fill_spec(
             normalized_style,
             normalized_border_color,

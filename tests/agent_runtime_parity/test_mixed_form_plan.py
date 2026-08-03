@@ -229,8 +229,8 @@ def test_success_preserves_untouched_members_and_reopens(tmp_path: Path) -> None
     assert result.verification_report["bytePreservation"]["ok"] is True
     assert validate_editor_open_safety(output).ok
     with HwpxDocument.open(output) as document:
-        assert document.list_form_fields()[0]["current_value"] == "AI 수업 나눔의 날"
-        matches = document.find_cell_by_label("담당 부서", direction="right")
+        assert document.fields.all[0].value == "AI 수업 나눔의 날"
+        matches = document.tables.find_cell_by_label("담당 부서", direction="right")
         match = matches["matches"][0]
         assert match["target_cell"]["text"] == "교육연구부"
     with HwpxAgentDocument.open(output) as agent:

@@ -36,7 +36,7 @@ def _write_supported_fixture(path: Path, *, paragraph_id: str = "102") -> str:
         paragraph.text = "결재 요청 본문"
         paragraph.add_rectangle(width=7200, height=3600, fill_color="#FFFFFF")
         paragraph.add_footnote("승인 근거")
-        image_ref = document.add_image(PNG, "png")
+        image_ref = document.media.add_image(PNG, "png")
         paragraph.add_picture(image_ref, width=7200, height=3600)
         table = paragraph.add_table(2, 2)
         table.rows[0].cells[0].text = "항목"

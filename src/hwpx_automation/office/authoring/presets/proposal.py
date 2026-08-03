@@ -80,17 +80,17 @@ class ProposalStylePreset:
         """Create/reuse public char styles and return semantic token IDs."""
 
         return {
-            "title": document.ensure_run_style(bold=self.title_bold),
-            "subtitle": document.ensure_run_style(italic=self.subtitle_italic),
-            "heading": document.ensure_run_style(bold=self.heading_bold),
-            "section_heading": document.ensure_run_style(
+            "title": document.styles.ensure_run(bold=self.title_bold),
+            "subtitle": document.styles.ensure_run(italic=self.subtitle_italic),
+            "heading": document.styles.ensure_run(bold=self.heading_bold),
+            "section_heading": document.styles.ensure_run(
                 bold=self.heading_bold,
                 underline=self.heading_underline,
             ),
-            "body": document.ensure_run_style(),
-            "table_header": document.ensure_run_style(bold=self.table_header_bold),
-            "table_cell": document.ensure_run_style(),
-            "callout": document.ensure_run_style(bold=self.callout_bold),
+            "body": document.styles.ensure_run(),
+            "table_header": document.styles.ensure_run(bold=self.table_header_bold),
+            "table_cell": document.styles.ensure_run(),
+            "callout": document.styles.ensure_run(bold=self.callout_bold),
         }
 
 
@@ -408,7 +408,7 @@ def _style_token_usage(document: HwpxDocument) -> dict[str, Any]:
         "callout",
     ]
     used_ids: set[str] = set()
-    for run in document.iter_runs():
+    for run in document.text.runs():
         style_id = run.element.get("charPrIDRef")
         if style_id:
             used_ids.add(str(style_id))
@@ -417,7 +417,7 @@ def _style_token_usage(document: HwpxDocument) -> dict[str, Any]:
         "semantic_tokens_expected_count": len(expected),
         "unique_run_style_ids": sorted(used_ids),
         "unique_run_style_count": len(used_ids),
-        "style_count_available": len(document.char_properties),
+        "style_count_available": len(document.styles.char_properties),
         "sample_anchor": {
             "good_samples_style_count_range": [30, 46],
             "bad_sample_style_count": 27,

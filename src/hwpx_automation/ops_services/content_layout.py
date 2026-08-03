@@ -53,7 +53,7 @@ class ContentLayoutService:
                 )
             if "charPrIDRef" in style_filter and style_filter["charPrIDRef"]:
                 filter_args["char_pr_id_ref"] = style_filter["charPrIDRef"]
-        replaced = document.replace_text_in_runs(
+        replaced = document.text.replace(
             search,
             replacement,
             limit=limit_per_run,
@@ -223,7 +223,7 @@ class ContentLayoutService:
             target_error_code="CHART_TARGET_INVALID",
         )
         try:
-            inline_object = document.add_chart(
+            inline_object = document.shapes.add_chart(
                 chart_ml, paragraph=paragraph, treat_as_char=treat_as_char
             )
         except ValueError as exc:
@@ -269,7 +269,7 @@ class ContentLayoutService:
             col=col,
         )
         try:
-            document.add_equation(script, paragraph=paragraph, base_unit=base_unit)
+            document.shapes.add_equation(script, paragraph=paragraph, base_unit=base_unit)
         except ValueError as exc:
             raise self._context._new_error(
                 "EQUATION_INPUT_INVALID", str(exc)
@@ -339,7 +339,10 @@ class ContentLayoutService:
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        result = document.set_paragraph_format(
+        # apply_paragraph_format now returns a frozen ParagraphFormatResult
+        # (design §2.4) rather than a dict — .to_dict() keeps this service's
+        # own dict-shaped op envelope (ok/filename merged below) unchanged.
+        result = document.styles.apply_paragraph_format(
             paragraph_index=paragraph_index,
             paragraph_indexes=paragraph_indexes,
             alignment=alignment,
@@ -353,7 +356,7 @@ class ContentLayoutService:
             keep_with_next=keep_with_next,
             keep_lines=keep_lines,
             page_break_before=page_break_before,
-        )
+        ).to_dict()
         result.update({"ok": True, "filename": path})
         return self._transactions._with_transaction_verification(
             result, document, resolved, dry_run=dry_run
@@ -381,7 +384,10 @@ class ContentLayoutService:
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        result = document.set_page_setup(
+        # page.setup now returns a frozen PageSetup (design §2.4) rather than
+        # a dict — .to_dict() keeps this service's own dict-shaped op
+        # envelope (ok/filename merged below) unchanged.
+        result = document.page.setup(
             paper_size=paper_size,
             width_mm=width_mm,
             height_mm=height_mm,
@@ -397,7 +403,7 @@ class ContentLayoutService:
             columns=columns,
             column_gap_mm=column_gap_mm,
             section_index=section_index,
-        )
+        ).to_dict()
         result.update({"ok": True, "filename": path})
         return self._transactions._with_transaction_verification(
             result, document, resolved, dry_run=dry_run
@@ -434,13 +440,26 @@ class ContentLayoutService:
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        wrapper = document.set_header_footer(
-            kind=kind,
-            text=text,
-            content=content,
-            section_index=section_index,
-            page_type=page_type,
-        )
+        # set_header_footer is demoted in 6.0 with no namespace replacement
+        # (design table row 102, kind= dispatch removed) — dispatch here
+        # instead, replicating the normalization the removed method used to do.
+        normalized_kind = kind.strip().lower() if isinstance(kind, str) else kind
+        if normalized_kind == "header":
+            wrapper = document.page.set_header(
+                text=text,
+                content=content,
+                section_index=section_index,
+                page_type=page_type,
+            )
+        elif normalized_kind == "footer":
+            wrapper = document.page.set_footer(
+                text=text,
+                content=content,
+                section_index=section_index,
+                page_type=page_type,
+            )
+        else:
+            raise ValueError("kind must be 'header' or 'footer'")
         result = {
             "ok": True,
             "filename": path,
@@ -470,7 +489,7 @@ class ContentLayoutService:
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        wrapper = document.set_page_number(
+        wrapper = document.page.set_page_number(
             target=target,
             page_type=page_type,
             format=format,
@@ -510,7 +529,10 @@ class ContentLayoutService:
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        result = document.set_list_format(
+        # apply_list_format now returns a frozen ListFormatResult (design
+        # §2.4) rather than a dict — .to_dict() keeps this service's own
+        # dict-shaped op envelope (ok/filename merged below) unchanged.
+        result = document.styles.apply_list_format(
             paragraph_index=paragraph_index,
             paragraph_indexes=paragraph_indexes,
             kind=kind,
@@ -518,7 +540,7 @@ class ContentLayoutService:
             bullet_char=bullet_char,
             number_format=number_format,
             start=start,
-        )
+        ).to_dict()
         result.update({"ok": True, "filename": path})
         return self._transactions._with_transaction_verification(
             result, document, resolved, dry_run=dry_run

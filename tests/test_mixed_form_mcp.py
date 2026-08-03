@@ -752,7 +752,7 @@ def test_analyze_and_apply_four_targets_with_receipt_and_member_preservation(
         common = set(before.namelist()) & set(after.namelist())
         assert all(before.read(name) == after.read(name) for name in common - changed)
     with HwpxDocument.open(output) as document:
-        assert document.list_form_fields()[0]["current_value"] == "AI 수업 나눔의 날"
+        assert document.fields.all[0].value == "AI 수업 나눔의 날"
     with HwpxAgentDocument.open(output) as agent:
         purpose = agent.resolve_record('/section[1]/paragraph[@id="240050"]')
         owner = agent.resolve_record('/section[1]/paragraph[@id="240040"]')

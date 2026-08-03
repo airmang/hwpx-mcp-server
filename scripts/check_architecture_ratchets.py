@@ -33,15 +33,27 @@ EXPECTED_SDK_IMPORTERS = (
 
 EXPECTED_SERVICE_LINES = {
     "_border_fill.py": 283,
-    "content_layout.py": 525,
+    # WP-F: add_equation/add_chart/set_header_footer/set_page_number now
+    # dispatch to the page/shapes namespaces and .to_dict() the returned
+    # living views before this op's dict-mutation contract (result.update()).
+    "content_layout.py": 547,
     "context.py": 213,
     # Receipt-truthfulness repair: the publish decision now compares the
     # produced bytes against the source instead of trusting a field on the
     # domain payload. A payload describing only the structural step suppressed
     # the write entirely while the tool reported ok with twenty-six fills.
-    "form_fields.py": 680,
-    "media.py": 178,
-    "memo_style.py": 477,
+    # WP-F (core 6.0 namespace adaptation): add_form_field/fill_form_field now
+    # rebuild the 5.x form-field dict shape from FormField/FieldFillResult
+    # living views via a local _form_field_to_legacy_dict helper (design §2.3).
+    "form_fields.py": 742,
+    # WP-F: insert_picture/replace_picture rebuild the picture-reference and
+    # replacement payload shapes from PictureRef/PictureReplacement, whose own
+    # to_dict() keys do not match this op's established contract.
+    "media.py": 208,
+    # WP-F: add_memo/fill now create the host paragraph explicitly before
+    # calling notes.add_memo(anchor=...), which has no auto-create fallback
+    # (unlike 5.x's add_memo_with_anchor(paragraph=None)).
+    "memo_style.py": 489,
     "package_validation.py": 166,
     "planning.py": 201,
     # S-108: canonical Chrome-path guidance names the 6.x fallback explicitly.

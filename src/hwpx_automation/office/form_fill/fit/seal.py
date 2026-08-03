@@ -413,7 +413,7 @@ def place_seal(
     raw_v = round(anchor_center_pt[1] * pt_to_hwpunit - seal_h_hu / 2.0)
     clamped = raw_h < 0 or raw_v < 0
 
-    binary_item_id = document.add_image(image_data, image_format)
+    binary_item_id = document.media.add_image(image_data, image_format)
     paragraphs[target_index].add_picture(
         binary_item_id,
         width=seal_w_hu,

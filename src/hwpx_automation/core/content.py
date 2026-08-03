@@ -274,7 +274,9 @@ def delete_paragraph_from_doc(doc: HwpxDocument, paragraph_index: int) -> int:
         return total
 
     try:
-        doc.remove_paragraph(paragraph_index)
+        # remove_paragraph is demoted in 6.0 with no namespace replacement
+        # (design table row 101) — the paragraph object owns .remove() now.
+        paragraphs[paragraph_index].remove()
     except (ValueError, IndexError) as exc:
         raise RuntimeError("삭제할 문단 요소를 섹션에서 찾을 수 없습니다.") from exc
     return total - 1
@@ -317,19 +319,19 @@ def get_table_data(doc: HwpxDocument, table_index: int) -> dict:
 
 def get_table_map_in_doc(doc: HwpxDocument) -> dict:
     """문서의 표 메타데이터를 LLM 친화적인 JSON 형태로 반환한다."""
-    result = doc.get_table_map()
+    result = doc.tables.map()
     tables = list(result.get("tables", []))
     return {"tables": tables, "count": len(tables)}
 
 
 def find_cell_by_label_in_doc(doc: HwpxDocument, label_text: str, direction: str = "right") -> dict:
     """라벨 셀 기준으로 대상 셀을 찾는다."""
-    return doc.find_cell_by_label(label_text, direction=direction)
+    return doc.tables.find_cell_by_label(label_text, direction=direction)
 
 
 def fill_by_path_in_doc(doc: HwpxDocument, mappings: dict[str, str]) -> dict:
     """라벨 기반 경로 구문으로 표 셀을 채운다."""
-    return doc.fill_by_path(mappings)
+    return doc.tables.fill_by_path(mappings)
 
 
 def set_cell_text(
@@ -429,7 +431,7 @@ def _apply_table_border_fill(
     col: int = None,
 ) -> str:
     """테두리/음영 borderFill을 만들어 표 전체 또는 한 셀에 적용한다."""
-    border_fill_id = doc.ensure_border_fill(
+    border_fill_id = doc.styles.ensure_border_fill(
         border_type=border_type or "SOLID",
         border_color=border_color or "#000000",
         border_width=border_width or "0.12 mm",
@@ -736,20 +738,20 @@ def add_memo_to_doc(
         create=True,
     )
     paragraph = resolved.paragraph
-    memo_count_before = len(doc.memos)
+    memo_count_before = len(doc.notes.memos)
     try:
-        doc.add_memo_with_anchor(text or "", paragraph=paragraph)
+        doc.notes.add_memo(text or "", anchor=paragraph)
     except Exception as exc:  # noqa: BLE001
         if not _looks_like_mixed_xml_type_error(exc):
             raise
         # Clean up any partially-created memo from the failed native call
-        current_memos = doc.memos
+        current_memos = doc.notes.memos
         while len(current_memos) > memo_count_before:
             try:
-                doc.remove_memo(current_memos[-1])
+                doc.notes.remove_memo(current_memos[-1])
             except Exception:  # noqa: BLE001
                 break
-            current_memos = doc.memos
+            current_memos = doc.notes.memos
         logger.warning("메모 추가 중 혼합 XML 타입 충돌 감지, fallback 경로 사용: %s", exc)
         _add_memo_with_anchor_fallback(paragraph, text or "")
     return {"memo_added": True, "location": resolved.location}
@@ -775,9 +777,9 @@ def remove_memo_from_doc(
             if memo_id:
                 memo_ids.add(memo_id)
 
-    for memo in list(doc.memos):
+    for memo in list(doc.notes.memos):
         if memo.id in memo_ids:
-            doc.remove_memo(memo)
+            doc.notes.remove_memo(memo)
 
     removed_anchor = False
     for run_element in _memo_anchor_runs(paragraph, memo_ids):

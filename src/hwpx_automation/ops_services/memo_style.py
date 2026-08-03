@@ -268,7 +268,7 @@ class MemoStyleService:
                 )
             if "charPrIDRef" in filters and filters["charPrIDRef"]:
                 filter_args["char_pr_id_ref"] = filters["charPrIDRef"]
-        runs = document.find_runs_by_style(**filter_args)
+        runs = document.text.find_runs(**filter_args)
         paragraph_index_map: Dict[int, int] = {}
         paragraphs = self._context._iter_paragraphs(document)
         for index, paragraph in enumerate(paragraphs):
@@ -302,7 +302,7 @@ class MemoStyleService:
         timestamp: str | None = None,
     ) -> Dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        memo = document.add_memo(
+        memo = document.notes.add_memo(
             text,
             section_index=section_index,
             attributes={
@@ -337,9 +337,12 @@ class MemoStyleService:
                 f"memo '{memo_id}' not found",
                 details={"memoId": memo_id},
             )
-        field_id = document.attach_memo_field(paragraph, memo)
+        # notes.attach now returns the anchored Memo itself rather than a
+        # bare field-id str (design §2.6) — .field_id (oxml/memo.py) resolves
+        # it live by searching the section for the anchor field.
+        attached_memo = document.notes.attach(paragraph, memo)
         self._save._save_document(document, resolved)
-        return {"fieldId": field_id}
+        return {"fieldId": attached_memo.field_id}
 
     def add_memo_with_anchor(
         self,
@@ -350,11 +353,20 @@ class MemoStyleService:
         memo_shape_id_ref: str | None = None,
     ) -> Dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        memo, paragraph, field_id = document.add_memo_with_anchor(
+        # notes.add_memo(anchor=...) replaces add_memo_with_anchor (design
+        # §2.6) but anchor= must resolve to an *existing* paragraph — unlike
+        # 5.x, it has no "create one for me" mode (anchor=None routes to the
+        # no-anchor path instead). Create the host paragraph explicitly
+        # through the public add_paragraph, exactly mirroring what 5.x did
+        # internally when its own paragraph= argument was omitted.
+        paragraph = document.add_paragraph("", section_index=section_index)
+        memo = document.notes.add_memo(
             text,
+            anchor=paragraph,
             section_index=section_index,
             memo_shape_id_ref=memo_shape_id_ref,
         )
+        field_id = memo.field_id
         paragraphs = self._context._iter_paragraphs(document)
         paragraph_index = len(paragraphs) - 1
         paragraph_element_id = id(paragraph.element)
@@ -408,7 +420,7 @@ class MemoStyleService:
         ]
         bullets = [
             asdict(cast(Any, bullet))
-            for bullet in document.bullets.values()
+            for bullet in document.styles.bullets.values()
             if dataclasses.is_dataclass(bullet)
         ]
         return {"styles": styles, "bullets": bullets}

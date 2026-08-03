@@ -595,7 +595,7 @@ class SavePolicy:
             if not split_newlines:
                 content = content.replace("\r\n", " ").replace("\n", " ")
 
-            replaced_count += document.replace_text_in_runs(needle, content)
+            replaced_count += document.text.replace(needle, content)
 
         if not preserve_style:
             logger.debug(

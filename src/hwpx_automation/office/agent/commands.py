@@ -624,7 +624,7 @@ def _apply_set_paragraph(document: HwpxDocument, native: Any, properties: Mappin
     if "breakBefore" in properties:
         format_kwargs["page_break_before"] = properties["breakBefore"]
     if format_kwargs:
-        document.set_paragraph_format(
+        document.styles.apply_paragraph_format(
             paragraph_index=_global_paragraph_index(document, native), **format_kwargs
         )
 
@@ -651,7 +651,7 @@ def _apply_set_run(document: HwpxDocument, native: Any, properties: Mapping[str,
             raise AgentContractError(
                 "not_found", f"font is not declared by the document: {requested_font!r}", target="run.fontName"
             )
-        style_id = document.ensure_run_style(
+        style_id = document.styles.ensure_run(
             **flags,
             color=properties.get("color"),
             font=requested_font,
@@ -694,7 +694,7 @@ def _apply_set_cell(native: Any, properties: Mapping[str, Any], record: NodeReco
 
 def _apply_set_form_field(document: HwpxDocument, native: Any, properties: Mapping[str, Any], record: NodeRecord) -> None:
     if "value" in properties:
-        document.fill_form_field(properties["value"], field_index=int(native["index"]))
+        document.fields.fill(properties["value"], field_index=int(native["index"]))
     if "readOnly" in properties:
         runs = native.get("_runs") or []
         try:

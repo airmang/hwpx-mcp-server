@@ -359,7 +359,7 @@ def _build_authoring_golden() -> dict[str, object]:
 
         document = authoring.create_document_from_plan(plan)
         try:
-            plan_text = document.export_text()
+            plan_text = document.text.plain()
             plan_path = tmp_path / "plan.hwpx"
             document.save_to_path(plan_path)
         finally:
@@ -377,7 +377,7 @@ def _build_authoring_golden() -> dict[str, object]:
             ]
         ).lower()
         try:
-            builder_text = lowered.export_text()
+            builder_text = lowered.text.plain()
             builder_path = tmp_path / "builder.hwpx"
             lowered.save_to_path(builder_path)
         finally:
@@ -720,7 +720,7 @@ def _build_document_ops_golden() -> dict[str, object]:
 
         created = document_module.HwpxDocument.open(report["rows"][0]["filename"])
         try:
-            export_text = created.export_text()
+            export_text = created.text.plain()
         finally:
             created.close()
 

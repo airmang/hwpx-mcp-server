@@ -99,7 +99,7 @@ def profile_form(
         if idx == 0:  # 관리박스 (never replaceable)
             continue
         sid = para.style_id_ref
-        style = doc.style(sid) if sid is not None else None
+        style = doc.styles.get(sid) if sid is not None else None
         if style is not None and style.name in anchor_names:
             anchors.append(idx)
 

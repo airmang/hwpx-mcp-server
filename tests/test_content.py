@@ -130,7 +130,7 @@ def test_insert_and_replace_picture_tools_preserve_safe_asset_graph(tmp_path: Pa
     refreshed = open_doc(str(target))
     assert not refreshed.package.has_part("BinData/BIN0001.png")
     assert refreshed.package.has_part("BinData/BIN0002.png")
-    assert refreshed.picture_references()[0]["binaryItemIDRef"] == "BIN0002"
+    assert refreshed.media.picture_references()[0].binary_item_id_ref == "BIN0002"
 
 
 def test_byte_preserving_patch_updates_paragraph_with_open_safety(tmp_path: Path):
@@ -1385,7 +1385,7 @@ def test_table_map_location_can_drive_text_lookup_and_memo(tmp_path: Path):
     assert text_result["location"] == cell_location
     assert memo_result["memo_added"] is True
     assert memo_result["location"] == cell_location
-    assert len(open_doc(str(target)).memos) == 1
+    assert len(open_doc(str(target)).notes.memos) == 1
 
 
 def test_replace_in_paragraph_uses_location_and_preserves_run_char_pr(tmp_path: Path):
@@ -1588,11 +1588,11 @@ def test_add_and_remove_memo(tmp_path: Path):
     add_paragraph(str(target), "메모 대상")
     original_text = open_doc(str(target)).paragraphs[1].text
     added = add_memo(str(target), 1, "검토 필요")
-    assert len(open_doc(str(target)).memos) == 1
+    assert len(open_doc(str(target)).notes.memos) == 1
 
     removed = remove_memo(str(target), 1)
     refreshed = open_doc(str(target))
-    assert len(refreshed.memos) == 0
+    assert len(refreshed.notes.memos) == 0
     assert refreshed.paragraphs[1].text == original_text
 
     assert added["memo_added"] is True
@@ -1621,7 +1621,7 @@ def test_format_table_border_and_shading(tmp_path: Path):
     ids = [c.get("borderFillIDRef") for c in cells]
     assert ids[:3] == [whole["border_fill_id"]] * 3
     assert ids[3] == one_cell["border_fill_id"]
-    fills = {bf.get("id"): bf for header in doc.headers for bf in header.element.iter(f"{HH}borderFill")}
+    fills = {bf.get("id"): bf for header in doc.parts.headers for bf in header.element.iter(f"{HH}borderFill")}
     dash = fills[whole["border_fill_id"]]
     assert any(child.get("type") == "DASH" for child in dash)
 

@@ -294,7 +294,10 @@ def set_paragraph_format(
     if guard is not None:
         return guard
     doc = open_doc(path)
-    result = doc.set_paragraph_format(
+    # apply_paragraph_format now returns a frozen ParagraphFormatResult
+    # (design §2.4) rather than a dict — .to_dict() keeps this handler's own
+    # dict-shaped response (filename merged below) unchanged.
+    result = doc.styles.apply_paragraph_format(
         paragraph_index=paragraph_index,
         paragraph_indexes=paragraph_indexes,
         alignment=alignment,
@@ -308,7 +311,7 @@ def set_paragraph_format(
         keep_with_next=keep_with_next,
         keep_lines=keep_lines,
         page_break_before=page_break_before,
-    )
+    ).to_dict()
     result["filename"] = filename
     if dry_run:
         return _with_dry_run_verification(result, doc, path)
@@ -342,7 +345,10 @@ def set_page_setup(
     if guard is not None:
         return guard
     doc = open_doc(path)
-    result = doc.set_page_setup(
+    # page.setup now returns a frozen PageSetup (design §2.4) rather than a
+    # dict — .to_dict() keeps this handler's own dict-shaped response
+    # (filename merged below) unchanged.
+    result = doc.page.setup(
         paper_size=paper_size,
         width_mm=width_mm,
         height_mm=height_mm,
@@ -358,7 +364,7 @@ def set_page_setup(
         columns=columns,
         column_gap_mm=column_gap_mm,
         section_index=section_index,
-    )
+    ).to_dict()
     result["filename"] = filename
     if dry_run:
         return _with_dry_run_verification(result, doc, path)
@@ -398,13 +404,26 @@ def set_header_footer(
     if guard is not None:
         return guard
     doc = open_doc(path)
-    wrapper = doc.set_header_footer(
-        kind=kind,
-        text=text,
-        content=content,
-        section_index=section_index,
-        page_type=page_type,
-    )
+    # set_header_footer is demoted in 6.0 with no namespace replacement
+    # (design table row 102, kind= dispatch removed) — dispatch here
+    # instead, replicating the normalization the removed method used to do.
+    normalized_kind = kind.strip().lower() if isinstance(kind, str) else kind
+    if normalized_kind == "header":
+        wrapper = doc.page.set_header(
+            text=text,
+            content=content,
+            section_index=section_index,
+            page_type=page_type,
+        )
+    elif normalized_kind == "footer":
+        wrapper = doc.page.set_footer(
+            text=text,
+            content=content,
+            section_index=section_index,
+            page_type=page_type,
+        )
+    else:
+        raise ValueError("kind must be 'header' or 'footer'")
     result = {
         "filename": filename,
         "headerFooter": _header_footer_payload(wrapper, kind=kind, page_type=page_type),
@@ -435,7 +454,7 @@ def set_page_number(
     if guard is not None:
         return guard
     doc = open_doc(path)
-    wrapper = doc.set_page_number(
+    wrapper = doc.page.set_page_number(
         target=target,
         page_type=page_type,
         format=format,
@@ -478,7 +497,10 @@ def set_list_format(
     if guard is not None:
         return guard
     doc = open_doc(path)
-    result = doc.set_list_format(
+    # apply_list_format now returns a frozen ListFormatResult (design §2.4)
+    # rather than a dict — .to_dict() keeps this handler's own dict-shaped
+    # response (filename merged below) unchanged.
+    result = doc.styles.apply_list_format(
         paragraph_index=paragraph_index,
         paragraph_indexes=paragraph_indexes,
         kind=kind,
@@ -486,7 +508,7 @@ def set_list_format(
         bullet_char=bullet_char,
         number_format=number_format,
         start=start,
-    )
+    ).to_dict()
     result["filename"] = filename
     if dry_run:
         return _with_dry_run_verification(result, doc, path)

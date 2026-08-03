@@ -24,12 +24,14 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    # 5.0 is the floor, not a preference: this package declares the `hwpx` console
+    # 6.0 is the floor, not a preference: this package declares the `hwpx` console
     # name that core used to own, and core only stops declaring it at 5.0. Pinning
     # the bounded major here is what makes "no valid install has two declarers"
     # true rather than hopeful, and prevents the next core major from silently
-    # breaking an already-published automation line.
-    "python-hwpx>=5.8.0,<6", # HWPX object model, OXML/OPC, format-native primitives
+    # breaking an already-published automation line. WP-F (engine surface 6.0):
+    # this line adapted to the new namespace surface (design §9 WP-F) — the dev0
+    # pre-release qualifier tracks core's own not-yet-tagged 6.0 identity.
+    "python-hwpx>=6.0.0.dev0,<7", # HWPX object model, OXML/OPC, format-native primitives
 
     "pydantic>=2.11,<3",
     "cryptography>=42.0",
@@ -124,6 +126,30 @@ include = ["hwpx_automation*"]
 # exercise, and their tests import them by bare name.
 pythonpath = ["src", "scripts"]
 addopts = "-q"
+# WP-F (core 6.0 namespace adaptation, design §9): any DeprecationWarning this
+# package's own code triggers by calling core's pre-7.0 legacy shim surface is
+# a real regression -- error by default, and name each known non-automation
+# source precisely rather than silencing DeprecationWarning wholesale.
+filterwarnings = [
+    "error::DeprecationWarning",
+    # hwpx-core's own internal modules still call its pre-6.0 facade
+    # internally (core's own migration debt, not automation's -- out of this
+    # package's control/scope).
+    "ignore::DeprecationWarning:hwpx\\._document\\._legacy",
+    "ignore::DeprecationWarning:hwpx\\.form_fit\\.measure",
+    "ignore::DeprecationWarning:hwpx\\.ingest\\.hwpx_converter",
+    "ignore::DeprecationWarning:hwpx\\.tools\\.mail_merge",
+    "ignore::DeprecationWarning:hwpx\\.tools\\.redline",
+    # test_fuzz_harness_wired dynamically imports whichever co-located
+    # python-hwpx* sibling checkout happens to carry scripts/fuzz (by design
+    # it does not pin to PYTHON_HWPX_REPO -- see that test's own docstring);
+    # that checkout's migration state is outside this package's control.
+    "ignore::DeprecationWarning:fuzz\\.runner",
+    # SWIG-generated C-extension types (from a rendering/test dependency)
+    # lack __module__ on some builtin types under newer CPython -- a
+    # third-party artifact, never an hwpx-sourced warning.
+    "ignore:builtin type \\w+ has no __module__ attribute:DeprecationWarning",
+]
 
 [tool.mypy]
 python_version = "3.10"

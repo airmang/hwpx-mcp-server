@@ -36,7 +36,7 @@ def _descendants(element: ET.Element, local_name: str) -> list[ET.Element]:
 def _para_pr_for_paragraph(document: HwpxDocument, paragraph_index: int) -> ET.Element:
     para_pr_id = document.paragraphs[paragraph_index].para_pr_id_ref
     assert para_pr_id is not None
-    para_pr = document.headers[0].element.find(f".//{HH}paraPr[@id='{para_pr_id}']")
+    para_pr = document.parts.headers[0].element.find(f".//{HH}paraPr[@id='{para_pr_id}']")
     assert para_pr is not None
     return para_pr
 
@@ -67,7 +67,10 @@ def test_fastmcp_format_edit_tools_roundtrip(tmp_path: Path) -> None:
         margin_bottom_mm=12,
     )
     assert page_result["openSafety"]["ok"] is True
-    assert page_result["pageSize"]["width"] == _mm(297)
+    # PageSize.to_dict() reports true millimetres under widthMm/heightMm
+    # (design §2.4) — 5.x's "width" key was mislabeled "mm" while actually
+    # holding the HWPUNIT value already computed for set_page_size.
+    assert page_result["pageSize"]["widthMm"] == 297
 
     header_result = server.set_header_footer(str(target), kind="header", text="Confidential")
     page_number_result = server.set_page_number(
@@ -92,11 +95,11 @@ def test_fastmcp_format_edit_tools_roundtrip(tmp_path: Path) -> None:
     heading = para_pr.find(f"{HH}heading")
     assert heading is not None
     assert heading.get("type") == "BULLET"
-    assert reopened.headers[0].element.find(f".//{HH}bullet[@char='※']") is not None
+    assert reopened.parts.headers[0].element.find(f".//{HH}bullet[@char='※']") is not None
 
     line_spacing_values = {
         node.get("value")
-        for node in _descendants(reopened.headers[0].element, "lineSpacing")
+        for node in _descendants(reopened.parts.headers[0].element, "lineSpacing")
     }
     assert "160" in line_spacing_values
     assert reopened.sections[0].properties.page_size.width == _mm(297)

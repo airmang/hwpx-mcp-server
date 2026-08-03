@@ -53,7 +53,7 @@ class MediaService:
         dry_run: bool = True,
     ) -> Dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        shape = document.add_shape(shape_type, section_index=section_index)
+        shape = document.shapes.add_raw(shape_type, section_index=section_index)
         if not dry_run:
             self._save._save_document(document, resolved)
         return {"objectId": shape.element.get("id")}
@@ -67,7 +67,7 @@ class MediaService:
         dry_run: bool = True,
     ) -> Dict[str, Any]:
         document, resolved = self._context._open_document(path)
-        control = document.add_control(
+        control = document.shapes.add_control(
             control_type=control_type, section_index=section_index
         )
         if not dry_run:
@@ -105,7 +105,10 @@ class MediaService:
             section_index=section_index,
             align=align,
         )
-        picture_refs = document.picture_references()
+        # media.picture_references now returns tuple[PictureRef, ...] rather
+        # than list[dict] (design §2.5) — .to_dict() per entry keeps this
+        # service's own dict-shaped response unchanged.
+        picture_refs = [ref.to_dict() for ref in document.media.picture_references()]
         result: Dict[str, Any] = {
             "ok": True,
             "dryRun": dry_run,
@@ -147,20 +150,47 @@ class MediaService:
             if output
             else resolved
         )
-        replacement = document.replace_picture(
+        # media.replace_picture now returns a frozen PictureReplacement
+        # (design §2.4: item_id/previous_item_id/removed_orphans/picture)
+        # rather than a dict — its own .to_dict() uses different field names
+        # (itemId/previousItemId/removedOrphans) than this op's established
+        # response contract (old_binaryItemIDRef/new_binaryItemIDRef/
+        # removedOldImage/geometryPreserved/picture_index/section_index),
+        # which existing callers/tests depend on, so rebuild that exact shape
+        # from the new object instead of using PictureReplacement.to_dict().
+        replacement = document.media.replace_picture(
             self._decode_image_base64(image_base64),
             image_format,
             picture_index=picture_index,
             binary_item_id_ref=binary_item_id_ref,
             remove_orphaned=remove_orphaned,
         )
+        replaced_section_index = next(
+            (
+                index
+                for index, section in enumerate(document.sections)
+                if section.element is replacement.picture.paragraph.section.element
+            ),
+            None,
+        )
+        replacement_payload = {
+            "picture_index": picture_index,
+            "section_index": replaced_section_index,
+            "old_binaryItemIDRef": replacement.previous_item_id,
+            "new_binaryItemIDRef": replacement.item_id,
+            "removedOldImage": bool(replacement.removed_orphans),
+            "geometryPreserved": True,
+        }
+        # media.picture_references now returns tuple[PictureRef, ...] rather
+        # than list[dict] (design §2.5) — .to_dict() per entry keeps this
+        # service's own dict-shaped response unchanged.
         result: Dict[str, Any] = {
             "ok": True,
             "dryRun": dry_run,
             "filename": path,
             "outputPath": str(target),
-            "replacement": replacement,
-            "pictureReferences": document.picture_references(),
+            "replacement": replacement_payload,
+            "pictureReferences": [ref.to_dict() for ref in document.media.picture_references()],
             "idIntegrity": self._id_integrity_payload(document),
         }
         if dry_run:

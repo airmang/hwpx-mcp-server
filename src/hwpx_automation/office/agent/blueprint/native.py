@@ -95,7 +95,7 @@ def create_paragraph_style(
 
 
 def create_character_format(document: HwpxDocument, properties: dict[str, Any]) -> str:
-    return document.ensure_run_style(
+    return document.styles.ensure_run(
         bold=_bool(properties.get("bold")),
         italic=_bool(properties.get("italic")),
         underline=_bool(properties.get("underline")),
@@ -108,7 +108,7 @@ def create_numbering(document: HwpxDocument, properties: dict[str, Any]) -> str:
     raw_type = str(properties.get("type") or "NUMBER").upper()
     kind = "bullet" if raw_type == "BULLET" else "number"
     level = max(0, int(properties.get("level") or 0))
-    refs = document.ensure_numbering(kind=kind, levels=[{} for _ in range(level + 1)])
+    refs = document.styles.ensure_numbering(kind=kind, levels=[{} for _ in range(level + 1)])
     return refs[level]
 
 
@@ -207,7 +207,7 @@ class TypedNativeBridge:
             paragraph.para_pr_id_ref = style["identity"]["paraPrIDRef"]
         numbering = self._dependency(node, "numberingRefs")
         if numbering is not None:
-            definition = self.document.paragraph_property(numbering["identity"]["paraPrIDRef"])
+            definition = self.document.styles.paragraph_property(numbering["identity"]["paraPrIDRef"])
             heading = definition.heading if definition is not None else None
             if heading is None or not self.document._root.headers:  # type: ignore[attr-defined]
                 raise AgentContractError("invariant_violation", "mapped numbering has no heading")
