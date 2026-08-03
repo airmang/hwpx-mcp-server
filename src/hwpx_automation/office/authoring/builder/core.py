@@ -258,7 +258,7 @@ class Paragraph:
     align: str | None = None
     style: str | None = None
 
-    def _alignment_kwargs(self, document: HwpxDocument) -> dict[str, str]:
+    def _alignment_para_pr(self, document: HwpxDocument) -> str | None:
         """Resolve ``align`` into the paragraph-property reference that emits it.
 
         ``align`` was parsed, validated, and carried all the way into this
@@ -270,24 +270,27 @@ class Paragraph:
         """
 
         if not self.align:
-            return {}
+            return None
         if not document.headers:  # pragma: no cover - defensive
             raise ValueError(
                 "paragraph alignment requires a header part to hold the "
                 "paragraph properties"
             )
-        return {
-            "para_pr_id_ref": document.headers[0].ensure_paragraph_alignment(
-                self.align
-            )
-        }
+        return document.headers[0].ensure_paragraph_alignment(self.align)
 
     def lower(self, document: HwpxDocument, *, preset: _BuilderPreset | None = None) -> None:
         style_preset = preset or _BuilderPreset()
-        align_kwargs = self._alignment_kwargs(document)
+        # Passed as an explicit keyword, not a **dict splat: a dict[str, str]
+        # unpack cannot be typed against add_paragraph's keyword surface, and
+        # pyright rightly rejected it in the release gate. None equals the
+        # parameter default, so the no-alignment path is unchanged.
+        align_para_pr = self._alignment_para_pr(document)
         if self.children:
             paragraph = document.add_paragraph(
-                "", include_run=False, inherit_style=False, **align_kwargs
+                "",
+                include_run=False,
+                inherit_style=False,
+                para_pr_id_ref=align_para_pr,
             )
             for run in self.children:
                 if isinstance(run, PageNumber):
@@ -297,7 +300,9 @@ class Paragraph:
         style_kwargs = style_preset.paragraph_style(self.style)
         if style_kwargs is None:
             document.add_paragraph(
-                _computed_text(self.text), inherit_style=False, **align_kwargs
+                _computed_text(self.text),
+                inherit_style=False,
+                para_pr_id_ref=align_para_pr,
             )
             return
         char_pr_id = document.ensure_run_style(**style_kwargs)
@@ -305,7 +310,7 @@ class Paragraph:
             _computed_text(self.text),
             char_pr_id_ref=char_pr_id,
             inherit_style=False,
-            **align_kwargs,
+            para_pr_id_ref=align_para_pr,
         )
 
 

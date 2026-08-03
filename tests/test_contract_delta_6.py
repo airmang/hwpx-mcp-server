@@ -19,7 +19,7 @@ def _load(name: str) -> dict:
 def test_6_8_0_contract_delta_matches_the_live_contract() -> None:
     """The honesty train adds no tool; the hash moves on floors alone."""
 
-    delta = _load("tool-contract-delta-6.8.0.json")
+    delta = _load("tool-contract-delta-6.8.1.json")
     contract = _load("tool-contract.generated.json")
 
     assert delta["target"]["contractHash"] == contract["contractHash"] == contract_hash()
@@ -44,10 +44,10 @@ def test_6_8_0_contract_delta_matches_the_live_contract() -> None:
 
 def test_6_7_1_delta_receipt_is_frozen_and_chains_into_the_6_8_0_baseline() -> None:
     """The historical 6.7.1 receipt stays frozen against its own hashes and its
-    target must be exactly the 6.8.0 baseline."""
+    target must be exactly the 6.8.1 baseline."""
 
     frozen = _load("tool-contract-delta-6.7.1.json")
-    delta = _load("tool-contract-delta-6.8.0.json")
+    delta = _load("tool-contract-delta-6.8.1.json")
     assert frozen["target"]["contractHash"] == "98510af22d13899c"
     assert frozen["target"]["contractHash"] == delta["baseline"]["contractHash"]
     assert frozen["target"]["defaultToolCount"] == delta["baseline"]["defaultToolCount"]

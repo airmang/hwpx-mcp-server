@@ -19,10 +19,12 @@ observed 4.2/5.1/0.8 release. No tag or upload is authorized.
    wrong conclusions during release preparation. Verify with
    `git rev-parse --abbrev-ref HEAD` and `git log --oneline -1` against the
    train branch before trusting any file you open.
-2. Run the local gates the tag will run:
-   `python scripts/check_tag_release_gate.py --dry-run`,
+2. Run the local gates the tag will run — ALL of them, including both type
+   checkers: `python scripts/check_tag_release_gate.py --dry-run`,
    `python scripts/check_transition_identity.py`,
-   `python scripts/check_current_public_remote.py`, the full test suite, and
+   `python scripts/check_current_public_remote.py`, `python -m mypy`,
+   `pyright` (v6.8.0 became a preserved failed tag because the local pre-tag
+   run skipped pyright while the CI gate runs it), the full test suite, and
    the compat install matrix. Since the coordinate derivation moved into
    `identity.json`, the dry run answers "would the tag I am about to push
    pass" without burning a tag.
