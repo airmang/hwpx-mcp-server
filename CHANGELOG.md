@@ -2,7 +2,40 @@
 
 ## Unreleased
 
-## [6.8.1] - 2026-08-03
+## [7.0.0] - unreleased candidate
+
+엔진 완전성 major입니다. 도구 표면은 그대로입니다(128/136/29 — 추가·제거·
+승격·프로파일 이동 0). 계약 해시는 플로어 전진만으로 `eb92b284e35eb40e`로
+이동합니다: `minPythonHwpx 6.0.0` · `minAutomationVersion 7.0.0` ·
+`minSkillVersion 2.0.0`.
+
+[6.8.1]은 발행되지 않았습니다 — release-approved 후보 상태에서 이 트레인에
+흡수되었습니다. 마지막 공개 트레인은 6.7.1입니다.
+
+### 바뀜
+
+- **python-hwpx 6.0 표면으로 전면 이주.** 모든 콜사이트가 이동한 5.x 루트
+  이름 대신 6.0 도메인 네임스페이스(`doc.notes`/`fields`/`shapes`/
+  `styles`/`page`)를 직접 호출합니다. 회귀는 구조적으로 봉쇄됩니다 —
+  테스트 스위트가 `error::DeprecationWarning`으로 돌므로 살아남은 shim
+  호출은 곧 스위트 실패입니다.
+- 의존 창이 `python-hwpx>=6.0.0,<7`로 이동하고, capability handshake
+  플로어(`MIN_PYTHON_HWPX`)가 6.0.0으로 core 버전과 원자적으로
+  전진합니다 — 플로어 선상향은 스큐 가드가 실설치 core를 거부하는 것을
+  실측으로 확인하고 릴리스 커밋에 묶었습니다.
+- compat 배포 `hwpx-mcp-server`는 `==7.0.0` 정확 위임으로 전진하며 7.x
+  시리즈 전체에서 유지됩니다.
+
+### 고쳐짐 (릴리스 게이트 정직성)
+
+- README 설치-휠 게이트가 후보 휠의 core 의존을 PyPI에서 해석하던 결합을
+  제거했습니다 — 핀 좌표가 마침 발행돼 있을 때만 통과하던 게이트가, 이제
+  방금 빌드한 wheelhouse에서 해석하고 휠 파일명에서 ==핀을 파생합니다.
+- compat 위임 테스트의 `==6.8.1` 리터럴 기대를 canonical pyproject 파생으로
+  바꿨습니다 — 셸이 한 트레인 뒤처지는 스큐가 이 테스트의 적발 대상인데
+  리터럴이 그 스큐를 만들고 있었습니다.
+
+## [6.8.1] - 2026-08-03 (unpublished — absorbed into 7.0.0)
 
 `v6.8.0`은 보존된 실패 태그입니다 — 아무것도 게시되지 않았습니다.
 prepublish의 pyright 게이트가 정렬 수리의 dict-스플랫 타입 부정밀을 적발해
