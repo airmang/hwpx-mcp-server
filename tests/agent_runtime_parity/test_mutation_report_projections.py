@@ -284,6 +284,12 @@ def test_byte_preserving_patch_result_to_dict_unchanged() -> None:
         open_safety={"ok": True},
         visual_complete=None,
     )
+    # ``discarded`` and ``outputIsSourceCopy`` are additive. They exist because
+    # the previous shape could not distinguish "these edits were applied" from
+    # "these edits matched and were then thrown away because another patch
+    # skipped", and could not say that ``output_path`` had received the
+    # unmodified source. Both defaults are empty/false, so a consumer reading
+    # the older keys is unaffected.
     assert result.to_dict() == {
         "ok": True,
         "applied": [],
@@ -293,6 +299,8 @@ def test_byte_preserving_patch_result_to_dict_unchanged() -> None:
         "zipMethod": "deflate",
         "openSafety": {"ok": True},
         "visualComplete": None,
+        "discarded": [],
+        "outputIsSourceCopy": False,
     }
 
 

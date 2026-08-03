@@ -35,7 +35,11 @@ EXPECTED_SERVICE_LINES = {
     "_border_fill.py": 283,
     "content_layout.py": 525,
     "context.py": 213,
-    "form_fields.py": 644,
+    # Receipt-truthfulness repair: the publish decision now compares the
+    # produced bytes against the source instead of trusting a field on the
+    # domain payload. A payload describing only the structural step suppressed
+    # the write entirely while the tool reported ok with twenty-six fills.
+    "form_fields.py": 680,
     "media.py": 178,
     "memo_style.py": 477,
     "package_validation.py": 166,
@@ -43,7 +47,11 @@ EXPECTED_SERVICE_LINES = {
     # S-108: canonical Chrome-path guidance names the 6.x fallback explicitly.
     "preview_export.py": 585,
     "read_query.py": 601,
-    "save_policy.py": 604,
+    # Receipt-truthfulness repair: the written verification report copied the
+    # domain payload's preservation claim verbatim, so an incoherent payload
+    # printed a byteIdentical receipt onto a rewritten document. The seam now
+    # refuses the impossible combination rather than forwarding it.
+    "save_policy.py": 616,
     "tables.py": 539,
     "transactions.py": 616,
 }

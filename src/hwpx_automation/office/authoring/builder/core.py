@@ -258,10 +258,37 @@ class Paragraph:
     align: str | None = None
     style: str | None = None
 
+    def _alignment_kwargs(self, document: HwpxDocument) -> dict[str, str]:
+        """Resolve ``align`` into the paragraph-property reference that emits it.
+
+        ``align`` was parsed, validated, and carried all the way into this
+        dataclass, and then never read: no body-paragraph path emitted it. A
+        plan asking for a centred 기관명 validated clean and rendered flush
+        left, with no warning anywhere. The core already owns the mechanism
+        (``ensure_paragraph_alignment``) and already rejects unknown values, so
+        the only thing missing here was the call.
+        """
+
+        if not self.align:
+            return {}
+        if not document.headers:  # pragma: no cover - defensive
+            raise ValueError(
+                "paragraph alignment requires a header part to hold the "
+                "paragraph properties"
+            )
+        return {
+            "para_pr_id_ref": document.headers[0].ensure_paragraph_alignment(
+                self.align
+            )
+        }
+
     def lower(self, document: HwpxDocument, *, preset: _BuilderPreset | None = None) -> None:
         style_preset = preset or _BuilderPreset()
+        align_kwargs = self._alignment_kwargs(document)
         if self.children:
-            paragraph = document.add_paragraph("", include_run=False, inherit_style=False)
+            paragraph = document.add_paragraph(
+                "", include_run=False, inherit_style=False, **align_kwargs
+            )
             for run in self.children:
                 if isinstance(run, PageNumber):
                     raise ValueError("PageNumber is only supported in Header/Footer content")
@@ -269,13 +296,16 @@ class Paragraph:
             return
         style_kwargs = style_preset.paragraph_style(self.style)
         if style_kwargs is None:
-            document.add_paragraph(_computed_text(self.text), inherit_style=False)
+            document.add_paragraph(
+                _computed_text(self.text), inherit_style=False, **align_kwargs
+            )
             return
         char_pr_id = document.ensure_run_style(**style_kwargs)
         document.add_paragraph(
             _computed_text(self.text),
             char_pr_id_ref=char_pr_id,
             inherit_style=False,
+            **align_kwargs,
         )
 
 

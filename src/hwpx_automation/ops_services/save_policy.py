@@ -506,8 +506,20 @@ class SavePolicy:
                 + report["openSafety"]["summary"],
             )
         report["filePath"] = str(target_path)
-        report["byteIdentical"] = payload["byteIdentical"]
-        report["changedParts"] = payload["changedParts"]
+        # These three are copied from the domain payload, so an incoherent
+        # payload would print a preservation receipt onto a document that was
+        # in fact rewritten. Refuse the incoherent combination instead of
+        # forwarding it: "identical" and "these parts changed" cannot both hold.
+        byte_identical = payload["byteIdentical"]
+        changed_parts = payload["changedParts"]
+        if byte_identical and changed_parts:
+            raise self._context._new_error(
+                "MUTATION_REPORT_INCOHERENT",
+                "refusing to write a receipt claiming byteIdentical while "
+                f"naming changed parts {list(changed_parts)!r}",
+            )
+        report["byteIdentical"] = byte_identical
+        report["changedParts"] = changed_parts
         report["skipped"] = payload["skipped"]
         payload["verificationReport"] = report
         payload["openSafety"] = report["openSafety"]

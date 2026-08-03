@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from hwpx.quality.rendering import RenderBackend
@@ -28,6 +28,34 @@ from .save_policy import SavePolicy
 from .transactions import TransactionService
 
 logger = logging.getLogger("hwpx_automation.hwpx_ops")
+
+
+def _note_preservation_contradiction(
+    payload: dict[str, Any],
+    domain_result: Mapping[str, Any],
+    produced_differs: bool,
+) -> None:
+    """Record a domain receipt that disagrees with the bytes it describes.
+
+    The publish decision reads ``byteIdentical`` from the domain result. A
+    result describing only part of the run therefore suppressed the write
+    entirely: an in-place evaluation-plan fill once reported ok alongside
+    twenty-six filled regions and left the file untouched, because the flag
+    came from the structural step taken before the content fills ran.
+
+    The bytes are authoritative. When the receipt disagrees with them, say so
+    rather than silently preferring one.
+    """
+
+    claimed_identical = domain_result.get("byteIdentical")
+    if claimed_identical is None:
+        return
+    if bool(claimed_identical) is not produced_differs:
+        return
+    payload.setdefault("warnings", []).append(
+        f"domain payload byteIdentical={claimed_identical!r} contradicts the "
+        "produced bytes; the produced bytes are authoritative"
+    )
 
 
 class FormFieldService:
@@ -614,10 +642,18 @@ class FormFieldService:
 
         # Do not publish a partial/failed domain result. Required rendering is
         # evaluated against candidate bytes before the atomic destination swap.
-        if payload["ok"] and (
-            not res.get("byteIdentical", True)
-            or target_path.resolve(strict=False) != blank.resolve(strict=False)
-        ):
+        #
+        # ``byteIdentical`` is read straight from the domain payload, so a
+        # payload that describes only part of the run silently suppresses the
+        # write: an in-place call once reported ok with twenty-six content fills
+        # and left the file untouched, because the flag came from the structural
+        # step taken before the content fills ran. Compare the produced bytes
+        # against the source directly so this decision cannot be poisoned by a
+        # stale field again.
+        in_place = target_path.resolve(strict=False) == blank.resolve(strict=False)
+        produced_differs = data != blank.read_bytes()
+        _note_preservation_contradiction(payload, res, produced_differs)
+        if payload["ok"] and (produced_differs or not in_place):
             payload = self._save._write_patched(
                 target_path,
                 data,

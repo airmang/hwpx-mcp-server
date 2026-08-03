@@ -2702,6 +2702,24 @@ def finalize_evalplan(data: bytes, content: EvalPlanContent) -> tuple[bytes, dic
     return data, report
 
 
+def _changed_part_names(before: bytes, after: bytes) -> list[str]:
+    """Names of the ZIP members whose bytes differ between two packages."""
+
+    import io
+    import zipfile
+
+    def _members(payload: bytes) -> dict[str, bytes]:
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            return {name: archive.read(name) for name in archive.namelist()}
+
+    try:
+        old, new = _members(before), _members(after)
+    except (zipfile.BadZipFile, OSError):  # pragma: no cover - defensive
+        return []
+    names = sorted(set(old) | set(new))
+    return [name for name in names if old.get(name) != new.get(name)]
+
+
 def fill_evalplan(
     blank: str | Path,
     content: EvalPlanContent,
@@ -2721,6 +2739,8 @@ def fill_evalplan(
     strip) that yields a submittable 채움본 with no bespoke driver. Returns the apply
     result dict plus the op-plan transcript and, for ``phase`` in ``{"all","clean"}``,
     a ``content_report`` per region (plus ``content_report["finalize"]`` for clean)."""
+    from pathlib import Path as _P
+
     from hwpx.table_patch import apply_table_ops
 
     plan = plan_structural_ops(blank, content)
@@ -2739,8 +2759,23 @@ def fill_evalplan(
     if phase == "clean":
         data, content_report["finalize"] = finalize_evalplan(data, content)
 
+    # ``payload`` above describes only the *structural* step. The content fills
+    # then keep mutating ``data`` without touching it, so before this recompute
+    # a run that filled dozens of cells still reported the structural step's
+    # ``byteIdentical`` and empty ``changedParts``. The caller in
+    # ``ops_services.form_fields`` decides whether to publish from exactly those
+    # fields, so an in-place call could report ok with a full content report and
+    # write nothing at all. Re-derive them from the bytes that actually exist.
+    source_bytes = _P(blank).read_bytes() if not isinstance(blank, bytes) else blank
+    payload["byteIdentical"] = data == source_bytes
+    if payload["byteIdentical"]:
+        payload["changedParts"] = []
+    elif not payload.get("changedParts"):
+        # The structural step changed nothing but a content fill did. Name the
+        # parts rather than leaving an empty list next to changed bytes.
+        payload["changedParts"] = _changed_part_names(source_bytes, data)
+
     if output is not None:
-        from pathlib import Path as _P
         _P(output).write_bytes(data)
         payload["outputPath"] = output
     payload["transcript"] = plan["transcript"]

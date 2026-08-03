@@ -11,15 +11,15 @@
  },
  "canonical": {
   "pythonFiles": 2,
-  "loc": 2798,
-  "manifestSha256": "8db0d06b5035723d391a1a3589e7c8d2ca09945b3ad9734af60b12df2c8d252a",
+  "loc": 2833,
+  "manifestSha256": "55412bd836c61a7816f9b47a1f0f90522c9b4eebbe06630d232a0285a80eab10",
   "nomenclatureRefrozenFrom": {
-   "loc": 2798,
+   "loc": 2833,
    "manifestSha256": "ba65da4b137cc6b9737b3a44f9a84fbdd04787454f47fa7d8ab3a86533f75e3a",
    "reason": "Canonical product ownership wording changed from MCP to automation; behavior is unchanged."
   },
   "refrozenFrom": {
-   "loc": 2798,
+   "loc": 2833,
    "manifestSha256": "f27c9d25e2dfd08545a00c530c034335dac8c3628896d38549d4bc38554824d5",
    "reason": "패키지 이름을 hwpx_mcp_server에서 hwpx_automation으로 바꿨다. 동작 변화 없음."
   }

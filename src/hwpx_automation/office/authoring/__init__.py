@@ -1580,8 +1580,36 @@ def _validate_heading_block(raw_block: Mapping[str, Any], *, path: str) -> list[
     return issues
 
 
+#: Keys a v1 paragraph accepts syntactically but cannot honour.
+#:
+#: v1 is the role-driven design plan: presentation follows ``role``
+#: (heading/body/info), and the plan has no direct-formatting model. v2 is the
+#: direct-formatting plan and does honour these. Silently dropping them made a
+#: plan that asked for a centred 기관명 validate clean and render flush left,
+#: so they are reported instead.
+_V1_UNSUPPORTED_PARAGRAPH_KEYS = ("align",)
+
+
 def _validate_paragraph_block(raw_block: Mapping[str, Any], *, path: str) -> list[PlanValidationIssue]:
     issues: list[PlanValidationIssue] = []
+    for key in _V1_UNSUPPORTED_PARAGRAPH_KEYS:
+        if raw_block.get(key) is not None:
+            issues.append(
+                _plan_issue(
+                    f"unsupported_v1_{key}",
+                    f"{path}.{key}",
+                    (
+                        f"{path}.{key} is ignored by "
+                        f"{DOCUMENT_PLAN_SCHEMA_VERSION}: this schema derives "
+                        "presentation from role, not from direct formatting"
+                    ),
+                    severity="warning",
+                    suggestion=(
+                        f"Use {DOCUMENT_PLAN_V2_SCHEMA_VERSION}, which honours "
+                        f"{key}, or drop the key."
+                    ),
+                )
+            )
     text = str(raw_block.get("text") or "").strip()
     runs = raw_block.get("runs")
     has_rich_runs = False

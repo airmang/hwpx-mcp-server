@@ -43,12 +43,15 @@ def test_canonical_evalplan_inventory_is_complete() -> None:
     expected = OWNER["canonical"]
 
     assert len(rows) == expected["pythonFiles"] == 2
-    assert sum(int(row["loc"]) for row in rows) == expected["loc"] == 2798
+    assert sum(int(row["loc"]) for row in rows) == expected["loc"] == 2833
     # 원장과 테스트에 같은 해시를 둔 이중 잠금이다. 원장만 고쳐서 통과시키는
     # 일을 막는다. 5.0 트레인에서 패키지가 hwpx_automation으로 바뀌며 파일
-    # 내용이 달라져 함께 갱신했다 — LOC 2798은 그대로다.
+    # 내용이 달라져 함께 갱신했다. 이후 fill_evalplan이 산출 바이트로
+    # 영수증을 재산출하도록 고치며 LOC 2798→2833·해시를 함께 갱신했다 —
+    # 구조 단계 결과를 최종 판정으로 재사용해 ok=true·채움 26건을 보고하고
+    # 파일을 쓰지 않던 결함의 수리다.
     assert expected["manifestSha256"] == (
-        "8db0d06b5035723d391a1a3589e7c8d2ca09945b3ad9734af60b12df2c8d252a"
+        "55412bd836c61a7816f9b47a1f0f90522c9b4eebbe06630d232a0285a80eab10"
     )
     assert hashlib.sha256(payload).hexdigest() == expected["manifestSha256"]
     assert canonical.__all__ == runtime.__all__
