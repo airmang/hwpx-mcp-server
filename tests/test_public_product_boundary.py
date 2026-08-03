@@ -55,7 +55,7 @@ def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
     dependencies = project["project"]["dependencies"]
     optional_dependencies = project["project"]["optional-dependencies"]
 
-    assert project["project"]["version"] == "6.8.1"
+    assert project["project"]["version"] == "7.0.0"
     # WP-F (core 6.0 namespace adaptation, design §9): the floor moved to the
     # 6.x line the automation code now targets; the dev0 pre-release marker
     # lets this resolve against core's not-yet-tagged 6.0 identity and is
@@ -118,10 +118,10 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
         MIN_MCP_VERSION,
         MIN_SKILL_VERSION,
     ) == (
-        "5.8.0",
-        "6.5.0",
-        "6.5.0",
-        "1.8.0",
+        "6.0.0",
+        "7.0.0",
+        "7.0.0",
+        "2.0.0",
     )
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(default)
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(advanced)

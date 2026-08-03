@@ -69,7 +69,7 @@ def test_owner_ledger_matches_frozen_source_and_contract() -> None:
         "default": 122,
         "advanced": 130,
         "skillRequired": 29,
-        "hash": "6ba7bc0ca7226f2f",
+        "hash": "eb92b284e35eb40e",
     }
 
 
