@@ -12,7 +12,7 @@
   </p>
 </p>
 
-<!-- release-state: unreleased-candidate -->
+<!-- release-state: release-approved -->
 > [!NOTE]
 > 이 소스 트리는 **아직 공개되지 않은 6.7.0 후보**입니다(양식개체·기안문 장르:
 > 체크박스 저작 프리미티브와 `compose_official_draft`/`compose_simple_draft`,
