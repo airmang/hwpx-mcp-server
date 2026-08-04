@@ -57,10 +57,10 @@ def test_fastmcp_dependency_stays_on_the_audited_minor_line() -> None:
 
     assert project["project"]["version"] == "7.0.0"
     # WP-F (core 6.0 namespace adaptation, design §9): the floor moved to the
-    # 6.x line the automation code now targets; the dev0 pre-release marker
-    # lets this resolve against core's not-yet-tagged 6.0 identity and is
-    # narrowed to a plain >=6.0.0 at release time (see release plan item B).
-    assert "python-hwpx>=6.0.0.dev0,<7" in dependencies
+    # 6.x line the automation code now targets. The dev-window pin
+    # (>=6.0.0.dev0) served the pre-tag phase; the release narrows it to the
+    # first published core of the line.
+    assert "python-hwpx>=6.0.1,<7" in dependencies
     # The imaging stack is declared here since the 5.0 boundary closed: core
     # stopped reading PDFs and images, so its `visual` extra is empty and
     # deferring to it would have installed nothing.
