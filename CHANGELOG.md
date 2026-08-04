@@ -2,11 +2,19 @@
 
 ## Unreleased
 
-## [7.0.0] - 2026-08-04
+## [7.0.1] - 2026-08-04
+
+`v7.0.0`은 보존된 실패 태그입니다 — 아무것도 게시되지 않았습니다.
+`error::DeprecationWarning` 게이트(이 트레인 자신의 산물)가 CI Python 3.12의
+stdlib tar filter 예고 경고를 적발해 업로드 전에 중단했습니다.
+`extractall(filter="data")` 명시로 고친 동일 내용이 7.0.1입니다.
+삭제·이동·재사용하지 않습니다.
+
+## [7.0.0] - 2026-08-04 (preserved failed tag — nothing published)
 
 엔진 완전성 major입니다. 도구 표면은 그대로입니다(128/136/29 — 추가·제거·
-승격·프로파일 이동 0). 계약 해시는 플로어 전진만으로 `7c5f93b6e2b2e6c3`로
-이동합니다: `minPythonHwpx 6.0.2` · `minAutomationVersion 7.0.0` ·
+승격·프로파일 이동 0). 계약 해시는 플로어 전진만으로 `34a91560759dc47a`로
+이동합니다: `minPythonHwpx 6.0.2` · `minAutomationVersion 7.0.1` ·
 `minSkillVersion 2.0.0`.
 
 [6.8.1]은 발행되지 않았습니다 — release-approved 후보 상태에서 이 트레인에

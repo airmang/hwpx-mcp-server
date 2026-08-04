@@ -16,14 +16,14 @@ def _load(name: str) -> dict:
     return json.loads((ROOT / "docs" / name).read_text(encoding="utf-8"))
 
 
-def test_7_0_0_contract_delta_matches_the_live_contract() -> None:
+def test_7_0_1_contract_delta_matches_the_live_contract() -> None:
     """The engine-completeness major adds no tool; the hash moves on floors alone."""
 
-    delta = _load("tool-contract-delta-7.0.0.json")
+    delta = _load("tool-contract-delta-7.0.1.json")
     contract = _load("tool-contract.generated.json")
 
     assert delta["target"]["contractHash"] == contract["contractHash"] == contract_hash()
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "7c5f93b6e2b2e6c3"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "34a91560759dc47a"
 
     assert delta["baseline"]["contractHash"] == "6ba7bc0ca7226f2f"
     assert delta["baseline"]["defaultToolCount"] == 128
@@ -37,17 +37,17 @@ def test_7_0_0_contract_delta_matches_the_live_contract() -> None:
     assert delta["delta"]["promotedTools"] == []
     assert delta["delta"]["profileMoves"] == []
 
-    assert contract["minAutomationVersion"] == contract["minMcpVersion"] == "7.0.0"
+    assert contract["minAutomationVersion"] == contract["minMcpVersion"] == "7.0.1"
     assert contract["minPythonHwpx"] == "6.0.2"
     assert contract["minSkillVersion"] == "2.0.0"
 
 
-def test_6_8_1_delta_receipt_is_frozen_and_chains_into_the_7_0_0_baseline() -> None:
+def test_6_8_1_delta_receipt_is_frozen_and_chains_into_the_7_0_1_baseline() -> None:
     """The historical 6.8.1 receipt stays frozen against its own hashes and its
     target must be exactly the 7.0.0 baseline."""
 
     frozen = _load("tool-contract-delta-6.8.1.json")
-    delta = _load("tool-contract-delta-7.0.0.json")
+    delta = _load("tool-contract-delta-7.0.1.json")
     assert frozen["target"]["contractHash"] == "6ba7bc0ca7226f2f"
     assert frozen["target"]["contractHash"] == delta["baseline"]["contractHash"]
     assert frozen["target"]["defaultToolCount"] == delta["baseline"]["defaultToolCount"]

@@ -163,15 +163,15 @@ def test_release_contract_versions_counts_and_hash_are_exact() -> None:
         MIN_SKILL_VERSION,
     ) == (
         "6.0.2",
-        "7.0.0",
-        "7.0.0",
+        "7.0.1",
+        "7.0.1",
         "2.0.0",
     )
     assert len(expected_tool_names(advanced=False)) == 128
     assert len(expected_tool_names(advanced=True)) == 136
     assert len(skill_required_tool_names()) == 29
-    assert RELEASED_CONTRACT_HASH == "7c5f93b6e2b2e6c3"
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "7c5f93b6e2b2e6c3"
+    assert RELEASED_CONTRACT_HASH == "34a91560759dc47a"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "34a91560759dc47a"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 

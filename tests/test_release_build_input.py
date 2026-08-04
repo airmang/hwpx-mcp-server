@@ -113,7 +113,7 @@ def test_exact_current_git_archive_is_a_clean_release_input(tmp_path: Path) -> N
     release_root = tmp_path / "archive"
     release_root.mkdir()
     with tarfile.open(archive_path) as archive:
-        archive.extractall(release_root)
+        archive.extractall(release_root, filter="data")
 
     completed = _run_checker(release_root)
 

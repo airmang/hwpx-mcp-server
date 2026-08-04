@@ -57,7 +57,7 @@ def test_capability_state_judges_core_6_0_and_automation_7_0_as_healthy(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """WP-F handshake-floor guard (release plan item B): the coordinated
-    release combo (core 6.0.2, automation 7.0.0) must clear the capability
+    release combo (core 6.0.2, automation 7.0.1) must clear the capability
     skew check under whatever MIN_PYTHON_HWPX/MIN_AUTOMATION_VERSION floor
     is pinned at merge time — a regression here would fail-closed-reject a
     healthy post-release stack."""
@@ -67,15 +67,15 @@ def test_capability_state_judges_core_6_0_and_automation_7_0_as_healthy(
         "package_version",
         lambda package: {
             "python-hwpx": "6.0.2",
-            "python-hwpx-automation": "7.0.0",
+            "python-hwpx-automation": "7.0.1",
         }[package],
     )
     state = Q.capability_state()
     assert state["skew"] == []
     assert state["ok"] is True
     assert state["versions"]["core"] == "6.0.2"
-    assert state["versions"]["automation"] == "7.0.0"
-    assert state["versions"]["mcp"] == "7.0.0"  # 6.x compatibility alias
+    assert state["versions"]["automation"] == "7.0.1"
+    assert state["versions"]["mcp"] == "7.0.1"  # 6.x compatibility alias
 
 
 def test_resolve_policy_default_is_transparent():

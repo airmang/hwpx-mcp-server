@@ -123,11 +123,11 @@ def test_installed_identity_contract_is_machine_readable() -> None:
     assert release["candidate"] == {
         "pythonHwpx": "6.0.2",
         "canonicalDistribution": "python-hwpx-automation",
-        "canonicalAutomation": "7.0.0",
+        "canonicalAutomation": "7.0.1",
         "compatibilityDistribution": "hwpx-mcp-server",
-        "compatibility": "7.0.0",
+        "compatibility": "7.0.1",
         "plugin": "2.0.0",
-        "contractHash": "7c5f93b6e2b2e6c3",
+        "contractHash": "34a91560759dc47a",
     }
     promotion_gate = release["promotionGate"]
     assert all(
@@ -155,9 +155,9 @@ def test_installed_identity_contract_is_machine_readable() -> None:
         assert release["currentPublic"] == {
             "pythonHwpx": "6.0.2",
             "primaryDistribution": "python-hwpx-automation",
-            "primaryApplication": "7.0.0",
+            "primaryApplication": "7.0.1",
             "plugin": "2.0.0",
-            "contractHash": "7c5f93b6e2b2e6c3",
+            "contractHash": "34a91560759dc47a",
         }
 
 
