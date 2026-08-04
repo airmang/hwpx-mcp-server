@@ -127,7 +127,7 @@ def test_installed_identity_contract_is_machine_readable() -> None:
         "compatibilityDistribution": "hwpx-mcp-server",
         "compatibility": "7.0.0",
         "plugin": "2.0.0",
-        "contractHash": "eb92b284e35eb40e",
+        "contractHash": "b468d0cab8179f79",
     }
     promotion_gate = release["promotionGate"]
     assert all(
@@ -157,7 +157,7 @@ def test_installed_identity_contract_is_machine_readable() -> None:
             "primaryDistribution": "python-hwpx-automation",
             "primaryApplication": "7.0.0",
             "plugin": "2.0.0",
-            "contractHash": "eb92b284e35eb40e",
+            "contractHash": "b468d0cab8179f79",
         }
 
 

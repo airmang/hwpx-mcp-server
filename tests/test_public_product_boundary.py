@@ -118,7 +118,7 @@ def test_contract_and_live_registry_exclude_internal_product_boundaries() -> Non
         MIN_MCP_VERSION,
         MIN_SKILL_VERSION,
     ) == (
-        "6.0.0",
+        "6.0.1",
         "7.0.0",
         "7.0.0",
         "2.0.0",

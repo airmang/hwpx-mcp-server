@@ -23,7 +23,7 @@ def test_7_0_0_contract_delta_matches_the_live_contract() -> None:
     contract = _load("tool-contract.generated.json")
 
     assert delta["target"]["contractHash"] == contract["contractHash"] == contract_hash()
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "eb92b284e35eb40e"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "b468d0cab8179f79"
 
     assert delta["baseline"]["contractHash"] == "6ba7bc0ca7226f2f"
     assert delta["baseline"]["defaultToolCount"] == 128
@@ -38,7 +38,7 @@ def test_7_0_0_contract_delta_matches_the_live_contract() -> None:
     assert delta["delta"]["profileMoves"] == []
 
     assert contract["minAutomationVersion"] == contract["minMcpVersion"] == "7.0.0"
-    assert contract["minPythonHwpx"] == "6.0.0"
+    assert contract["minPythonHwpx"] == "6.0.1"
     assert contract["minSkillVersion"] == "2.0.0"
 
 

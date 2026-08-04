@@ -162,7 +162,7 @@ def test_release_contract_versions_counts_and_hash_are_exact() -> None:
         MIN_MCP_VERSION,
         MIN_SKILL_VERSION,
     ) == (
-        "6.0.0",
+        "6.0.1",
         "7.0.0",
         "7.0.0",
         "2.0.0",
@@ -170,8 +170,8 @@ def test_release_contract_versions_counts_and_hash_are_exact() -> None:
     assert len(expected_tool_names(advanced=False)) == 128
     assert len(expected_tool_names(advanced=True)) == 136
     assert len(skill_required_tool_names()) == 29
-    assert RELEASED_CONTRACT_HASH == "eb92b284e35eb40e"
-    assert contract_hash() == RELEASED_CONTRACT_HASH == "eb92b284e35eb40e"
+    assert RELEASED_CONTRACT_HASH == "b468d0cab8179f79"
+    assert contract_hash() == RELEASED_CONTRACT_HASH == "b468d0cab8179f79"
     assert REMOVED_PRACTICE_TOOLS.isdisjoint(expected_tool_names(advanced=True))
 
 
