@@ -9,12 +9,12 @@
   },
   "target": {
     "release": "7.0.0",
-    "contractHash": "b468d0cab8179f79",
+    "contractHash": "7c5f93b6e2b2e6c3",
     "defaultToolCount": 128,
     "advancedToolCount": 136,
     "skillRequiredToolCount": 29
   },
-  "note": "Engine-completeness major (6.8.1 was a release-approved candidate absorbed into this train; nothing between 6.7.1 and 7.0.0 was published). No tool is added, removed, promoted, or moved — the hash advances because the contract floors move to the 6.0 stack (minPythonHwpx 5.8.0→6.0.1, minAutomationVersion 6.5.0→7.0.0, minSkillVersion 1.8.0→2.0.0). The train's substance is the surface migration underneath the unchanged tool contract: every automation callsite now speaks python-hwpx 6.0's namespaced surface (doc.notes/fields/shapes/styles/page) with DeprecationWarning promoted to a test failure, the python-hwpx dependency window moves to >=6.0.0,<7, and the capability handshake floor advances atomically with the observed core so skew stays fail-closed in both directions.",
+  "note": "Engine-completeness major (6.8.1 was a release-approved candidate absorbed into this train; nothing between 6.7.1 and 7.0.0 was published). No tool is added, removed, promoted, or moved — the hash advances because the contract floors move to the 6.0 stack (minPythonHwpx 5.8.0→6.0.2, minAutomationVersion 6.5.0→7.0.0, minSkillVersion 1.8.0→2.0.0). The train's substance is the surface migration underneath the unchanged tool contract: every automation callsite now speaks python-hwpx 6.0's namespaced surface (doc.notes/fields/shapes/styles/page) with DeprecationWarning promoted to a test failure, the python-hwpx dependency window moves to >=6.0.0,<7, and the capability handshake floor advances atomically with the observed core so skew stays fail-closed in both directions.",
   "delta": {
     "addedTools": [],
     "removedTools": [],
@@ -22,7 +22,7 @@
     "profileMoves": []
   },
   "floors": {
-    "minPythonHwpx": "6.0.1",
+    "minPythonHwpx": "6.0.2",
     "minAutomationVersion": "7.0.0",
     "minSkillVersion": "2.0.0",
     "automation": "7.0.0"

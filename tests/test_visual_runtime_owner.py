@@ -80,4 +80,4 @@ def test_tool_contract_is_exactly_unchanged() -> None:
     assert len(expected_tool_names(advanced=False)) == 128
     assert len(expected_tool_names(advanced=True)) == 136
     assert len(skill_required_tool_names()) == 29
-    assert contract_hash() == "b468d0cab8179f79"
+    assert contract_hash() == "7c5f93b6e2b2e6c3"

@@ -5,8 +5,8 @@
 ## [7.0.0] - 2026-08-04
 
 엔진 완전성 major입니다. 도구 표면은 그대로입니다(128/136/29 — 추가·제거·
-승격·프로파일 이동 0). 계약 해시는 플로어 전진만으로 `b468d0cab8179f79`로
-이동합니다: `minPythonHwpx 6.0.1` · `minAutomationVersion 7.0.0` ·
+승격·프로파일 이동 0). 계약 해시는 플로어 전진만으로 `7c5f93b6e2b2e6c3`로
+이동합니다: `minPythonHwpx 6.0.2` · `minAutomationVersion 7.0.0` ·
 `minSkillVersion 2.0.0`.
 
 [6.8.1]은 발행되지 않았습니다 — release-approved 후보 상태에서 이 트레인에
